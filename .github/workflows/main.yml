@@ -13,6 +13,9 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: flutter_app
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -54,7 +57,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
       - name: Upload to Appetize.io
@@ -96,6 +99,9 @@ jobs:
   build-ios:
     runs-on: macos-latest
     timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: flutter_app
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -122,5 +128,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-release-app
-          path: build/ios/iphoneos/Runner.app
+          path: flutter_app/build/ios/iphoneos/Runner.app
           if-no-files-found: error

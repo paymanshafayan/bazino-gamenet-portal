@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Real database files / local install state — must never be committed
+install-config.json
+bazino.sqlite3
+bazino.sqlite3-*
+database.json

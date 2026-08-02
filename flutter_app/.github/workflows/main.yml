@@ -1,0 +1,126 @@
+name: Flutter Build APK & IPA
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: mobile-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (verbose)
+        run: flutter build apk --release -v
+
+      - name: Dump Gradle logs on failure
+        if: failure()
+        run: |
+          echo "==== gradle properties ===="
+          ./android/gradlew -p android properties || true
+          echo "==== last build outputs ===="
+          find android -type f \( -name "*.log" -o -name "mapping.txt" \) | head -100 || true
+
+      - name: Verify APK exists
+        run: test -f build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload to Appetize.io
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
+        run: |
+          set -euo pipefail
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+
+          if [ ! -f "$APK_PATH" ]; then
+            echo "ERROR: APK not found at $APK_PATH"
+            exit 1
+          fi
+
+          if [ -z "${APPETIZE_API_TOKEN:-}" ]; then
+            echo "ERROR: APPETIZE_TOKEN is empty or unavailable"
+            exit 1
+          fi
+
+          echo "Uploading APK to Appetize.io..."
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST "https://api.appetize.io/v1/apps" \
+            -u "${APPETIZE_API_TOKEN}:" \
+            -F "file=@${APK_PATH}" \
+            -F "platform=android")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP status: $HTTP_STATUS"
+          echo "Appetize response: $BODY"
+
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "ERROR: Appetize upload failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "Appetize upload succeeded."
+
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS (No Sign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Verify iOS app exists
+        run: test -d build/ios/iphoneos/Runner.app
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-app
+          path: build/ios/iphoneos/Runner.app
+          if-no-files-found: error

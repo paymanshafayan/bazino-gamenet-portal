@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --neon-purple: #b366ff;
+  --neon-gold: #ffcf5c;
+  --neon-cyan: #7dd3fc;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Rajdhani', sans-serif;
+  background-color: #05030d;
+}
+
+.font-display {
+  font-family: 'Orbitron', sans-serif;
+}
+
+.perspective-wrap {
+  perspective: 1800px;
+}
+
+.tilt-left {
+  transform: rotateY(14deg) rotateX(1.5deg);
+  transform-style: preserve-3d;
+}
+
+.tilt-right {
+  transform: rotateY(-14deg) rotateX(1.5deg);
+  transform-style: preserve-3d;
+}
+
+/* ===== IMPROVED GLASS - MORE TRANSPARENT & BLURRY ===== */
+.glass {
+  /* Much more transparent than before (0.08->0.04, 0.02->0.01) */
+  background: linear-gradient(135deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 
+    0 8px 32px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.glass-strong {
+  /* FIXED: Old was 0.55/0.45 - too opaque, not blurry enough */
+  /* New: 0.22/0.08 with 28px blur - truly transparent glass */
+  background: linear-gradient(135deg, rgba(28,12,52,0.28), rgba(14,8,28,0.12));
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid rgba(190,140,255,0.14);
+  box-shadow: 
+    0 12px 40px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(255,255,255,0.03) inset,
+    0 0 24px rgba(179,102,255,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+.glass-strong:hover {
+  border-color: rgba(190,140,255,0.22);
+  background: linear-gradient(135deg, rgba(32,16,58,0.32), rgba(18,10,32,0.16));
+  box-shadow: 
+    0 16px 48px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(255,255,255,0.05) inset,
+    0 0 32px rgba(179,102,255,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.09);
+}
+
+.neon-text {
+  text-shadow: 0 0 6px rgba(255,255,255,0.5), 0 0 14px rgba(179,102,255,0.8), 0 0 24px rgba(179,102,255,0.5);
+}
+
+.neon-border-glow {
+  box-shadow: 
+    0 0 20px rgba(179,102,255,0.15),
+    0 0 40px rgba(179,102,255,0.06),
+    0 0 2px rgba(255,255,255,0.2) inset;
+}
+
+/* Enhanced scrollbars */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(179,102,255,0.35);
+  border-radius: 10px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(179,102,255,0.55);
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 6px rgba(255,207,92,0.8)); }
+  50% { opacity: 0.85; filter: drop-shadow(0 0 16px rgba(255,207,92,1)) drop-shadow(0 0 32px rgba(179,102,255,0.6)); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float-y 6s ease-in-out infinite;
+}
+
+/* New: gentle border shimmer for glass panels */
+@keyframes border-shimmer {
+  0% { border-color: rgba(190,140,255,0.14); }
+  50% { border-color: rgba(125,211,252,0.22); }
+  100% { border-color: rgba(190,140,255,0.14); }
+}

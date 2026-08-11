@@ -635,7 +635,9 @@ export default function AdminPanelTab({
       return;
     }
     
-    const id = newThemeName.trim().toLowerCase().replace(/\s+/g, '-');
+    // Build a CSS-safe theme id (persian/non-latin chars are stripped)
+    let id = newThemeName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (!id) id = 'custom-theme-' + Date.now();
     
     // Check if it already exists
     if (availableThemes.some(t => t.id === id)) {

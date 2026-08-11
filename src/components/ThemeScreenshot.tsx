@@ -50,6 +50,10 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
       primary = '#ffb800';
       bg = '#050608';
       card = '#0D0E15';
+    } else if (theme.id === 'console-grid') {
+      primary = '#00ff66';
+      bg = '#05060a';
+      card = '#0b0e14';
     } else if (theme.colors) {
       primary = theme.colors.primary || '#ffb800';
       bg = theme.colors.bg || '#050608';

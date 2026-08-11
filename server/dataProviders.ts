@@ -1,5 +1,10 @@
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import { createRequire } from 'module';
+
+// ESM compatibility bridge: this file (and its provider classes) uses
+// CommonJS `require(...)` for lazy-loading optional DB drivers.
+const require = createRequire(import.meta.url);
 
 // -----------------------------------------------------------------------------
 // Query/activity logger shown in the admin panel ("Database Activity" widget)

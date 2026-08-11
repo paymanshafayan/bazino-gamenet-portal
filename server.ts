@@ -2522,7 +2522,12 @@ Example format:
   if (process.env.NODE_ENV !== "production") {
     // Mount Vite dev server in middleware mode
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // Allow preview/forwarded hosts (e.g. AI Studio / sandbox preview
+        // domains) — dev only; production serves static files below.
+        allowedHosts: true,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

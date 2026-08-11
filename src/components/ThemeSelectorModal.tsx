@@ -216,7 +216,7 @@ export default function ThemeSelectorModal({
                 {language === 'fa' ? 'موتور پویا و تمام‌انیمیشنی کلوپ بازینو' : 'POWERED BY BAZINO ANIMATION ENGINE'}
               </span>
               <span className="mt-2 sm:mt-0">
-                {language === 'fa' ? '۴ قالب آماده گیمینگ و سایبرپانک بارگذاری شده' : '4 READY GAMING THEMES INSTALLED'}
+                {language === 'fa' ? `${availableThemes.length} قالب آماده گیمینگ و سایبرپانک بارگذاری شده` : `${availableThemes.length} READY GAMING THEMES INSTALLED`}
               </span>
             </div>
           </motion.div>

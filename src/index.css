@@ -1,7 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&family=Orbitron:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════
+   BAZINO BASE STYLES (استایل پایه سراسری)
+   ═══════════════════════════════════════════════════════════════════
+   این فایل فقط استایل‌های «پایه و مشترک» را نگه می‌دارد.
+   استایل اختصاصی هر قالب (متغیرهای رنگی، هدر، کارت‌ها، دکمه‌ها،
+   فرم‌ها، پس‌زمینه و ...) در فایل جداگانه خودش قرار دارد:
+      src/themes/dark-gold.css
+      src/themes/cyberpunk-cyan.css
+      src/themes/geco-purple.css
+      src/themes/gaming-amp.css
+      src/themes/console-grid.css
+   موتور بارگذاری قالب‌ها: src/themes/index.ts
+   ═══════════════════════════════════════════════════════════════════ */
 
+/* مقادیر پیش‌فرض (قالب dark-gold) — قبل از بارگذاری فایل قالب */
 :root {
   --primary-color: #ffb800;
   --primary-hover-color: #e09900;
@@ -17,79 +31,6 @@
   --theme-btn-skew: 0deg;
   --theme-btn-radius: 0.75rem;
 }
-
-body[data-theme='dark-gold'] {
-  --primary-color: #ffb800;
-  --primary-hover-color: #e09900;
-  --accent-red-color: #ff3b30;
-  --dark-bg-color: #07080a;
-  --dark-card-color: #12141c;
-}
-
-body[data-theme='geco-purple'] {
-  --primary-color: #a855f7;
-  --primary-hover-color: #8b5cf6;
-  --accent-red-color: #ec4899;
-  --dark-bg-color: #0d0c15;
-  --dark-card-color: #181528;
-
-  --theme-bg: #0b0c10;
-  --theme-card-bg: #1a1c29;
-  --theme-card-border: transparent;
-  --theme-card-radius: 0;
-  --theme-primary: #a855f7;
-  --theme-btn-skew: -15deg;
-  --theme-btn-radius: 0;
-}
-
-body[data-theme='gaming-amp'] {
-  --primary-color: #00d8ff;
-  --primary-hover-color: #00b8d4;
-  --accent-red-color: #ff4757;
-  --dark-bg-color: #081015;
-  --dark-card-color: #0e1921;
-
-  --theme-bg: #0f0f16;
-  --theme-card-bg: rgba(15, 15, 22, 0.95);
-  --theme-card-border: rgba(0, 216, 255, 0.2);
-  --theme-card-radius: 0.25rem;
-  --theme-primary: #00d8ff;
-  --theme-btn-skew: 0deg;
-  --theme-btn-radius: 0.25rem;
-}
-
-body[data-theme='cyberpunk-cyan'] {
-  --primary-color: #00f0ff;
-  --primary-hover-color: #00c8ff;
-  --accent-red-color: #ff0055;
-  --dark-bg-color: #000b18;
-  --dark-card-color: #02152a;
-
-  --theme-bg: #000b18;
-  --theme-card-bg: rgba(0, 11, 24, 0.8);
-  --theme-card-border: rgba(0, 240, 255, 0.4);
-  --theme-card-radius: 0;
-  --theme-primary: #00f0ff;
-  --theme-btn-skew: 0deg;
-  --theme-btn-radius: 0;
-}
-
-body[data-theme='gaming-hub'] {
-  --primary-color: #ffd700;
-  --primary-hover-color: #f59e0b;
-  --accent-red-color: #a855f7;
-  --dark-bg-color: #050a0e;
-  --dark-card-color: #0b1319;
-
-  --theme-bg: #050a0e;
-  --theme-card-bg: rgba(11, 19, 25, 0.95);
-  --theme-card-border: rgba(234, 179, 8, 0.3);
-  --theme-card-radius: 1rem;
-  --theme-primary: #ffd700;
-  --theme-btn-skew: 0deg;
-  --theme-btn-radius: 0.75rem;
-}
-
 
 @theme {
   --color-primary: var(--primary-color, #ffb800);
@@ -159,23 +100,27 @@ body[data-theme='gaming-hub'] {
   letter-spacing: 2px;
 }
 
-/* Global scrollbars and dark aesthetics */
+/* Global scrollbars and dark aesthetics
+   ⚠️ پس‌زمینه اینجا فقط مقدار پیش‌فرض است؛ هر قالب، پس‌زمینه اختصاصی
+   خودش را در فایل خودش (src/themes/*.css) روی body و .app-bg-main
+   اعمال می‌کند. */
 body {
-  background-image: url('/src/assets/images/background.png') !important;
-  background-size: cover !important;
-  background-position: center !important;
-  background-attachment: fixed !important;
-  background-color: var(--dark-bg-color, #0b1125);
+  background-color: var(--dark-bg-color, #07080a);
+  background-image: url('/src/assets/images/background.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   color: #f3f4f6;
   font-family: var(--font-sans);
 }
 
 .app-bg-main {
-  background-image: url('/src/assets/images/background.png') !important;
-  background-size: cover !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
+  background-color: var(--dark-bg-color, #07080a);
+  background-image: url('/src/assets/images/background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 @keyframes scan-line-anim {
@@ -210,314 +155,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-slide-in-left {
   animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-
-
-
-
-
-
-
-
-/* Theme Scoped Shapes */
-
-/* 1. Dark Gold (Classic) */
-.theme-dark-gold .theme-box {
-  clip-path: polygon(16px 0%, 100% 0%, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0% 100%, 0% 16px);
-  border-radius: 0;
-}
-.theme-dark-gold .theme-btn {
-  clip-path: polygon(10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%, 0% 10px);
-  border-radius: 0;
-}
-
-/* 2. Cyberpunk Cyan */
-
-/* ========================================= */
-/* THEME OVERRIDES (Geco Purple)             */
-/* ========================================= */
-.theme-geco-purple .btn {
-  border-radius: 0 !important;
-  transform: skewX(-12deg);
-  background-color: var(--color-primary);
-  color: #000;
-  border: none;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-.theme-geco-purple .btn-primary-outline {
-  background-color: transparent;
-  border: 2px solid var(--color-primary);
-  color: var(--color-primary);
-}
-.theme-geco-purple .btn-primary-outline:hover {
-  background-color: var(--color-primary);
-  color: #000;
-}
-.theme-geco-purple .btn > * {
-  transform: skewX(12deg);
-  display: inline-block;
-}
-.theme-geco-purple .notched-clip,
-.theme-geco-purple .notched-clip-sm {
-  clip-path: none !important;
-  border-radius: 0 !important;
-}
-.theme-geco-purple .bg-dark-card {
-  background-color: var(--color-dark-card);
-  border-radius: 0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-.theme-geco-purple input,
-.theme-geco-purple textarea,
-.theme-geco-purple select {
-  border-radius: 0 !important;
-  transform: skewX(-8deg);
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.theme-geco-purple input::placeholder,
-.theme-geco-purple textarea::placeholder {
-  transform: skewX(8deg);
-}
-.theme-geco-purple .rounded-2xl,
-.theme-geco-purple .rounded-xl,
-.theme-geco-purple .rounded-lg,
-.theme-geco-purple .rounded-md,
-.theme-geco-purple .rounded-full {
-  border-radius: 0 !important;
-}
-
-/* ========================================= */
-/* THEME OVERRIDES (Cyberpunk Cyan)          */
-/* ========================================= */
-.theme-cyberpunk-cyan .btn {
-  border-radius: 0 !important;
-  border: 1px solid var(--color-primary);
-  background-color: transparent;
-  color: var(--color-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-.theme-cyberpunk-cyan .btn:hover {
-  background-color: rgba(0, 216, 255, 0.15);
-  box-shadow: 0 0 15px rgba(0, 216, 255, 0.3);
-}
-.theme-cyberpunk-cyan .notched-clip,
-.theme-cyberpunk-cyan .notched-clip-sm {
-  clip-path: none !important;
-  border-radius: 4px !important;
-}
-.theme-cyberpunk-cyan .bg-dark-card {
-  background-color: #1a1c26 !important;
-  border-radius: 4px !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
-}
-.theme-cyberpunk-cyan .rounded-2xl,
-.theme-cyberpunk-cyan .rounded-xl,
-.theme-cyberpunk-cyan .rounded-lg,
-.theme-cyberpunk-cyan .rounded-md,
-.theme-cyberpunk-cyan .rounded-full {
-  border-radius: 4px !important;
-}
-.theme-cyberpunk-cyan input,
-.theme-cyberpunk-cyan textarea,
-.theme-cyberpunk-cyan select {
-  border-radius: 4px !important;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: rgba(0, 0, 0, 0.2);
-}
-
-.theme-cyberpunk-cyan .theme-box {
-  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
-  border-radius: 0;
-  box-shadow: inset 0 0 15px rgba(27,194,202,0.15);
-  border: 1px solid rgba(27,194,202,0.3);
-}
-.theme-cyberpunk-cyan .theme-box:hover {
-  border: 1px solid rgba(27,194,202,0.8);
-  box-shadow: inset 0 0 25px rgba(27,194,202,0.3), 0 0 15px rgba(27,194,202,0.3);
-}
-.theme-cyberpunk-cyan .theme-btn {
-  clip-path: polygon(15px 0%, 100% 0%, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0% 100%, 0% 15px);
-  border-radius: 0;
-  border-style: dashed !important;
-  border-width: 2px !important;
-  font-weight: 900;
-  letter-spacing: 3px;
-}
-
-.theme-geco-purple .theme-box {
-  clip-path: none;
-  border-radius: 16px;
-  background: linear-gradient(145deg, var(--dark-card-color), rgba(15, 11, 25, 0.8));
-  box-shadow: 0 15px 35px rgba(0,0,0,0.6);
-  border-top: 3px solid var(--primary-color);
-  border-bottom: 1px solid rgba(255,255,255,0.02);
-  border-left: 1px solid rgba(255,255,255,0.02);
-  border-right: 1px solid rgba(255,255,255,0.02);
-}
-.theme-geco-purple .theme-box:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(255,123,0,0.15);
-  border-top: 3px solid var(--primary-hover-color);
-}
-.theme-geco-purple .theme-btn {
-  clip-path: none;
-  border-radius: 30px;
-  border: 2px solid var(--primary-color) !important;
-  box-shadow: 0 4px 15px rgba(255,123,0,0.3);
-  text-transform: uppercase;
-  font-weight: 800;
-}
-.theme-geco-purple .theme-btn:hover {
-  box-shadow: 0 8px 25px rgba(255,123,0,0.5);
-}
-
-/* 4. Gaming AMP Theme Overrides */
-.theme-gaming-amp .btn {
-  border-radius: 4px !important;
-  border: 1px solid var(--color-primary);
-  background-color: transparent;
-  color: var(--color-primary);
-  text-transform: uppercase;
-  font-weight: 800;
-  box-shadow: 0 0 10px rgba(0, 216, 255, 0.15);
-}
-.theme-gaming-amp .btn:hover {
-  background-color: var(--color-primary);
-  color: #000;
-  box-shadow: 0 0 20px rgba(0, 216, 255, 0.4);
-}
-.theme-gaming-amp .notched-clip,
-.theme-gaming-amp .notched-clip-sm {
-  clip-path: none !important;
-  border-radius: 4px !important;
-}
-.theme-gaming-amp .bg-dark-card {
-  background-color: var(--color-dark-card) !important;
-  border-radius: 4px !important;
-  border: 1px solid rgba(0, 216, 255, 0.2) !important;
-  box-shadow: 0 0 15px rgba(0, 216, 255, 0.1) !important;
-}
-.theme-gaming-amp .rounded-2xl,
-.theme-gaming-amp .rounded-xl,
-.theme-gaming-amp .rounded-lg,
-.theme-gaming-amp .rounded-md,
-.theme-gaming-amp .rounded-full {
-  border-radius: 4px !important;
-}
-.theme-gaming-amp input,
-.theme-gaming-amp textarea,
-.theme-gaming-amp select {
-  border-radius: 4px !important;
-  border: 1px solid rgba(0, 216, 255, 0.2) !important;
-  background-color: rgba(0, 0, 0, 0.3) !important;
-}
-.theme-gaming-amp input:focus,
-.theme-gaming-amp textarea:focus,
-.theme-gaming-amp select:focus {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 10px rgba(0, 216, 255, 0.3) !important;
-}
-
-.theme-gaming-amp .theme-box {
-  border-radius: 8px !important;
-  border: 1px solid rgba(0, 216, 255, 0.2) !important;
-  background-color: rgba(15, 15, 22, 0.95) !important;
-  box-shadow: 0 0 15px rgba(0, 216, 255, 0.1) !important;
-  clip-path: none !important;
-}
-.theme-gaming-amp .theme-box:hover {
-  border-color: rgba(0, 216, 255, 0.6) !important;
-  box-shadow: 0 0 25px rgba(0, 216, 255, 0.25) !important;
-}
-.theme-gaming-amp .theme-btn {
-  border-radius: 4px !important;
-  border: 2px solid var(--primary-color) !important;
-  box-shadow: 0 0 10px rgba(0, 216, 255, 0.2) !important;
-  text-transform: uppercase !important;
-  font-weight: 800 !important;
-  clip-path: none !important;
-}
-.theme-gaming-amp .theme-btn:hover {
-  background-color: var(--primary-color) !important;
-  color: #000 !important;
-  box-shadow: 0 0 20px rgba(0, 216, 255, 0.5) !important;
-}
-
-/* 5. Gaming Hub (Console Hub) Theme Overrides */
-.theme-gaming-hub .btn {
-  border-radius: 8px !important;
-  border: 1px solid var(--color-primary);
-  background-color: rgba(234, 179, 8, 0.05);
-  color: var(--color-primary);
-  text-transform: uppercase;
-  font-weight: 800;
-  text-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
-  box-shadow: 0 0 10px rgba(234, 179, 8, 0.15);
-}
-.theme-gaming-hub .btn:hover {
-  background-color: var(--color-primary);
-  color: #000;
-  box-shadow: 0 0 20px rgba(234, 179, 8, 0.45);
-}
-.theme-gaming-hub .notched-clip,
-.theme-gaming-hub .notched-clip-sm {
-  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px) !important;
-  border-radius: 0 !important;
-}
-.theme-gaming-hub .bg-dark-card {
-  background-color: rgba(11, 19, 25, 0.85) !important;
-  backdrop-filter: blur(12px);
-  border-radius: 8px !important;
-  border: 1px solid rgba(168, 85, 247, 0.3) !important;
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.1) !important;
-}
-.theme-gaming-hub .rounded-2xl,
-.theme-gaming-hub .rounded-xl,
-.theme-gaming-hub .rounded-lg,
-.theme-gaming-hub .rounded-md,
-.theme-gaming-hub .rounded-full {
-  border-radius: 8px !important;
-}
-.theme-gaming-hub input,
-.theme-gaming-hub textarea,
-.theme-gaming-hub select {
-  border-radius: 8px !important;
-  border: 1px solid rgba(234, 179, 8, 0.25) !important;
-  background-color: rgba(0, 0, 0, 0.4) !important;
-}
-.theme-gaming-hub input:focus,
-.theme-gaming-hub textarea:focus,
-.theme-gaming-hub select:focus {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 10px rgba(234, 179, 8, 0.3) !important;
-}
-.theme-gaming-hub .theme-box {
-  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px) !important;
-  border-radius: 0 !important;
-  border: 1px solid rgba(234, 179, 8, 0.3) !important;
-  background-color: rgba(5, 10, 14, 0.9) !important;
-  box-shadow: 0 0 15px rgba(234, 179, 8, 0.1) !important;
-}
-.theme-gaming-hub .theme-box:hover {
-  border-color: rgba(168, 85, 247, 0.8) !important;
-  box-shadow: 0 0 25px rgba(168, 85, 247, 0.35) !important;
-}
-.theme-gaming-hub .theme-btn {
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px) !important;
-  border-radius: 0 !important;
-  border: 2px solid var(--primary-color) !important;
-  box-shadow: 0 0 10px rgba(234, 179, 8, 0.2) !important;
-  text-transform: uppercase !important;
-  font-weight: 800 !important;
-}
-.theme-gaming-hub .theme-btn:hover {
-  background-color: var(--primary-color) !important;
-  color: #000 !important;
-  box-shadow: 0 0 20px rgba(234, 179, 8, 0.5) !important;
 }
 
 /* Fix global scrolling and prevent double scrollbars */
@@ -685,9 +322,3 @@ html, body {
 
     pointer-events:none;
 }
-
-
-
-
-
-

@@ -1,0 +1,80 @@
+/* ═══════════════════════════════════════════════════════════════════
+   BAZINO THEME — DARK GOLD (پیش‌فرض طلایی)
+   فایل: src/themes/dark-gold.css
+   هر قالب فایل CSS مجزای خودش را دارد و این فایل «تمام صفحات» سایت
+   را پوشش می‌دهد: متغیرهای رنگی + هدر، کارت‌ها، دکمه‌ها، فرم‌ها،
+   مودال‌ها و اسکرول‌بارها (خانه، رزرو، کافه، فروشگاه، مسابقات،
+   باشگاه، بلاگ، چت، ادمین).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ---------- ۱) سیستم رنگی (متغیرهای سراسری) ---------- */
+body[data-theme='dark-gold'] {
+  --primary-color: #ffb800;
+  --primary-hover-color: #e09900;
+  --accent-red-color: #ff3b30;
+  --dark-bg-color: #07080a;
+  --dark-card-color: #12141c;
+
+  --theme-bg: #07080a;
+  --theme-card-bg: #12141c;
+  --theme-card-border: rgba(255, 255, 255, 0.1);
+  --theme-card-radius: 1rem;
+  --theme-primary: #ffb800;
+  --theme-btn-skew: 0deg;
+  --theme-btn-radius: 0.75rem;
+}
+
+/* ---------- ۲) پس‌زمینه کل سایت ---------- */
+body[data-theme='dark-gold'],
+body[data-theme='dark-gold'] .app-bg-main {
+  background-color: var(--dark-bg-color);
+  background-image: url('/src/assets/images/background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* ---------- ۳) انتخاب متن / اسکرول‌بار ---------- */
+body[data-theme='dark-gold'] ::selection {
+  background: rgba(255, 184, 0, 0.35);
+  color: #ffffff;
+}
+
+.theme-dark-gold .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 184, 0, 0.25);
+}
+.theme-dark-gold .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 184, 0, 0.45);
+}
+
+/* ---------- ۴) هدر سایت (همه صفحات) ---------- */
+.theme-dark-gold .site-header {
+  border-bottom: 1px solid rgba(255, 184, 0, 0.2);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  background-color: rgba(7, 8, 10, 0.92);
+}
+.theme-dark-gold .site-header nav button {
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+/* ---------- ۵) اشکال اختصاصی قالب ---------- */
+.theme-dark-gold .theme-box {
+  clip-path: polygon(16px 0%, 100% 0%, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0% 100%, 0% 16px);
+  border-radius: 0;
+}
+.theme-dark-gold .theme-btn {
+  clip-path: polygon(10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%, 0% 10px);
+  border-radius: 0;
+}
+
+/* ---------- ۶) دکمه‌ها / فرم‌ها ---------- */
+.theme-dark-gold .btn {
+  border-radius: var(--theme-btn-radius);
+}
+.theme-dark-gold input:focus,
+.theme-dark-gold textarea:focus,
+.theme-dark-gold select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px rgba(255, 184, 0, 0.3), 0 0 12px rgba(255, 184, 0, 0.15);
+}

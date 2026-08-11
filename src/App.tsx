@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
 import bazinoLogo from './assets/images/bazino_logo_user.png';
-import backgroundBg from './assets/images/background.png';
+import {
+  BUILT_IN_THEMES,
+  getStoredThemeId,
+  loadCustomThemes,
+  loadThemeStylesheet,
+  saveCustomThemes,
+  type ThemeInfo
+} from './themes';
 import LoyaltyProfileTab from './components/LoyaltyProfileTab';
 import ReservationsTab from './components/ReservationsTab';
 import CafeTab from './components/CafeTab';
@@ -27,29 +34,58 @@ import {
   Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight, Palette
 } from 'lucide-react';
 
+/* ────────────────────────────────────────────────────────────────
+   THEME BOOTSTRAP (یک‌بار قبل از اولین رندر)
+   فایل CSS قالب ذخیره‌شده را قبل از paint اولیه اعمال می‌کند تا
+   هنگام بارگذاری صفحه هیچ پرش ظاهری (flash) رخ ندهد.
+   ──────────────────────────────────────────────────────────────── */
+const __initialCustomThemes = loadCustomThemes();
+const __initialThemeId = getStoredThemeId();
+const __initialTheme = [...BUILT_IN_THEMES, ...__initialCustomThemes]
+  .find(t => t.id === __initialThemeId) ?? BUILT_IN_THEMES[0];
+document.body.setAttribute('data-theme', __initialTheme.id);
+loadThemeStylesheet(__initialTheme);
+
 export default function App() {
   const { language, setLanguage, t, dir } = useLanguage();
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [themeId, setThemeId] = useState(() => {
-    const saved = localStorage.getItem('themeId') || "dark-gold";
-    return saved === "gaming-hub" ? "dark-gold" : saved;
+    const saved = getStoredThemeId();
+    const known = [...BUILT_IN_THEMES, ...loadCustomThemes()];
+    return known.some(t => t.id === saved) ? saved : 'dark-gold';
   });
   const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
-  const [availableThemes, setAvailableThemes] = useState([
-    { id: 'dark-gold', name: 'Dark Gold', type: 'built-in' },
-    { id: 'cyberpunk-cyan', name: 'Cyberpunk Cyan', type: 'built-in' },
-    { id: 'geco-purple', name: 'Geco Purple', type: 'built-in' },
-    { id: 'gaming-amp', name: 'Gaming AMP', type: 'built-in' },
-    { id: 'console-grid', name: 'قالب گرید کنسولی (کلاسیک)', type: 'built-in' }
+  const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
+    ...BUILT_IN_THEMES,
+    ...loadCustomThemes()
   ]);
+
+  // نسخه‌ی هوشمند setAvailableThemes: قالب‌های سفارشی را در localStorage
+  // ذخیره می‌کند تا بعد از رفرش صفحه از بین نروند.
+  const setAvailableThemes = (updater: React.SetStateAction<ThemeInfo[]>) => {
+    setAvailableThemesState(prev => {
+      const next = typeof updater === 'function'
+        ? (updater as (p: ThemeInfo[]) => ThemeInfo[])(prev)
+        : updater;
+      saveCustomThemes(next.filter(t => t.type === 'custom'));
+      return next;
+    });
+  };
 
   useEffect(() => {
     localStorage.setItem('themeId', themeId);
     document.body.setAttribute('data-theme', themeId);
     setLayoutMode('classic');
   }, [themeId]);
+
+  // بارگذاری فایل CSS مجزای قالب فعال — با تغییر قالب، استایل قبلی
+  // حذف و استایل کامل قالب جدید روی «تمام صفحات» اعمال می‌شود.
+  useEffect(() => {
+    const theme = availableThemes.find(t => t.id === themeId) ?? BUILT_IN_THEMES[0];
+    loadThemeStylesheet(theme);
+  }, [themeId, availableThemes]);
 
   useEffect(() => {
     localStorage.setItem('layoutMode', layoutMode);
@@ -339,19 +375,8 @@ export default function App() {
         ))}
       </div>
 
-      {themeId === 'gaming-hub' && (
-        <>
-          {/* Cyber scanlines overlay for Hub Theme */}
-          <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden opacity-[0.06] mix-blend-overlay">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_4px,3px_100%]" />
-          </div>
-          {/* Subtle Cyber vignette glow overlay in neon purple instead of green */}
-          <div className="pointer-events-none fixed inset-0 z-40 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(168,85,247,0.05)_100%)]" />
-        </>
-      )}
-
       {!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin' && (
-        <header className="h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
+        <header className="site-header h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
                <img src={bazinoLogo} alt="Bazino Pro" className="h-10 w-auto" />
                <span className="font-display font-black text-xl tracking-wider text-white hidden md:block">BAZINO <span className="text-primary">PRO</span></span>

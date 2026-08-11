@@ -186,7 +186,7 @@ export interface WebSyncStatus {
   lastSyncTime?: string;
   pendingTransactionsCount: number;
   /**
-   * Base URL of the ONLINE website's server (e.g. "https://bazino.runasp.net"), used when
+   * Base URL of the ONLINE website's server (e.g. "https://bazino.pro"), used when
    * this Management App runs standalone (e.g. the desktop build) with its own local
    * server+database and needs to sync reservations/status with the real website over the
    * internet. Leave empty to use the co-located/relative-path behavior (when Management

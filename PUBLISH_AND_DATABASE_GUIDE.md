@@ -148,11 +148,11 @@ npm run dev
 
 سرور مستقیماً HTTP ساده روی `0.0.0.0:PORT` گوش می‌ده، بدون HTTPS داخلی. برای یک دامنه‌ی واقعی با گواهی SSL، از یک reverse proxy جلوش استفاده کنید (رایج‌ترین روش):
 
-**نمونه‌ی تنظیمات Nginx** (با دامنه‌ی واقعی پروژه، `xerxes.biz`، به‌عنوان مثال):
+**نمونه‌ی تنظیمات Nginx** (با دامنه‌ی واقعی پروژه، `bazino.pro`، به‌عنوان مثال):
 ```nginx
 server {
     listen 80;
-    server_name xerxes.biz;
+    server_name bazino.pro;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -164,7 +164,7 @@ server {
     }
 }
 ```
-بعد با [Certbot](https://certbot.eff.org) گواهی SSL رایگان بگیرید (`certbot --nginx -d xerxes.biz`).
+بعد با [Certbot](https://certbot.eff.org) گواهی SSL رایگان بگیرید (`certbot --nginx -d bazino.pro`).
 
 ⚠️ خط‌های `Upgrade`/`Connection` رو حتماً بذارید — بدونشون چت زنده (WebSocket) از کار می‌افته.
 

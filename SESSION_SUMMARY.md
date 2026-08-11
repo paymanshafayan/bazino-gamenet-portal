@@ -695,3 +695,19 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - `README.md` — بازنویسی کامل با معرفی بازینو پرو، امکانات، اجرا، تست‌ها، تنظیمات، ساختار
 - `src/themes/README.md` — راهنمای کامل موتور قالب‌بندی (فرمت ZIP، assets، لوگو، کامپوننت، API ها)
 - `ci/README.md` — راهنمای فعال‌سازی ورک‌فلو CI
+
+---
+
+## ۴۰. دامنه‌ی سرور اپ فلاتر: xerxes.biz → bazino.pro
+
+کاربر اعلام کرد سرور اپ فلاتر باید `https://bazino.pro` باشد (دامنه‌ی فعلی سایت، پشت Cloudflare).
+
+### تغییرات
+- `flutter_app/lib/api_config.dart`: مقدار پیش‌فرض `kApiBaseUrl` از `https://xerxes.biz` به `https://bazino.pro` تغییر کرد. (WebSocket چت به‌صورت خودکار `wss://bazino.pro/api/chat/ws` می‌شود — نیازی به تغییر جداگانه نیست.)
+- `Management App/Bazino` (و کپی داخل `flutter_app/`): متن راهنما و placeholder مودال Web Sync + کامنت‌های `types.ts` / `syncClient.ts` از `xerxes.biz` (و `bazino.runasp.net` در نسخه‌ی قدیمی‌تر) به `bazino.pro` به‌روزرسانی شدند.
+- `ARCHITECTURE.md` (و کپی داخل `flutter_app/`): یادداشت دامنه‌ی فعلی `bazino.pro` + تاریخچه‌ی دامنه (runasp.net → xerxes.biz → bazino.pro).
+- `PUBLISH_AND_DATABASE_GUIDE.md`: مثال Nginx (`server_name` و `certbot -d`) به `bazino.pro` به‌روزرسانی شد.
+
+### نکته
+- از sandbox نمی‌توان به `bazino.pro` دسترسی گرفت (HTTP 000 — محدودیت شبکه‌ی sandbox)؛ تست زنده روی خود دامنه انجام شود.
+- مقدار پیش‌فرض بدون اسلش انتهایی نگه داشته شد (`https://bazino.pro`) چون کدها با الحاق رشته‌ای `'$kApiBaseUrl/api/...'` کار می‌کنند و اسلش اضافه باعث `//api` می‌شود.

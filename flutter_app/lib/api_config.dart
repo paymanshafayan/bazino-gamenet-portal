@@ -10,7 +10,7 @@
 ///   flutter run --dart-define=API_BASE_URL=http://localhost:3000
 const String kApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://xerxes.biz',
+  defaultValue: 'https://bazino.pro',
 );
 
 /// The same server, as a WebSocket URL, for the real-time chat/notification

@@ -491,7 +491,7 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
           {activeTab === 'config' && (
             <div className="space-y-4">
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 leading-relaxed">
-                برای نسخه‌ی <b>دسکتاپ مستقل</b> (که دیتابیس محلی خودش رو داره)، آدرس سرور واقعی سایت (مثلاً <span className="dir-ltr inline-block">https://bazino.runasp.net</span>) رو اینجا وارد کنید تا رزروهای آنلاین از اون سرور دریافت بشه. اگه این برنامه از همون سرور سایت سرو می‌شه (حالت وب‌اپ عادی)، این فیلد رو خالی بذارید.
+                برای نسخه‌ی <b>دسکتاپ مستقل</b> (که دیتابیس محلی خودش رو داره)، آدرس سرور واقعی سایت (مثلاً <span className="dir-ltr inline-block">https://bazino.pro</span>) رو اینجا وارد کنید تا رزروهای آنلاین از اون سرور دریافت بشه. اگه این برنامه از همون سرور سایت سرو می‌شه (حالت وب‌اپ عادی)، این فیلد رو خالی بذارید.
               </div>
               <div className="p-4 bg-zinc-950 rounded-xl border border-zinc-800 space-y-3">
                 <div>
@@ -502,7 +502,7 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
                       type="text"
                       value={apiUrlDraft}
                       onChange={(e) => setApiUrlDraft(e.target.value)}
-                      placeholder="https://bazino.runasp.net"
+                      placeholder="https://bazino.pro"
                       className="w-full bg-zinc-900 border border-zinc-700 rounded-xl pr-9 pl-3 py-2 text-amber-400 font-mono text-xs focus:outline-none focus:border-amber-500 dir-ltr text-left"
                     />
                   </div>

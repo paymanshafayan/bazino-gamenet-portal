@@ -43,7 +43,7 @@ export default function ConsoleHubView({
     <div 
       className="fixed inset-0 w-full h-[100dvh] flex flex-col justify-between select-none font-sans text-slate-100 z-30 overflow-hidden pb-[env(safe-area-inset-bottom,0px)]"
       style={{
-        backgroundImage: "url('/bg.png')",
+        backgroundImage: "url('/bg.jpg')",
         backgroundSize: '100% 100%',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'

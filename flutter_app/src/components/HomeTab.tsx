@@ -650,6 +650,8 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
             
             {/* Slide Image */}
             <img
+              loading={activeBanner === idx ? 'eager' : 'lazy'}
+              fetchpriority={activeBanner === idx ? 'high' : 'auto'}
               src={game.imageUrl}
               alt={getLocText(game.title)}
               className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-all duration-[10s] ease-out"
@@ -743,6 +745,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
               >
                 {/* Image banner */}
                 <img
+                  loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
                   className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-all duration-500"
@@ -815,6 +818,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                 {/* Card Image */}
                 <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden border-b border-white/10">
                   <img
+                    loading="lazy"
                     src={sect.imageUrl}
                     alt={getLocText(sect.title)}
                     className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-all duration-500"
@@ -1004,6 +1008,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                   {/* Image and status badge */}
                   <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden">
                     <img
+                      loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
                       className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"
@@ -1194,6 +1199,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
               {/* Avatar Frame with custom gold borders */}
               <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-all duration-300">
                 <img
+                  loading="lazy"
                   src={staff.avatar}
                   alt={getLocText(staff.name)}
                   className="rounded-full bg-dark-bg w-full h-full object-cover"

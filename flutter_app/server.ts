@@ -2529,7 +2529,16 @@ Example format:
   } else {
     // Serve static files in production
     const distPath = path.join(staticRoot, "dist");
-    app.use(express.static(distPath));
+    // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML بدون کش (برای به‌روزرسانی فوری)
+    app.use(express.static(distPath, {
+      maxAge: "7d",
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (/\/assets\//.test(filePath)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });

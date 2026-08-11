@@ -437,7 +437,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
                 >
                   {/* User Avatar */}
                   <div className="w-8.5 h-8.5 rounded-full border-2 border-primary/30 p-0.5 shrink-0">
-                    <img 
+                    <img loading="lazy" 
                       src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.username}`} 
                       className="rounded-full bg-dark-card w-full h-full" 
                       alt="Avatar" 

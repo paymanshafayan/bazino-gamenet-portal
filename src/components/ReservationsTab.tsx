@@ -423,7 +423,7 @@ export default function ReservationsTab({
                   <div key={res.id} className="bg-dark-card/60 rounded-xl p-4 border border-white/5 hover:border-white/10 transition-all flex flex-col sm:flex-row gap-4 items-center relative overflow-hidden">
                     {/* QR Code Graphic Container */}
                     <div className="bg-dark-bg p-2.5 rounded-xl border border-white/10 flex flex-col items-center justify-center relative group shrink-0">
-                      <img 
+                      <img loading="lazy" 
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=00f0ff&bgcolor=070913&data=${res.id}`} 
                         alt="Reservation QR Token"
                         className="w-28 h-28 object-contain"

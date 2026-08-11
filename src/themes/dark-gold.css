@@ -28,7 +28,7 @@ body[data-theme='dark-gold'] {
 body[data-theme='dark-gold'],
 body[data-theme='dark-gold'] .app-bg-main {
   background-color: var(--dark-bg-color);
-  background-image: url('/src/assets/images/background.png');
+  background-image: url('/src/assets/images/background.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

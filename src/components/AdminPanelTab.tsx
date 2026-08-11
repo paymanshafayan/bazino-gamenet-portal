@@ -1482,7 +1482,7 @@ export default function AdminPanelTab({
                     {appSliders.map((slide) => (
                       <div key={slide.id} className="relative bg-[#0d122b] border border-white/5 rounded-xl overflow-hidden flex flex-col group">
                         <div className="h-40 w-full relative overflow-hidden bg-black/50">
-                          <img 
+                          <img loading="lazy" 
                             src={slide.imageUrl} 
                             alt={slide.titleFa} 
                             referrerPolicy="no-referrer"
@@ -2388,7 +2388,7 @@ export default function AdminPanelTab({
                   {cafeItems.map((item) => (
                     <div key={item.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3">
                       <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        <img loading="lazy" src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
@@ -2504,7 +2504,7 @@ export default function AdminPanelTab({
                   {accessories.map((acc) => (
                     <div key={acc.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3">
                       <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img src={acc.imageUrl} alt={acc.name} className="w-full h-full object-cover" />
+                        <img loading="lazy" src={acc.imageUrl} alt={acc.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{acc.name}</h4>
@@ -2718,7 +2718,7 @@ export default function AdminPanelTab({
                   {articles.map((art) => (
                     <div key={art.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3 items-center">
                       <div className="w-14 h-14 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img src={art.imageUrl} alt={art.title} className="w-full h-full object-cover" />
+                        <img loading="lazy" src={art.imageUrl} alt={art.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{art.title}</h4>
@@ -3241,7 +3241,7 @@ export default function AdminPanelTab({
                   ) : (
                     appSliders.map((slide) => (
                       <div key={slide.id} className="p-3 bg-[#0d122b] border border-white/5 rounded-xl flex gap-3 group relative overflow-hidden">
-                        <img 
+                        <img loading="lazy" 
                           src={slide.imageUrl} 
                           alt={slide.titleFa} 
                           className="w-16 h-16 object-cover rounded-lg border border-white/10"

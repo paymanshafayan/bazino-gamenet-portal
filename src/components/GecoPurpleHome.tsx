@@ -118,7 +118,7 @@ export default function GecoPurpleHome({
           {featuredGames?.slice(0, 3).map((game: any, i: number) => (
             <div key={i} className="group cursor-pointer bg-[#111119] border border-white/5 p-4 transition-all hover:border-[#ffb800]/20" onClick={() => onNavigate('reservations')}>
               <div className="relative aspect-video overflow-hidden border border-white/10 mb-6">
-                <img src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <img loading="lazy" src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 <div className="absolute bottom-4 left-4 bg-[#ffb800] text-black text-[10px] font-black px-3 py-1 uppercase tracking-wider">
                   {game.badge || 'GAMING'}
                 </div>
@@ -175,7 +175,7 @@ export default function GecoPurpleHome({
           </div>
           <div className="w-full lg:w-1/2 relative group cursor-pointer" onClick={() => onNavigate('tournaments')}>
             <div className="absolute inset-0 bg-[#ffb800] transform translate-x-4 translate-y-4 border border-white/10 opacity-20 group-hover:translate-x-2 group-hover:translate-y-2 transition-transform"></div>
-            <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80" alt="About" className="relative z-10 w-full h-[360px] object-cover border-4 border-white/10" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80" alt="About" className="relative z-10 w-full h-[360px] object-cover border-4 border-white/10" />
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="w-20 h-20 bg-black/60 rounded-full flex items-center justify-center border-2 border-[#ffb800] group-hover:scale-110 transition-transform backdrop-blur-sm">
                 <Play className="w-8 h-8 text-[#ffb800] ml-1" fill="currentColor" />
@@ -451,7 +451,7 @@ export default function GecoPurpleHome({
               <div className="h-64 p-8 flex items-center justify-center bg-[#161824] border-b border-white/5 relative overflow-hidden">
                 <ShoppingBag className="w-24 h-24 text-white/5 group-hover:scale-125 transition-transform duration-500" />
                 <div className="absolute inset-0 flex items-center justify-center p-8">
-                   <img src={prod.url} alt="" className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
+                   <img loading="lazy" src={prod.url} alt="" className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
               <div className="p-6 flex flex-col items-center text-center">

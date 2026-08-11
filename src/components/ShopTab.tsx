@@ -248,7 +248,7 @@ export default function ShopTab({
               >
                 {/* Product Image */}
                 <div className="relative aspect-video w-full bg-[#0d122b] overflow-hidden">
-                  <img 
+                  <img loading="lazy" 
                     src={accessory.imageUrl} 
                     alt={translatedName}
                     className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
@@ -337,7 +337,7 @@ export default function ShopTab({
                   return (
                     <div key={item.item.id} className="flex gap-3 bg-[#0d122b] p-2.5 rounded-xl border border-white/5 relative group">
                       <div className="w-12 h-12 bg-[#0f1326] rounded overflow-hidden shrink-0">
-                        <img src={item.item.imageUrl} alt={mappedItemName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img loading="lazy" src={item.item.imageUrl} alt={mappedItemName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       
                       <div className="flex-1 min-w-0 flex flex-col justify-between">

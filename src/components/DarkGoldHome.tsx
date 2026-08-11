@@ -193,7 +193,7 @@ export default function DarkGoldHome({
       {/* 1. HERO GAME SLIDER (FULL WIDTH, SLANTED & MOBIRISE GAMINGAMP STYLED) */}
       {themeId === 'geco-purple' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-black shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[500px] flex items-center" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 85%, 0% 100%)' }}>
-          <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
+          <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
           
           <div className="relative z-10 w-full max-w-7xl mx-auto px-8 py-20 flex flex-col justify-center h-full">
@@ -217,7 +217,7 @@ export default function DarkGoldHome({
         </section>
       ) : themeId === 'cyberpunk-cyan' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#070b19] min-h-[650px] flex items-center justify-start border-b-[3px] border-[#00f0ff] shadow-[0_10px_50px_rgba(0,240,255,0.2)]">
-          <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
+          <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
           
           {/* Cyberpunk Grid Overlay */}
           <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: '0.2' }}></div>
@@ -265,7 +265,7 @@ export default function DarkGoldHome({
                 idx === activeBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'
               }`}
             >
-              <img
+              <img loading="lazy"
                 src={game.imageUrl}
                 alt={getLocText(game.title)}
                 className="w-full h-full object-cover opacity-100 scale-105 group-hover:scale-100 transition-transform duration-[10s] ease-out"
@@ -342,7 +342,7 @@ export default function DarkGoldHome({
                 className="group relative h-96 overflow-hidden notched-clip border border-white/10 hover:border-primary hover:shadow-[0_0_30px_rgba(27,194,202,0.2)] bg-dark-card transition-all duration-300"
               >
                 {/* Image banner */}
-                <img
+                <img loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
                   className="w-full h-full object-cover opacity-60 group-hover:scale-110 group-hover:opacity-80 transition-all duration-500"
@@ -413,7 +413,7 @@ export default function DarkGoldHome({
             >
               {/* Card Image */}
               <div className="relative aspect-[16/10] w-full bg-dark-bg overflow-hidden border-b border-white/10 shrink-0">
-                <img
+                <img loading="lazy"
                   src={sect.imageUrl}
                   alt={getLocText(sect.title)}
                   className="w-full h-full object-cover group-hover:scale-105 opacity-75 group-hover:opacity-90 transition-all duration-500"
@@ -604,7 +604,7 @@ export default function DarkGoldHome({
                 >
                   {/* Image and status badge */}
                   <div className="relative aspect-[16/10] w-full bg-dark-bg overflow-hidden rounded-t-2xl">
-                    <img
+                    <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
                       className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"

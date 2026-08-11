@@ -659,7 +659,7 @@ export default function ConsoleGridClassic({
               const qty = cafeCart[item.id] || 0;
               return (
                 <div key={item.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
-                  <img src={item.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200'} alt={item.name} className="h-20 w-full object-cover rounded-lg" />
+                  <img loading="lazy" src={item.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200'} alt={item.name} className="h-20 w-full object-cover rounded-lg" />
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{item.name}</h3>
@@ -758,7 +758,7 @@ export default function ConsoleGridClassic({
               const qty = shopCart[acc.id] || 0;
               return (
                 <div key={acc.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
-                  <img src={acc.imageUrl || 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=200'} alt={acc.name} className="h-20 w-full object-cover rounded-lg" />
+                  <img loading="lazy" src={acc.imageUrl || 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=200'} alt={acc.name} className="h-20 w-full object-cover rounded-lg" />
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{acc.name}</h3>

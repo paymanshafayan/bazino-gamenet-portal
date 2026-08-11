@@ -716,8 +716,8 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             {/* Soft lightweight overlay removed to keep images bright as per user request */}
             <div className="absolute inset-0 bg-transparent z-10" />
             
-            {/* Slide Image */}
-            <img
+            {/* Slide Image — LCP: باید eager بماند */}
+            <img loading="eager" fetchpriority="high"
               src={game.imageUrl}
               alt={getLocText(game.title)}
               className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-all duration-[10s] ease-out"
@@ -810,7 +810,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 className="group relative h-96 overflow-hidden rounded-none notched-clip border border-white/10 hover:border-primary hover:shadow-[0_0_30px_rgba(255,184,0,0.2)] bg-[#0d0e15] transition-all duration-300"
               >
                 {/* Image banner */}
-                <img
+                <img loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
                   className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-all duration-500"
@@ -882,7 +882,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               >
                 {/* Card Image */}
                 <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden border-b border-white/10">
-                  <img
+                  <img loading="lazy"
                     src={sect.imageUrl}
                     alt={getLocText(sect.title)}
                     className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-all duration-500"
@@ -1071,7 +1071,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 >
                   {/* Image and status badge */}
                   <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden">
-                    <img
+                    <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
                       className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"
@@ -1261,7 +1261,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             >
               {/* Avatar Frame with custom gold borders */}
               <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-all duration-300">
-                <img
+                <img loading="lazy"
                   src={staff.avatar}
                   alt={getLocText(staff.name)}
                   className="rounded-full bg-dark-bg w-full h-full object-cover"

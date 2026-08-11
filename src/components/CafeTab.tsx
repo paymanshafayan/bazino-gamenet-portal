@@ -259,7 +259,7 @@ export default function CafeTab({
                 className="rounded-2xl border border-white/10 bg-dark-card overflow-hidden flex flex-col group hover:border-primary/50 hover:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all duration-300"
               >
                 <div className="relative aspect-video w-full bg-[#0d122b] overflow-hidden">
-                  <img 
+                  <img loading="lazy" 
                     src={item.imageUrl} 
                     alt={translatedName}
                     className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
@@ -380,7 +380,7 @@ export default function CafeTab({
                   return (
                     <div key={item.item.id} className="flex gap-3 bg-[#0d122b] p-2.5 rounded-xl border border-white/5 relative group">
                       <div className="w-10 h-10 bg-[#0f1326] rounded overflow-hidden shrink-0">
-                        <img src={item.item.imageUrl} alt={mappedItemName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img loading="lazy" src={item.item.imageUrl} alt={mappedItemName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       
                       <div className="flex-1 min-w-0 flex flex-col justify-between">

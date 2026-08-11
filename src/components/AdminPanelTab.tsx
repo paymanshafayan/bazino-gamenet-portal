@@ -37,12 +37,20 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
 import VisualHelpGuide from './VisualHelpGuide';
+import type { ThemeInfo } from '../themes';
+import {
+  parseThemeZip,
+  buildSampleThemeZip,
+  buildThemeZip,
+  downloadZip,
+  type ParsedZipTheme
+} from '../themes/zip';
 
 interface Props {
   themeId?: string;
   setThemeId?: (id: string) => void;
-  availableThemes?: {id: string; name: string; type: string}[];
-  setAvailableThemes?: React.Dispatch<React.SetStateAction<{id: string; name: string; type: string}[]>>;
+  availableThemes?: ThemeInfo[];
+  setAvailableThemes?: React.Dispatch<React.SetStateAction<ThemeInfo[]>>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
   layoutMode?: 'classic' | 'hub';
   setLayoutMode?: (mode: 'classic' | 'hub') => void;
@@ -81,10 +89,17 @@ export default function AdminPanelTab({
 
   // Theme upload/creation states
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'zip' | 'quick'>('zip');
   const [newThemeName, setNewThemeName] = useState('');
   const [newThemePrimary, setNewThemePrimary] = useState('#1bc2ca');
   const [newThemeBg, setNewThemeBg] = useState('#0b1125');
   const [newThemeCard, setNewThemeCard] = useState('#121a30');
+
+  // ZIP theme install states
+  const [zipFileName, setZipFileName] = useState('');
+  const [zipParsed, setZipParsed] = useState<ParsedZipTheme | null>(null);
+  const [zipError, setZipError] = useState('');
+  const [isParsingZip, setIsParsingZip] = useState(false);
 
   // Messages form and states
   const [recipient, setRecipient] = useState('All');
@@ -645,10 +660,11 @@ export default function AdminPanelTab({
       return;
     }
     
-    const newTheme = {
+    const newTheme: ThemeInfo = {
       id,
       name: newThemeName.trim(),
       type: 'custom',
+      kind: 'colors',
       colors: {
         primary: newThemePrimary,
         bg: newThemeBg,
@@ -665,6 +681,101 @@ export default function AdminPanelTab({
     // Reset form
     setNewThemeName('');
     setShowUploadForm(false);
+  };
+
+  /* ---------- نصب قالب از فایل ZIP (فرمت جدید) ---------- */
+  const handleZipFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // اجازه انتخاب دوباره همان فایل
+    e.target.value = '';
+
+    setZipFileName(file.name);
+    setZipError('');
+    setZipParsed(null);
+    setIsParsingZip(true);
+
+    try {
+      const buffer = new Uint8Array(await file.arrayBuffer());
+      const result = parseThemeZip(buffer, file.name);
+
+      if ('error' in result) {
+        setZipError(result.error);
+        addNotification(language === 'fa' ? `خطا در خواندن ZIP: ${result.error}` : `ZIP parse error: ${result.error}`, 'error');
+        return;
+      }
+
+      // بررسی تکراری نبودن شناسه
+      if (availableThemes.some(t => t.id === result.theme.id)) {
+        setZipError(language === 'fa'
+          ? `قالبی با شناسه «${result.theme.id}» قبلاً نصب شده است`
+          : `A theme with id "${result.theme.id}" is already installed`);
+        addNotification(language === 'fa' ? 'قالب تکراری است' : 'Duplicate theme', 'error');
+        return;
+      }
+
+      // بررسی حجم ذخیره‌سازی مرورگر (localStorage ≈ 5MB)
+      const estimated = JSON.stringify([...availableThemes, result.theme]).length;
+      if (estimated > 3_500_000) {
+        setZipError(language === 'fa'
+          ? 'حجم کل قالب‌های نصب‌شده از حد مجاز ذخیره‌سازی مرورگر بیشتر است؛ ابتدا چند قالب را حذف کنید'
+          : 'Total installed themes exceed browser storage limit; delete some themes first');
+        return;
+      }
+
+      setZipParsed(result);
+      addNotification(language === 'fa'
+        ? `فایل ZIP با موفقیت خوانده شد: «${result.theme.name}» (${(result.css.length / 1024).toFixed(1)}KB CSS)`
+        : `ZIP parsed: "${result.theme.name}" (${(result.css.length / 1024).toFixed(1)}KB CSS)`, 'success');
+    } catch (err) {
+      console.error('[Themes] ZIP parse error:', err);
+      setZipError(language === 'fa' ? 'خطا در خواندن فایل ZIP' : 'Failed to read ZIP file');
+    } finally {
+      setIsParsingZip(false);
+    }
+  };
+
+  const handleInstallZip = () => {
+    if (!zipParsed) return;
+    if (!setAvailableThemes) return;
+
+    setAvailableThemes(prev => [...prev, zipParsed.theme]);
+    addNotification(language === 'fa'
+      ? `قالب "${zipParsed.theme.name}" با موفقیت نصب و فعال شد`
+      : `Theme "${zipParsed.theme.name}" installed & activated`, 'success');
+
+    // فعال‌سازی فوری تا اثر قالب روی همه صفحات دیده شود
+    if (setThemeId) setThemeId(zipParsed.theme.id);
+
+    setZipParsed(null);
+    setZipFileName('');
+    setZipError('');
+    setShowUploadForm(false);
+    setUploadMode('zip');
+  };
+
+  /* ---------- دانلود قالب نمونه (فرمت جدید ZIP) ---------- */
+  const handleDownloadSampleZip = () => {
+    try {
+      downloadZip(buildSampleThemeZip(), 'bazino-theme-sample.zip');
+      addNotification(language === 'fa'
+        ? 'فایل قالب نمونه دانلود شد — ساختار theme.json + theme.css را ببینید'
+        : 'Sample theme zip downloaded — see theme.json + theme.css structure', 'success');
+    } catch (e) {
+      console.error(e);
+      addNotification(language === 'fa' ? 'خطا در ساخت فایل نمونه' : 'Failed to build sample zip', 'error');
+    }
+  };
+
+  /* ---------- خروجی گرفتن ZIP از یک قالب نصب‌شده ---------- */
+  const handleExportThemeZip = (theme: ThemeInfo) => {
+    try {
+      downloadZip(buildThemeZip(theme), `${theme.id}.zip`);
+      addNotification(language === 'fa' ? `پکیج ZIP قالب «${theme.name}» دانلود شد` : `Theme "${theme.name}" zip downloaded`, 'success');
+    } catch (e) {
+      console.error(e);
+      addNotification(language === 'fa' ? 'خطا در ساخت فایل ZIP' : 'Failed to build zip', 'error');
+    }
   };
 
   const handleDeleteTheme = (id: string, name: string) => {
@@ -1299,10 +1410,27 @@ export default function AdminPanelTab({
                 <div>
                   <h3 className="text-xl font-black uppercase mb-1">{language === 'fa' ? 'مدیریت قالب‌ها' : 'Theme Management'}</h3>
                   <p className="text-gray-400 text-sm">
-                    {language === 'fa' ? 'قالب‌های سیستم را مدیریت کنید و قالب جدید بارگذاری نمایید.' : 'Manage system themes and upload new ones.'}
+                    {language === 'fa'
+                      ? 'قالب‌ها را از فایل ZIP (فرمت جدید: theme.json + theme.css) نصب کنید یا با رنگ‌ها قالب بسازید.'
+                      : 'Install themes from ZIP packages (new format: theme.json + theme.css) or build with colors.'}
+                  </p>
+                  <p className="text-[10px] text-gray-500 font-mono mt-1">
+                    {language === 'fa'
+                      ? 'هر قالب یک فایل CSS مستقل است و تمام صفحات سایت را پوشش می‌دهد'
+                      : 'Each theme is a standalone CSS file covering every page of the site'}
                   </p>
                 </div>
                 <div className="flex gap-2">
+                   <button 
+                     onClick={handleDownloadSampleZip}
+                     className="btn btn-primary-outline text-xs px-4 py-2 flex items-center gap-2 rounded-xl"
+                     title={language === 'fa' ? 'دانلود قالب نمونه با فرمت ZIP جدید' : 'Download a sample theme zip'}
+                   >
+                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                     </svg>
+                     {language === 'fa' ? 'دانلود قالب نمونه' : 'Sample Theme'}
+                   </button>
                    <button 
                      onClick={() => setShowUploadForm(!showUploadForm)}
                      className="btn btn-primary-outline text-xs px-4 py-2 flex items-center gap-2 rounded-xl"
@@ -1310,7 +1438,7 @@ export default function AdminPanelTab({
                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                      </svg>
-                     {language === 'fa' ? 'آپلود قالب (.zip)' : 'Upload Theme'}
+                     {language === 'fa' ? 'نصب قالب جدید' : 'Install Theme'}
                    </button>
                 </div>
               </div>
@@ -1377,11 +1505,11 @@ export default function AdminPanelTab({
               </div>
 
               {showUploadForm && (
-                <form onSubmit={handleCreateTheme} className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-4 animate-fade-in">
+                <div className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-4 animate-fade-in">
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
                     <h4 className="font-bold text-md text-primary flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                      <span>{language === 'fa' ? 'آپلود و راه‌اندازی قالب جدید' : 'Upload & Install New Theme'}</span>
+                      <span>{language === 'fa' ? 'نصب قالب جدید' : 'Install New Theme'}</span>
                     </h4>
                     <button 
                       type="button" 
@@ -1392,107 +1520,235 @@ export default function AdminPanelTab({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* ZIP Upload Slot */}
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs text-gray-400 font-bold uppercase">{language === 'fa' ? 'فایل قالب (.zip)' : 'Theme Package (.zip)'}</label>
-                      <div className="border border-dashed border-white/10 hover:border-primary/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-black/10 transition-colors relative cursor-pointer group min-h-[120px]">
-                        <input 
-                          type="file" 
-                          accept=".zip" 
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              const file = e.target.files[0];
-                              const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, ' ');
-                              const formattedName = nameWithoutExt.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                              setNewThemeName(formattedName);
-                              addNotification(language === 'fa' ? `فایل ${file.name} با موفقیت شناسایی شد. نام قالب به طور خودکار تنظیم گردید!` : `File ${file.name} loaded. Theme name populated!`, 'info');
-                            }
-                          }}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                        <svg className="w-8 h-8 text-gray-500 group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors text-center">{language === 'fa' ? 'فایل zip قالب را بکشید یا انتخاب کنید' : 'Drag or select theme zip file'}</span>
-                        <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'سیستم به صورت خودکار متادیتا را استخراج می‌کند' : 'System auto-extracts theme metadata'}</span>
-                      </div>
-                    </div>
+                  {/* Mode Tabs */}
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => { setUploadMode('zip'); setZipError(''); }}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                        uploadMode === 'zip'
+                          ? 'bg-primary text-black border-primary shadow-[0_0_12px_rgba(255,184,0,0.25)]'
+                          : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span>{language === 'fa' ? 'نصب از فایل ZIP (فرمت جدید)' : 'Install from ZIP'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setUploadMode('quick'); setZipError(''); }}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                        uploadMode === 'quick'
+                          ? 'bg-primary text-black border-primary shadow-[0_0_12px_rgba(255,184,0,0.25)]'
+                          : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      <span>{language === 'fa' ? 'ساخت سریع با رنگ' : 'Quick Build (Colors)'}</span>
+                    </button>
+                  </div>
 
+                  {uploadMode === 'zip' ? (
                     <div className="space-y-4">
-                      {/* Theme Name */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs text-gray-400 font-bold uppercase">{language === 'fa' ? 'نام قالب' : 'Theme Name'}</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={newThemeName}
-                          onChange={(e) => setNewThemeName(e.target.value)}
-                          placeholder="e.g. Synthwave Horizon"
-                          className="px-4 py-2.5 bg-black/20 border border-white/5 rounded-xl text-xs text-white placeholder-gray-600 outline-none focus:border-primary/50 transition-colors w-full"
-                        />
+                      {/* ZIP Upload Slot */}
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-400 font-bold uppercase">
+                          {language === 'fa' ? 'فایل پکیج قالب (.zip)' : 'Theme Package (.zip)'}
+                        </label>
+                        <div className="border border-dashed border-white/10 hover:border-primary/40 rounded-xl p-5 flex flex-col items-center justify-center gap-2 bg-black/10 transition-colors relative cursor-pointer group min-h-[130px]">
+                          <input 
+                            type="file" 
+                            accept=".zip" 
+                            onChange={handleZipFileSelect}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                          {isParsingZip ? (
+                            <>
+                              <span className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                              <span className="text-xs font-bold text-gray-300">{language === 'fa' ? 'در حال استخراج متادیتا و CSS قالب...' : 'Extracting theme metadata & CSS...'}</span>
+                            </>
+                          ) : zipParsed ? (
+                            <>
+                              <span className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                                <Check className="w-5 h-5" strokeWidth={3} />
+                              </span>
+                              <span className="text-xs font-black text-emerald-400">{zipParsed.theme.name}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">{zipFileName}</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-8 h-8 text-gray-500 group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors text-center">{language === 'fa' ? 'فایل zip قالب را انتخاب کنید' : 'Select theme zip file'}</span>
+                              <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'فرمت: theme.json + theme.css' : 'Format: theme.json + theme.css'}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Color Pickers */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ اصلی' : 'Primary'}</label>
-                          <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
-                            <input 
-                              type="color" 
-                              value={newThemePrimary}
-                              onChange={(e) => setNewThemePrimary(e.target.value)}
-                              className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
-                            />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
+                      {/* Parse Error */}
+                      {zipError && (
+                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] font-bold leading-relaxed flex items-start gap-2">
+                          <X className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{zipError}</span>
+                        </div>
+                      )}
+
+                      {/* Parsed Metadata Preview */}
+                      {zipParsed && !zipError && (
+                        <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                              {language === 'fa' ? 'پیش‌نمایش متادیتای قالب' : 'Parsed Theme Metadata'}
+                            </span>
+                            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[9px] font-mono font-bold">
+                              {language === 'fa' ? 'آماده نصب' : 'READY TO INSTALL'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
+                            <div>
+                              <span className="block text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نام' : 'Name'}</span>
+                              <span className="text-white font-black">{zipParsed.theme.name}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] text-gray-500 font-bold uppercase">ID</span>
+                              <span className="text-primary font-mono font-bold" dir="ltr">{zipParsed.theme.id}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نسخه' : 'Version'}</span>
+                              <span className="text-white font-mono font-bold">{zipParsed.theme.version || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] text-gray-500 font-bold uppercase">CSS</span>
+                              <span className="text-white font-mono font-bold">{(zipParsed.css.length / 1024).toFixed(1)}KB</span>
+                            </div>
+                          </div>
+                          {zipParsed.theme.description && (
+                            <p className="text-[11px] text-gray-400 leading-relaxed">{zipParsed.theme.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                            <span className="text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ‌ها:' : 'Colors:'}</span>
+                            {(['primary', 'bg', 'card'] as const).map(k => (
+                              <span key={k} className="flex items-center gap-1.5 text-[10px] font-mono text-gray-300">
+                                <span className="w-4 h-4 rounded border border-white/20" style={{ backgroundColor: zipParsed.theme.colors?.[k] || '#333' }} />
+                                <span className="hidden md:inline">{zipParsed.theme.colors?.[k]}</span>
+                              </span>
+                            ))}
+                            <span className="text-[9px] text-gray-500 font-mono mr-auto">{zipParsed.theme.type === 'custom' && zipParsed.theme.kind === 'zip' ? 'ZIP' : ''}</span>
                           </div>
                         </div>
+                      )}
 
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'پس‌زمینه' : 'Background'}</label>
-                          <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
-                            <input 
-                              type="color" 
-                              value={newThemeBg}
-                              onChange={(e) => setNewThemeBg(e.target.value)}
-                              className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
-                            />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeBg}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'کارت‌ها' : 'Cards'}</label>
-                          <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
-                            <input 
-                              type="color" 
-                              value={newThemeCard}
-                              onChange={(e) => setNewThemeCard(e.target.value)}
-                              className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
-                            />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeCard}</span>
-                          </div>
+                      <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-white/5">
+                        <button 
+                          type="button" 
+                          onClick={handleDownloadSampleZip}
+                          className="px-3 py-2 text-[10px] font-bold uppercase rounded-xl bg-white/5 text-cyan-400 hover:text-white border border-white/10 hover:border-cyan-400/40 transition-all flex items-center gap-1.5"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          <span>{language === 'fa' ? 'دانلود قالب نمونه (فرمت جدید)' : 'Download Sample ZIP'}</span>
+                        </button>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button" 
+                            onClick={() => setShowUploadForm(false)} 
+                            className="px-4 py-2 text-xs font-bold uppercase rounded-xl bg-white/5 text-gray-400 hover:text-white transition-colors"
+                          >
+                            {language === 'fa' ? 'انصراف' : 'Cancel'}
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={handleInstallZip}
+                            disabled={!zipParsed || !!zipError || isParsingZip}
+                            className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            {language === 'fa' ? 'نصب و فعال‌سازی' : 'Install & Activate'}
+                          </button>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <form onSubmit={handleCreateTheme} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs text-gray-400 font-bold uppercase">{language === 'fa' ? 'نام قالب' : 'Theme Name'}</label>
+                          <input 
+                            type="text" 
+                            required
+                            value={newThemeName}
+                            onChange={(e) => setNewThemeName(e.target.value)}
+                            placeholder="e.g. Synthwave Horizon"
+                            className="px-4 py-2.5 bg-black/20 border border-white/5 rounded-xl text-xs text-white placeholder-gray-600 outline-none focus:border-primary/50 transition-colors w-full"
+                          />
+                        </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
-                    <button 
-                      type="button" 
-                      onClick={() => setShowUploadForm(false)} 
-                      className="px-4 py-2 text-xs font-bold uppercase rounded-xl bg-white/5 text-gray-400 hover:text-white transition-colors"
-                    >
-                      {language === 'fa' ? 'انصراف' : 'Cancel'}
-                    </button>
-                    <button 
-                      type="submit" 
-                      className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all"
-                    >
-                      {language === 'fa' ? 'نصب و فعال‌سازی' : 'Install & Activate'}
-                    </button>
-                  </div>
-                </form>
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ اصلی' : 'Primary'}</label>
+                            <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
+                              <input 
+                                type="color" 
+                                value={newThemePrimary}
+                                onChange={(e) => setNewThemePrimary(e.target.value)}
+                                className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
+                              />
+                              <span className="text-[9px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'پس‌زمینه' : 'Background'}</label>
+                            <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
+                              <input 
+                                type="color" 
+                                value={newThemeBg}
+                                onChange={(e) => setNewThemeBg(e.target.value)}
+                                className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
+                              />
+                              <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeBg}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'کارت‌ها' : 'Cards'}</label>
+                            <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
+                              <input 
+                                type="color" 
+                                value={newThemeCard}
+                                onChange={(e) => setNewThemeCard(e.target.value)}
+                                className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
+                              />
+                              <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeCard}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+                        <button 
+                          type="button" 
+                          onClick={() => setShowUploadForm(false)} 
+                          className="px-4 py-2 text-xs font-bold uppercase rounded-xl bg-white/5 text-gray-400 hover:text-white transition-colors"
+                        >
+                          {language === 'fa' ? 'انصراف' : 'Cancel'}
+                        </button>
+                        <button 
+                          type="submit" 
+                          className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all"
+                        >
+                          {language === 'fa' ? 'ساخت و نصب قالب' : 'Build & Install'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1511,20 +1767,52 @@ export default function AdminPanelTab({
                         </div>
                         <div>
                           <h4 className="font-bold text-lg">{theme.name}</h4>
-                          <span className="text-[10px] uppercase tracking-wider text-gray-500">{theme.type === 'built-in' ? (language === 'fa' ? 'سیستمی' : 'Built-in') : (language === 'fa' ? 'سفارشی' : 'Custom')}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                              {theme.type === 'built-in' 
+                                ? (language === 'fa' ? 'سیستمی' : 'Built-in') 
+                                : (theme.kind === 'zip' 
+                                    ? (language === 'fa' ? 'پکیج ZIP' : 'ZIP Package')
+                                    : (language === 'fa' ? 'سفارشی (رنگ)' : 'Custom (Colors)'))}
+                            </span>
+                            {theme.type === 'custom' && theme.css && (
+                              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[8px] font-mono font-bold">
+                                CSS {(theme.css.length / 1024).toFixed(1)}KB
+                              </span>
+                            )}
+                            {theme.version && (
+                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10 text-[8px] font-mono font-bold">
+                                v{theme.version}
+                              </span>
+                            )}
+                          </div>
+                          {theme.description && (
+                            <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">{theme.description}</p>
+                          )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5">
                         {theme.type !== 'built-in' && (
-                          <button 
-                            onClick={() => handleDeleteTheme(theme.id, theme.name)}
-                            className="text-gray-500 hover:text-accent-red transition-colors"
-                            title={language === 'fa' ? 'حذف' : 'Delete'}
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          <>
+                            <button 
+                              onClick={() => handleExportThemeZip(theme)}
+                              className="p-1.5 text-gray-500 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
+                              title={language === 'fa' ? 'دانلود پکیج ZIP این قالب' : 'Download this theme as ZIP'}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteTheme(theme.id, theme.name)}
+                              className="p-1.5 text-gray-500 hover:text-accent-red hover:bg-red-500/10 rounded-lg transition-colors"
+                              title={language === 'fa' ? 'حذف' : 'Delete'}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>

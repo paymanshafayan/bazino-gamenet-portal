@@ -14,9 +14,13 @@
  *  3) در هر لحظه فقط CSS قالب فعال به‌صورت یک <style> تزریق می‌شود؛
  *     با تغییر قالب، استایل قبلی حذف و استایل جدید جایگزین می‌شود
  *     بنابراین ظاهر «کامل» همه صفحات عوض می‌شود.
- *  4) قالب‌های سفارشی (ساخته‌شده در پنل ادمین) CSS خود را به‌صورت
- *     زنده از روی رنگ‌های انتخاب‌شده تولید می‌کنند و در localStorage
- *     ذخیره می‌شوند تا بعد از رفرش هم باقی بمانند.
+ *  4) قالب‌های سفارشی (ساخته‌شده در پنل ادمین) به دو شکل پشتیبانی می‌شوند:
+ *       • «نصب از فایل ZIP (فرمت جدید)» → پکیج شامل theme.json + theme.css
+ *         که CSS آن دقیقاً همان فرمت فایل‌های src/themes/*.css است و به‌صورت
+ *         مستقیم (verbatim) روی سایت اعمال می‌شود.
+ *       • «ساخت سریع با رنگ» → CSS کامل به‌صورت خودکار از سه رنگ انتخاب‌شده
+ *         تولید می‌شود (generateCustomThemeCss).
+ *     هر دو نوع در localStorage ذخیره می‌شوند تا بعد از رفرش باقی بمانند.
  *
  *  فایل‌های قالب:
  *     dark-gold.css        → پیش‌فرض طلایی
@@ -40,6 +44,12 @@ export interface ThemeInfo {
   name: string;
   type: 'built-in' | 'custom';
   colors?: ThemeColorConfig;
+  /** استایل کامل قالب (فرمت جدید ZIP) — در صورت وجود، عیناً تزریق می‌شود */
+  css?: string;
+  version?: string;
+  description?: string;
+  /** نحوه ساخت قالب سفارشی: 'zip' = نصب از فایل ZIP، 'colors' = ساخت با رنگ */
+  kind?: 'zip' | 'colors';
 }
 
 /* ---------- قالب‌های سیستمی ---------- */
@@ -98,9 +108,14 @@ function injectStyleTag(themeId: string, css: string) {
 export function loadThemeStylesheet(theme: ThemeInfo): Promise<void> | void {
   if (!theme) return;
 
-  // قالب‌های سفارشی: تولید CSS از رنگ‌های ذخیره‌شده
+  // قالب‌های سفارشی:
+  //  - اگر فایل CSS کامل دارد (نصب از ZIP با فرمت جدید) → عیناً تزریق می‌شود
+  //  - در غیر این صورت CSS از روی رنگ‌ها تولید می‌شود (ساخت سریع)
   if (theme.type === 'custom') {
-    injectStyleTag(theme.id, generateCustomThemeCss(theme));
+    const css = (theme.css && theme.css.trim().length > 0)
+      ? theme.css
+      : generateCustomThemeCss(theme);
+    injectStyleTag(theme.id, css);
     return;
   }
 
@@ -195,6 +210,27 @@ export function sanitizeThemeId(id: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
   return clean || 'custom-theme-' + Date.now().toString(36);
+}
+
+/* ---------- استخراج رنگ‌ها از فایل CSS یک قالب ----------
+ * وقتی قالب ZIP فایل `colors` در متادیتا نداشته باشد، رنگ‌های
+ * پیش‌نمایش (اسکرین‌شات) از روی متغیرهای خود فایل CSS خوانده می‌شوند.
+ */
+export function extractColorsFromCss(
+  css: string,
+  fallback: ThemeColorConfig = { primary: '#ffb800', bg: '#050608', card: '#0D0E15' }
+): ThemeColorConfig {
+  // کامنت‌های CSS ممکن است شامل نمونه‌هایی از متغیرها باشند → حذف قبل از الگویابی
+  const code = (css || '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const getVar = (prop: string): string | null => {
+    const m = code.match(new RegExp(prop + '\\s*:\\s*(#[0-9a-fA-F]{3,8}|rgba?\\([^)]*\\))'));
+    return m ? m[1] : null;
+  };
+  return {
+    primary: getVar('--primary-color') || fallback.primary,
+    bg: getVar('--dark-bg-color') || getVar('--theme-bg') || fallback.bg,
+    card: getVar('--dark-card-color') || getVar('--theme-card-bg') || fallback.card,
+  };
 }
 
 /* ---------- تولید CSS برای قالب‌های سفارشی ----------

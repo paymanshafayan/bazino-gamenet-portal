@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { extractColorsFromCss } from '../themes';
 
 interface ThemeColorConfig {
   primary: string;
@@ -11,6 +12,7 @@ interface ThemeInfo {
   name: string;
   type: string;
   colors?: ThemeColorConfig;
+  css?: string;
 }
 
 interface ThemeScreenshotProps {
@@ -58,6 +60,12 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
       primary = theme.colors.primary || '#ffb800';
       bg = theme.colors.bg || '#050608';
       card = theme.colors.card || '#0D0E15';
+    } else if (theme.css) {
+      // قالب‌های ZIP که رنگ پیش‌نمایش ندارند → استخراج از خود فایل CSS
+      const extracted = extractColorsFromCss(theme.css);
+      primary = extracted.primary;
+      bg = extracted.bg;
+      card = extracted.card;
     }
 
     // Set canvas dimensions

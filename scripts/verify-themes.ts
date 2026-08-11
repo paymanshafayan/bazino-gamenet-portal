@@ -19,6 +19,9 @@ const vite = await createServer({
   server: { middlewareMode: true },
   appType: 'spa',
   logLevel: 'error',
+  // از کش/قفل نمونه‌ی Vite در حال اجرا (سرور توسعه) جدا باشیم
+  cacheDir: 'node_modules/.vite-verify',
+  optimizeDeps: { noDiscovery: true },
 });
 
 try {
@@ -71,6 +74,34 @@ try {
   console.log('shadeHex(#ffb800, -12) =', themes.shadeHex('#ffb800', -12), '(expect darker)');
   console.log('hexToRgba(#ffb800, 0.3) =', themes.hexToRgba('#ffb800', 0.3));
   console.log('sanitizeThemeId("قالب بنفش من!") =', themes.sanitizeThemeId('قالب بنفش من!'));
+
+  // 6) ZIP install flow (new package format: theme.json + theme.css)
+  const zip = await vite.ssrLoadModule('/src/themes/zip.ts');
+  const sampleZipBytes = zip.buildSampleThemeZip();
+  const parsed = zip.parseThemeZip(sampleZipBytes, 'sample.zip');
+  if ('error' in parsed) throw new Error('parseThemeZip failed on sample: ' + parsed.error);
+  console.log('\nzip sample parsed:', parsed.theme.id, '| name:', parsed.theme.name,
+    '| css:', parsed.css.length, 'bytes | colors:', JSON.stringify(parsed.theme.colors));
+  if (parsed.theme.id !== 'neon-storm') throw new Error('Expected id neon-storm from sample CSS');
+  if (!parsed.theme.css || parsed.theme.css !== parsed.css) throw new Error('theme.css must be carried on ThemeInfo');
+
+  // ZIP theme CSS is injected verbatim (not regenerated)
+  await themes.loadThemeStylesheet(parsed.theme as any);
+  const zipTag = styleTags[styleTags.length - 1];
+  if (zipTag.textContent !== parsed.css) throw new Error('ZIP theme css must be injected verbatim');
+  console.log('zip theme css injected verbatim: OK');
+
+  // Invalid zip → clear error code
+  const bad = zip.parseThemeZip(new Uint8Array([1, 2, 3]), 'bad.zip');
+  if (!('error' in bad) || bad.code !== 'invalid-zip') throw new Error('Invalid zip should return invalid-zip error');
+  console.log('invalid zip rejected with code:', bad.code);
+
+  // Round-trip: build zip from an installed theme → parse again
+  const rebuilt = zip.buildThemeZip(parsed.theme as any);
+  const reparsed = zip.parseThemeZip(rebuilt, 'rebuilt.zip');
+  if ('error' in reparsed) throw new Error('reparse of rebuilt zip failed: ' + reparsed.error);
+  if (reparsed.theme.id !== parsed.theme.id || reparsed.css !== parsed.css) throw new Error('zip round-trip mismatch');
+  console.log('zip round-trip (build → parse): OK');
 
   // 5) CSS validity: braces balanced
   const check = (css: string) => {

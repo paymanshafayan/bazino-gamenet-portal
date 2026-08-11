@@ -18,3 +18,10 @@ This file serves as the official design record and reference for the **Bazino Pr
    - Dark background (from `/CyberpunkAsset/background.png`) featuring high-contrast neon highlights (Cyberpunk Gold, Cyan, and Magenta/Purple).
 4. **Tactile Interactive Elements:**
    - Buttons, tags, and inputs must use precise grid layouts, hover states with neon scale/glow effects, and single-line labels (no wrapped or truncated text).
+
+## Asset Status (Updated Aug 2026)
+
+- The original `/CyberpunkAsset/background.png` was corrupt/unreadable; a regenerated, optimized version is used instead:
+  - Source: `src/assets/images/background.jpg` (18.4 kB, JPG, dark neon theme preserved).
+- Site logo is served from `src/assets/images/bazino_logo_user.webp` (15.1 kB, 256×256) with `width`/`height` attributes set; canonical URL: `/logo.png` (copied from `public/logo.png` at build).
+- All active image assets are optimized (WebP/JPG); no large PNGs remain in the production bundle.

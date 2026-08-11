@@ -23,6 +23,8 @@
 | 🎨 موتور قالب | هر قالب فایل CSS مجزا + نصب قالب از ZIP (با assets و کامپوننت) |
 | 🗄️ منبع داده | سوییچ بین «داده نمونه» و «دیتابیس» از پنل ادمین |
 | 🌐 چندزبانه | فارسی، انگلیسی، روسی، ترکی |
+| ⚡ عملکرد | کد اسپلیتینگ + کش immutable + lazy loading + فونت بهینه (طبق GTmetrix) |
+| 🔄 CI | ورک‌فلو GitHub Actions: تایپ‌چک، تست قالب، بیلد، بوت + smoke تست |
 
 ## 🚀 اجرای محلی
 
@@ -54,6 +56,11 @@ npx tsx scripts/test-theme-store.mts           # تست ذخیره‌ساز قا
 npx tsx scripts/test-theme-http.mts            # تست HTTP قالب‌ها (نیاز به سرور running)
 npx tsx scripts/test-theme-sdk.mts             # تست SDK کامپوننت قالب (نیاز به سرور running)
 ```
+
+### CI (اختیاری)
+
+ورک‌فلو آماده‌ی GitHub Actions در `ci/build-test.workflow.yml` موجود است (راهنما: `ci/README.md`).
+
 
 ## 🔑 تنظیمات
 

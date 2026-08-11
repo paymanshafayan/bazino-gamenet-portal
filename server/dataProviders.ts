@@ -214,50 +214,25 @@ export interface IDataStore {
 
 // -----------------------------------------------------------------------------
 // Shared seed data (identical across all three real backends so switching
-// database provider never changes what the app looks like on first run)
+// database provider never changes what the app looks like on first run).
+// The actual sample dataset (4-5 items per section) lives in ./sampleData —
+// the same single source of truth also powers the "sample data source" mode
+// (default) of the site & mobile app.
 // -----------------------------------------------------------------------------
+import {
+  SAMPLE_CHAT_ROOMS,
+  SAMPLE_SYSTEMS,
+  SAMPLE_CAFE_ITEMS,
+  SAMPLE_ACCESSORIES,
+  SAMPLE_SLIDERS,
+  SAMPLE_ARTICLES,
+  SAMPLE_TOURNAMENTS,
+  SAMPLE_RESERVATION_LOGS
+} from './sampleData';
+
 const DEFAULT_THEMES: ThemeRow[] = [
   { id: 'cyberpunk-cyan', name: 'گیمینگ امپ (سرمه ای و فیروزه ای)', nameEn: 'Gaming AMP (Navy & Cyan)', primaryColor: '#00d8ff', primaryHover: '#00b5d6', darkBg: '#11121a', darkCard: '#191a24', accentRed: '#ff3b30' },
   { id: 'dark-gold', name: 'طلایی ذغالی (کلاسیک قبلی)', nameEn: 'Dark Gold (Classic)', primaryColor: '#ffb800', primaryHover: '#e09900', darkBg: '#07080a', darkCard: '#12141c', accentRed: '#ff3b30' },
-];
-
-const SAMPLE_CHAT_ROOMS = ['عمومی (General)', 'CS2', 'FIFA 26', 'Dota 2', 'Valorant'];
-
-const SAMPLE_SYSTEMS: SystemRow[] = [
-  { id: 's1', name: 'سیستم شماره ۱ (VIP PC)', type: 'PC', hourlyRate: 35000, isActive: true, isReserved: false },
-  { id: 's2', name: 'سیستم شماره ۲ (VIP PC)', type: 'PC', hourlyRate: 35000, isActive: true, isReserved: true },
-  { id: 's3', name: 'سیستم شماره ۳ (Standard)', type: 'PC', hourlyRate: 25000, isActive: true, isReserved: false },
-  { id: 's4', name: 'سیستم شماره ۴ (Standard)', type: 'PC', hourlyRate: 25000, isActive: true, isReserved: false },
-  { id: 's5', name: 'سیستم شماره ۵ (Standard)', type: 'PC', hourlyRate: 25000, isActive: true, isReserved: true },
-];
-
-const SAMPLE_CAFE_ITEMS: CafeItemRow[] = [
-  { id: 'c1', name: 'پیتزا پپرونی مخصوص گیمرها', category: 'Foods', price: 95000, imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80', inventory: 15, isAvailable: true },
-  { id: 'c2', name: 'همبرگر دوبل با پنیر گودا', category: 'Foods', price: 85000, imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=80', inventory: 10, isAvailable: true },
-  { id: 'c3', name: 'نوشابه ردبول خنک (RedBull)', category: 'Drinks', price: 45000, imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=400&q=80', inventory: 32, isAvailable: true },
-];
-
-const SAMPLE_ACCESSORIES: AccessoryRow[] = [
-  { id: 'a1', name: 'کیبورد مکانیکال Redragon K552 RGB', description: 'کیبورد مکانیکال گیمینگ با سوییچ‌های آبی مقاوم، نورپردازی RGB.', price: 1450000, imageUrl: 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?auto=format&fit=crop&w=400&q=80', stock: 5, category: 'Keyboard' },
-  { id: 'a2', name: 'موس گیمینگ Logitech G502 HERO', description: 'موس حرفه‌ای با حسگر HERO 25K، یازده کلید قابل برنامه‌ریزی.', price: 1200000, imageUrl: 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=400&q=80', stock: 8, category: 'Mouse' },
-];
-
-const SAMPLE_SLIDERS: SliderRow[] = [
-  { id: 'slide-1', imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80', target: 'reserve', titleFa: 'رزرو سیستم‌های گیمینگ فوق پیشرفته', titleEn: 'Reserve High-End Gaming Rigs', titleRu: 'Забронировать мощные игровые ПК', titleTr: 'Son Teknoloji Oyun Bilgisayarlarını Rezerve Edin' },
-  { id: 'slide-2', imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80', target: 'cafe', titleFa: 'سفارش آنلاین انواع پیتزا و نوشیدنی انرژی‌زا', titleEn: 'Order Pizza & Energy Drinks Online', titleRu: 'Заказать пиццу и энергетики онлайн', titleTr: 'Online Pizza ve Enerji İçeceği Sipariş Et' },
-];
-
-const SAMPLE_ARTICLES: ArticleRow[] = [
-  { id: 'a1', title: 'معرفی آپدیت جدید Counter-Strike 2 و تغییرات کلیدی نقشه‌ها', content: 'شرکت ولو سرانجام آپدیت بزرگ و جدید کانتر استرایک ۲ را منتشر کرد که طی آن نقشه Dust II تغییرات نورپردازی شگفت‌انگیزی داشته است.', category: 'CS2', imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80', author: 'آرش قاسمی (مدیر فنی)', date: '۱۴۰۵/۰۴/۱۱', comments: '[]' },
-];
-
-const SAMPLE_RESERVATION_LOGS: ReservationLogRow[] = [
-  { id: 'r1', systemId: 's2', username: '', systemName: 'سیستم شماره ۲ (VIP PC)', startTime: '14:00', endTime: '16:00', totalPrice: 70000, date: 'امروز', checkedIn: false, timestamp: new Date(Date.now() - 7200000).toISOString() },
-  { id: 'r2', systemId: 's5', username: '', systemName: 'سیستم شماره ۵ (Standard)', startTime: '18:00', endTime: '20:00', totalPrice: 50000, date: 'امروز', checkedIn: true, timestamp: new Date(Date.now() - 14400000).toISOString() },
-];
-
-const SAMPLE_TOURNAMENTS: TournamentRow[] = [
-  { id: 't1', title: 'مسابقات قهرمانی Counter-Strike 2 سالن', game: 'CS2 5v5', registrationFee: 250000, startDate: '۱۴۰۵/۰۴/۲۰', maxTeams: 8, status: 'Active', registeredTeamsCount: 0, teams: '[]', bracket: '{}' },
 ];
 
 // =============================================================================

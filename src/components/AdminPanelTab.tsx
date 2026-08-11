@@ -87,6 +87,11 @@ export default function AdminPanelTab({
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [isResettingDb, setIsResettingDb] = useState(false);
 
+  // Data source state (sample ⇄ database)
+  const [dataSource, setDataSource] = useState<'sample' | 'database'>('sample');
+  const [dataSourceInfo, setDataSourceInfo] = useState<{ sample: Record<string, number>; database: Record<string, number> } | null>(null);
+  const [isSwitchingDataSource, setIsSwitchingDataSource] = useState(false);
+
   // Theme upload/creation states
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadMode, setUploadMode] = useState<'zip' | 'quick'>('zip');
@@ -790,7 +795,46 @@ export default function AdminPanelTab({
 
   useEffect(() => {
     fetchData();
+    // خواندن وضعیت فعلی منبع داده (نمونه / دیتابیس)
+    fetch('/api/data-source')
+      .then(r => r.json())
+      .then(data => {
+        if (data && (data.mode === 'sample' || data.mode === 'database')) {
+          setDataSource(data.mode);
+          setDataSourceInfo({ sample: data.sample || {}, database: data.database || {} });
+        }
+      })
+      .catch(err => console.error('Failed to read data source:', err));
   }, []);
+
+  const handleSwitchDataSource = async (mode: 'sample' | 'database') => {
+    if (mode === dataSource || isSwitchingDataSource) return;
+    setIsSwitchingDataSource(true);
+    try {
+      const res = await fetch('/api/admin/data-source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDataSource(mode);
+        addNotification(
+          language === 'fa'
+            ? (mode === 'sample' ? 'منبع داده به «نمونه» تغییر کرد — سایت و اپ از داده‌های نمونه می‌خوانند' : 'منبع داده به «دیتابیس» تغییر کرد — سایت و اپ از دیتابیس می‌خوانند')
+            : (mode === 'sample' ? 'Data source switched to Sample — site & app read from sample data' : 'Data source switched to Database — site & app read from the database'),
+          'success'
+        );
+      } else {
+        addNotification(language === 'fa' ? 'خطا در تغییر منبع داده' : 'Failed to switch data source', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      addNotification(language === 'fa' ? 'خطا در ارتباط با سرور' : 'Connection error', 'error');
+    } finally {
+      setIsSwitchingDataSource(false);
+    }
+  };
 
   // Update order status on server
   const handleUpdateCafeOrderStatus = async (orderId: string, status: string) => {
@@ -2826,7 +2870,130 @@ export default function AdminPanelTab({
           {/* Customization Sub-Tab */}
           {activeSubTab === 'customization' && (
             <div className="animate-fade-in space-y-8 pb-12">
-              
+
+              {/* SECTION 0: DATA SOURCE (SAMPLE ⇄ DATABASE) */}
+              <div className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
+                      <Database className="w-4 h-4 text-cyan-400" />
+                      <span>{language === 'fa' ? 'منبع داده سایت و اپلیکیشن' : 'Site & App Data Source'}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
+                        dataSource === 'sample'
+                          ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      }`}>
+                        {dataSource === 'sample'
+                          ? (language === 'fa' ? 'حالت نمونه (پیش‌فرض)' : 'SAMPLE MODE')
+                          : (language === 'fa' ? 'حالت دیتابیس' : 'DATABASE MODE')}
+                      </span>
+                    </h3>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {language === 'fa'
+                        ? 'سایت و اپلیکیشن موبایل اطلاعات خود را از اینجا می‌گیرند. در حالت نمونه (پیش‌فرض) همه‌چیز از داده‌های آماده (۴-۵ مورد برای هر بخش) پر می‌شود؛ در حالت دیتابیس، جداول خالی به‌صورت خودکار از داده نمونه پر می‌شوند.'
+                        : 'Site & mobile app read their data from here. In sample mode (default) everything is populated from ready-made data (4-5 items per section); in database mode, empty tables automatically fall back to sample data.'}
+                    </p>
+                  </div>
+                  {isSwitchingDataSource && (
+                    <span className="text-[10px] text-gray-400 font-mono flex items-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      {language === 'fa' ? 'در حال تغییر...' : 'Switching...'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sample Option */}
+                  <div
+                    onClick={() => handleSwitchDataSource('sample')}
+                    className={`p-4 border rounded-xl cursor-pointer transition-all flex flex-col gap-3 relative overflow-hidden ${
+                      dataSource === 'sample'
+                        ? 'border-cyan-400 bg-cyan-500/[0.06] shadow-[0_0_15px_rgba(34,211,238,0.15)]'
+                        : 'border-white/5 bg-black/10 hover:border-white/20'
+                    }`}
+                  >
+                    {dataSource === 'sample' && (
+                      <div className="absolute top-3 right-3 bg-cyan-400 text-black p-1 rounded-full">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dataSource === 'sample' ? 'bg-cyan-400/15 text-cyan-400' : 'bg-white/5 text-gray-400'}`}>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h5 className="font-black text-sm text-white">{language === 'fa' ? 'داده نمونه (Sample)' : 'Sample Data'}</h5>
+                        <span className="text-[10px] text-cyan-400 font-bold">{language === 'fa' ? 'پیش‌فرض — بدون نیاز به دیتابیس' : 'Default — no database required'}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 leading-relaxed font-semibold">
+                      {language === 'fa'
+                        ? 'همه بخش‌ها (سیستم‌ها، کافه، فروشگاه، مسابقات، بلاگ، اسلایدر، کد تخفیف و ...) از داده‌های آماده نمونه پر می‌شوند. مناسب نمایش و تست سایت.'
+                        : 'All sections (systems, cafe, shop, tournaments, blog, sliders, coupons...) are populated from ready sample data. Ideal for demo & testing.'}
+                    </p>
+                    {dataSourceInfo && (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+                        {Object.entries(dataSourceInfo.sample).map(([k, v]) => (
+                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[8px] font-mono text-gray-400">
+                            {k}: <span className="text-cyan-400 font-black">{v}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Database Option */}
+                  <div
+                    onClick={() => handleSwitchDataSource('database')}
+                    className={`p-4 border rounded-xl cursor-pointer transition-all flex flex-col gap-3 relative overflow-hidden ${
+                      dataSource === 'database'
+                        ? 'border-emerald-400 bg-emerald-500/[0.06] shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                        : 'border-white/5 bg-black/10 hover:border-white/20'
+                    }`}
+                  >
+                    {dataSource === 'database' && (
+                      <div className="absolute top-3 right-3 bg-emerald-400 text-black p-1 rounded-full">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dataSource === 'database' ? 'bg-emerald-400/15 text-emerald-400' : 'bg-white/5 text-gray-400'}`}>
+                        <Database className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="font-black text-sm text-white">{language === 'fa' ? 'دیتابیس' : 'Database'}</h5>
+                        <span className="text-[10px] text-emerald-400 font-bold">{language === 'fa' ? 'داده‌های واقعی ذخیره‌شده' : 'Real stored records'}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 leading-relaxed font-semibold">
+                      {language === 'fa'
+                        ? 'سایت و اپ از رکوردهای واقعی دیتابیس می‌خوانند. اگر جدولی خالی باشد، به‌صورت خودکار از داده نمونه پر می‌شود تا سایت خالی نماند.'
+                        : 'Site & app read from real database records. Empty tables automatically fall back to sample data so the site never looks empty.'}
+                    </p>
+                    {dataSourceInfo && (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+                        {Object.entries(dataSourceInfo.database).map(([k, v]) => (
+                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[8px] font-mono text-gray-400">
+                            {k}: <span className="text-emerald-400 font-black">{v}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/30 border border-white/5 text-[10px] text-gray-500 leading-relaxed flex items-start gap-2">
+                  <HelpCircle className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                  <span>
+                    {language === 'fa'
+                      ? 'تغییر منبع داده بلافاصله روی سایت و اپلیکیشن موبایل اعمال می‌شود (بدون رفرش). سفارش‌ها، رزروها و ثبت‌نام‌ها در هر دو حالت در دیتابیس ذخیره می‌شوند.'
+                      : 'Switching the data source applies to the site and mobile app immediately (no refresh). Orders, reservations and registrations are always stored in the database in both modes.'}
+                  </span>
+                </div>
+              </div>
+
               {/* SECTION 1: SLIDER MANAGEMENT */}
               <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
                 <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">

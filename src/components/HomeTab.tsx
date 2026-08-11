@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Tournament } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
 import GamingAmpHome from './GamingAmpHome';
 import GecoPurpleHome from './GecoPurpleHome';
+import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
 import { 
   Gamepad2, 
   Tv, 
@@ -36,11 +37,15 @@ interface Props {
   themeId?: string;
   tournaments: Tournament[];
   onNavigate: (tab: 'loyalty' | 'reservations' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'csharp') => void;
+  /** قالب‌های دارای کامپوننت اختصاصی (theme.js) — اطلاعات از App می‌آید */
+  themeComponent?: { cssUrl: string; assetsBase: string } | null;
 }
 
-export default function HomeTab({ tournaments, onNavigate, themeId,
+export default function HomeTab({ tournaments, onNavigate, themeId, themeComponent,
 }: Props) {
   const { language, dir, t } = useLanguage();
+
+
   const [activeBanner, setActiveBanner] = useState(0);
   const [activeTournamentSlide, setActiveTournamentSlide] = useState(0);
   const tournamentRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -48,6 +53,29 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
 
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [appSliders, setAppSliders] = useState<any[]>([]);
+  const themeComponentHostRef = useRef<HTMLDivElement | null>(null);
+  const [themeComponentVersion, setThemeComponentVersion] = useState(0);
+  // بارگذاری theme.js قالب (فقط وقتی قالب کامپوننت دارد)
+  useEffect(() => {
+    if (!themeComponent) return;
+    let cancelled = false;
+    const script = document.createElement('script');
+    script.src = themeComponent.cssUrl.replace(/\/theme\.css$/, '/theme.js');
+    script.async = true;
+    script.onload = () => {
+      if (!cancelled) setThemeComponentVersion(v => v + 1);
+    };
+    script.onerror = () => {
+      console.warn('[ThemeSDK] theme.js failed to load:', script.src);
+    };
+    document.body.appendChild(script);
+    return () => {
+      cancelled = true;
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, [themeComponent]);
+
+
 
   const getSocialLinks = () => {
     try {
@@ -509,6 +537,35 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
       }))
     : featuredGames;
 
+  // mount کامپوننت قالب وقتی ثبت شد
+  useEffect(() => {
+    if (!themeComponent || !themeComponentHostRef.current) return;
+    if (!hasComponent('home')) return;
+
+    const mounted = mountComponent('home', themeComponentHostRef.current, {
+      language,
+      dir,
+      t,
+      onNavigate: onNavigate as any,
+      featuredGames: activeBanners,
+      gameGenres,
+      matchHistory,
+      pricingPackages,
+      loungeSections,
+      staffTeam,
+      tournaments,
+      settings: siteSettings,
+      logoUrl: '/logo.png',
+      assetsBase: themeComponent.assetsBase,
+      themeId: themeId || 'dark-gold',
+    });
+    if (!mounted) return;
+    // پاک‌سازی هنگام تغییر
+    return () => { unmountComponent('home'); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themeComponentVersion, themeComponent, language, dir, tournaments, activeBanners, siteSettings]);
+
+
   // Helper to translate text dynamically
   const getLocText = (obj: any) => {
     return obj[language] || obj['en'] || '';
@@ -584,6 +641,17 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
     const customKey = `section_${key}_desc_${language}`;
     return siteSettings[customKey] || defaultVal;
   };
+
+  // قالب‌های دارای کامپوننت اختصاصی (theme.js نصب‌شده با ZIP):
+  // کامپوننت قالب در یک هاست رندر می‌شود تا چیدمان کاملاً اختصاصی
+  // داشته باشد — دقیقاً مثل قالب‌های سیستمی Geco/GamingAmp.
+  if (themeComponent && hasComponent('home')) {
+    return (
+      <div className="w-full animate-fade-in" dir={dir}>
+        <div ref={themeComponentHostRef} className="w-full" />
+      </div>
+    );
+  }
 
   if (themeId === 'geco-purple') {
     return (

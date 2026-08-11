@@ -52,6 +52,8 @@ export interface ThemeInfo {
   kind?: 'zip' | 'colors' | 'server';
   /** قالب‌های نصب‌شده روی سرور: آدرس فایل CSS (با assets بازنویسی‌شده) */
   cssUrl?: string;
+  /** آدرس پایه پوشه assets قالب (مثل /api/themes/<id>/assets) */
+  assetsBase?: string;
   /** آیا قالب پوشه assets دارد؟ */
   hasAssets?: boolean;
   /** لیست فایل‌های داخل پوشه assets قالب */

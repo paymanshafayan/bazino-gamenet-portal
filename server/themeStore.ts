@@ -143,6 +143,11 @@ export function installThemeZip(buffer: Uint8Array, fallbackName?: string): { th
   // theme.css
   fs.writeFileSync(path.join(dir, "theme.css"), parsed.css, "utf8");
 
+  // theme.js (کامپوننت قالب — اختیاری)
+  if (parsed.componentJs && parsed.componentJs.trim().length > 0) {
+    fs.writeFileSync(path.join(dir, "theme.js"), parsed.componentJs, "utf8");
+  }
+
   // assets/
   const assetNames = Object.keys(parsed.assets);
   if (assetNames.length > 0) {
@@ -203,6 +208,17 @@ export function getThemeAsset(id: string, relPath: string): { data: Buffer; ext:
 
   const ext = path.extname(dest).toLowerCase().replace(".", "");
   return { data: fs.readFileSync(dest), ext };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  سرو کامپوننت قالب (theme.js) — فقط اگر در پوشه قالب وجود داشته باشد
+ *  (اختیاری؛ برای قالب‌های دارای کامپوننت صفحه اصلی اختصاصی)
+ * ═══════════════════════════════════════════════════════════════ */
+export function getThemeComponentJs(id: string): { data: Buffer } | null {
+  const dir = getThemeDir(id);
+  const jsPath = path.join(dir, "theme.js");
+  if (!fs.existsSync(jsPath) || !fs.statSync(jsPath).isFile()) return null;
+  return { data: fs.readFileSync(jsPath) };
 }
 
 /* ═══════════════════════════════════════════════════════════════

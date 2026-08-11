@@ -35,12 +35,14 @@ src/themes/
 | `theme.css` | ✅ **اجباری** | استایل کامل قالب — همان فرمت فایل‌های `src/themes/*.css` |
 | `theme.json` | ⬜ اختیاری | متادیتا (نام، شناسه، نسخه، توضیح، رنگ‌ها) |
 | `assets/` | ⬜ اختیاری | **فایل‌های مورد نیاز قالب**: تصویر، ویدئو، فونت، آیکون و ... |
+| `theme.js` | ⬜ اختیاری | **کامپوننت صفحه اصلی قالب** (با SDK — بخش «کامپوننت قالب» را ببینید) |
 
 ```
 ساده‌ترین حالت (فقط CSS):        حالت کامل (پیشنهادی):
 theme.zip                          theme.zip
 └── theme.css                      ├── theme.json
                                    ├── theme.css
+                                   ├── theme.js        ← کامپوننت صفحه اصلی (اختیاری)
                                    └── assets/
                                        ├── banner.jpg
                                        ├── logo.png
@@ -128,6 +130,82 @@ API های مدیریتی:
 
 > پوشه `themes/` در `.gitignore` است — قالب‌های نصب‌شده هنگام اجرا ساخته می‌شوند و
 > نباید در مخزن ذخیره شوند.
+
+## 🏷 قانون لوگو — «حق انحصاری سایت مادر»
+
+**لوگوی سایت متعلق به «سایت مادر» است و هیچ قالبی حق تغییر، جایگزینی، پوشاندن یا
+مخفی‌کردن آن را ندارد.** لوگوی هدر اصلی (`<img class="brand-logo-guard">`) خارج از
+کنترل قالب‌ها رندر می‌شود و با یک محافظ CSS تضمین شده است که هیچ قالبی (سیستمی یا
+سفارشی) نتواند آن را مخفی یا تغییر دهد.
+
+**آدرس استاندارد دریافت لوگو** (برای قالب‌هایی که در صفحه اختصاصی خود نیاز به نمایش لوگو دارند):
+
+```
+/logo.png
+```
+
+و معادل CSS آن (متغیر سراسری تعریف‌شده در `index.css`):
+
+```css
+:root { --brand-logo-url: url('/logo.png'); }
+
+/* استفاده در قالب: */
+.hero-logo { background-image: var(--brand-logo-url); }
+```
+
+این آدرس در هر دو حالت توسعه و تولید پایدار است (فایل در پوشه `public/` قرار دارد).
+
+## 🧩 کامپوننت قالب (theme.js) — صفحه اصلی اختصاصی
+
+قالب‌ها می‌توانند یک فایل **`theme.js`** (اختیاری) داشته باشند که یک کامپوننت صفحه
+اصلی اختصاصی ثبت می‌کند — دقیقاً مثل قالب‌های سیستمی `GecoPurpleHome.tsx` و
+`GamingAmpHome.tsx`. کامپوننت با **SDK** ثبت می‌شود و همان «قرارداد داده» (props)
+قالب‌های سیستمی را دریافت می‌کند:
+
+```js
+/* theme.js — داخل پکیج ZIP */
+(function () {
+  var SDK = window.BazinoThemeSDK;
+  if (!SDK) return; // SDK هنوز بارگذاری نشده → نادیده بگیر
+
+  SDK.registerComponent('home', function () {
+    return {
+      apiVersion: 1,                       // نسخه قرارداد داده
+      render: function (props) {
+        var R = SDK.React;                 // React از SDK (بدون نیاز به باندل)
+        return R.createElement('div', { className: 'my-theme-home' },
+          R.createElement('h1', null, props.settings.clubName || 'BAZINO'),
+          R.createElement('button', {
+            onClick: function () { props.onNavigate('reservations'); }
+          }, 'Reserve')
+        );
+      }
+    };
+  });
+})();
+```
+
+**قرارداد داده (props) — نسخه 1** (همان داده‌ای که قالب‌های سیستمی می‌گیرند):
+
+| prop | توضیح |
+|---|---|
+| `language`, `dir`, `t` | زبان فعلی (fa/en/ru/tr)، جهت (rtl/ltr)، تابع ترجمه |
+| `onNavigate(tab)` | رفتن به تب (reservations, cafe, shop, tournaments, blog, loyalty, chat) |
+| `featuredGames` | اسلایدهای اصلی (array با title/desc/imageUrl به‌صورت چندزبانه) |
+| `gameGenres`, `matchHistory`, `pricingPackages`, `loungeSections`, `staffTeam` | بخش‌های محتوایی هوم |
+| `tournaments` | تورنمنت‌های فعال |
+| `settings` | تنظیمات کلوپ (club_name, club_phone, ...) |
+| `logoUrl` | آدرس لوگوی سایت مادر (`/logo.png`) — **فقط برای نمایش** |
+| `assetsBase` | آدرس پایه فایل‌های assets این قالب (مثل `/api/themes/<id>/assets`) |
+| `themeId` | شناسه قالب |
+
+**نکته‌ها:**
+- برای ساخت `theme.js` باید کد خود را **از قبل باندل (compile) کنید**؛ React و آیکون‌ها
+  از طریق `window.BazinoThemeSDK.React` در دسترس‌اند — آن‌ها را داخل bundle نگذارید.
+- فایل `theme.js` از پوشه قالب سرو می‌شود: `GET /api/themes/<id>/theme.js`
+- امنیت: `theme.js` کد اجرایی است — **فقط ادمین مورد اعتماد** باید قالب نصب کند
+  (نصب از پنل مدیریت انجام می‌شود).
+- اگر قالب `theme.js` نداشته باشد، صفحه اصلی پیش‌فرض اپ با استایل قالب نمایش داده می‌شود.
 
 ## 🏗 معماری
 

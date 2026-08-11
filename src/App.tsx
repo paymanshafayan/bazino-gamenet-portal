@@ -92,6 +92,7 @@ export default function App() {
           cssUrl: t.cssUrl,
           hasAssets: t.hasAssets,
           assetFiles: t.assetFiles,
+          assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
         }));
         setAvailableThemesState(prev => {
           const existing = new Set(prev.map(t => t.id));
@@ -307,7 +308,17 @@ export default function App() {
             refreshData={fetchData}
           />
         ) : (
-          <HomeTab themeId={themeId} tournaments={tournaments} onNavigate={setActiveTab} />
+          <HomeTab 
+            themeId={themeId} 
+            tournaments={tournaments} 
+            onNavigate={setActiveTab} 
+            themeComponent={(() => {
+              const th = availableThemes.find(x => x.id === themeId);
+              return th && th.kind === 'server' && th.cssUrl
+                ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
+                : null;
+            })()}
+          />
         )
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
@@ -408,7 +419,7 @@ export default function App() {
       {!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin' && (
         <header className="site-header h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
-               <img src={bazinoLogo} alt="Bazino Pro" className="h-10 w-auto" />
+               <img src={bazinoLogo} alt="Bazino Pro" className="brand-logo-guard h-10 w-auto" />
                <span className="font-display font-black text-xl tracking-wider text-white hidden md:block">BAZINO <span className="text-primary">PRO</span></span>
             </div>
             

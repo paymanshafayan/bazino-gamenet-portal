@@ -30,6 +30,43 @@
   --theme-primary: #ffb800;
   --theme-btn-skew: 0deg;
   --theme-btn-radius: 0.75rem;
+
+  /* ─── لوگوی رسمی سایت مادر ─────────────────────────────
+     لوگو متعلق به «سایت مادر» است و هیچ قالبی حق تغییر آن را
+     ندارد. قالب‌ها برای نمایش لوگو باید از این متغیر استفاده
+     کنند (آدرس استاندارد: /logo.png). */
+  --brand-logo-url: url('/logo.png');
+}
+
+/* محافظ لوگو: هیچ قالبی نمی‌تواند لوگوی هدر را پنهان یا حذف کند */
+.brand-logo-guard {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  height: auto !important;
+  pointer-events: none !important;
+}
+.theme-dark-gold .brand-logo-guard,
+.theme-cyberpunk-cyan .brand-logo-guard,
+.theme-geco-purple .brand-logo-guard,
+.theme-gaming-amp .brand-logo-guard,
+.theme-console-grid .brand-logo-guard,
+.theme-gaming-hub .brand-logo-guard,
+.theme-custom .brand-logo-guard {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  height: auto !important;
+}
+/* برای هر قالب سفارشی که کلاس theme-<id> دارد */
+[class*='theme-'] .brand-logo-guard {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  height: auto !important;
 }
 
 @theme {

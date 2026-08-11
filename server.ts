@@ -40,6 +40,7 @@ import {
   deleteTheme,
   readThemeCss,
   getThemeAsset,
+  getThemeComponentJs,
   exportThemeZip
 } from "./server/themeStore";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -2046,6 +2047,19 @@ Decide whether one of the available functions matches what the user is asking fo
       res.setHeader("Content-Type", result.contentType);
       res.setHeader("Cache-Control", "no-cache");
       res.send(result.css);
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // سرو کامپوننت قالب (theme.js) — اختیاری؛ فقط اگر در پوشه قالب باشد
+  app.get("/api/themes/:id/theme.js", (req, res) => {
+    try {
+      const result = getThemeComponentJs(req.params.id);
+      if (!result) return res.status(404).json({ error: "Theme has no component" });
+      res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.send(Buffer.from(result.data));
     } catch (e) {
       res.status(400).json({ error: String(e) });
     }

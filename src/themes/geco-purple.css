@@ -24,6 +24,14 @@ body[data-theme='geco-purple'] {
 
   --font-display: "Space Grotesk", "Vazirmatn", sans-serif;
 }
+/* ---------- حلقه‌ی فوکوس کیبورد (قانون UX: Focus Visibility) ---------- */
+.theme-geco-purple :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.25);
+}
+
+
 
 /* ---------- ۲) پس‌زمینه: هاله‌های بنفش نئونی ---------- */
 body[data-theme='geco-purple'],

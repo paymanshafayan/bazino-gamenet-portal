@@ -21,6 +21,14 @@ body[data-theme='gaming-amp'] {
   --theme-btn-skew: 0deg;
   --theme-btn-radius: 0.25rem;
 }
+/* ---------- حلقه‌ی فوکوس کیبورد (قانون UX: Focus Visibility) ---------- */
+.theme-gaming-amp :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 216, 255, 0.25);
+}
+
+
 
 /* ---------- ۲) پس‌زمینه: خطوط مورب فیروزه‌ای ---------- */
 body[data-theme='gaming-amp'],

@@ -126,6 +126,24 @@
   color: var(--primary-color, #1bc2ca) !important;
 }
 
+/* قوانین UX (UI/UX Pro Max): حداقل هدف لمسی ۴۴×۴۴px در موبایل
+   (قانون Touch Target Size) — دکمه‌های کوچک روی صفحه‌های لمسی بزرگ می‌شوند */
+@media (pointer: coarse) {
+  .btn,
+  .theme-btn,
+  button {
+    min-height: 44px;
+  }
+  .btn,
+  .theme-btn {
+    min-width: 44px;
+  }
+  button svg.lucide {
+    min-width: 18px;
+    min-height: 18px;
+  }
+}
+
 .btn-primary-outline:hover {
   background-color: var(--primary-color, #1bc2ca) !important;
   color: var(--dark-bg-color, #0b1125) !important;
@@ -170,6 +188,14 @@ body {
 .animate-scan-line-slow {
   position: absolute;
   animation: scan-line-anim 4s ease-in-out infinite;
+}
+
+/* قوانین UX (UI/UX Pro Max): حلقه‌ی فوکوس قابل مشاهده برای ناوبری کیبورد
+   (قانون Focus Visibility) — هر عنصر تعاملی هنگام فوکوس کیبورد ring دارد */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color, #ffb800);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -359,4 +385,26 @@ html, body {
     filter:blur(6px);
 
     pointer-events:none;
+}
+
+
+/* قوانین UX (UI/UX Pro Max): احترام به تنظیم کاهش حرکت کاربر
+   (قانون Reduced Motion) — همه‌ی انیمیشن‌ها/ترنزیشن‌ها غیرفعال می‌شوند */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* قوانین UX (UI/UX Pro Max): کنتراست متن‌های کمرنگ روی زمینه‌ی تیره
+   (قانون Color Contrast) — gray-500 (نسبت ~3.8:1) به gray-400 (نسبت ~7.2:1)
+   ارتقا می‌یابد تا متن عادی همیشه ≥4.5:1 باشد */
+body[data-theme] .text-gray-500 {
+  color: #9ca3af;
 }

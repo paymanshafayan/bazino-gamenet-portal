@@ -686,7 +686,28 @@ html, body {
 }
 
 
+/* ─── قوانین UX (UI/UX Pro Max): حداقل هدف لمسی ۴۴×۴۴px در موبایل ─── */
+@media (pointer: coarse) {
+  .btn, .theme-btn, button { min-height: 44px; }
+  .btn, .theme-btn { min-width: 44px; }
+}
 
+/* ─── قوانین UX: حلقهی فوکوس کیبورد قابل مشاهده ─── */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color, #ffb800);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
+/* ─── قوانین UX: احترام به کاهش حرکت کاربر ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
-
+/* ─── قوانین UX: کنتراست متنهای کمرنگ روی زمینه تیره (gray-500 → gray-400) ─── */
+body[data-theme] .text-gray-500 { color: #9ca3af; }

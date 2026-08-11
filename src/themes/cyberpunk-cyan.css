@@ -22,6 +22,14 @@ body[data-theme='cyberpunk-cyan'] {
   --theme-btn-skew: 0deg;
   --theme-btn-radius: 0;
 }
+/* ---------- حلقه‌ی فوکوس کیبورد (قانون UX: Focus Visibility) ---------- */
+.theme-cyberpunk-cyan :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 240, 255, 0.25);
+}
+
+
 
 /* ---------- ۲) پس‌زمینه: شبکه سایبر + هاله نئونی ---------- */
 body[data-theme='cyberpunk-cyan'],

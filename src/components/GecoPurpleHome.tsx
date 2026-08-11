@@ -451,7 +451,7 @@ export default function GecoPurpleHome({
               <div className="h-64 p-8 flex items-center justify-center bg-[#161824] border-b border-white/5 relative overflow-hidden">
                 <ShoppingBag className="w-24 h-24 text-white/5 group-hover:scale-125 transition-transform duration-500" />
                 <div className="absolute inset-0 flex items-center justify-center p-8">
-                   <img loading="lazy" src={prod.url} alt="" className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
+                   <img loading="lazy" src={prod.url} alt={prod.name} className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
               <div className="p-6 flex flex-col items-center text-center">

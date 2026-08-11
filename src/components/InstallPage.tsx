@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Database, Server, Shield, Sparkles, Layout, Globe, Check, AlertCircle, ChevronRight, Terminal, User
 } from 'lucide-react';
-import bazinoLogo from '../assets/images/bazino_logo_user.png';
+import bazinoLogo from '../assets/images/bazino_logo_user.webp';
 
 interface InstallPageProps {
   onInstallationComplete: () => void;
@@ -219,7 +219,7 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
         <div className="bg-[#0b0e24]/80 border border-white/10 rounded-3xl p-6 md:p-8 mb-6 text-center backdrop-blur-xl relative overflow-hidden">
           <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent animate-pulse" />
           <div className="flex items-center justify-center gap-4 mb-4">
-            <img loading="lazy" src={bazinoLogo} alt="Bazino Pro" className="h-16 w-auto" />
+            <img loading="lazy" src={bazinoLogo} alt="Bazino Pro" width="64" height="64" className="h-16 w-auto" />
             <div className="h-12 w-[1px] bg-white/10" />
             <h1 className="text-3xl font-display font-black tracking-wider text-white">
               BAZINO <span className="text-emerald-500">PRO</span>

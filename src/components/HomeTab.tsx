@@ -722,8 +722,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             {/* Soft lightweight overlay removed to keep images bright as per user request */}
             <div className="absolute inset-0 bg-transparent z-10" />
             
-            {/* Slide Image — LCP: باید eager بماند */}
-            <img loading="eager" fetchpriority="high"
+            {/* Slide Image — فقط اسلاید فعال eager است (LCP)؛ بقیه lazy */}
+            <img
+              loading={activeBanner === idx ? 'eager' : 'lazy'}
+              fetchpriority={activeBanner === idx ? 'high' : 'auto'}
               src={game.imageUrl}
               alt={getLocText(game.title)}
               className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-all duration-[10s] ease-out"

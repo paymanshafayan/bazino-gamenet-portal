@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { Tournament } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
-import GamingAmpHome from './GamingAmpHome';
-import GecoPurpleHome from './GecoPurpleHome';
 import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
+
+// نماهای اختصاصی قالب‌ها — فقط وقتی قالب مربوطه فعال باشد دانلود می‌شوند
+const GamingAmpHome = lazy(() => import('./GamingAmpHome'));
+const GecoPurpleHome = lazy(() => import('./GecoPurpleHome'));
 import { 
   Gamepad2, 
   Tv, 
@@ -655,6 +657,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
   if (themeId === 'geco-purple') {
     return (
+      <Suspense fallback={<div className="w-full py-24 flex justify-center"><div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>}>
       <GecoPurpleHome
         featuredGames={activeBanners}
         matchHistory={matchHistory}
@@ -664,6 +667,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         staffTeam={staffTeam}
         onNavigate={onNavigate}
       />
+      </Suspense>
     );
   }
 
@@ -688,6 +692,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
   if (themeId === 'gaming-amp') {
     return (
+      <Suspense fallback={<div className="w-full py-24 flex justify-center"><div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>}>
       <GamingAmpHome
         featuredGames={activeBanners}
         gameGenres={gameGenres}
@@ -698,6 +703,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         onNavigate={onNavigate}
         tournaments={tournaments}
       />
+      </Suspense>
     );
   }
 

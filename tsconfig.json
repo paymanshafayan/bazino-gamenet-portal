@@ -25,6 +25,7 @@
   },
   "exclude": [
     "Management App",
+    "flutter_app",
     "node_modules",
     "dist"
   ]

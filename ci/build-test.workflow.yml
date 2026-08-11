@@ -112,6 +112,12 @@ jobs:
       - name: Build backend bundle (esbuild → dist/server.cjs)
         run: npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs
 
+      # استاتیک‌های عمومی (لوگو و ...) را برای بوت production در dist قرار بده
+      - name: Copy public assets into dist
+        run: |
+          mkdir -p dist
+          cp -r public/. dist/
+
       - name: Boot server & smoke-test APIs
         run: |
           set -euo pipefail

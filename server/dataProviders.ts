@@ -4,7 +4,16 @@ import { createRequire } from 'module';
 
 // ESM compatibility bridge: this file (and its provider classes) uses
 // CommonJS `require(...)` for lazy-loading optional DB drivers.
-const require = createRequire(import.meta.url);
+// Under ESM we use import.meta.url; under the CJS production bundle
+// (dist/server.cjs) neither import.meta.url nor __filename is reliably
+// defined by esbuild, so we fall back to an absolute path inside the
+// project root (createRequire only needs any absolute file path to
+// resolve node_modules from).
+const require = createRequire(
+  (typeof import.meta !== 'undefined' && (import.meta as any).url)
+    ? (import.meta as any).url
+    : path.join(process.cwd(), 'server', 'dataProviders.ts')
+);
 
 // -----------------------------------------------------------------------------
 // Query/activity logger shown in the admin panel ("Database Activity" widget)

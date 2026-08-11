@@ -8,10 +8,18 @@
 /// Defaults to the real production domain (confirmed live — serves the
 /// Bazino Game Center site). Override for local development with:
 ///   flutter run --dart-define=API_BASE_URL=http://localhost:3000
-const String kApiBaseUrl = String.fromEnvironment(
+///
+/// The configured value may include a trailing slash (e.g. "https://bazino.pro/").
+const String _kApiBaseUrlConfigured = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://bazino.pro',
+  defaultValue: 'https://bazino.pro/',
 );
+
+/// Normalized base URL — always WITHOUT a trailing slash, so that string
+/// concatenation (`'$kApiBaseUrl/api/...'`) never produces a double slash
+/// (`https://bazino.pro//api/...`). Works for any value passed via
+/// `--dart-define=API_BASE_URL=...` (with or without trailing slash).
+final String kApiBaseUrl = _kApiBaseUrlConfigured.replaceFirst(RegExp(r'/+$'), '');
 
 /// The same server, as a WebSocket URL, for the real-time chat/notification
 /// stream (`ws://.../api/chat/ws` — the exact same endpoint the website uses).

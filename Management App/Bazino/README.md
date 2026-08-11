@@ -1,20 +1,33 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+
+# 🖥️ Bazino Pro — Management App
+
+**اپلیکیشن دسکتاپ مدیریت کلوپ گیمینگ بازینو**
+
+مدیریت ایستگاه‌ها، صندوق، بوفه، مشتریان و همگام‌سازی با وب‌سایت بازینو
+
 </div>
 
-# Run and deploy your AI Studio app
+## 🚀 اجرای محلی
 
-This contains everything you need to run your app locally.
+**پیش‌نیاز:** Node.js
 
-View your app in AI Studio: https://ai.studio/apps/1028c664-0ff1-40c2-b6e9-aefdd95eb536
+```bash
+npm install
+npm run dev
+```
 
-## Run Locally
+## 🔧 بیلد
 
-**Prerequisites:**  Node.js
+```bash
+npm run build
+```
 
+خروجی در پوشه `dist/` قرار می‌گیرد و وب‌سایت بازینو آن را در مسیر `/management-app/` سرو می‌کند.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🔑 تنظیمات
+
+| متغیر | توضیح |
+|---|---|
+| `GEMINI_API_KEY` | کلید API گوگل جمینای (برای قابلیت‌های هوش مصنوعی) |
+| `APP_URL` | آدرس عمومی میزبانی برنامه |

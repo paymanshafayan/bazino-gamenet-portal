@@ -1,7 +1,7 @@
 // Loads a `.env` file at the project root into process.env, if one exists (safe no-op
-// otherwise — e.g. under Google AI Studio, where GEMINI_API_KEY/APP_URL are injected
-// directly into the environment and no .env file is present). `dotenv` was already an
-// installed dependency but was never actually imported anywhere; see PUBLISH_AND_DATABASE_GUIDE.md.
+// otherwise — e.g. under a managed hosting platform, where GEMINI_API_KEY/APP_URL
+// are injected directly into the environment and no .env file is present). `dotenv`
+// was already an installed dependency but was never actually imported anywhere.
 import "dotenv/config";
 import express from "express";
 import compression from "compression";
@@ -2419,7 +2419,7 @@ namespace GameNet.Infrastructure.Migrations
         apiKey: key,
         httpOptions: {
           headers: {
-            'User-Agent': 'aistudio-build',
+            'User-Agent': 'bazino-pro-server',
           }
         }
       });
@@ -2759,8 +2759,8 @@ Example format:
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        // Allow preview/forwarded hosts (e.g. AI Studio / sandbox preview
-        // domains) — dev only; production serves static files below.
+        // Allow preview/forwarded hosts (sandbox preview domains) —
+        // dev only; production serves static files below.
         allowedHosts: true,
       },
       appType: "spa",

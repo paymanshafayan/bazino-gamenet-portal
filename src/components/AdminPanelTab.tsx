@@ -3839,11 +3839,11 @@ export default function AdminPanelTab({
                     <p className="text-xs text-gray-400 mb-4 leading-relaxed">
                       {language === 'fa' ? (
                         <>
-                          برای فعال‌سازی قابلیت‌های هوش مصنوعی (مانند ربات Jarvis و ترجمه خودکار متن)، سیستم نیازمند <strong className="text-white">Gemini API Key</strong> است. این کلید به‌صورت خودکار در سرور توسط محیط AI Studio تزریق می‌شود، اما باید آن را از سایت گوگل دریافت کرده و در پنل مدیریت محیط تنظیم کنید.
+                          برای فعال‌سازی قابلیت‌های هوش مصنوعی (مانند ربات Jarvis و ترجمه خودکار متن)، سیستم نیازمند <strong className="text-white">Gemini API Key</strong> است. این کلید به‌صورت خودکار در سرور از طریق متغیر محیطی تزریق می‌شود، اما باید آن را از سایت گوگل دریافت کرده و در پنل تنظیمات محیط میزبانی خود قرار دهید.
                         </>
                       ) : (
                         <>
-                          To enable AI features (like the Jarvis assistant and auto-translations), the system requires a <strong className="text-white">Gemini API Key</strong>. This key is automatically injected by the AI Studio environment, but you need to obtain it from Google and configure it in the platform.
+                          To enable AI features (like the Jarvis assistant and auto-translations), the system requires a <strong className="text-white">Gemini API Key</strong>. This key is automatically injected on the server via an environment variable, but you need to obtain it from Google and configure it in your hosting platform's settings.
                         </>
                       )}
                     </p>
@@ -3855,23 +3855,21 @@ export default function AdminPanelTab({
                       <ol className="list-decimal list-inside text-xs text-gray-300 space-y-2 leading-loose">
                         {language === 'fa' ? (
                           <>
-                            <li>به سایت <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">aistudio.google.com</a> مراجعه کنید.</li>
+                            <li>به سایت <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a> مراجعه کنید.</li>
                             <li>با اکانت گوگل خود وارد شوید و یک API Key جدید بسازید (Create API Key).</li>
                             <li>کلید ساخته شده را کپی کنید (شبیه به <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>در همین محیط (AI Studio)، روی دکمه <strong>Settings</strong> (آیکون چرخ‌دنده در منوی پلتفرم) کلیک کنید.</li>
-                            <li>به بخش <strong>Secrets</strong> بروید.</li>
-                            <li>یک Secret جدید با نام دقیق <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code> بسازید.</li>
+                            <li>در پنل تنظیمات محیط میزبانی خود (بخش <strong>Settings/Secrets</strong>)، یک متغیر محیطی (Environment Variable) جدید بسازید.</li>
+                            <li>نام دقیق متغیر: <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code></li>
                             <li>مقدار کلید کپی شده را در آن قرار داده و ذخیره کنید.</li>
                             <li>ممکن است نیاز باشد یک بار کانتینر اپلیکیشن مجددا راه‌اندازی (Restart) شود.</li>
                           </>
                         ) : (
                           <>
-                            <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">aistudio.google.com</a>.</li>
+                            <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a>.</li>
                             <li>Log in with your Google account and click "Create API Key".</li>
                             <li>Copy the generated key (looks like <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>In this platform (AI Studio), click the <strong>Settings</strong> button (gear icon).</li>
-                            <li>Navigate to the <strong>Secrets</strong> section.</li>
-                            <li>Create a new secret with the exact name <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code>.</li>
+                            <li>In your hosting platform's settings (e.g. <strong>Settings/Secrets</strong>), create a new environment variable.</li>
+                            <li>Use the exact name <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code>.</li>
                             <li>Paste the copied key as its value and save.</li>
                             <li>You might need to restart the application container for the changes to take effect.</li>
                           </>

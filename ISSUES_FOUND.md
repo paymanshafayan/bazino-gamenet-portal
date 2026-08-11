@@ -74,7 +74,7 @@ SELECT * FROM users WHERE ... AND password = ?                          -- مق�
 `Bazino_Pro_Presentation.pdf/html` (~۷ مگابایت)، `zip_project.py`، `database.json` (که علاوه بر مشکل امنیتی‌اش، اصلاً نباید در مسیر deploy باشد)
 
 ### ۴.۳ کامپوننت‌های ابزار توسعه داخل اپ اصلی
-`src/App.tsx` مستقیماً `CsharpCodeViewer`, `FlutterCodeViewer`, `PresentationTab`, `InstallPage` را ایمپورت می‌کند — این‌ها ابزار دمو/AI Studio هستند، نه چیزی که کاربر نهایی گیم‌نت باید ببیند.
+`src/App.tsx` مستقیماً `CsharpCodeViewer`, `FlutterCodeViewer`, `PresentationTab`, `InstallPage` را ایمپورت می‌کند — این‌ها ابزارهای دمو/توسعه هستند، نه چیزی که کاربر نهایی گیم‌نت باید ببیند.
 
 ---
 

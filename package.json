@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "bazino-pro",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -20,6 +20,7 @@
     "compression": "^1.8.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "fflate": "^0.8.3",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.546.0",
     "mongodb": "^6.9.0",
@@ -48,5 +49,6 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
-  }
+  },
+  "description": "Bazino Pro — Gaming net club platform (reservation, cafe, shop, tournaments, loyalty, themes)"
 }

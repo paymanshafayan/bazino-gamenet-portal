@@ -37,12 +37,20 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
 import VisualHelpGuide from './VisualHelpGuide';
+import type { ThemeInfo } from '../themes';
+import {
+  parseThemeZip,
+  buildSampleThemeZip,
+  buildThemeZip,
+  downloadZip,
+  type ParsedZipTheme
+} from '../themes/zip';
 
 interface Props {
   themeId?: string;
   setThemeId?: (id: string) => void;
-  availableThemes?: {id: string; name: string; type: string}[];
-  setAvailableThemes?: React.Dispatch<React.SetStateAction<{id: string; name: string; type: string}[]>>;
+  availableThemes?: ThemeInfo[];
+  setAvailableThemes?: React.Dispatch<React.SetStateAction<ThemeInfo[]>>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
   layoutMode?: 'classic' | 'hub';
   setLayoutMode?: (mode: 'classic' | 'hub') => void;
@@ -79,12 +87,26 @@ export default function AdminPanelTab({
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [isResettingDb, setIsResettingDb] = useState(false);
 
+  // Data source state (sample ⇄ database)
+  const [dataSource, setDataSource] = useState<'sample' | 'database'>('sample');
+  const [dataSourceInfo, setDataSourceInfo] = useState<{ sample: Record<string, number>; database: Record<string, number> } | null>(null);
+  const [isSwitchingDataSource, setIsSwitchingDataSource] = useState(false);
+
   // Theme upload/creation states
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'zip' | 'quick'>('zip');
   const [newThemeName, setNewThemeName] = useState('');
   const [newThemePrimary, setNewThemePrimary] = useState('#1bc2ca');
   const [newThemeBg, setNewThemeBg] = useState('#0b1125');
   const [newThemeCard, setNewThemeCard] = useState('#121a30');
+
+  // ZIP theme install states
+  const [zipFileName, setZipFileName] = useState('');
+  const [zipParsed, setZipParsed] = useState<ParsedZipTheme | null>(null);
+  const [zipFileBytes, setZipFileBytes] = useState<Uint8Array | null>(null);
+  const [zipError, setZipError] = useState('');
+  const [isParsingZip, setIsParsingZip] = useState(false);
+  const [isInstallingZip, setIsInstallingZip] = useState(false);
 
   // Messages form and states
   const [recipient, setRecipient] = useState('All');
@@ -635,7 +657,9 @@ export default function AdminPanelTab({
       return;
     }
     
-    const id = newThemeName.trim().toLowerCase().replace(/\s+/g, '-');
+    // Build a CSS-safe theme id (persian/non-latin chars are stripped)
+    let id = newThemeName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (!id) id = 'custom-theme-' + Date.now();
     
     // Check if it already exists
     if (availableThemes.some(t => t.id === id)) {
@@ -643,10 +667,11 @@ export default function AdminPanelTab({
       return;
     }
     
-    const newTheme = {
+    const newTheme: ThemeInfo = {
       id,
       name: newThemeName.trim(),
       type: 'custom',
+      kind: 'colors',
       colors: {
         primary: newThemePrimary,
         bg: newThemeBg,
@@ -665,19 +690,221 @@ export default function AdminPanelTab({
     setShowUploadForm(false);
   };
 
-  const handleDeleteTheme = (id: string, name: string) => {
-    if (setAvailableThemes) {
-      setAvailableThemes(prev => prev.filter(t => t.id !== id));
+  /* ---------- نصب قالب از فایل ZIP (فرمت جدید: theme.json + theme.css + assets/) ----------
+   * پیش‌نمایش متادیتا به‌صورت محلی انجام می‌شود؛ اما خود نصب روی سرور
+   * انجام می‌شود تا قالب پوشه اختصاصی خودش (با assets) را داشته باشد. */
+  const handleZipFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // اجازه انتخاب دوباره همان فایل
+    e.target.value = '';
+
+    setZipFileName(file.name);
+    setZipError('');
+    setZipParsed(null);
+    setZipFileBytes(null);
+    setIsParsingZip(true);
+
+    try {
+      const buffer = new Uint8Array(await file.arrayBuffer());
+      setZipFileBytes(buffer);
+      const result = parseThemeZip(buffer, file.name);
+
+      if ('error' in result) {
+        setZipError(result.error);
+        addNotification(language === 'fa' ? `خطا در خواندن ZIP: ${result.error}` : `ZIP parse error: ${result.error}`, 'error');
+        return;
+      }
+
+      // بررسی تکراری نبودن شناسه (بین قالب‌های محلی و سروری)
+      if (availableThemes.some(t => t.id === result.meta.id)) {
+        setZipError(language === 'fa'
+          ? `قالبی با شناسه «${result.meta.id}» قبلاً نصب شده است`
+          : `A theme with id "${result.meta.id}" is already installed`);
+        addNotification(language === 'fa' ? 'قالب تکراری است' : 'Duplicate theme', 'error');
+        return;
+      }
+
+      const assetCount = Object.keys(result.assets).length;
+      setZipParsed(result);
+      addNotification(language === 'fa'
+        ? `فایل ZIP با موفقیت خوانده شد: «${result.meta.name}» (${(result.css.length / 1024).toFixed(1)}KB CSS${assetCount > 0 ? ` + ${assetCount} فایل assets` : ''})`
+        : `ZIP parsed: "${result.meta.name}" (${(result.css.length / 1024).toFixed(1)}KB CSS${assetCount > 0 ? ` + ${assetCount} assets` : ''})`, 'success');
+    } catch (err) {
+      console.error('[Themes] ZIP parse error:', err);
+      setZipError(language === 'fa' ? 'خطا در خواندن فایل ZIP' : 'Failed to read ZIP file');
+    } finally {
+      setIsParsingZip(false);
     }
-    if (themeId === id && setThemeId) {
+  };
+
+  /* ---------- نصب روی سرور (پوشه اختصاصی قالب + assets) ---------- */
+  const handleInstallZip = async () => {
+    if (!zipParsed || !zipFileBytes) return;
+    if (!setAvailableThemes) return;
+
+    setIsInstallingZip(true);
+    try {
+      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: zipFileBytes as unknown as BodyInit,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setZipError(data.error || 'خطا در نصب قالب');
+        addNotification(language === 'fa' ? `خطا در نصب: ${data.error || ''}` : `Install error: ${data.error || ''}`, 'error');
+        return;
+      }
+
+      const serverTheme: ThemeInfo = {
+        id: data.theme.id,
+        name: data.theme.name,
+        type: 'custom',
+        kind: 'server',
+        version: data.theme.version,
+        description: data.theme.description,
+        colors: data.theme.colors,
+        cssUrl: data.theme.cssUrl,
+        hasAssets: data.theme.hasAssets,
+        assetFiles: data.theme.assetFiles,
+      };
+
+      setAvailableThemes(prev => [...prev, serverTheme]);
+      addNotification(language === 'fa'
+        ? `قالب «${serverTheme.name}» روی سرور نصب و فعال شد${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} فایل assets)` : ''}`
+        : `Theme "${serverTheme.name}" installed on server & activated${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} assets)` : ''}`, 'success');
+
+      // فعال‌سازی فوری
+      if (setThemeId) setThemeId(serverTheme.id);
+
+      setZipParsed(null);
+      setZipFileBytes(null);
+      setZipFileName('');
+      setZipError('');
+      setShowUploadForm(false);
+      setUploadMode('zip');
+    } catch (err) {
+      console.error('[Themes] Install error:', err);
+      setZipError(language === 'fa' ? 'خطا در ارتباط با سرور' : 'Server connection error');
+    } finally {
+      setIsInstallingZip(false);
+    }
+  };
+
+  /* ---------- دانلود قالب نمونه (فرمت جدید ZIP) ---------- */
+  const handleDownloadSampleZip = () => {
+    try {
+      downloadZip(buildSampleThemeZip(), 'bazino-theme-sample.zip');
+      addNotification(language === 'fa'
+        ? 'فایل قالب نمونه دانلود شد — ساختار theme.json + theme.css را ببینید'
+        : 'Sample theme zip downloaded — see theme.json + theme.css structure', 'success');
+    } catch (e) {
+      console.error(e);
+      addNotification(language === 'fa' ? 'خطا در ساخت فایل نمونه' : 'Failed to build sample zip', 'error');
+    }
+  };
+
+  /* ---------- خروجی گرفتن ZIP از یک قالب نصب‌شده ----------
+   * قالب‌های سروری از سرور دانلود می‌شوند (شامل پوشه assets)؛
+   * قالب‌های محلی با buildThemeZip ساخته می‌شوند. */
+  const handleExportThemeZip = async (theme: ThemeInfo) => {
+    try {
+      if (theme.kind === 'server') {
+        const res = await fetch(`/api/themes/${encodeURIComponent(theme.id)}/export`);
+        if (!res.ok) throw new Error('export failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${theme.id}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      } else {
+        downloadZip(buildThemeZip(theme), `${theme.id}.zip`);
+      }
+      addNotification(language === 'fa' ? `پکیج ZIP قالب «${theme.name}» دانلود شد` : `Theme "${theme.name}" zip downloaded`, 'success');
+    } catch (e) {
+      console.error(e);
+      addNotification(language === 'fa' ? 'خطا در ساخت فایل ZIP' : 'Failed to build zip', 'error');
+    }
+  };
+
+  const handleDeleteTheme = async (theme: ThemeInfo) => {
+    // قالب‌های سروری: پوشه اختصاصی قالب روی سرور هم حذف می‌شود
+    if (theme.kind === 'server') {
+      try {
+        const res = await fetch(`/api/admin/themes/${encodeURIComponent(theme.id)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          addNotification(language === 'fa' ? 'خطا در حذف قالب از سرور' : 'Failed to delete theme on server', 'error');
+          return;
+        }
+      } catch (e) {
+        console.error(e);
+        addNotification(language === 'fa' ? 'خطا در ارتباط با سرور' : 'Server connection error', 'error');
+        return;
+      }
+    }
+
+    if (setAvailableThemes) {
+      setAvailableThemes(prev => prev.filter(t => t.id !== theme.id));
+    }
+    if (themeId === theme.id && setThemeId) {
       setThemeId('dark-gold');
     }
-    addNotification(language === 'fa' ? `قالب "${name}" با موفقیت حذف شد` : `Theme "${name}" deleted successfully`, 'success');
+    addNotification(
+      language === 'fa'
+        ? (theme.kind === 'server' ? `قالب "${theme.name}" و پوشه آن حذف شد` : `قالب "${theme.name}" با موفقیت حذف شد`)
+        : (theme.kind === 'server' ? `Theme "${theme.name}" and its folder deleted` : `Theme "${theme.name}" deleted successfully`),
+      'success'
+    );
   };
 
   useEffect(() => {
     fetchData();
+    // خواندن وضعیت فعلی منبع داده (نمونه / دیتابیس)
+    fetch('/api/data-source')
+      .then(r => r.json())
+      .then(data => {
+        if (data && (data.mode === 'sample' || data.mode === 'database')) {
+          setDataSource(data.mode);
+          setDataSourceInfo({ sample: data.sample || {}, database: data.database || {} });
+        }
+      })
+      .catch(err => console.error('Failed to read data source:', err));
   }, []);
+
+  const handleSwitchDataSource = async (mode: 'sample' | 'database') => {
+    if (mode === dataSource || isSwitchingDataSource) return;
+    setIsSwitchingDataSource(true);
+    try {
+      const res = await fetch('/api/admin/data-source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDataSource(mode);
+        addNotification(
+          language === 'fa'
+            ? (mode === 'sample' ? 'منبع داده به «نمونه» تغییر کرد — سایت و اپ از داده‌های نمونه می‌خوانند' : 'منبع داده به «دیتابیس» تغییر کرد — سایت و اپ از دیتابیس می‌خوانند')
+            : (mode === 'sample' ? 'Data source switched to Sample — site & app read from sample data' : 'Data source switched to Database — site & app read from the database'),
+          'success'
+        );
+      } else {
+        addNotification(language === 'fa' ? 'خطا در تغییر منبع داده' : 'Failed to switch data source', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      addNotification(language === 'fa' ? 'خطا در ارتباط با سرور' : 'Connection error', 'error');
+    } finally {
+      setIsSwitchingDataSource(false);
+    }
+  };
 
   // Update order status on server
   const handleUpdateCafeOrderStatus = async (orderId: string, status: string) => {
@@ -1255,13 +1482,13 @@ export default function AdminPanelTab({
                     {appSliders.map((slide) => (
                       <div key={slide.id} className="relative bg-[#0d122b] border border-white/5 rounded-xl overflow-hidden flex flex-col group">
                         <div className="h-40 w-full relative overflow-hidden bg-black/50">
-                          <img 
+                          <img loading="lazy" 
                             src={slide.imageUrl} 
                             alt={slide.titleFa} 
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover transition-transform group-hover:scale-105"
                           />
-                          <div className="absolute top-2 left-2 bg-black/65 px-2.5 py-1 rounded-full text-[9px] font-mono text-amber-500 font-bold uppercase tracking-wider border border-white/5">
+                          <div className="absolute top-2 left-2 bg-black/65 px-2.5 py-1 rounded-full text-[10px] font-mono text-amber-500 font-bold uppercase tracking-wider border border-white/5">
                             {slide.target}
                           </div>
                         </div>
@@ -1297,10 +1524,27 @@ export default function AdminPanelTab({
                 <div>
                   <h3 className="text-xl font-black uppercase mb-1">{language === 'fa' ? 'مدیریت قالب‌ها' : 'Theme Management'}</h3>
                   <p className="text-gray-400 text-sm">
-                    {language === 'fa' ? 'قالب‌های سیستم را مدیریت کنید و قالب جدید بارگذاری نمایید.' : 'Manage system themes and upload new ones.'}
+                    {language === 'fa'
+                      ? 'قالب را با فایل ZIP نصب کنید (فقط فایل CSS کافی است؛ theme.json اختیاری است) یا با رنگ‌ها قالب بسازید.'
+                      : 'Install themes from ZIP packages (CSS file is enough; theme.json optional) or build with colors.'}
+                  </p>
+                  <p className="text-[10px] text-gray-500 font-mono mt-1">
+                    {language === 'fa'
+                      ? 'هر قالب یک فایل CSS مستقل است و تمام صفحات سایت را پوشش می‌دهد'
+                      : 'Each theme is a standalone CSS file covering every page of the site'}
                   </p>
                 </div>
                 <div className="flex gap-2">
+                   <button 
+                     onClick={handleDownloadSampleZip}
+                     className="btn btn-primary-outline text-xs px-4 py-2 flex items-center gap-2 rounded-xl"
+                     title={language === 'fa' ? 'دانلود قالب نمونه با فرمت ZIP جدید' : 'Download a sample theme zip'}
+                   >
+                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                     </svg>
+                     {language === 'fa' ? 'دانلود قالب نمونه' : 'Sample Theme'}
+                   </button>
                    <button 
                      onClick={() => setShowUploadForm(!showUploadForm)}
                      className="btn btn-primary-outline text-xs px-4 py-2 flex items-center gap-2 rounded-xl"
@@ -1308,7 +1552,7 @@ export default function AdminPanelTab({
                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                      </svg>
-                     {language === 'fa' ? 'آپلود قالب (.zip)' : 'Upload Theme'}
+                     {language === 'fa' ? 'نصب قالب جدید' : 'Install Theme'}
                    </button>
                 </div>
               </div>
@@ -1375,11 +1619,11 @@ export default function AdminPanelTab({
               </div>
 
               {showUploadForm && (
-                <form onSubmit={handleCreateTheme} className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-4 animate-fade-in">
+                <div className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-4 animate-fade-in">
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
                     <h4 className="font-bold text-md text-primary flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                      <span>{language === 'fa' ? 'آپلود و راه‌اندازی قالب جدید' : 'Upload & Install New Theme'}</span>
+                      <span>{language === 'fa' ? 'نصب قالب جدید' : 'Install New Theme'}</span>
                     </h4>
                     <button 
                       type="button" 
@@ -1390,107 +1634,240 @@ export default function AdminPanelTab({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* ZIP Upload Slot */}
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs text-gray-400 font-bold uppercase">{language === 'fa' ? 'فایل قالب (.zip)' : 'Theme Package (.zip)'}</label>
-                      <div className="border border-dashed border-white/10 hover:border-primary/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-black/10 transition-colors relative cursor-pointer group min-h-[120px]">
-                        <input 
-                          type="file" 
-                          accept=".zip" 
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              const file = e.target.files[0];
-                              const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, ' ');
-                              const formattedName = nameWithoutExt.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                              setNewThemeName(formattedName);
-                              addNotification(language === 'fa' ? `فایل ${file.name} با موفقیت شناسایی شد. نام قالب به طور خودکار تنظیم گردید!` : `File ${file.name} loaded. Theme name populated!`, 'info');
-                            }
-                          }}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                        <svg className="w-8 h-8 text-gray-500 group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors text-center">{language === 'fa' ? 'فایل zip قالب را بکشید یا انتخاب کنید' : 'Drag or select theme zip file'}</span>
-                        <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'سیستم به صورت خودکار متادیتا را استخراج می‌کند' : 'System auto-extracts theme metadata'}</span>
-                      </div>
-                    </div>
+                  {/* Mode Tabs */}
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => { setUploadMode('zip'); setZipError(''); }}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                        uploadMode === 'zip'
+                          ? 'bg-primary text-black border-primary shadow-[0_0_12px_rgba(255,184,0,0.25)]'
+                          : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span>{language === 'fa' ? 'نصب از فایل ZIP (فرمت جدید)' : 'Install from ZIP'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setUploadMode('quick'); setZipError(''); }}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                        uploadMode === 'quick'
+                          ? 'bg-primary text-black border-primary shadow-[0_0_12px_rgba(255,184,0,0.25)]'
+                          : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      <span>{language === 'fa' ? 'ساخت سریع با رنگ' : 'Quick Build (Colors)'}</span>
+                    </button>
+                  </div>
 
+                  {uploadMode === 'zip' ? (
                     <div className="space-y-4">
-                      {/* Theme Name */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs text-gray-400 font-bold uppercase">{language === 'fa' ? 'نام قالب' : 'Theme Name'}</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={newThemeName}
-                          onChange={(e) => setNewThemeName(e.target.value)}
-                          placeholder="e.g. Synthwave Horizon"
-                          className="px-4 py-2.5 bg-black/20 border border-white/5 rounded-xl text-xs text-white placeholder-gray-600 outline-none focus:border-primary/50 transition-colors w-full"
-                        />
+                      {/* ZIP Upload Slot */}
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-400 font-bold uppercase">
+                          {language === 'fa' ? 'فایل پکیج قالب (.zip)' : 'Theme Package (.zip)'}
+                        </label>
+                        <div className="border border-dashed border-white/10 hover:border-primary/40 rounded-xl p-5 flex flex-col items-center justify-center gap-2 bg-black/10 transition-colors relative cursor-pointer group min-h-[130px]">
+                          <input 
+                            type="file" 
+                            accept=".zip" 
+                            onChange={handleZipFileSelect}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                          {isParsingZip ? (
+                            <>
+                              <span className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                              <span className="text-xs font-bold text-gray-300">{language === 'fa' ? 'در حال استخراج متادیتا و CSS قالب...' : 'Extracting theme metadata & CSS...'}</span>
+                            </>
+                          ) : zipParsed ? (
+                            <>
+                              <span className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                                <Check className="w-5 h-5" strokeWidth={3} />
+                              </span>
+                              <span className="text-xs font-black text-emerald-400">{zipParsed.meta.name}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">{zipFileName}</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-8 h-8 text-gray-500 group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors text-center">{language === 'fa' ? 'فایل zip قالب را انتخاب کنید' : 'Select theme zip file'}</span>
+                              <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'فرمت: theme.json + theme.css + پوشه assets/ (اختیاری)' : 'Format: theme.json + theme.css + assets/ folder (optional)'}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Color Pickers */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ اصلی' : 'Primary'}</label>
-                          <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
-                            <input 
-                              type="color" 
-                              value={newThemePrimary}
-                              onChange={(e) => setNewThemePrimary(e.target.value)}
-                              className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
-                            />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
+                      {/* Parse Error */}
+                      {zipError && (
+                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold leading-relaxed flex items-start gap-2">
+                          <X className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{zipError}</span>
+                        </div>
+                      )}
+
+                      {/* Parsed Metadata Preview */}
+                      {zipParsed && !zipError && (
+                        <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                              {language === 'fa' ? 'پیش‌نمایش متادیتای قالب' : 'Parsed Theme Metadata'}
+                            </span>
+                            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[10px] font-mono font-bold">
+                              {language === 'fa' ? 'آماده نصب' : 'READY TO INSTALL'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            <div>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نام' : 'Name'}</span>
+                              <span className="text-white font-black">{zipParsed.meta.name}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">ID</span>
+                              <span className="text-primary font-mono font-bold" dir="ltr">{zipParsed.meta.id}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نسخه' : 'Version'}</span>
+                              <span className="text-white font-mono font-bold">{zipParsed.meta.version || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">CSS / Assets</span>
+                              <span className="text-white font-mono font-bold">{(zipParsed.css.length / 1024).toFixed(1)}KB{Object.keys(zipParsed.assets).length > 0 ? ` + ${Object.keys(zipParsed.assets).length}` : ''}</span>
+                            </div>
+                          </div>
+                          {zipParsed.meta.description && (
+                            <p className="text-xs text-gray-400 leading-relaxed">{zipParsed.meta.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ‌ها:' : 'Colors:'}</span>
+                            {(['primary', 'bg', 'card'] as const).map(k => (
+                              <span key={k} className="flex items-center gap-1.5 text-[10px] font-mono text-gray-300">
+                                <span className="w-4 h-4 rounded border border-white/20" style={{ backgroundColor: zipParsed.meta.colors?.[k] || '#333' }} />
+                                <span className="hidden md:inline">{zipParsed.meta.colors?.[k]}</span>
+                              </span>
+                            ))}
+                            <span className="text-[10px] text-gray-500 font-mono mr-auto">{Object.keys(zipParsed.assets).length > 0 ? `assets: ${Object.keys(zipParsed.assets).join(', ')}` : 'بدون assets'}</span>
                           </div>
                         </div>
+                      )}
 
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'پس‌زمینه' : 'Background'}</label>
-                          <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
-                            <input 
-                              type="color" 
-                              value={newThemeBg}
-                              onChange={(e) => setNewThemeBg(e.target.value)}
-                              className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
-                            />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeBg}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'کارت‌ها' : 'Cards'}</label>
-                          <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
-                            <input 
-                              type="color" 
-                              value={newThemeCard}
-                              onChange={(e) => setNewThemeCard(e.target.value)}
-                              className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
-                            />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeCard}</span>
-                          </div>
+                      <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-white/5">
+                        <button 
+                          type="button" 
+                          onClick={handleDownloadSampleZip}
+                          className="px-3 py-2 text-[10px] font-bold uppercase rounded-xl bg-white/5 text-cyan-400 hover:text-white border border-white/10 hover:border-cyan-400/40 transition-all flex items-center gap-1.5"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          <span>{language === 'fa' ? 'دانلود قالب نمونه (فرمت جدید)' : 'Download Sample ZIP'}</span>
+                        </button>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button" 
+                            onClick={() => setShowUploadForm(false)} 
+                            className="px-4 py-2 text-xs font-bold uppercase rounded-xl bg-white/5 text-gray-400 hover:text-white transition-colors"
+                          >
+                            {language === 'fa' ? 'انصراف' : 'Cancel'}
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={handleInstallZip}
+                            disabled={!zipParsed || !!zipError || isParsingZip || isInstallingZip}
+                            className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
+                          >
+                            {isInstallingZip && (
+                              <span className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                            )}
+                            {isInstallingZip
+                              ? (language === 'fa' ? 'در حال نصب روی سرور...' : 'Installing on server...')
+                              : (language === 'fa' ? 'نصب و فعال‌سازی' : 'Install & Activate')}
+                          </button>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <form onSubmit={handleCreateTheme} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs text-gray-400 font-bold uppercase">{language === 'fa' ? 'نام قالب' : 'Theme Name'}</label>
+                          <input 
+                            type="text" 
+                            required
+                            value={newThemeName}
+                            onChange={(e) => setNewThemeName(e.target.value)}
+                            placeholder="e.g. Synthwave Horizon"
+                            className="px-4 py-2.5 bg-black/20 border border-white/5 rounded-xl text-xs text-white placeholder-gray-600 outline-none focus:border-primary/50 transition-colors w-full"
+                          />
+                        </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
-                    <button 
-                      type="button" 
-                      onClick={() => setShowUploadForm(false)} 
-                      className="px-4 py-2 text-xs font-bold uppercase rounded-xl bg-white/5 text-gray-400 hover:text-white transition-colors"
-                    >
-                      {language === 'fa' ? 'انصراف' : 'Cancel'}
-                    </button>
-                    <button 
-                      type="submit" 
-                      className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all"
-                    >
-                      {language === 'fa' ? 'نصب و فعال‌سازی' : 'Install & Activate'}
-                    </button>
-                  </div>
-                </form>
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ اصلی' : 'Primary'}</label>
+                            <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
+                              <input 
+                                type="color" 
+                                value={newThemePrimary}
+                                onChange={(e) => setNewThemePrimary(e.target.value)}
+                                className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
+                              />
+                              <span className="text-[10px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'پس‌زمینه' : 'Background'}</label>
+                            <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
+                              <input 
+                                type="color" 
+                                value={newThemeBg}
+                                onChange={(e) => setNewThemeBg(e.target.value)}
+                                className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
+                              />
+                              <span className="text-[10px] font-mono text-gray-400 truncate">{newThemeBg}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'کارت‌ها' : 'Cards'}</label>
+                            <div className="flex items-center gap-1.5 bg-black/20 border border-white/5 rounded-xl p-1.5">
+                              <input 
+                                type="color" 
+                                value={newThemeCard}
+                                onChange={(e) => setNewThemeCard(e.target.value)}
+                                className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
+                              />
+                              <span className="text-[10px] font-mono text-gray-400 truncate">{newThemeCard}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+                        <button 
+                          type="button" 
+                          onClick={() => setShowUploadForm(false)} 
+                          className="px-4 py-2 text-xs font-bold uppercase rounded-xl bg-white/5 text-gray-400 hover:text-white transition-colors"
+                        >
+                          {language === 'fa' ? 'انصراف' : 'Cancel'}
+                        </button>
+                        <button 
+                          type="submit" 
+                          className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all"
+                        >
+                          {language === 'fa' ? 'ساخت و نصب قالب' : 'Build & Install'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1509,20 +1886,59 @@ export default function AdminPanelTab({
                         </div>
                         <div>
                           <h4 className="font-bold text-lg">{theme.name}</h4>
-                          <span className="text-[10px] uppercase tracking-wider text-gray-500">{theme.type === 'built-in' ? (language === 'fa' ? 'سیستمی' : 'Built-in') : (language === 'fa' ? 'سفارشی' : 'Custom')}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                              {theme.type === 'built-in' 
+                                ? (language === 'fa' ? 'سیستمی' : 'Built-in') 
+                                : theme.kind === 'server'
+                                    ? (language === 'fa' ? 'سروری (پوشه اختصاصی)' : 'Server (own folder)')
+                                : (theme.kind === 'zip' 
+                                    ? (language === 'fa' ? 'پکیج ZIP' : 'ZIP Package')
+                                    : (language === 'fa' ? 'سفارشی (رنگ)' : 'Custom (Colors)'))}
+                            </span>
+                            {theme.hasAssets && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono font-bold" title={theme.assetFiles?.join(', ')}>
+                                📁 {theme.assetFiles?.length || 0} assets
+                              </span>
+                            )}
+                            {theme.type === 'custom' && theme.css && (
+                              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-mono font-bold">
+                                CSS {(theme.css.length / 1024).toFixed(1)}KB
+                              </span>
+                            )}
+                            {theme.version && (
+                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10 text-[10px] font-mono font-bold">
+                                v{theme.version}
+                              </span>
+                            )}
+                          </div>
+                          {theme.description && (
+                            <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">{theme.description}</p>
+                          )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5">
                         {theme.type !== 'built-in' && (
-                          <button 
-                            onClick={() => handleDeleteTheme(theme.id, theme.name)}
-                            className="text-gray-500 hover:text-accent-red transition-colors"
-                            title={language === 'fa' ? 'حذف' : 'Delete'}
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          <>
+                            <button 
+                              onClick={() => handleExportThemeZip(theme)}
+                              className="p-1.5 text-gray-500 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
+                              title={language === 'fa' ? 'دانلود پکیج ZIP این قالب' : 'Download this theme as ZIP'}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteTheme(theme)}
+                              className="p-1.5 text-gray-500 hover:text-accent-red hover:bg-red-500/10 rounded-lg transition-colors"
+                              title={language === 'fa' ? 'حذف (پوشه قالب نیز حذف می‌شود)' : 'Delete (theme folder removed too)'}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -1558,7 +1974,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'کل درآمد فروشگاه و بوفه' : 'Total Revenue'}</span>
                   <span className="text-xl font-black text-white mt-1">{(stats.totalSales || 0).toLocaleString()} <span className="text-xs text-primary font-bold">تومان</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Real-time ledger audit log</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Real-time ledger audit log</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1567,7 +1983,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'تعداد رزرو سانس‌ها' : 'Total System Bookings'}</span>
                   <span className="text-xl font-black text-white mt-1">{stats.totalReservations || 0} <span className="text-xs text-primary font-bold">سانس</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Active schedule pool size</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Active schedule pool size</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1576,7 +1992,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'سیستم‌های در حال بازی' : 'Occupied PCs/Consoles'}</span>
                   <span className="text-xl font-black text-cyan-400 mt-1">{stats.activeReservations || 0} / {stats.activeSystems || 8} <span className="text-xs font-bold text-white">روشن</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Live bandwidth load check</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Live bandwidth load check</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1585,7 +2001,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'گیمرهای ثبت‌شده' : 'Registered Gamers'}</span>
                   <span className="text-xl font-black text-white mt-1">{stats.totalUsers || 147} <span className="text-xs text-purple-400 font-bold">نفر</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Loyalty club members list</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Loyalty club members list</p>
                 </div>
               </div>
 
@@ -1601,7 +2017,7 @@ export default function AdminPanelTab({
                         <h3 className="font-bold text-sm text-white">
                           {language === 'fa' ? 'وضعیت اتصال و همگام‌سازی نرم‌افزار مدیریت دسکتاپ (بازینو پرو دسکتاپ)' : 'Bazino Pro Desktop Software Sync Status'}
                         </h3>
-                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full ${stats.gamenetSyncStatus ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'}`}>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${stats.gamenetSyncStatus ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'}`}>
                           {stats.gamenetSyncStatus 
                             ? (language === 'fa' ? 'متصل و فعال (Live)' : 'Connected & Live') 
                             : (language === 'fa' ? 'در انتظار اولین اتصال (Offline)' : 'Pending First Sync')}
@@ -1972,20 +2388,20 @@ export default function AdminPanelTab({
                   {cafeItems.map((item) => (
                     <div key={item.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3">
                       <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        <img loading="lazy" src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
                           <span className="text-[10px] text-gray-400 font-mono">{item.price.toLocaleString()} تومان</span>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             موجودی: {item.inventory}
                           </span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این آیتم مطمئن هستید؟')) handleDeleteCafeItem(item.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2088,20 +2504,20 @@ export default function AdminPanelTab({
                   {accessories.map((acc) => (
                     <div key={acc.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3">
                       <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img src={acc.imageUrl} alt={acc.name} className="w-full h-full object-cover" />
+                        <img loading="lazy" src={acc.imageUrl} alt={acc.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{acc.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
                           <span className="text-[10px] text-gray-400 font-mono">{acc.price.toLocaleString()} تومان</span>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             موجودی: {acc.stock}
                           </span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این کالا مطمئن هستید؟')) handleDeleteAccessory(acc.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2200,7 +2616,7 @@ export default function AdminPanelTab({
                           <span className="px-2.5 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold">{tour.status}</span>
                           <button
                             onClick={() => { if (confirm('آیا از حذف این تورنومنت مطمئن هستید؟')) handleDeleteTournament(tour.id); }}
-                            className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400"
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400"
                           >
                             حذف
                           </button>
@@ -2302,18 +2718,18 @@ export default function AdminPanelTab({
                   {articles.map((art) => (
                     <div key={art.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3 items-center">
                       <div className="w-14 h-14 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img src={art.imageUrl} alt={art.title} className="w-full h-full object-cover" />
+                        <img loading="lazy" src={art.imageUrl} alt={art.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{art.title}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold font-mono bg-primary/10 text-primary">{art.category}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-primary/10 text-primary">{art.category}</span>
                           <span className="text-[10px] text-gray-500 font-mono">{art.date}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این مقاله مطمئن هستید؟')) handleDeleteArticle(art.id); }}
-                        className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2359,7 +2775,7 @@ export default function AdminPanelTab({
                       <span className="text-xs font-bold text-white truncate">{room}</span>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این اتاق گفتگو مطمئن هستید؟ تمام پیام‌های آن نیز حذف نمی‌شوند ولی اتاق دیگر در دسترس نخواهد بود.')) handleDeleteChatRoom(room); }}
-                        className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2474,10 +2890,10 @@ export default function AdminPanelTab({
                           <span className="text-[10px] text-gray-500 font-mono">{m.date}</span>
                         </div>
                         <h4 className="text-xs font-bold text-white mt-1">{m.title}</h4>
-                        <p className="text-[11px] text-gray-400 font-medium leading-relaxed">{m.body}</p>
+                        <p className="text-xs text-gray-400 font-medium leading-relaxed">{m.body}</p>
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className={`w-1.5 h-1.5 rounded-full ${m.type === 'notification' ? 'bg-amber-400' : 'bg-blue-400'}`}></span>
-                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
                             {m.type === 'notification' ? (language === 'fa' ? 'نوع: نوتیفیکیشن لایو' : 'Type: Live Notification') : (m.type === 'news' ? (language === 'fa' ? 'نوع: خبر بلاگ' : 'Type: Blog News') : (language === 'fa' ? 'نوع: صندوق پیام معمولی' : 'Type: Inbox Message'))}
                           </span>
                         </div>
@@ -2511,8 +2927,8 @@ export default function AdminPanelTab({
                   </button>
                 </div>
 
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-[11px] leading-relaxed text-slate-300 text-left" style={{ direction: 'ltr' }}>
-                  <div className="absolute top-3 right-3 text-slate-500 select-none text-[9px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold">
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-xs leading-relaxed text-slate-300 text-left" style={{ direction: 'ltr' }}>
+                  <div className="absolute top-3 right-3 text-slate-500 select-none text-[10px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold">
                     InitialGameNetDb.cs (C# Code First)
                   </div>
                   <pre className="overflow-x-auto max-h-[500px] whitespace-pre p-2 scrollbar-thin scrollbar-thumb-slate-800">
@@ -2521,7 +2937,7 @@ export default function AdminPanelTab({
                   </pre>
                 </div>
 
-                <div className="mt-4 p-4 rounded-xl bg-[#A855F7]/5 border border-[#A855F7]/20 text-[11px] leading-relaxed text-purple-300">
+                <div className="mt-4 p-4 rounded-xl bg-[#A855F7]/5 border border-[#A855F7]/20 text-xs leading-relaxed text-purple-300">
                   <p className="font-bold mb-1 flex items-center gap-2 text-white">
                     <span>💡 راهنمای پیکربندی پایگاه داده رابطه‌ای در دات‌نت:</span>
                   </p>
@@ -2536,7 +2952,130 @@ export default function AdminPanelTab({
           {/* Customization Sub-Tab */}
           {activeSubTab === 'customization' && (
             <div className="animate-fade-in space-y-8 pb-12">
-              
+
+              {/* SECTION 0: DATA SOURCE (SAMPLE ⇄ DATABASE) */}
+              <div className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
+                      <Database className="w-4 h-4 text-cyan-400" />
+                      <span>{language === 'fa' ? 'منبع داده سایت و اپلیکیشن' : 'Site & App Data Source'}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                        dataSource === 'sample'
+                          ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      }`}>
+                        {dataSource === 'sample'
+                          ? (language === 'fa' ? 'حالت نمونه (پیش‌فرض)' : 'SAMPLE MODE')
+                          : (language === 'fa' ? 'حالت دیتابیس' : 'DATABASE MODE')}
+                      </span>
+                    </h3>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {language === 'fa'
+                        ? 'سایت و اپلیکیشن موبایل اطلاعات خود را از اینجا می‌گیرند. در حالت نمونه (پیش‌فرض) همه‌چیز از داده‌های آماده (۴-۵ مورد برای هر بخش) پر می‌شود؛ در حالت دیتابیس، جداول خالی به‌صورت خودکار از داده نمونه پر می‌شوند.'
+                        : 'Site & mobile app read their data from here. In sample mode (default) everything is populated from ready-made data (4-5 items per section); in database mode, empty tables automatically fall back to sample data.'}
+                    </p>
+                  </div>
+                  {isSwitchingDataSource && (
+                    <span className="text-[10px] text-gray-400 font-mono flex items-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      {language === 'fa' ? 'در حال تغییر...' : 'Switching...'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sample Option */}
+                  <div
+                    onClick={() => handleSwitchDataSource('sample')}
+                    className={`p-4 border rounded-xl cursor-pointer transition-all flex flex-col gap-3 relative overflow-hidden ${
+                      dataSource === 'sample'
+                        ? 'border-cyan-400 bg-cyan-500/[0.06] shadow-[0_0_15px_rgba(34,211,238,0.15)]'
+                        : 'border-white/5 bg-black/10 hover:border-white/20'
+                    }`}
+                  >
+                    {dataSource === 'sample' && (
+                      <div className="absolute top-3 right-3 bg-cyan-400 text-black p-1 rounded-full">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dataSource === 'sample' ? 'bg-cyan-400/15 text-cyan-400' : 'bg-white/5 text-gray-400'}`}>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h5 className="font-black text-sm text-white">{language === 'fa' ? 'داده نمونه (Sample)' : 'Sample Data'}</h5>
+                        <span className="text-[10px] text-cyan-400 font-bold">{language === 'fa' ? 'پیش‌فرض — بدون نیاز به دیتابیس' : 'Default — no database required'}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 leading-relaxed font-semibold">
+                      {language === 'fa'
+                        ? 'همه بخش‌ها (سیستم‌ها، کافه، فروشگاه، مسابقات، بلاگ، اسلایدر، کد تخفیف و ...) از داده‌های آماده نمونه پر می‌شوند. مناسب نمایش و تست سایت.'
+                        : 'All sections (systems, cafe, shop, tournaments, blog, sliders, coupons...) are populated from ready sample data. Ideal for demo & testing.'}
+                    </p>
+                    {dataSourceInfo && (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+                        {Object.entries(dataSourceInfo.sample).map(([k, v]) => (
+                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[10px] font-mono text-gray-400">
+                            {k}: <span className="text-cyan-400 font-black">{v}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Database Option */}
+                  <div
+                    onClick={() => handleSwitchDataSource('database')}
+                    className={`p-4 border rounded-xl cursor-pointer transition-all flex flex-col gap-3 relative overflow-hidden ${
+                      dataSource === 'database'
+                        ? 'border-emerald-400 bg-emerald-500/[0.06] shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                        : 'border-white/5 bg-black/10 hover:border-white/20'
+                    }`}
+                  >
+                    {dataSource === 'database' && (
+                      <div className="absolute top-3 right-3 bg-emerald-400 text-black p-1 rounded-full">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dataSource === 'database' ? 'bg-emerald-400/15 text-emerald-400' : 'bg-white/5 text-gray-400'}`}>
+                        <Database className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="font-black text-sm text-white">{language === 'fa' ? 'دیتابیس' : 'Database'}</h5>
+                        <span className="text-[10px] text-emerald-400 font-bold">{language === 'fa' ? 'داده‌های واقعی ذخیره‌شده' : 'Real stored records'}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 leading-relaxed font-semibold">
+                      {language === 'fa'
+                        ? 'سایت و اپ از رکوردهای واقعی دیتابیس می‌خوانند. اگر جدولی خالی باشد، به‌صورت خودکار از داده نمونه پر می‌شود تا سایت خالی نماند.'
+                        : 'Site & app read from real database records. Empty tables automatically fall back to sample data so the site never looks empty.'}
+                    </p>
+                    {dataSourceInfo && (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+                        {Object.entries(dataSourceInfo.database).map(([k, v]) => (
+                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[10px] font-mono text-gray-400">
+                            {k}: <span className="text-emerald-400 font-black">{v}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/30 border border-white/5 text-[10px] text-gray-500 leading-relaxed flex items-start gap-2">
+                  <HelpCircle className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                  <span>
+                    {language === 'fa'
+                      ? 'تغییر منبع داده بلافاصله روی سایت و اپلیکیشن موبایل اعمال می‌شود (بدون رفرش). سفارش‌ها، رزروها و ثبت‌نام‌ها در هر دو حالت در دیتابیس ذخیره می‌شوند.'
+                      : 'Switching the data source applies to the site and mobile app immediately (no refresh). Orders, reservations and registrations are always stored in the database in both modes.'}
+                  </span>
+                </div>
+              </div>
+
               {/* SECTION 1: SLIDER MANAGEMENT */}
               <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
                 <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">
@@ -2569,7 +3108,7 @@ export default function AdminPanelTab({
                   
                   <div className="md:col-span-2 bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <h4 className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                      <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>{language === 'fa' ? 'دستیار ترجمه هوش مصنوعی (جمینای)' : 'Gemini AI Translation Assistant'}</span>
                       </h4>
@@ -2702,14 +3241,14 @@ export default function AdminPanelTab({
                   ) : (
                     appSliders.map((slide) => (
                       <div key={slide.id} className="p-3 bg-[#0d122b] border border-white/5 rounded-xl flex gap-3 group relative overflow-hidden">
-                        <img 
+                        <img loading="lazy" 
                           src={slide.imageUrl} 
                           alt={slide.titleFa} 
                           className="w-16 h-16 object-cover rounded-lg border border-white/10"
                           referrerPolicy="no-referrer"
                         />
                         <div className="flex-1 min-w-0">
-                          <span className="text-[8px] px-2 py-0.5 bg-primary/20 text-primary border border-primary/20 rounded-full font-mono uppercase font-bold">
+                          <span className="text-[10px] px-2 py-0.5 bg-primary/20 text-primary border border-primary/20 rounded-full font-mono uppercase font-bold">
                             Target: {slide.target}
                           </span>
                           <h5 className="text-xs font-bold text-white mt-1 truncate" title={slide.titleFa}>{slide.titleFa}</h5>
@@ -2786,7 +3325,7 @@ export default function AdminPanelTab({
                       
                       {/* Section Toggle */}
                       <div className="flex items-center gap-2">
-                        <label className="text-[11px] text-gray-400 font-bold cursor-pointer select-none" htmlFor="secEnable">
+                        <label className="text-xs text-gray-400 font-bold cursor-pointer select-none" htmlFor="secEnable">
                           {language === 'fa' ? 'وضعیت نمایش:' : 'Visibility:'}
                         </label>
                         <button
@@ -2806,7 +3345,7 @@ export default function AdminPanelTab({
                     {/* Translation Wizard Card */}
                     <div className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
                       <div className="space-y-0.5">
-                        <h4 className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                        <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                           <Sparkles className="w-3.5 h-3.5" />
                           <span>{language === 'fa' ? 'دستیار ترجمه هوش مصنوعی (جمینای)' : 'Gemini AI Translation Assistant'}</span>
                         </h4>
@@ -3059,7 +3598,7 @@ export default function AdminPanelTab({
                         {socialMediaList.map((item) => (
                           <div key={item.id} className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-center justify-between group">
                             <div className="flex items-center gap-2.5">
-                              <span className="text-[9px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-primary font-mono font-bold uppercase">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-primary font-mono font-bold uppercase">
                                 {item.platform}
                               </span>
                               <div>
@@ -3216,7 +3755,7 @@ export default function AdminPanelTab({
                       <Database className="w-5 h-5 text-emerald-500 animate-pulse" />
                       <span>{language === 'fa' ? 'لاگ موتور دیتابیس فعال' : 'Active Database Provider Logs'}</span>
                     </h3>
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {language === 'fa' 
                         ? 'مشاهده لاگ درخواست‌ها، دستورات SQL یا فرامین NoSQL (MongoDB) و مدت زمان اجرای آن‌ها' 
                         : 'Review native SQL / NoSQL operations executed by the current BaseDataProvider.'}
@@ -3251,7 +3790,7 @@ export default function AdminPanelTab({
                             <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-400 rounded border border-emerald-900 font-bold">
                               {log.provider}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
                               log.operation === 'INSERT' || log.operation === 'UPDATE' ? 'bg-amber-950 text-amber-400' :
                               log.operation === 'SELECT' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400'
                             }`}>
@@ -3260,7 +3799,7 @@ export default function AdminPanelTab({
                           </div>
                           <span className="text-gray-500 font-mono">{log.timestamp}</span>
                         </div>
-                        <p className="text-gray-300 font-mono text-[11px] leading-relaxed break-words">{log.query}</p>
+                        <p className="text-gray-300 font-mono text-xs leading-relaxed break-words">{log.query}</p>
                         {log.params && log.params.length > 0 && (
                           <div className="text-[10px] text-gray-500 font-mono bg-black/40 p-1 rounded">
                             Parameters: <span className="text-gray-400">{JSON.stringify(log.params)}</span>
@@ -3283,7 +3822,7 @@ export default function AdminPanelTab({
                       <Key className="w-5 h-5 text-blue-500 animate-pulse" />
                       <span>{language === 'fa' ? 'تنظیمات API Key ها' : 'API Keys Settings'}</span>
                     </h3>
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {language === 'fa' 
                         ? 'مدیریت کلیدهای امنیتی برای ارتباط با سرویس‌های خارجی مانند هوش مصنوعی' 
                         : 'Manage security keys for integrating with external services like AI.'}
@@ -3300,39 +3839,37 @@ export default function AdminPanelTab({
                     <p className="text-xs text-gray-400 mb-4 leading-relaxed">
                       {language === 'fa' ? (
                         <>
-                          برای فعال‌سازی قابلیت‌های هوش مصنوعی (مانند ربات Jarvis و ترجمه خودکار متن)، سیستم نیازمند <strong className="text-white">Gemini API Key</strong> است. این کلید به‌صورت خودکار در سرور توسط محیط AI Studio تزریق می‌شود، اما باید آن را از سایت گوگل دریافت کرده و در پنل مدیریت محیط تنظیم کنید.
+                          برای فعال‌سازی قابلیت‌های هوش مصنوعی (مانند ربات Jarvis و ترجمه خودکار متن)، سیستم نیازمند <strong className="text-white">Gemini API Key</strong> است. این کلید به‌صورت خودکار در سرور از طریق متغیر محیطی تزریق می‌شود، اما باید آن را از سایت گوگل دریافت کرده و در پنل تنظیمات محیط میزبانی خود قرار دهید.
                         </>
                       ) : (
                         <>
-                          To enable AI features (like the Jarvis assistant and auto-translations), the system requires a <strong className="text-white">Gemini API Key</strong>. This key is automatically injected by the AI Studio environment, but you need to obtain it from Google and configure it in the platform.
+                          To enable AI features (like the Jarvis assistant and auto-translations), the system requires a <strong className="text-white">Gemini API Key</strong>. This key is automatically injected on the server via an environment variable, but you need to obtain it from Google and configure it in your hosting platform's settings.
                         </>
                       )}
                     </p>
 
                     <div className="bg-[#0a0e21] border border-white/5 p-4 rounded-lg">
-                      <h5 className="text-[11px] font-bold text-blue-400 uppercase tracking-wider mb-3">
+                      <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3">
                         {language === 'fa' ? 'راهنمای دریافت و ثبت کلید' : 'How to get and set the key'}
                       </h5>
                       <ol className="list-decimal list-inside text-xs text-gray-300 space-y-2 leading-loose">
                         {language === 'fa' ? (
                           <>
-                            <li>به سایت <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">aistudio.google.com</a> مراجعه کنید.</li>
+                            <li>به سایت <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a> مراجعه کنید.</li>
                             <li>با اکانت گوگل خود وارد شوید و یک API Key جدید بسازید (Create API Key).</li>
                             <li>کلید ساخته شده را کپی کنید (شبیه به <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>در همین محیط (AI Studio)، روی دکمه <strong>Settings</strong> (آیکون چرخ‌دنده در منوی پلتفرم) کلیک کنید.</li>
-                            <li>به بخش <strong>Secrets</strong> بروید.</li>
-                            <li>یک Secret جدید با نام دقیق <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code> بسازید.</li>
+                            <li>در پنل تنظیمات محیط میزبانی خود (بخش <strong>Settings/Secrets</strong>)، یک متغیر محیطی (Environment Variable) جدید بسازید.</li>
+                            <li>نام دقیق متغیر: <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code></li>
                             <li>مقدار کلید کپی شده را در آن قرار داده و ذخیره کنید.</li>
                             <li>ممکن است نیاز باشد یک بار کانتینر اپلیکیشن مجددا راه‌اندازی (Restart) شود.</li>
                           </>
                         ) : (
                           <>
-                            <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">aistudio.google.com</a>.</li>
+                            <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a>.</li>
                             <li>Log in with your Google account and click "Create API Key".</li>
                             <li>Copy the generated key (looks like <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>In this platform (AI Studio), click the <strong>Settings</strong> button (gear icon).</li>
-                            <li>Navigate to the <strong>Secrets</strong> section.</li>
-                            <li>Create a new secret with the exact name <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code>.</li>
+                            <li>In your hosting platform's settings (e.g. <strong>Settings/Secrets</strong>), create a new environment variable.</li>
+                            <li>Use the exact name <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code>.</li>
                             <li>Paste the copied key as its value and save.</li>
                             <li>You might need to restart the application container for the changes to take effect.</li>
                           </>
@@ -3340,7 +3877,7 @@ export default function AdminPanelTab({
                       </ol>
                     </div>
 
-                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-[11px] text-blue-200 flex items-start gap-2">
+                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-200 flex items-start gap-2">
                       <FileText className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                       <p>
                         {language === 'fa' 

@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { Tournament } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
-import GamingAmpHome from './GamingAmpHome';
-import GecoPurpleHome from './GecoPurpleHome';
+import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
+
+// نماهای اختصاصی قالب‌ها — فقط وقتی قالب مربوطه فعال باشد دانلود می‌شوند
+const GamingAmpHome = lazy(() => import('./GamingAmpHome'));
+const GecoPurpleHome = lazy(() => import('./GecoPurpleHome'));
 import { 
   Gamepad2, 
   Tv, 
@@ -36,11 +39,15 @@ interface Props {
   themeId?: string;
   tournaments: Tournament[];
   onNavigate: (tab: 'loyalty' | 'reservations' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'csharp') => void;
+  /** قالب‌های دارای کامپوننت اختصاصی (theme.js) — اطلاعات از App می‌آید */
+  themeComponent?: { cssUrl: string; assetsBase: string } | null;
 }
 
-export default function HomeTab({ tournaments, onNavigate, themeId,
+export default function HomeTab({ tournaments, onNavigate, themeId, themeComponent,
 }: Props) {
   const { language, dir, t } = useLanguage();
+
+
   const [activeBanner, setActiveBanner] = useState(0);
   const [activeTournamentSlide, setActiveTournamentSlide] = useState(0);
   const tournamentRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -48,6 +55,29 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
 
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [appSliders, setAppSliders] = useState<any[]>([]);
+  const themeComponentHostRef = useRef<HTMLDivElement | null>(null);
+  const [themeComponentVersion, setThemeComponentVersion] = useState(0);
+  // بارگذاری theme.js قالب (فقط وقتی قالب کامپوننت دارد)
+  useEffect(() => {
+    if (!themeComponent) return;
+    let cancelled = false;
+    const script = document.createElement('script');
+    script.src = themeComponent.cssUrl.replace(/\/theme\.css$/, '/theme.js');
+    script.async = true;
+    script.onload = () => {
+      if (!cancelled) setThemeComponentVersion(v => v + 1);
+    };
+    script.onerror = () => {
+      console.warn('[ThemeSDK] theme.js failed to load:', script.src);
+    };
+    document.body.appendChild(script);
+    return () => {
+      cancelled = true;
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, [themeComponent]);
+
+
 
   const getSocialLinks = () => {
     try {
@@ -509,6 +539,35 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
       }))
     : featuredGames;
 
+  // mount کامپوننت قالب وقتی ثبت شد
+  useEffect(() => {
+    if (!themeComponent || !themeComponentHostRef.current) return;
+    if (!hasComponent('home')) return;
+
+    const mounted = mountComponent('home', themeComponentHostRef.current, {
+      language,
+      dir,
+      t,
+      onNavigate: onNavigate as any,
+      featuredGames: activeBanners,
+      gameGenres,
+      matchHistory,
+      pricingPackages,
+      loungeSections,
+      staffTeam,
+      tournaments,
+      settings: siteSettings,
+      logoUrl: '/logo.png',
+      assetsBase: themeComponent.assetsBase,
+      themeId: themeId || 'dark-gold',
+    });
+    if (!mounted) return;
+    // پاک‌سازی هنگام تغییر
+    return () => { unmountComponent('home'); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themeComponentVersion, themeComponent, language, dir, tournaments, activeBanners, siteSettings]);
+
+
   // Helper to translate text dynamically
   const getLocText = (obj: any) => {
     return obj[language] || obj['en'] || '';
@@ -585,8 +644,20 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
     return siteSettings[customKey] || defaultVal;
   };
 
+  // قالب‌های دارای کامپوننت اختصاصی (theme.js نصب‌شده با ZIP):
+  // کامپوننت قالب در یک هاست رندر می‌شود تا چیدمان کاملاً اختصاصی
+  // داشته باشد — دقیقاً مثل قالب‌های سیستمی Geco/GamingAmp.
+  if (themeComponent && hasComponent('home')) {
+    return (
+      <div className="w-full animate-fade-in" dir={dir}>
+        <div ref={themeComponentHostRef} className="w-full" />
+      </div>
+    );
+  }
+
   if (themeId === 'geco-purple') {
     return (
+      <Suspense fallback={<div className="w-full py-24 flex justify-center"><div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>}>
       <GecoPurpleHome
         featuredGames={activeBanners}
         matchHistory={matchHistory}
@@ -596,6 +667,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
         staffTeam={staffTeam}
         onNavigate={onNavigate}
       />
+      </Suspense>
     );
   }
 
@@ -620,6 +692,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
 
   if (themeId === 'gaming-amp') {
     return (
+      <Suspense fallback={<div className="w-full py-24 flex justify-center"><div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>}>
       <GamingAmpHome
         featuredGames={activeBanners}
         gameGenres={gameGenres}
@@ -630,6 +703,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
         onNavigate={onNavigate}
         tournaments={tournaments}
       />
+      </Suspense>
     );
   }
 
@@ -648,8 +722,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
             {/* Soft lightweight overlay removed to keep images bright as per user request */}
             <div className="absolute inset-0 bg-transparent z-10" />
             
-            {/* Slide Image */}
+            {/* Slide Image — فقط اسلاید فعال eager است (LCP)؛ بقیه lazy */}
             <img
+              loading={activeBanner === idx ? 'eager' : 'lazy'}
+              fetchpriority={activeBanner === idx ? 'high' : 'auto'}
               src={game.imageUrl}
               alt={getLocText(game.title)}
               className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-all duration-[10s] ease-out"
@@ -742,7 +818,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                 className="group relative h-96 overflow-hidden rounded-none notched-clip border border-white/10 hover:border-primary hover:shadow-[0_0_30px_rgba(255,184,0,0.2)] bg-[#0d0e15] transition-all duration-300"
               >
                 {/* Image banner */}
-                <img
+                <img loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
                   className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-all duration-500"
@@ -752,7 +828,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
 
                 {/* Tag header */}
                 <div className="absolute top-4 left-4 z-20">
-                  <span className="px-2.5 py-1 text-[9px] font-black tracking-wider bg-black/80 text-primary border border-primary/40 rounded-none notched-clip-sm font-mono">
+                  <span className="px-2.5 py-1 text-[10px] font-black tracking-wider bg-black/80 text-primary border border-primary/40 rounded-none notched-clip-sm font-mono">
                     {genre.tag}
                   </span>
                 </div>
@@ -766,7 +842,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                     {getLocText(genre.subtitle)}
                   </p>
                   <div className="pt-2 border-t border-white/10 mt-1">
-                    <span className="block text-[9px] text-gray-500 font-bold uppercase tracking-widest font-mono">
+                    <span className="block text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">
                       {language === 'fa' ? 'بازی‌های شاخص:' : 'Featured Games:'}
                     </span>
                     <span className="text-[10px] text-primary font-bold">
@@ -814,7 +890,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
               >
                 {/* Card Image */}
                 <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden border-b border-white/10">
-                  <img
+                  <img loading="lazy"
                     src={sect.imageUrl}
                     alt={getLocText(sect.title)}
                     className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-all duration-500"
@@ -878,7 +954,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                 <Sword className="w-5 h-5 text-primary" />
                 <span className="text-xs font-bold font-display uppercase text-white">Esports Arena Matches</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-none notched-clip-sm text-[9px] font-mono font-bold uppercase">
+              <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-none notched-clip-sm text-[10px] font-mono font-bold uppercase">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                 <span>Lobby Connected</span>
               </div>
@@ -889,12 +965,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                 <div key={match.id} className="p-5 flex flex-col md:flex-row items-center justify-between gap-4 hover:bg-[#141624]/30 transition-all">
                   {/* Game badge & Title */}
                   <div className="flex items-center gap-3 w-full md:w-1/3">
-                    <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[9px] border border-primary/30 notched-clip-sm shrink-0">
+                    <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[10px] border border-primary/30 notched-clip-sm shrink-0">
                       {match.game}
                     </span>
                     <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       <h4 className="text-xs font-bold text-white font-display line-clamp-1">{getLocText(match.title)}</h4>
-                      <span className="text-[9px] text-gray-500 font-bold">{match.time}</span>
+                      <span className="text-[10px] text-gray-500 font-bold">{match.time}</span>
                     </div>
                   </div>
 
@@ -916,18 +992,18 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                   {/* Status indicator */}
                   <div className="flex items-center justify-end w-full md:w-1/4 gap-3">
                     {match.status === 'Live' && (
-                      <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[9px] font-black uppercase notched-clip-sm">
+                      <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase notched-clip-sm">
                         <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
                         <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
                       </span>
                     )}
                     {match.status === 'Finished' && (
-                      <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[9px] font-black uppercase notched-clip-sm">
+                      <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[10px] font-black uppercase notched-clip-sm">
                         {language === 'fa' ? 'پایان یافته' : 'Finished'}
                       </span>
                     )}
                     {match.status === 'Scheduled' && (
-                      <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[9px] font-black uppercase notched-clip-sm">
+                      <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase notched-clip-sm">
                         {language === 'fa' ? 'برنامه‌ریزی شده' : 'Scheduled'}
                       </span>
                     )}
@@ -1003,7 +1079,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                 >
                   {/* Image and status badge */}
                   <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden">
-                    <img
+                    <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
                       className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"
@@ -1025,7 +1101,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                     </span>
 
                     {/* Game badge */}
-                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[9px] font-mono font-bold rounded-none notched-clip-sm">
+                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[10px] font-mono font-bold rounded-none notched-clip-sm">
                       {tournament.game}
                     </span>
                   </div>
@@ -1039,7 +1115,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                       
                       <div className="grid grid-cols-2 gap-3 text-[10px] border-y border-white/5 py-3 font-medium text-gray-400">
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'هزینه ثبت‌نام تیم'}
                             {language === 'en' && 'Team Entry Fee'}
                             {language === 'ru' && 'Взнос с команды'}
@@ -1050,7 +1126,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                           </span>
                         </div>
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'ظرفیت ثبت‌نام'}
                             {language === 'en' && 'Capacity Status'}
                             {language === 'ru' && 'Зарегистрировано'}
@@ -1123,7 +1199,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
             >
               {/* Popular Tag */}
               {pack.popular && (
-                <span className="absolute top-4 right-4 bg-primary text-black font-black text-[9px] px-3 py-1 notched-clip-sm uppercase tracking-widest font-display animate-pulse">
+                <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 notched-clip-sm uppercase tracking-widest font-display animate-pulse">
                   {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
                 </span>
               )}
@@ -1193,12 +1269,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
             >
               {/* Avatar Frame with custom gold borders */}
               <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-all duration-300">
-                <img
+                <img loading="lazy"
                   src={staff.avatar}
                   alt={getLocText(staff.name)}
                   className="rounded-full bg-dark-bg w-full h-full object-cover"
                 />
-                <span className="absolute -bottom-1 -right-1 bg-primary text-black font-mono font-black text-[9px] px-2 py-0.5 notched-clip-sm shadow-md">
+                <span className="absolute -bottom-1 -right-1 bg-primary text-black font-mono font-black text-[10px] px-2 py-0.5 notched-clip-sm shadow-md">
                   PRO
                 </span>
               </div>
@@ -1218,7 +1294,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
 
               {/* Specialty */}
               <div className="w-full pt-3.5 border-t border-white/10 flex flex-col items-center gap-1.5">
-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest font-mono">
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">
                   {language === 'fa' ? 'حوزه تخصصی:' : 'Core Specialty:'}
                 </span>
                 <span className="text-xs text-gray-300 font-black">{staff.specialty}</span>
@@ -1347,12 +1423,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
               />
 
               {/* Custom overlay tracker */}
-              <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[9px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md notched-clip-sm">
+              <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[10px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md notched-clip-sm">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                 <span>GPS Tracking: Live Lock</span>
               </div>
               
-              <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[9px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono notched-clip-sm">
+              <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono notched-clip-sm">
                 <span>Lat: 35.7810° N | Lon: 51.4340° E</span>
               </div>
             </div>

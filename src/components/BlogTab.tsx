@@ -81,7 +81,7 @@ export default function BlogTab({
 
           {/* Article Header */}
           <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-[#0d122b] border border-white/10 mb-6">
-            <img 
+            <img loading="lazy" 
               src={selectedArticle.imageUrl} 
               alt={selectedArticle.title} 
               className="w-full h-full object-cover"
@@ -265,7 +265,7 @@ export default function BlogTab({
                 className="rounded-2xl border border-white/10 bg-dark-card overflow-hidden flex flex-col group hover:border-primary/50 hover:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all duration-300"
               >
                 <div className="relative aspect-[16/9] w-full bg-[#0d122b] overflow-hidden">
-                  <img 
+                  <img loading="lazy" 
                     src={article.imageUrl} 
                     alt={article.title} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"

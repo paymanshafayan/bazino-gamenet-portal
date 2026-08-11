@@ -1261,7 +1261,7 @@ export default function AdminPanelTab({
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover transition-transform group-hover:scale-105"
                           />
-                          <div className="absolute top-2 left-2 bg-black/65 px-2.5 py-1 rounded-full text-[9px] font-mono text-amber-500 font-bold uppercase tracking-wider border border-white/5">
+                          <div className="absolute top-2 left-2 bg-black/65 px-2.5 py-1 rounded-full text-[10px] font-mono text-amber-500 font-bold uppercase tracking-wider border border-white/5">
                             {slide.target}
                           </div>
                         </div>
@@ -1442,7 +1442,7 @@ export default function AdminPanelTab({
                               onChange={(e) => setNewThemePrimary(e.target.value)}
                               className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
                             />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
+                            <span className="text-[10px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
                           </div>
                         </div>
 
@@ -1455,7 +1455,7 @@ export default function AdminPanelTab({
                               onChange={(e) => setNewThemeBg(e.target.value)}
                               className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
                             />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeBg}</span>
+                            <span className="text-[10px] font-mono text-gray-400 truncate">{newThemeBg}</span>
                           </div>
                         </div>
 
@@ -1468,7 +1468,7 @@ export default function AdminPanelTab({
                               onChange={(e) => setNewThemeCard(e.target.value)}
                               className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
                             />
-                            <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeCard}</span>
+                            <span className="text-[10px] font-mono text-gray-400 truncate">{newThemeCard}</span>
                           </div>
                         </div>
                       </div>
@@ -1558,7 +1558,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'کل درآمد فروشگاه و بوفه' : 'Total Revenue'}</span>
                   <span className="text-xl font-black text-white mt-1">{(stats.totalSales || 0).toLocaleString()} <span className="text-xs text-primary font-bold">تومان</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Real-time ledger audit log</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Real-time ledger audit log</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1567,7 +1567,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'تعداد رزرو سانس‌ها' : 'Total System Bookings'}</span>
                   <span className="text-xl font-black text-white mt-1">{stats.totalReservations || 0} <span className="text-xs text-primary font-bold">سانس</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Active schedule pool size</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Active schedule pool size</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1576,7 +1576,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'سیستم‌های در حال بازی' : 'Occupied PCs/Consoles'}</span>
                   <span className="text-xl font-black text-cyan-400 mt-1">{stats.activeReservations || 0} / {stats.activeSystems || 8} <span className="text-xs font-bold text-white">روشن</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Live bandwidth load check</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Live bandwidth load check</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1585,7 +1585,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'گیمرهای ثبت‌شده' : 'Registered Gamers'}</span>
                   <span className="text-xl font-black text-white mt-1">{stats.totalUsers || 147} <span className="text-xs text-purple-400 font-bold">نفر</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Loyalty club members list</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Loyalty club members list</p>
                 </div>
               </div>
 
@@ -1601,7 +1601,7 @@ export default function AdminPanelTab({
                         <h3 className="font-bold text-sm text-white">
                           {language === 'fa' ? 'وضعیت اتصال و همگام‌سازی نرم‌افزار مدیریت دسکتاپ (بازینو پرو دسکتاپ)' : 'Bazino Pro Desktop Software Sync Status'}
                         </h3>
-                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full ${stats.gamenetSyncStatus ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'}`}>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${stats.gamenetSyncStatus ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'}`}>
                           {stats.gamenetSyncStatus 
                             ? (language === 'fa' ? 'متصل و فعال (Live)' : 'Connected & Live') 
                             : (language === 'fa' ? 'در انتظار اولین اتصال (Offline)' : 'Pending First Sync')}
@@ -1978,14 +1978,14 @@ export default function AdminPanelTab({
                         <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
                           <span className="text-[10px] text-gray-400 font-mono">{item.price.toLocaleString()} تومان</span>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             موجودی: {item.inventory}
                           </span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این آیتم مطمئن هستید؟')) handleDeleteCafeItem(item.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2094,14 +2094,14 @@ export default function AdminPanelTab({
                         <h4 className="text-xs font-bold text-white truncate">{acc.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
                           <span className="text-[10px] text-gray-400 font-mono">{acc.price.toLocaleString()} تومان</span>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             موجودی: {acc.stock}
                           </span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این کالا مطمئن هستید؟')) handleDeleteAccessory(acc.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2200,7 +2200,7 @@ export default function AdminPanelTab({
                           <span className="px-2.5 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold">{tour.status}</span>
                           <button
                             onClick={() => { if (confirm('آیا از حذف این تورنومنت مطمئن هستید؟')) handleDeleteTournament(tour.id); }}
-                            className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400"
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400"
                           >
                             حذف
                           </button>
@@ -2307,13 +2307,13 @@ export default function AdminPanelTab({
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{art.title}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold font-mono bg-primary/10 text-primary">{art.category}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-primary/10 text-primary">{art.category}</span>
                           <span className="text-[10px] text-gray-500 font-mono">{art.date}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این مقاله مطمئن هستید؟')) handleDeleteArticle(art.id); }}
-                        className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2359,7 +2359,7 @@ export default function AdminPanelTab({
                       <span className="text-xs font-bold text-white truncate">{room}</span>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این اتاق گفتگو مطمئن هستید؟ تمام پیام‌های آن نیز حذف نمی‌شوند ولی اتاق دیگر در دسترس نخواهد بود.')) handleDeleteChatRoom(room); }}
-                        className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2474,10 +2474,10 @@ export default function AdminPanelTab({
                           <span className="text-[10px] text-gray-500 font-mono">{m.date}</span>
                         </div>
                         <h4 className="text-xs font-bold text-white mt-1">{m.title}</h4>
-                        <p className="text-[11px] text-gray-400 font-medium leading-relaxed">{m.body}</p>
+                        <p className="text-xs text-gray-400 font-medium leading-relaxed">{m.body}</p>
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className={`w-1.5 h-1.5 rounded-full ${m.type === 'notification' ? 'bg-amber-400' : 'bg-blue-400'}`}></span>
-                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
                             {m.type === 'notification' ? (language === 'fa' ? 'نوع: نوتیفیکیشن لایو' : 'Type: Live Notification') : (m.type === 'news' ? (language === 'fa' ? 'نوع: خبر بلاگ' : 'Type: Blog News') : (language === 'fa' ? 'نوع: صندوق پیام معمولی' : 'Type: Inbox Message'))}
                           </span>
                         </div>
@@ -2511,8 +2511,8 @@ export default function AdminPanelTab({
                   </button>
                 </div>
 
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-[11px] leading-relaxed text-slate-300 text-left" style={{ direction: 'ltr' }}>
-                  <div className="absolute top-3 right-3 text-slate-500 select-none text-[9px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold">
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-xs leading-relaxed text-slate-300 text-left" style={{ direction: 'ltr' }}>
+                  <div className="absolute top-3 right-3 text-slate-500 select-none text-[10px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold">
                     InitialGameNetDb.cs (C# Code First)
                   </div>
                   <pre className="overflow-x-auto max-h-[500px] whitespace-pre p-2 scrollbar-thin scrollbar-thumb-slate-800">
@@ -2521,7 +2521,7 @@ export default function AdminPanelTab({
                   </pre>
                 </div>
 
-                <div className="mt-4 p-4 rounded-xl bg-[#A855F7]/5 border border-[#A855F7]/20 text-[11px] leading-relaxed text-purple-300">
+                <div className="mt-4 p-4 rounded-xl bg-[#A855F7]/5 border border-[#A855F7]/20 text-xs leading-relaxed text-purple-300">
                   <p className="font-bold mb-1 flex items-center gap-2 text-white">
                     <span>💡 راهنمای پیکربندی پایگاه داده رابطه‌ای در دات‌نت:</span>
                   </p>
@@ -2569,7 +2569,7 @@ export default function AdminPanelTab({
                   
                   <div className="md:col-span-2 bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <h4 className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                      <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>{language === 'fa' ? 'دستیار ترجمه هوش مصنوعی (جمینای)' : 'Gemini AI Translation Assistant'}</span>
                       </h4>
@@ -2709,7 +2709,7 @@ export default function AdminPanelTab({
                           referrerPolicy="no-referrer"
                         />
                         <div className="flex-1 min-w-0">
-                          <span className="text-[8px] px-2 py-0.5 bg-primary/20 text-primary border border-primary/20 rounded-full font-mono uppercase font-bold">
+                          <span className="text-[10px] px-2 py-0.5 bg-primary/20 text-primary border border-primary/20 rounded-full font-mono uppercase font-bold">
                             Target: {slide.target}
                           </span>
                           <h5 className="text-xs font-bold text-white mt-1 truncate" title={slide.titleFa}>{slide.titleFa}</h5>
@@ -2786,7 +2786,7 @@ export default function AdminPanelTab({
                       
                       {/* Section Toggle */}
                       <div className="flex items-center gap-2">
-                        <label className="text-[11px] text-gray-400 font-bold cursor-pointer select-none" htmlFor="secEnable">
+                        <label className="text-xs text-gray-400 font-bold cursor-pointer select-none" htmlFor="secEnable">
                           {language === 'fa' ? 'وضعیت نمایش:' : 'Visibility:'}
                         </label>
                         <button
@@ -2806,7 +2806,7 @@ export default function AdminPanelTab({
                     {/* Translation Wizard Card */}
                     <div className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
                       <div className="space-y-0.5">
-                        <h4 className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                        <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                           <Sparkles className="w-3.5 h-3.5" />
                           <span>{language === 'fa' ? 'دستیار ترجمه هوش مصنوعی (جمینای)' : 'Gemini AI Translation Assistant'}</span>
                         </h4>
@@ -3059,7 +3059,7 @@ export default function AdminPanelTab({
                         {socialMediaList.map((item) => (
                           <div key={item.id} className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-center justify-between group">
                             <div className="flex items-center gap-2.5">
-                              <span className="text-[9px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-primary font-mono font-bold uppercase">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-primary font-mono font-bold uppercase">
                                 {item.platform}
                               </span>
                               <div>
@@ -3216,7 +3216,7 @@ export default function AdminPanelTab({
                       <Database className="w-5 h-5 text-emerald-500 animate-pulse" />
                       <span>{language === 'fa' ? 'لاگ موتور دیتابیس فعال' : 'Active Database Provider Logs'}</span>
                     </h3>
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {language === 'fa' 
                         ? 'مشاهده لاگ درخواست‌ها، دستورات SQL یا فرامین NoSQL (MongoDB) و مدت زمان اجرای آن‌ها' 
                         : 'Review native SQL / NoSQL operations executed by the current BaseDataProvider.'}
@@ -3251,7 +3251,7 @@ export default function AdminPanelTab({
                             <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-400 rounded border border-emerald-900 font-bold">
                               {log.provider}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
                               log.operation === 'INSERT' || log.operation === 'UPDATE' ? 'bg-amber-950 text-amber-400' :
                               log.operation === 'SELECT' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400'
                             }`}>
@@ -3260,7 +3260,7 @@ export default function AdminPanelTab({
                           </div>
                           <span className="text-gray-500 font-mono">{log.timestamp}</span>
                         </div>
-                        <p className="text-gray-300 font-mono text-[11px] leading-relaxed break-words">{log.query}</p>
+                        <p className="text-gray-300 font-mono text-xs leading-relaxed break-words">{log.query}</p>
                         {log.params && log.params.length > 0 && (
                           <div className="text-[10px] text-gray-500 font-mono bg-black/40 p-1 rounded">
                             Parameters: <span className="text-gray-400">{JSON.stringify(log.params)}</span>
@@ -3283,7 +3283,7 @@ export default function AdminPanelTab({
                       <Key className="w-5 h-5 text-blue-500 animate-pulse" />
                       <span>{language === 'fa' ? 'تنظیمات API Key ها' : 'API Keys Settings'}</span>
                     </h3>
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {language === 'fa' 
                         ? 'مدیریت کلیدهای امنیتی برای ارتباط با سرویس‌های خارجی مانند هوش مصنوعی' 
                         : 'Manage security keys for integrating with external services like AI.'}
@@ -3300,26 +3300,26 @@ export default function AdminPanelTab({
                     <p className="text-xs text-gray-400 mb-4 leading-relaxed">
                       {language === 'fa' ? (
                         <>
-                          برای فعال‌سازی قابلیت‌های هوش مصنوعی (مانند ربات Jarvis و ترجمه خودکار متن)، سیستم نیازمند <strong className="text-white">Gemini API Key</strong> است. این کلید به‌صورت خودکار در سرور توسط محیط AI Studio تزریق می‌شود، اما باید آن را از سایت گوگل دریافت کرده و در پنل مدیریت محیط تنظیم کنید.
+                          برای فعال‌سازی قابلیت‌های هوش مصنوعی (مانند ربات Jarvis و ترجمه خودکار متن)، سیستم نیازمند <strong className="text-white">Gemini API Key</strong> است. این کلید به‌صورت خودکار در سرور از طریق متغیر محیطی تزریق می‌شود، اما باید آن را از سایت گوگل دریافت کرده و در پنل تنظیمات محیط میزبانی خود قرار دهید.
                         </>
                       ) : (
                         <>
-                          To enable AI features (like the Jarvis assistant and auto-translations), the system requires a <strong className="text-white">Gemini API Key</strong>. This key is automatically injected by the AI Studio environment, but you need to obtain it from Google and configure it in the platform.
+                          To enable AI features (like the Jarvis assistant and auto-translations), the system requires a <strong className="text-white">Gemini API Key</strong>. This key is automatically injected on the server via an environment variable, but you need to obtain it from Google and configure it in your hosting platform's settings.
                         </>
                       )}
                     </p>
 
                     <div className="bg-[#0a0e21] border border-white/5 p-4 rounded-lg">
-                      <h5 className="text-[11px] font-bold text-blue-400 uppercase tracking-wider mb-3">
+                      <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3">
                         {language === 'fa' ? 'راهنمای دریافت و ثبت کلید' : 'How to get and set the key'}
                       </h5>
                       <ol className="list-decimal list-inside text-xs text-gray-300 space-y-2 leading-loose">
                         {language === 'fa' ? (
                           <>
-                            <li>به سایت <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">aistudio.google.com</a> مراجعه کنید.</li>
+                            <li>به سایت <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a> مراجعه کنید.</li>
                             <li>با اکانت گوگل خود وارد شوید و یک API Key جدید بسازید (Create API Key).</li>
                             <li>کلید ساخته شده را کپی کنید (شبیه به <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>در همین محیط (AI Studio)، روی دکمه <strong>Settings</strong> (آیکون چرخ‌دنده در منوی پلتفرم) کلیک کنید.</li>
+                            <li>در پنل تنظیمات محیط میزبانی خود (بخش <strong>Settings/Secrets</strong>)، یک متغیر محیطی جدید بسازید.</li>
                             <li>به بخش <strong>Secrets</strong> بروید.</li>
                             <li>یک Secret جدید با نام دقیق <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code> بسازید.</li>
                             <li>مقدار کلید کپی شده را در آن قرار داده و ذخیره کنید.</li>
@@ -3327,10 +3327,10 @@ export default function AdminPanelTab({
                           </>
                         ) : (
                           <>
-                            <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">aistudio.google.com</a>.</li>
+                            <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a>.</li>
                             <li>Log in with your Google account and click "Create API Key".</li>
                             <li>Copy the generated key (looks like <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>In this platform (AI Studio), click the <strong>Settings</strong> button (gear icon).</li>
+                            <li>In your hosting platform's settings, create a new environment variable.</li>
                             <li>Navigate to the <strong>Secrets</strong> section.</li>
                             <li>Create a new secret with the exact name <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code>.</li>
                             <li>Paste the copied key as its value and save.</li>
@@ -3340,7 +3340,7 @@ export default function AdminPanelTab({
                       </ol>
                     </div>
 
-                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-[11px] text-blue-200 flex items-start gap-2">
+                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-200 flex items-start gap-2">
                       <FileText className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                       <p>
                         {language === 'fa' 

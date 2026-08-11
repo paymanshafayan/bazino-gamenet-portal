@@ -141,7 +141,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Username */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
               {language === 'fa' ? 'نام کاربری (گیمر تگ)' : 'Gamertag / Username'}
             </label>
             <div className="relative">
@@ -160,7 +160,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           {/* Email (only for register) */}
           {activeTab === 'register' && (
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
                 {language === 'fa' ? 'آدرس ایمیل' : 'Email Address'}
               </label>
               <div className="relative">
@@ -180,7 +180,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           {/* Phone (only for register) */}
           {activeTab === 'register' && (
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
                 {language === 'fa' ? 'شماره تماس (اختیاری)' : 'Phone Number (Optional)'}
               </label>
               <div className="relative">
@@ -198,7 +198,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
 
           {/* Password */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
               {language === 'fa' ? 'کلمه عبور' : 'Password'}
             </label>
             <div className="relative">

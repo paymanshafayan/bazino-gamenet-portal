@@ -148,11 +148,11 @@ npm run dev
 
 سرور مستقیماً HTTP ساده روی `0.0.0.0:PORT` گوش می‌ده، بدون HTTPS داخلی. برای یک دامنه‌ی واقعی با گواهی SSL، از یک reverse proxy جلوش استفاده کنید (رایج‌ترین روش):
 
-**نمونه‌ی تنظیمات Nginx** (با دامنه‌ی واقعی پروژه، `xerxes.biz`، به‌عنوان مثال):
+**نمونه‌ی تنظیمات Nginx** (با دامنه‌ی واقعی پروژه، `bazino.pro`، به‌عنوان مثال):
 ```nginx
 server {
     listen 80;
-    server_name xerxes.biz;
+    server_name bazino.pro;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -164,7 +164,7 @@ server {
     }
 }
 ```
-بعد با [Certbot](https://certbot.eff.org) گواهی SSL رایگان بگیرید (`certbot --nginx -d xerxes.biz`).
+بعد با [Certbot](https://certbot.eff.org) گواهی SSL رایگان بگیرید (`certbot --nginx -d bazino.pro`).
 
 ⚠️ خط‌های `Upgrade`/`Connection` رو حتماً بذارید — بدونشون چت زنده (WebSocket) از کار می‌افته.
 
@@ -194,6 +194,34 @@ pm2 startup   # سرور رو طوری تنظیم می‌کنه که بعد از
 - [ ] بک‌آپ منظم از دیتابیس واقعی (SQL Server/MongoDB) یا فایل `bazino.sqlite3` گرفته می‌شه.
 - [ ] رمزهای عبور دیتابیس در `install-config.json` قوی و واقعی هستن، نه نمونه.
 - [ ] بعد از `npm install`، پکیج‌های جدید `postcss` و `@csstools/postcss-oklab-function` هم نصب شدن (برای رفع باگ رنگ oklch روی Safari قدیمی — به `HANDOFF_CONTINUE_HERE.md` بخش ۴.۱/۴.۲ مراجعه کنید).
+
+---
+
+---
+
+## ۹. منبع داده نمونه/دیتابیس و قالب‌های نصب‌شده
+
+### منبع داده (Sample ⇄ Database)
+پروژه یک کلید تنظیمات `data_source` دارد (پیش‌فرض: `sample`):
+- **sample** — همه‌ی لیست‌ها از `server/sampleData.ts` خوانده می‌شوند (۴-۵ مورد برای هر بخش)؛ مناسب نمایش/تست بدون دیتابیس.
+- **database** — از دیتابیس خوانده می‌شود؛ جدول خالی → فال‌بک خودکار به داده نمونه.
+- سوییچ از پنل ادمین ← سفارشی‌سازی کلوپ ← «منبع داده» (`GET /api/data-source` / `POST /api/admin/data-source`).
+
+### قالب‌های نصب‌شده روی سرور
+قالب‌هایی که از پنل ادمین با ZIP نصب می‌شوند در پوشه‌ی `themes/<id>/` (روی سرور، کنار `dist/`) ذخیره می‌شوند:
+```
+themes/<id>/
+├── theme.json   ← متادیتا
+├── theme.css    ← استایل کامل
+├── theme.js     ← کامپوننت صفحه اصلی (اختیاری)
+└── assets/      ← تصویر/ویدئو/فونت (اختیاری)
+```
+- این پوشه در `.gitignore` است و هنگام نصب ساخته می‌شود.
+- حذف قالب از پنل = حذف کامل پوشه.
+- ⚠️ هنگام deploy، مطمئن شوید پوشه‌ی `themes/` روی سرور قابل‌نوشتن است و آن را در بک‌آپ‌ها لحاظ کنید.
+
+### لوگو
+لوگوی سایت مادر از `public/logo.png` در آدرس استاندارد `/logo.png` سرو می‌شود (هنگام build به `dist/` کپی می‌شود).
 
 ---
 

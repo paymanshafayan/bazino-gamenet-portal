@@ -1,0 +1,147 @@
+/* ═══════════════════════════════════════════════════════════════════
+   BAZINO THEME — GAMING AMP (گیمینگ AMP)
+   فایل: src/themes/gaming-amp.css
+   قالب کامل سایت — تمام صفحات را با حال‌وهوای «گیمینگ اسپرت»
+   (فیروزه‌ای برقی، گوشه‌های ۴ پیکسلی، هاله‌های نئونی) پوشش می‌دهد.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ---------- ۱) سیستم رنگی ---------- */
+body[data-theme='gaming-amp'] {
+  --primary-color: #00d8ff;
+  --primary-hover-color: #00b8d4;
+  --accent-red-color: #ff4757;
+  --dark-bg-color: #081015;
+  --dark-card-color: #0e1921;
+
+  --theme-bg: #0f0f16;
+  --theme-card-bg: rgba(15, 15, 22, 0.95);
+  --theme-card-border: rgba(0, 216, 255, 0.2);
+  --theme-card-radius: 0.25rem;
+  --theme-primary: #00d8ff;
+  --theme-btn-skew: 0deg;
+  --theme-btn-radius: 0.25rem;
+}
+/* ---------- حلقه‌ی فوکوس کیبورد (قانون UX: Focus Visibility) ---------- */
+.theme-gaming-amp :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 216, 255, 0.25);
+}
+
+
+
+/* ---------- ۲) پس‌زمینه: خطوط مورب فیروزه‌ای ---------- */
+body[data-theme='gaming-amp'],
+body[data-theme='gaming-amp'] .app-bg-main {
+  background-color: #081015;
+  background-image:
+    linear-gradient(115deg, rgba(0, 216, 255, 0.05) 0%, transparent 38%, transparent 62%, rgba(0, 216, 255, 0.04) 100%),
+    radial-gradient(circle at 85% 10%, rgba(0, 216, 255, 0.13), transparent 50%),
+    radial-gradient(circle at 10% 90%, rgba(0, 184, 212, 0.1), transparent 50%),
+    linear-gradient(#081015, #081015);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* ---------- ۳) انتخاب متن / اسکرول‌بار ---------- */
+body[data-theme='gaming-amp'] ::selection {
+  background: rgba(0, 216, 255, 0.35);
+  color: #ffffff;
+}
+.theme-gaming-amp .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 216, 255, 0.3);
+}
+.theme-gaming-amp .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 216, 255, 0.55);
+}
+
+/* ---------- ۴) هدر سایت ---------- */
+.theme-gaming-amp .site-header {
+  background-color: rgba(8, 16, 21, 0.94);
+  border-bottom: 2px solid rgba(0, 216, 255, 0.4);
+  box-shadow: 0 4px 24px rgba(0, 216, 255, 0.12), 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+.theme-gaming-amp .site-header nav button {
+  text-transform: uppercase;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+/* ---------- ۵) دکمه‌ها ---------- */
+.theme-gaming-amp .btn {
+  border-radius: 4px !important;
+  border: 1px solid var(--color-primary);
+  background-color: transparent;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(0, 216, 255, 0.15);
+}
+.theme-gaming-amp .btn:hover {
+  background-color: var(--color-primary);
+  color: #000;
+  box-shadow: 0 0 20px rgba(0, 216, 255, 0.4);
+}
+
+/* ---------- ۶) شکل‌ها و گوشه‌ها ---------- */
+.theme-gaming-amp .notched-clip,
+.theme-gaming-amp .notched-clip-sm {
+  clip-path: none !important;
+  border-radius: 4px !important;
+}
+.theme-gaming-amp .bg-dark-card {
+  background-color: var(--color-dark-card) !important;
+  border-radius: 4px !important;
+  border: 1px solid rgba(0, 216, 255, 0.2) !important;
+  box-shadow: 0 0 15px rgba(0, 216, 255, 0.1) !important;
+}
+.theme-gaming-amp .rounded-2xl,
+.theme-gaming-amp .rounded-xl,
+.theme-gaming-amp .rounded-lg,
+.theme-gaming-amp .rounded-md,
+.theme-gaming-amp .rounded-3xl,
+.theme-gaming-amp .rounded-full {
+  border-radius: 4px !important;
+}
+
+/* ---------- ۷) فرم‌ها ---------- */
+.theme-gaming-amp input,
+.theme-gaming-amp textarea,
+.theme-gaming-amp select {
+  border-radius: 4px !important;
+  border: 1px solid rgba(0, 216, 255, 0.2) !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}
+.theme-gaming-amp input:focus,
+.theme-gaming-amp textarea:focus,
+.theme-gaming-amp select:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 10px rgba(0, 216, 255, 0.3) !important;
+}
+
+/* ---------- ۸) اجزای قالب ---------- */
+.theme-gaming-amp .theme-box {
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 216, 255, 0.2) !important;
+  background-color: rgba(15, 15, 22, 0.95) !important;
+  box-shadow: 0 0 15px rgba(0, 216, 255, 0.1) !important;
+  clip-path: none !important;
+}
+.theme-gaming-amp .theme-box:hover {
+  border-color: rgba(0, 216, 255, 0.6) !important;
+  box-shadow: 0 0 25px rgba(0, 216, 255, 0.25) !important;
+}
+.theme-gaming-amp .theme-btn {
+  border-radius: 4px !important;
+  border: 2px solid var(--primary-color) !important;
+  box-shadow: 0 0 10px rgba(0, 216, 255, 0.2) !important;
+  text-transform: uppercase !important;
+  font-weight: 800 !important;
+  clip-path: none !important;
+}
+.theme-gaming-amp .theme-btn:hover {
+  background-color: var(--primary-color) !important;
+  color: #000 !important;
+  box-shadow: 0 0 20px rgba(0, 216, 255, 0.5) !important;
+}

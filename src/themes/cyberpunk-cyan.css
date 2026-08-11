@@ -1,0 +1,147 @@
+/* ═══════════════════════════════════════════════════════════════════
+   BAZINO THEME — CYBERPUNK CYAN (سایبرپانک فیروزه‌ای)
+   فایل: src/themes/cyberpunk-cyan.css
+   قالب کامل سایت — تمام صفحات (هدر، کارت‌ها، دکمه‌ها، فرم‌ها،
+   مودال‌ها، جداول، اسکرول‌بارها) را با حال‌وهوای سایبرپانک
+   (گوشه‌های تیز، شبکه نئونی فیروزه‌ای، خطوط فسفری) پوشش می‌دهد.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ---------- ۱) سیستم رنگی ---------- */
+body[data-theme='cyberpunk-cyan'] {
+  --primary-color: #00f0ff;
+  --primary-hover-color: #00c8ff;
+  --accent-red-color: #ff0055;
+  --dark-bg-color: #000b18;
+  --dark-card-color: #02152a;
+
+  --theme-bg: #000b18;
+  --theme-card-bg: rgba(0, 11, 24, 0.8);
+  --theme-card-border: rgba(0, 240, 255, 0.4);
+  --theme-card-radius: 0;
+  --theme-primary: #00f0ff;
+  --theme-btn-skew: 0deg;
+  --theme-btn-radius: 0;
+}
+/* ---------- حلقه‌ی فوکوس کیبورد (قانون UX: Focus Visibility) ---------- */
+.theme-cyberpunk-cyan :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 240, 255, 0.25);
+}
+
+
+
+/* ---------- ۲) پس‌زمینه: شبکه سایبر + هاله نئونی ---------- */
+body[data-theme='cyberpunk-cyan'],
+body[data-theme='cyberpunk-cyan'] .app-bg-main {
+  background-color: #000b18;
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% -10%, rgba(0, 240, 255, 0.16), transparent 60%),
+    radial-gradient(ellipse at 95% 110%, rgba(255, 0, 85, 0.1), transparent 50%),
+    linear-gradient(#000b18, #000b18);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* ---------- ۳) انتخاب متن / اسکرول‌بار ---------- */
+body[data-theme='cyberpunk-cyan'] ::selection {
+  background: rgba(0, 240, 255, 0.35);
+  color: #ffffff;
+}
+.theme-cyberpunk-cyan .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.3);
+}
+.theme-cyberpunk-cyan .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.55);
+}
+
+/* ---------- ۴) هدر سایت ---------- */
+.theme-cyberpunk-cyan .site-header {
+  background-color: rgba(0, 11, 24, 0.94);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.5);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.14), 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+.theme-cyberpunk-cyan .site-header nav button {
+  letter-spacing: 0.08em;
+  transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
+}
+.theme-cyberpunk-cyan .site-header nav button:hover {
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+}
+
+/* ---------- ۵) دکمه‌ها ---------- */
+.theme-cyberpunk-cyan .btn {
+  border-radius: 0 !important;
+  border: 1px solid var(--color-primary);
+  background-color: transparent;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.theme-cyberpunk-cyan .btn:hover {
+  background-color: rgba(0, 216, 255, 0.15);
+  box-shadow: 0 0 15px rgba(0, 216, 255, 0.3);
+}
+
+/* ---------- ۶) شکل‌ها و گوشه‌ها ---------- */
+.theme-cyberpunk-cyan .notched-clip,
+.theme-cyberpunk-cyan .notched-clip-sm {
+  clip-path: none !important;
+  border-radius: 4px !important;
+}
+.theme-cyberpunk-cyan .bg-dark-card {
+  background-color: #1a1c26 !important;
+  border-radius: 4px !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+.theme-cyberpunk-cyan .rounded-2xl,
+.theme-cyberpunk-cyan .rounded-xl,
+.theme-cyberpunk-cyan .rounded-lg,
+.theme-cyberpunk-cyan .rounded-md,
+.theme-cyberpunk-cyan .rounded-3xl,
+.theme-cyberpunk-cyan .rounded-full {
+  border-radius: 4px !important;
+}
+
+/* ---------- ۷) فرم‌ها ---------- */
+.theme-cyberpunk-cyan input,
+.theme-cyberpunk-cyan textarea,
+.theme-cyberpunk-cyan select {
+  border-radius: 4px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+.theme-cyberpunk-cyan input:focus,
+.theme-cyberpunk-cyan textarea:focus,
+.theme-cyberpunk-cyan select:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3) !important;
+}
+
+/* ---------- ۸) اجزای قالب ---------- */
+.theme-cyberpunk-cyan .theme-box {
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  border-radius: 0;
+  box-shadow: inset 0 0 15px rgba(27, 194, 202, 0.15);
+  border: 1px solid rgba(27, 194, 202, 0.3);
+}
+.theme-cyberpunk-cyan .theme-box:hover {
+  border: 1px solid rgba(27, 194, 202, 0.8);
+  box-shadow: inset 0 0 25px rgba(27, 194, 202, 0.3), 0 0 15px rgba(27, 194, 202, 0.3);
+}
+.theme-cyberpunk-cyan .theme-btn {
+  clip-path: polygon(15px 0%, 100% 0%, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0% 100%, 0% 15px);
+  border-radius: 0;
+  border-style: dashed !important;
+  border-width: 2px !important;
+  font-weight: 900;
+  letter-spacing: 3px;
+}
+.theme-cyberpunk-cyan .theme-btn:hover {
+  background-color: rgba(0, 240, 255, 0.15);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.35);
+}

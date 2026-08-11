@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { extractColorsFromCss } from '../themes';
 
 interface ThemeColorConfig {
   primary: string;
@@ -11,6 +12,7 @@ interface ThemeInfo {
   name: string;
   type: string;
   colors?: ThemeColorConfig;
+  css?: string;
 }
 
 interface ThemeScreenshotProps {
@@ -50,10 +52,20 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
       primary = '#ffb800';
       bg = '#050608';
       card = '#0D0E15';
+    } else if (theme.id === 'console-grid') {
+      primary = '#00ff66';
+      bg = '#05060a';
+      card = '#0b0e14';
     } else if (theme.colors) {
       primary = theme.colors.primary || '#ffb800';
       bg = theme.colors.bg || '#050608';
       card = theme.colors.card || '#0D0E15';
+    } else if (theme.css) {
+      // قالب‌های ZIP که رنگ پیش‌نمایش ندارند → استخراج از خود فایل CSS
+      const extracted = extractColorsFromCss(theme.css);
+      primary = extracted.primary;
+      bg = extracted.bg;
+      card = extracted.card;
     }
 
     // Set canvas dimensions
@@ -320,7 +332,7 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover/shot:opacity-40 transition-opacity" />
           
           {/* Status Indicator */}
-          <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-black/75 border border-emerald-500/30 text-emerald-400 text-[8px] font-mono flex items-center gap-1">
+          <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-black/75 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             {language === 'fa' ? 'پیش‌نمایش زنده' : 'LIVE VIEWPORT'}
           </div>
@@ -332,7 +344,7 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
               <span className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ backgroundColor: theme.colors?.bg || '#050608' }} title="Background" />
               <span className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ backgroundColor: theme.colors?.card || '#0D0E15' }} title="Card" />
             </div>
-            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider font-mono">
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider font-mono">
               480 × 270 px
             </span>
           </div>

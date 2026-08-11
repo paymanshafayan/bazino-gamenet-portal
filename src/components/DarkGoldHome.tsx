@@ -193,7 +193,7 @@ export default function DarkGoldHome({
       {/* 1. HERO GAME SLIDER (FULL WIDTH, SLANTED & MOBIRISE GAMINGAMP STYLED) */}
       {themeId === 'geco-purple' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-black shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[500px] flex items-center" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 85%, 0% 100%)' }}>
-          <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
+          <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
           
           <div className="relative z-10 w-full max-w-7xl mx-auto px-8 py-20 flex flex-col justify-center h-full">
@@ -217,7 +217,7 @@ export default function DarkGoldHome({
         </section>
       ) : themeId === 'cyberpunk-cyan' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#070b19] min-h-[650px] flex items-center justify-start border-b-[3px] border-[#00f0ff] shadow-[0_10px_50px_rgba(0,240,255,0.2)]">
-          <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
+          <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
           
           {/* Cyberpunk Grid Overlay */}
           <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: '0.2' }}></div>
@@ -265,7 +265,7 @@ export default function DarkGoldHome({
                 idx === activeBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'
               }`}
             >
-              <img
+              <img loading="lazy"
                 src={game.imageUrl}
                 alt={getLocText(game.title)}
                 className="w-full h-full object-cover opacity-100 scale-105 group-hover:scale-100 transition-transform duration-[10s] ease-out"
@@ -342,7 +342,7 @@ export default function DarkGoldHome({
                 className="group relative h-96 overflow-hidden notched-clip border border-white/10 hover:border-primary hover:shadow-[0_0_30px_rgba(27,194,202,0.2)] bg-dark-card transition-all duration-300"
               >
                 {/* Image banner */}
-                <img
+                <img loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
                   className="w-full h-full object-cover opacity-60 group-hover:scale-110 group-hover:opacity-80 transition-all duration-500"
@@ -413,7 +413,7 @@ export default function DarkGoldHome({
             >
               {/* Card Image */}
               <div className="relative aspect-[16/10] w-full bg-dark-bg overflow-hidden border-b border-white/10 shrink-0">
-                <img
+                <img loading="lazy"
                   src={sect.imageUrl}
                   alt={getLocText(sect.title)}
                   className="w-full h-full object-cover group-hover:scale-105 opacity-75 group-hover:opacity-90 transition-all duration-500"
@@ -440,7 +440,7 @@ export default function DarkGoldHome({
 
                 <button
                   onClick={() => onNavigate(sect.id === 'consoles' ? 'reservations' : (sect.id as any))}
-                  className="w-full py-2.5 btn btn-primary-outline display-4 text-[11px] flex items-center justify-center gap-1.5 theme-btn"
+                  className="w-full py-2.5 btn btn-primary-outline display-4 text-xs flex items-center justify-center gap-1.5 theme-btn"
                 >
                   <span>{getLocText(sect.btnText)}</span>
                   {dir === 'rtl' ? <ArrowLeft className="w-3.5 h-3.5 group-hover:translate-x-[-3px] transition-transform" /> : <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-[3px] transition-transform" />}
@@ -481,7 +481,7 @@ export default function DarkGoldHome({
                 {language === 'fa' ? 'جدول زنده مسابقات و نبردها' : 'Esports Live Matchboard'}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-lg text-[9px] font-mono font-bold uppercase">
+            <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
               <span>Lobby Connected</span>
             </div>
@@ -492,12 +492,12 @@ export default function DarkGoldHome({
               <div key={match.id} className="p-5 flex flex-row items-center justify-between gap-4 hover:bg-[#141624]/40 transition-all duration-200">
                 {/* 1. Right Side (RTL): Title & Game Badge */}
                 <div className="flex items-center gap-3 w-1/3 justify-start">
-                  <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[9px] border border-primary/30 rounded-md shrink-0">
+                  <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[10px] border border-primary/30 rounded-md shrink-0">
                     {match.game}
                   </span>
                   <div className="text-right">
                     <h4 className="text-xs font-bold text-white font-display line-clamp-1">{getLocText(match.title)}</h4>
-                    <span className="text-[9px] text-gray-500 font-bold">{match.time}</span>
+                    <span className="text-[10px] text-gray-500 font-bold">{match.time}</span>
                   </div>
                 </div>
 
@@ -515,18 +515,18 @@ export default function DarkGoldHome({
                 {/* 3. Left Side (RTL): Action & Status badge */}
                 <div className="flex items-center gap-3 w-1/3 justify-end">
                   {match.status === 'Live' && (
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[9px] font-black uppercase rounded-md">
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase rounded-md">
                       <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
                       <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
                     </span>
                   )}
                   {match.status === 'Finished' && (
-                    <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[9px] font-black uppercase rounded-md">
+                    <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[10px] font-black uppercase rounded-md">
                       {language === 'fa' ? 'پایان یافته' : 'Finished'}
                     </span>
                   )}
                   {match.status === 'Scheduled' && (
-                    <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[9px] font-black uppercase rounded-md">
+                    <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase rounded-md">
                       {language === 'fa' ? 'برنامه‌ریزی شده' : 'Scheduled'}
                     </span>
                   )}
@@ -604,7 +604,7 @@ export default function DarkGoldHome({
                 >
                   {/* Image and status badge */}
                   <div className="relative aspect-[16/10] w-full bg-dark-bg overflow-hidden rounded-t-2xl">
-                    <img
+                    <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
                       className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"
@@ -626,7 +626,7 @@ export default function DarkGoldHome({
                     </span>
 
                     {/* Game badge */}
-                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[9px] font-mono font-bold rounded-md">
+                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[10px] font-mono font-bold rounded-md">
                       {tournament.game}
                     </span>
                   </div>
@@ -640,7 +640,7 @@ export default function DarkGoldHome({
                       
                       <div className="grid grid-cols-2 gap-3 text-[10px] border-y border-white/5 py-3 font-medium text-gray-400">
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'هزینه ثبت‌نام تیم'}
                             {language === 'en' && 'Team Entry Fee'}
                             {language === 'ru' && 'Взнос с команды'}
@@ -651,7 +651,7 @@ export default function DarkGoldHome({
                           </span>
                         </div>
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'ظرفیت ثبت‌نام'}
                             {language === 'en' && 'Capacity Status'}
                             {language === 'ru' && 'Зарегистрировано'}
@@ -676,7 +676,7 @@ export default function DarkGoldHome({
 
                     <button
                       onClick={() => onNavigate('tournaments')}
-                      className="w-full py-2.5 btn btn-primary-outline display-4 text-[11px] flex items-center justify-center gap-1.5 theme-btn"
+                      className="w-full py-2.5 btn btn-primary-outline display-4 text-xs flex items-center justify-center gap-1.5 theme-btn"
                     >
                       <span>
                         {language === 'fa' && 'مشاهده جدول مسابقات و ثبت‌نام'}
@@ -720,7 +720,7 @@ export default function DarkGoldHome({
             {pricingPackages.map((pack) => (
               <div key={pack.id} className={`theme-box border flex flex-col justify-between bg-dark-card transition-all duration-300 ${pack.popular ? 'border-primary shadow-[0_0_30px_rgba(27,194,202,0.15)] -translate-y-2 relative' : 'border-white/10 hover:border-white/20'}`}>
                 {pack.popular && (
-                  <span className="absolute top-4 right-4 bg-primary text-black font-black text-[9px] px-3 py-1 theme-btn uppercase tracking-widest font-display animate-pulse">
+                  <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 theme-btn uppercase tracking-widest font-display animate-pulse">
                     {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
                   </span>
                 )}
@@ -742,7 +742,7 @@ export default function DarkGoldHome({
                       </li>
                     ))}
                   </ul>
-                  <button onClick={() => onNavigate('reservations')} className="w-full py-3 btn btn-primary-outline display-4 text-[11px] flex items-center justify-center theme-btn">
+                  <button onClick={() => onNavigate('reservations')} className="w-full py-3 btn btn-primary-outline display-4 text-xs flex items-center justify-center theme-btn">
                     {language === 'fa' ? 'شارژ حساب و خرید پکیج' : 'Purchase Pass Ticket'}
                   </button>
                 </div>
@@ -970,12 +970,12 @@ export default function DarkGoldHome({
             />
 
             {/* Custom overlay tracker */}
-            <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[9px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md rounded-md">
+            <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[10px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md rounded-md">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
               <span>GPS Tracking: Live Lock</span>
             </div>
             
-            <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[9px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono rounded-md">
+            <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono rounded-md">
               <span>Lat: 35.7810° N | Lon: 51.4340° E</span>
             </div>
           </div>

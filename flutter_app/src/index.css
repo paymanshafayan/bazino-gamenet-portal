@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&family=Orbitron:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 
@@ -161,7 +160,7 @@ body[data-theme='gaming-hub'] {
 
 /* Global scrollbars and dark aesthetics */
 body {
-  background-image: url('/src/assets/images/background.png') !important;
+  background-image: url('/src/assets/images/background.jpg') !important;
   background-size: cover !important;
   background-position: center !important;
   background-attachment: fixed !important;
@@ -171,7 +170,7 @@ body {
 }
 
 .app-bg-main {
-  background-image: url('/src/assets/images/background.png') !important;
+  background-image: url('/src/assets/images/background.jpg') !important;
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
@@ -687,7 +686,31 @@ html, body {
 }
 
 
+/* ─── قوانین UX (UI/UX Pro Max): حداقل هدف لمسی ۴۴×۴۴px در موبایل ─── */
+@media (pointer: coarse) {
+  .btn, .theme-btn, button { min-height: 44px; }
+  .btn, .theme-btn { min-width: 44px; }
+}
 
+/* ─── قوانین UX: حلقهی فوکوس کیبورد قابل مشاهده ─── */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-color, #ffb800);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
+/* ─── قوانین UX: احترام به کاهش حرکت کاربر ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
+/* ─── قوانین UX: کنتراست متنهای کمرنگ روی زمینه تیره (gray-500 → gray-400) ─── */
+body[data-theme] .text-gray-500 { color: #9ca3af; }
 
+/* قانون UX: line-height بدنه 1.5 (اسکیل UI/UX Pro Max) */
+body { line-height: 1.5; }

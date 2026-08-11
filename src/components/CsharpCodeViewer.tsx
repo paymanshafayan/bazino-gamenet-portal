@@ -285,7 +285,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
 
       {/* Code panel with syntax highlight look */}
       <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-xs leading-relaxed text-slate-300 ltr-code text-left" style={{ direction: 'ltr' }}>
-        <div className="absolute top-3 right-3 text-slate-500 select-none text-[9px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold uppercase tracking-wider">
+        <div className="absolute top-3 right-3 text-slate-500 select-none text-[10px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold uppercase tracking-wider">
           {architecture === 'mvc' ? 'C# / Razor engine' : 'C# / Entity Framework'}
         </div>
         <pre className="overflow-x-auto max-h-[500px] whitespace-pre p-2 scrollbar-thin scrollbar-thumb-slate-800">

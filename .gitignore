@@ -12,3 +12,6 @@ install-config.json
 bazino.sqlite3
 bazino.sqlite3-*
 database.json
+
+# Runtime-installed theme packages (installed via admin panel ZIP upload) — only at repo root
+/themes/

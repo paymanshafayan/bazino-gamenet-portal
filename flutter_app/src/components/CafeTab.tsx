@@ -484,7 +484,7 @@ export default function CafeTab({
                 {/* Loyalty points display */}
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3.5 text-primary mt-2 relative overflow-hidden font-sans">
                   <div className="absolute -top-12 -right-12 w-16 h-16 bg-primary/5 blur-xl"></div>
-                  <div className="flex items-center gap-1.5 font-bold mb-1 relative z-10 font-display text-[11px] uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5 font-bold mb-1 relative z-10 font-display text-xs uppercase tracking-wider">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>{t('booking.pointsToEarn', 'کسب امتیاز باشگاه:')}</span>
                   </div>

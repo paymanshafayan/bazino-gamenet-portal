@@ -118,7 +118,7 @@ export default function GecoPurpleHome({
           {featuredGames?.slice(0, 3).map((game: any, i: number) => (
             <div key={i} className="group cursor-pointer bg-[#111119] border border-white/5 p-4 transition-all hover:border-[#ffb800]/20" onClick={() => onNavigate('reservations')}>
               <div className="relative aspect-video overflow-hidden border border-white/10 mb-6">
-                <img src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <img loading="lazy" src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 <div className="absolute bottom-4 left-4 bg-[#ffb800] text-black text-[10px] font-black px-3 py-1 uppercase tracking-wider">
                   {game.badge || 'GAMING'}
                 </div>
@@ -175,7 +175,7 @@ export default function GecoPurpleHome({
           </div>
           <div className="w-full lg:w-1/2 relative group cursor-pointer" onClick={() => onNavigate('tournaments')}>
             <div className="absolute inset-0 bg-[#ffb800] transform translate-x-4 translate-y-4 border border-white/10 opacity-20 group-hover:translate-x-2 group-hover:translate-y-2 transition-transform"></div>
-            <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80" alt="About" className="relative z-10 w-full h-[360px] object-cover border-4 border-white/10" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80" alt="About" className="relative z-10 w-full h-[360px] object-cover border-4 border-white/10" />
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="w-20 h-20 bg-black/60 rounded-full flex items-center justify-center border-2 border-[#ffb800] group-hover:scale-110 transition-transform backdrop-blur-sm">
                 <Play className="w-8 h-8 text-[#ffb800] ml-1" fill="currentColor" />
@@ -246,22 +246,22 @@ export default function GecoPurpleHome({
               <div className="flex justify-between w-full text-center px-4">
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.days)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'روز' : 'DAYS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'روز' : 'DAYS'}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.hours)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ساعت' : 'HRS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ساعت' : 'HRS'}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.mins)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'دقیقه' : 'MINS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'دقیقه' : 'MINS'}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.secs)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ثانیه' : 'SECS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ثانیه' : 'SECS'}</span>
                 </div>
               </div>
             </div>
@@ -380,7 +380,7 @@ export default function GecoPurpleHome({
               </div>
               <div className="flex items-center gap-4 pt-6 border-t border-white/5">
                  <div className="flex-1">
-                   <span className="text-[#ffb800] border border-[#ffb800] text-[9px] font-black uppercase px-2 py-0.5 mb-2 inline-block">BAZINO</span>
+                   <span className="text-[#ffb800] border border-[#ffb800] text-[10px] font-black uppercase px-2 py-0.5 mb-2 inline-block">BAZINO</span>
                    <h4 className="text-sm font-bold leading-tight">{language === 'fa' ? 'کلیک کنید و کشف کنید' : 'Click to discover'}</h4>
                  </div>
                  <div className="w-12 h-12 bg-[#1a1c29] border border-white/10 shrink-0 flex items-center justify-center rounded-full">
@@ -451,11 +451,11 @@ export default function GecoPurpleHome({
               <div className="h-64 p-8 flex items-center justify-center bg-[#161824] border-b border-white/5 relative overflow-hidden">
                 <ShoppingBag className="w-24 h-24 text-white/5 group-hover:scale-125 transition-transform duration-500" />
                 <div className="absolute inset-0 flex items-center justify-center p-8">
-                   <img src={prod.url} alt="" className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
+                   <img loading="lazy" src={prod.url} alt={prod.name} className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
               <div className="p-6 flex flex-col items-center text-center">
-                <span className="bg-[#ffb800] text-black text-[9px] font-black uppercase px-3 py-1 mb-4 inline-block">{prod.id}</span>
+                <span className="bg-[#ffb800] text-black text-[10px] font-black uppercase px-3 py-1 mb-4 inline-block">{prod.id}</span>
                 <h4 className="text-sm font-black uppercase mb-4 group-hover:text-[#ffb800] transition-colors">
                   {getLocText(prod.name)}
                 </h4>

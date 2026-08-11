@@ -1,20 +1,88 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+
+# 🎮 Bazino Pro | بازینو پرو
+
+**سامانه جامع مدیریت کلوپ گیمینگ (گیم‌نت) — وب‌سایت، پنل مدیریت و اپلیکیشن موبایل**
+
+رزرو سیستم‌ها · بوفه و کافه · فروشگاه تجهیزات · مسابقات و تورنمنت‌ها · باشگاه وفاداری · چت زنده · قالب‌های بصری چندگانه
+
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## ✨ امکانات
 
-View your app in AI Studio: https://ai.studio/apps/1f0c099a-574e-4756-896c-f351bd3eb326
+| بخش | توضیح |
+|---|---|
+| 🖥️ رزرو سیستم | رزرو آنلاین PC / کنسول با تعیین ساعت و محاسبه قیمت |
+| ☕ کافه و بوفه | سفارش آنلاین غذا و نوشیدنی، تحویل پشت سیستم |
+| 🛒 فروشگاه جانبی | تجهیزات گیمینگ با گارانتی کلوپ |
+| 🏆 مسابقات | تورنمنت‌های CS2، Dota 2، FIFA و ... با ثبت‌نام تیمی |
+| ⭐ باشگاه وفاداری | امتیازدهی و تبدیل امتیاز به کد تخفیف |
+| 💬 چت زنده | اتاق‌های گفتگو با WebSocket |
+| 🎨 موتور قالب | هر قالب فایل CSS مجزا + نصب قالب از ZIP (با assets و کامپوننت) |
+| 🗄️ منبع داده | سوییچ بین «داده نمونه» و «دیتابیس» از پنل ادمین |
+| 🌐 چندزبانه | فارسی، انگلیسی، روسی، ترکی |
+| ⚡ عملکرد | کد اسپلیتینگ + کش immutable + lazy loading + فونت بهینه (طبق GTmetrix) |
+| 🔄 CI | ورک‌فلو GitHub Actions: تایپ‌چک، تست قالب، بیلد، بوت + smoke تست |
 
-## Run Locally
+## 🚀 اجرای محلی
 
-**Prerequisites:**  Node.js
+**پیش‌نیاز:** Node.js (نسخه ۲۲ یا بالاتر)
+
+```bash
+npm install
+npm run dev
+```
+
+سرور توسعه روی `http://localhost:3000` بالا می‌آید.
+
+### اسکریپت‌ها
+
+| دستور | کار |
+|---|---|
+| `npm run dev` | اجرای سرور توسعه (بک‌اند + فرانت‌اند) |
+| `npm run build` | بیلد کامل (فرانت‌اند + اپ مدیریت + باندل بک‌اند) |
+| `npm run start` | اجرای بیلد production (`dist/server.cjs`) |
+| `npm run lint` | تایپ‌چک TypeScript |
+| `npm run clean` | پاک‌سازی خروجی‌ها |
+
+## 🧪 تست‌ها
+
+```bash
+npm run lint                                   # تایپ‌چک
+npx tsx scripts/verify-themes.ts               # تست موتور قالب
+npx tsx scripts/test-theme-store.mts           # تست ذخیره‌ساز قالب
+npx tsx scripts/test-theme-http.mts            # تست HTTP قالب‌ها (نیاز به سرور running)
+npx tsx scripts/test-theme-sdk.mts             # تست SDK کامپوننت قالب (نیاز به سرور running)
+```
+
+### CI (اختیاری)
+
+ورک‌فلو آماده‌ی GitHub Actions در `ci/build-test.workflow.yml` موجود است (راهنما: `ci/README.md`).
 
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🔑 تنظیمات
+
+| متغیر | توضیح |
+|---|---|
+| `GEMINI_API_KEY` | کلید API گوگل جمینای (برای ترجمه خودکار و دستیار هوشمند در پنل ادمین) |
+| `APP_URL` | آدرس عمومی میزبانی برنامه |
+| `JWT_SECRET` | کلید امضای توکن‌های احراز هویت (در production الزامی است) |
+
+## 📁 ساختار پروژه
+
+```
+├── server.ts            ← سرور Express + WebSocket + API ها
+├── server/              ← provider های دیتابیس، داده نمونه، ذخیره‌ساز قالب
+├── src/                 ← فرانت‌اند React
+│   ├── themes/          ← موتور قالب‌بندی (CSS مجزای هر قالب + فرمت ZIP)
+│   └── themeSdk/        ← SDK کامپوننت قالب (theme.js)
+├── flutter_app/         ← اپلیکیشن موبایل Flutter (پروژه مستقل)
+├── Management App/      ← اپ دسکتاپ مدیریت (پروژه مستقل)
+└── public/              ← فایل‌های استاتیک (لوگو و ...)
+```
+
+## 📜 مجوز
+
+پروژه اختصاصی «بازینو پرو» — تمامی حقوق محفوظ است.

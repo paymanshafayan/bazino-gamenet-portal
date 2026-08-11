@@ -167,7 +167,7 @@ export default function ThemeSelectorModal({
                         <h4 className="font-bold text-sm text-white group-hover:text-primary transition-colors">
                           {theme.name}
                         </h4>
-                        <span className="text-[9px] uppercase font-mono tracking-widest text-gray-500">
+                        <span className="text-[10px] uppercase font-mono tracking-widest text-gray-500">
                           {theme.type === 'built-in' 
                             ? (language === 'fa' ? 'سیستمی' : 'BUILT-IN') 
                             : (language === 'fa' ? 'پوسته سفارشی' : 'CUSTOM')}
@@ -216,7 +216,7 @@ export default function ThemeSelectorModal({
                 {language === 'fa' ? 'موتور پویا و تمام‌انیمیشنی کلوپ بازینو' : 'POWERED BY BAZINO ANIMATION ENGINE'}
               </span>
               <span className="mt-2 sm:mt-0">
-                {language === 'fa' ? '۴ قالب آماده گیمینگ و سایبرپانک بارگذاری شده' : '4 READY GAMING THEMES INSTALLED'}
+                {language === 'fa' ? `${availableThemes.length} قالب آماده گیمینگ و سایبرپانک بارگذاری شده` : `${availableThemes.length} READY GAMING THEMES INSTALLED`}
               </span>
             </div>
           </motion.div>

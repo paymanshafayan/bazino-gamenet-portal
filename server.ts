@@ -1,7 +1,7 @@
 // Loads a `.env` file at the project root into process.env, if one exists (safe no-op
-// otherwise — e.g. under Google AI Studio, where GEMINI_API_KEY/APP_URL are injected
-// directly into the environment and no .env file is present). `dotenv` was already an
-// installed dependency but was never actually imported anywhere; see PUBLISH_AND_DATABASE_GUIDE.md.
+// otherwise — e.g. under a managed hosting platform, where GEMINI_API_KEY/APP_URL
+// are injected directly into the environment and no .env file is present). `dotenv`
+// was already an installed dependency but was never actually imported anywhere.
 import "dotenv/config";
 import express from "express";
 import compression from "compression";
@@ -20,8 +20,83 @@ import {
   logDbQuery,
   dbQueryLogs
 } from "./server/dataProviders";
+import {
+  SAMPLE_SYSTEMS,
+  SAMPLE_CAFE_ITEMS,
+  SAMPLE_ACCESSORIES,
+  SAMPLE_TOURNAMENTS,
+  SAMPLE_ARTICLES,
+  SAMPLE_SLIDERS,
+  SAMPLE_COUPONS,
+  SAMPLE_TRANSACTIONS,
+  SAMPLE_CHAT_ROOMS,
+  SAMPLE_RESERVATION_LOGS,
+  SAMPLE_SETTINGS,
+  SAMPLE_COUNTS
+} from "./server/sampleData";
+import {
+  listInstalledThemes,
+  installThemeZip,
+  deleteTheme,
+  readThemeCss,
+  getThemeAsset,
+  getThemeComponentJs,
+  exportThemeZip
+} from "./server/themeStore";
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
+
+/* ═══════════════════════════════════════════════════════════════════
+   DATA SOURCE MODE — «منبع داده سایت و اپلیکیشن»
+   ═══════════════════════════════════════════════════════════════════
+   • sample   (پیش‌فرض) → تمام لیست‌ها از داده‌های نمونه (server/sampleData.ts)
+     خوانده می‌شوند؛ سایت و اپلیکیشن موبایل بدون نیاز به دیتابیس پر کار می‌کنند.
+   • database            → لیست‌ها از دیتابیس خوانده می‌شوند؛ اگر جدولی خالی
+     باشد، به‌صورت خودکار از داده‌های نمونه پر می‌شود (سایت هیچ‌وقت خالی نیست).
+
+   تنظیم در پنل مدیریت ← سفارشی‌سازی کلوپ ← «منبع داده» (کلید: data_source)
+   ═══════════════════════════════════════════════════════════════════ */
+const DATA_SOURCE_SETTING = "data_source";
+export type DataSourceMode = "sample" | "database";
+
+export async function getDataSourceMode(): Promise<DataSourceMode> {
+  try {
+    const v = await getActiveDataProvider().getSetting(DATA_SOURCE_SETTING);
+    return v === "database" ? "database" : "sample";
+  } catch (e) {
+    return "sample";
+  }
+}
+
+export async function setDataSourceMode(mode: DataSourceMode): Promise<void> {
+  await getActiveDataProvider().setSetting(DATA_SOURCE_SETTING, mode);
+}
+
+/** لیست نهایی یک بخش: در حالت sample → داده نمونه؛ در حالت database →
+ *  داده دیتابیس، و اگر جدول خالی بود → داده نمونه (فال‌بک خودکار). */
+export async function resolveSampleList<T>(dbRows: T[], sampleRows: T[]): Promise<T[]> {
+  const mode = await getDataSourceMode();
+  if (mode === "sample") return sampleRows;
+  return dbRows.length > 0 ? dbRows : sampleRows;
+}
+
+/** پیدا کردن یک رکورد با کلید: در حالت sample → داده نمونه؛ در حالت database →
+ *  دیتابیس، و اگر پیدا نشد → داده نمونه (تا جریان رزرو/سفارش/ثبت‌نام در
+ *  حالت sample هم کار کند). keyField مشخص می‌کند با کدام فیلد جستجو شود
+ *  (پیش‌فرض 'id' — برای کد تخفیف 'code'). */
+export async function resolveSampleById<T extends Record<string, any>>(
+  fetchDb: () => Promise<T | undefined>,
+  sampleRows: T[],
+  key: string,
+  keyField: string = "id"
+): Promise<T | undefined> {
+  const mode = await getDataSourceMode();
+  if (mode === "sample") {
+    return sampleRows.find(x => x[keyField] === key) ?? (await fetchDb());
+  }
+  const dbRow = await fetchDb();
+  return dbRow ?? sampleRows.find(x => x[keyField] === key);
+}
 
 async function startServer() {
   const app = express();
@@ -316,7 +391,7 @@ async function startServer() {
   // Chat Room Endpoints
   app.get("/api/chat/rooms", async (req, res) => {
     try {
-      const rooms = await getActiveDataProvider().listChatRooms();
+      const rooms = await resolveSampleList(await getActiveDataProvider().listChatRooms(), SAMPLE_CHAT_ROOMS);
       res.json(rooms);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -432,7 +507,7 @@ async function startServer() {
 
   app.get("/api/transactions", async (req, res) => {
     try {
-      const transactions = await getActiveDataProvider().listTransactions();
+      const transactions = await resolveSampleList(await getActiveDataProvider().listTransactions(), SAMPLE_TRANSACTIONS);
       res.json(transactions);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -441,7 +516,7 @@ async function startServer() {
 
   app.get("/api/coupons", async (req, res) => {
     try {
-      const coupons = await getActiveDataProvider().listCoupons();
+      const coupons = await resolveSampleList(await getActiveDataProvider().listCoupons(), SAMPLE_COUPONS);
       res.json(coupons);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -504,7 +579,7 @@ async function startServer() {
   // Systems & Reservations
   app.get("/api/systems", async (req, res) => {
     try {
-      const systems = await getActiveDataProvider().listSystems();
+      const systems = await resolveSampleList(await getActiveDataProvider().listSystems(), SAMPLE_SYSTEMS);
       res.json(systems);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -533,7 +608,7 @@ async function startServer() {
     try {
       const { systemId, startTime, endTime, date, couponCode } = req.body;
       const store = getActiveDataProvider();
-      const system = await store.getSystemById(systemId);
+      const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
 
       if (!system) {
         return res.status(404).json({ error: "System not found" });
@@ -615,7 +690,7 @@ async function startServer() {
 
   app.get("/api/reservations", async (req, res) => {
     try {
-      const reservationLogs = await getActiveDataProvider().listReservationLogs();
+      const reservationLogs = await resolveSampleList(await getActiveDataProvider().listReservationLogs(), SAMPLE_RESERVATION_LOGS);
       res.json(reservationLogs);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -626,7 +701,7 @@ async function startServer() {
     try {
       const { id } = req.params;
       const store = getActiveDataProvider();
-      const reservation = await store.getReservationLogById(id);
+      const reservation = await resolveSampleById(() => store.getReservationLogById(id), SAMPLE_RESERVATION_LOGS, id);
       if (reservation) {
         await store.setReservationCheckedIn(id);
         const reservationLogs = await store.listReservationLogs();
@@ -1128,7 +1203,7 @@ Decide whether one of the available functions matches what the user is asking fo
   // Cafe Buffet Catalog & Orders
   app.get("/api/cafe", async (req, res) => {
     try {
-      const cafeItems = await getActiveDataProvider().listCafeItems();
+      const cafeItems = await resolveSampleList(await getActiveDataProvider().listCafeItems(), SAMPLE_CAFE_ITEMS);
       res.json(cafeItems);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -1141,7 +1216,7 @@ Decide whether one of the available functions matches what the user is asking fo
   async function validateCouponServerSide(amount: number, code?: string) {
     if (!code) return { discountAmount: 0, coupon: null as any };
     const store = getActiveDataProvider();
-    const coupon = await store.getCouponByCode(code);
+    const coupon = await resolveSampleById(() => store.getCouponByCode(code), SAMPLE_COUPONS, code, "code");
     if (!coupon || !coupon.isActive) {
       throw Object.assign(new Error("کد تخفیف معتبر نیست یا قبلاً استفاده شده است."), { statusCode: 400 });
     }
@@ -1171,7 +1246,7 @@ Decide whether one of the available functions matches what the user is asking fo
       // never trust item.price or a total sent by the client.
       let totalPrice = 0;
       for (const orderItem of items) {
-        const menuItem = await store.getCafeItemById(orderItem.item.id);
+        const menuItem = await resolveSampleById(() => store.getCafeItemById(orderItem.item.id), SAMPLE_CAFE_ITEMS, orderItem.item.id);
         if (!menuItem) {
           return res.status(404).json({ error: `آیتم منو یافت نشد: ${orderItem.item?.id}` });
         }
@@ -1243,7 +1318,7 @@ Decide whether one of the available functions matches what the user is asking fo
   // Accessory Shop & Orders
   app.get("/api/accessories", async (req, res) => {
     try {
-      const accessories = await getActiveDataProvider().listAccessories();
+      const accessories = await resolveSampleList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES);
       res.json(accessories);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -1263,7 +1338,7 @@ Decide whether one of the available functions matches what the user is asking fo
       // never trust item.price or a total sent by the client.
       let totalPrice = 0;
       for (const cartItem of cart) {
-        const catalogItem = await store.getAccessoryById(cartItem.item.id);
+        const catalogItem = await resolveSampleById(() => store.getAccessoryById(cartItem.item.id), SAMPLE_ACCESSORIES, cartItem.item.id);
         if (!catalogItem) {
           return res.status(404).json({ error: `کالا یافت نشد: ${cartItem.item?.id}` });
         }
@@ -1332,7 +1407,7 @@ Decide whether one of the available functions matches what the user is asking fo
   // Tournaments
   app.get("/api/tournaments", async (req, res) => {
     try {
-      const tournaments = await getActiveDataProvider().listTournaments();
+      const tournaments = await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS);
       res.json(tournaments.map(t => ({
         ...t,
         teams: JSON.parse(t.teams),
@@ -1347,7 +1422,7 @@ Decide whether one of the available functions matches what the user is asking fo
     try {
       const { tournamentId, team } = req.body;
       const store = getActiveDataProvider();
-      const tournament = await store.getTournamentById(tournamentId);
+      const tournament = await resolveSampleById(() => store.getTournamentById(tournamentId), SAMPLE_TOURNAMENTS, tournamentId);
 
       if (tournament) {
         const teams = JSON.parse(tournament.teams);
@@ -1376,7 +1451,7 @@ Decide whether one of the available functions matches what the user is asking fo
   // Blog News Articles & Comments
   app.get("/api/articles", async (req, res) => {
     try {
-      const articles = await getActiveDataProvider().listArticles();
+      const articles = await resolveSampleList(await getActiveDataProvider().listArticles(), SAMPLE_ARTICLES);
       res.json(articles.map(a => ({
         ...a,
         comments: JSON.parse(a.comments)
@@ -1391,7 +1466,7 @@ Decide whether one of the available functions matches what the user is asking fo
       const { id } = req.params;
       const { gamerTag, content } = req.body;
       const store = getActiveDataProvider();
-      const article = await store.getArticleById(id);
+      const article = await resolveSampleById(() => store.getArticleById(id), SAMPLE_ARTICLES, id);
 
       if (article) {
         const comments = JSON.parse(article.comments);
@@ -1441,10 +1516,14 @@ Decide whether one of the available functions matches what the user is asking fo
   app.get("/api/admin/stats", async (req, res) => {
     try {
       const store = getActiveDataProvider();
-      const cafeOrdersRows = await store.listCafeOrders();
-      const shopOrdersRows = await store.listShopOrders();
-      const reservationLogsRows = await store.listReservationLogs();
-      const systemsRows = await store.listSystems();
+      const mode = await getDataSourceMode();
+      // در حالت نمونه، آمار داشبورد از داده‌های نمونه محاسبه می‌شود تا
+      // پنل مدیریت هم در حالت پیش‌فرض (sample) پر و زنده دیده شود.
+      const useSample = mode === "sample";
+      const cafeOrdersRows = useSample ? [] : await store.listCafeOrders();
+      const shopOrdersRows = useSample ? [] : await store.listShopOrders();
+      const reservationLogsRows = useSample ? SAMPLE_RESERVATION_LOGS : await store.listReservationLogs();
+      const systemsRows = useSample ? SAMPLE_SYSTEMS : await store.listSystems();
 
       const parsedCafeOrders = cafeOrdersRows.map(o => ({ ...o, items: JSON.parse(o.items) }));
       const parsedShopOrders = shopOrdersRows.map(o => ({ ...o, cart: JSON.parse(o.cart) }));
@@ -1474,6 +1553,7 @@ Decide whether one of the available functions matches what the user is asking fo
         cafeOrders: parsedCafeOrders,
         shopOrders: parsedShopOrders,
         reservationLogs: reservationLogsRows,
+        dataSource: mode,
         gamenetSyncStatus
       });
     } catch (e) {
@@ -1922,9 +2002,113 @@ Decide whether one of the available functions matches what the user is asking fo
       const store = getActiveDataProvider();
       const themes = await store.listThemes();
       const activeThemeId = await store.getSetting("activeThemeId");
-      res.json({ themes, activeThemeId: activeThemeId || "dark-gold" });
+      // قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
+      const serverThemes = listInstalledThemes();
+      res.json({ themes, serverThemes, activeThemeId: activeThemeId || "dark-gold" });
     } catch (e) {
       res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // THEME STORE — نصب/حذف/سرو قالب‌های سروری (پوشه اختصاصی هر قالب)
+  // ═══════════════════════════════════════════════════════════════════
+
+  // نصب قالب از فایل ZIP (body خام با Content-Type: application/zip)
+  // ساختار: theme.json + theme.css + assets/
+  app.post(
+    "/api/admin/themes/install",
+    express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
+    (req, res) => {
+      try {
+        const buffer = req.body as Buffer | undefined;
+        if (!buffer || buffer.length === 0) {
+          return res.status(400).json({ error: "فایل ZIP ارسال نشده است" });
+        }
+        const fallbackName = (req.query.name as string) || undefined;
+        const result = installThemeZip(new Uint8Array(buffer), fallbackName);
+        if ("error" in result) {
+          return res.status(400).json({ error: result.error });
+        }
+        logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${result.theme.id}" installed (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
+        res.json({ success: true, theme: result.theme });
+      } catch (e) {
+        console.error("Theme install error:", e);
+        res.status(500).json({ error: String(e) });
+      }
+    }
+  );
+
+  // سرو فایل CSS قالب (با بازنویسی مسیرهای assets)
+  app.get("/api/themes/:id/theme.css", (req, res) => {
+    try {
+      const result = readThemeCss(req.params.id);
+      if (!result) return res.status(404).json({ error: "Theme not found" });
+      res.setHeader("Content-Type", result.contentType);
+      res.setHeader("Cache-Control", "no-cache");
+      res.send(result.css);
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // سرو کامپوننت قالب (theme.js) — اختیاری؛ فقط اگر در پوشه قالب باشد
+  app.get("/api/themes/:id/theme.js", (req, res) => {
+    try {
+      const result = getThemeComponentJs(req.params.id);
+      if (!result) return res.status(404).json({ error: "Theme has no component" });
+      res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.send(Buffer.from(result.data));
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // سرو فایل‌های assets قالب (تصویر/ویدئو/فونت/...)
+  const ASSET_MIME: Record<string, string> = {
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+    webp: "image/webp", svg: "image/svg+xml", avif: "image/avif", ico: "image/x-icon",
+    mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", ogv: "video/ogg",
+    mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg",
+    woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", otf: "font/otf", eot: "application/vnd.ms-fontobject",
+    css: "text/css", js: "text/javascript", json: "application/json", txt: "text/plain",
+  };
+  app.get("/api/themes/:id/assets/*", (req, res) => {
+    try {
+      const rel = (req.params[0] as string) || "";
+      const asset = getThemeAsset(req.params.id, rel);
+      if (!asset) return res.status(404).json({ error: "Asset not found" });
+      res.setHeader("Content-Type", ASSET_MIME[asset.ext] || "application/octet-stream");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(Buffer.from(asset.data));
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // خروجی ZIP از قالب نصب‌شده (شامل پوشه assets)
+  app.get("/api/themes/:id/export", (req, res) => {
+    try {
+      const zip = exportThemeZip(req.params.id);
+      if (!zip) return res.status(404).json({ error: "Theme not found" });
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${req.params.id}.zip"`);
+      res.send(Buffer.from(zip));
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // حذف قالب (پوشه کامل قالب حذف می‌شود)
+  app.delete("/api/admin/themes/:id", (req, res) => {
+    try {
+      const removed = deleteTheme(req.params.id);
+      if (!removed) return res.status(404).json({ error: "Theme not found" });
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${req.params.id}" deleted (folder removed)`);
+      res.json({ success: true, serverThemes: listInstalledThemes() });
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
     }
   });
 
@@ -1978,7 +2162,7 @@ Decide whether one of the available functions matches what the user is asking fo
   // App Sliders APIs
   app.get("/api/app-sliders", async (req, res) => {
     try {
-      const sliders = await getActiveDataProvider().listSliders();
+      const sliders = await resolveSampleList(await getActiveDataProvider().listSliders(), SAMPLE_SLIDERS);
       res.json(sliders);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -2097,7 +2281,16 @@ namespace GameNet.Infrastructure.Migrations
         acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);
-      res.json(settingsObj);
+
+      // مقادیر نمونه به‌عنوان پایه (پیش‌فرض)؛ مقادیر ذخیره‌شده در دیتابیس
+      // همیشه اولویت دارند — یعنی اگر ادمین چیزی را سفارشی کرده باشد،
+      // در هر دو حالت sample/database همان مقدار دیده می‌شود.
+      const sampleObj = SAMPLE_SETTINGS.reduce((acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      res.json({ ...sampleObj, ...settingsObj, data_source: await getDataSourceMode() });
     } catch (err) {
       console.error("Error fetching settings:", err);
       res.status(500).json({ error: "Failed to load settings" });
@@ -2115,6 +2308,48 @@ namespace GameNet.Infrastructure.Migrations
     } catch (err) {
       console.error("Error saving setting:", err);
       res.status(500).json({ error: "Failed to save setting" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // DATA SOURCE — «منبع داده (نمونه / دیتابیس)»
+  // اطلاعات وضعیت فعلی + تعداد آیتم‌های هر بخش در هر دو منبع
+  // ═══════════════════════════════════════════════════════════════
+  app.get("/api/data-source", async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const mode = await getDataSourceMode();
+      const dbCounts = {
+        systems: (await store.listSystems()).length,
+        cafeItems: (await store.listCafeItems()).length,
+        accessories: (await store.listAccessories()).length,
+        tournaments: (await store.listTournaments()).length,
+        articles: (await store.listArticles()).length,
+        sliders: (await store.listSliders()).length,
+        coupons: (await store.listCoupons()).length,
+        transactions: (await store.listTransactions()).length,
+        chatRooms: (await store.listChatRooms()).length,
+        reservations: (await store.listReservationLogs()).length
+      };
+      res.json({ mode, sample: SAMPLE_COUNTS, database: dbCounts });
+    } catch (err) {
+      console.error("Error reading data source:", err);
+      res.status(500).json({ error: "Failed to read data source" });
+    }
+  });
+
+  app.post("/api/admin/data-source", async (req, res) => {
+    try {
+      const { mode } = req.body;
+      if (mode !== "sample" && mode !== "database") {
+        return res.status(400).json({ error: "mode must be 'sample' or 'database'" });
+      }
+      await setDataSourceMode(mode);
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", `Data source switched to "${mode}"`);
+      res.json({ success: true, mode });
+    } catch (err) {
+      console.error("Error switching data source:", err);
+      res.status(500).json({ error: "Failed to switch data source" });
     }
   });
 
@@ -2184,7 +2419,7 @@ namespace GameNet.Infrastructure.Migrations
         apiKey: key,
         httpOptions: {
           headers: {
-            'User-Agent': 'aistudio-build',
+            'User-Agent': 'bazino-pro-server',
           }
         }
       });
@@ -2522,14 +2757,28 @@ Example format:
   if (process.env.NODE_ENV !== "production") {
     // Mount Vite dev server in middleware mode
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // Allow preview/forwarded hosts (sandbox preview domains) —
+        // dev only; production serves static files below.
+        allowedHosts: true,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
     // Serve static files in production
     const distPath = path.join(staticRoot, "dist");
-    app.use(express.static(distPath));
+    // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML بدون کش (برای به‌روزرسانی فوری)
+    app.use(express.static(distPath, {
+      maxAge: "7d",
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (/\/assets\//.test(filePath)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });

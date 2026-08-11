@@ -1,25 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
-import bazinoLogo from './assets/images/bazino_logo_user.png';
-import backgroundBg from './assets/images/background.png';
-import LoyaltyProfileTab from './components/LoyaltyProfileTab';
-import ReservationsTab from './components/ReservationsTab';
-import CafeTab from './components/CafeTab';
-import ShopTab from './components/ShopTab';
-import TournamentsTab from './components/TournamentsTab';
-import BlogTab from './components/BlogTab';
-import CsharpCodeViewer from './components/CsharpCodeViewer';
-import AdminPanelTab from './components/AdminPanelTab';
+import bazinoLogo from './assets/images/bazino_logo_user.webp';
+// تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند (کد اسپلیتینگ):
+// فقط HomeTab (صفحه اصلی/LCP) به‌صورت eager می‌ماند — بقیه با کلیک کاربر
+// دانلود می‌شوند تا باندل اولیه کوچک بماند (توصیه اصلی GTmetrix/PageSpeed).
 import HomeTab from './components/HomeTab';
-import FlutterCodeViewer from './components/FlutterCodeViewer';
-import PresentationTab from './components/PresentationTab';
-import AuthModal from './components/AuthModal';
-import InstallPage from './components/InstallPage';
-import ChatTab from './components/ChatTab';
-import ThemeSelectorModal from './components/ThemeSelectorModal';
-import ConsoleHubView from './components/ConsoleHubView';
-import ConsoleGridClassic from './components/ConsoleGridClassic';
-import VisualHelpGuide from './components/VisualHelpGuide';
+const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
+const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
+const CafeTab = lazy(() => import('./components/CafeTab'));
+const ShopTab = lazy(() => import('./components/ShopTab'));
+const TournamentsTab = lazy(() => import('./components/TournamentsTab'));
+const BlogTab = lazy(() => import('./components/BlogTab'));
+const CsharpCodeViewer = lazy(() => import('./components/CsharpCodeViewer'));
+const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
+const FlutterCodeViewer = lazy(() => import('./components/FlutterCodeViewer'));
+const PresentationTab = lazy(() => import('./components/PresentationTab'));
+const AuthModal = lazy(() => import('./components/AuthModal'));
+const InstallPage = lazy(() => import('./components/InstallPage'));
+const ChatTab = lazy(() => import('./components/ChatTab'));
+const ThemeSelectorModal = lazy(() => import('./components/ThemeSelectorModal'));
+const ConsoleHubView = lazy(() => import('./components/ConsoleHubView'));
+const ConsoleGridClassic = lazy(() => import('./components/ConsoleGridClassic'));
+const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
 import { useLanguage } from './context/LanguageContext';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
@@ -200,6 +202,11 @@ export default function App() {
   };
 
   const renderTabContent = () => (
+    <Suspense fallback={
+      <div className="w-full flex items-center justify-center py-24">
+        <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    }>
     <div className="max-w-7xl mx-auto w-full flex-grow relative pb-20">
       {activeTab === 'home' && (
         layoutMode === 'hub' ? (
@@ -266,6 +273,7 @@ export default function App() {
       {activeTab === 'presentation' && <PresentationTab addNotification={addNotification} />}
       {activeTab === 'chat' && <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} />}
     </div>
+    </Suspense>
   );
 
   if (isInstalled === null) {
@@ -278,12 +286,18 @@ export default function App() {
 
   if (isInstalled === false) {
     return (
-      <InstallPage 
-        onInstallationComplete={() => {
-          setIsInstalled(true);
-          fetchData();
-        }} 
-      />
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#050714] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+        </div>
+      }>
+        <InstallPage 
+          onInstallationComplete={() => {
+            setIsInstalled(true);
+            fetchData();
+          }} 
+        />
+      </Suspense>
     );
   }
 
@@ -353,7 +367,7 @@ export default function App() {
       {!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin' && (
         <header className="h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
-               <img src={bazinoLogo} alt="Bazino Pro" className="h-10 w-auto" />
+               <img src={bazinoLogo} alt="Bazino Pro" width="40" height="40" className="brand-logo-guard h-10 w-auto" />
                <span className="font-display font-black text-xl tracking-wider text-white hidden md:block">BAZINO <span className="text-primary">PRO</span></span>
             </div>
             
@@ -388,7 +402,7 @@ export default function App() {
                ) : (
                  <div className="flex items-center gap-3">
                    <span className="text-xs font-bold text-primary">@{user.username}</span>
-                   <button onClick={handleLogout} className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
+                   <button onClick={handleLogout} aria-label="Logout" className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
                  </div>
                )}
                <button 
@@ -442,28 +456,30 @@ export default function App() {
             {renderTabContent()}
           </main>
 
-      {/* Modals */}
-      <VisualHelpGuide 
-        isOpen={isHelpOpen} 
-        onClose={() => setIsHelpOpen(false)} 
-        mode={helpMode} 
-        language={language} 
-        dir={dir} 
-      />
-      <AuthModal 
-        addNotification={addNotification}
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={setUser}
-      />
-      <ThemeSelectorModal 
-        isOpen={isThemeModalOpen}
-        onClose={() => setIsThemeModalOpen(false)}
-        availableThemes={availableThemes}
-        themeId={themeId}
-        setThemeId={setThemeId}
-        language={language}
-      />
+      {/* Modals — lazy: هنگام اولین باز شدن دانلود می‌شوند */}
+      <Suspense fallback={null}>
+        <VisualHelpGuide 
+          isOpen={isHelpOpen} 
+          onClose={() => setIsHelpOpen(false)} 
+          mode={helpMode} 
+          language={language} 
+          dir={dir} 
+        />
+        <AuthModal 
+          addNotification={addNotification}
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={setUser}
+        />
+        <ThemeSelectorModal 
+          isOpen={isThemeModalOpen}
+          onClose={() => setIsThemeModalOpen(false)}
+          availableThemes={availableThemes}
+          themeId={themeId}
+          setThemeId={setThemeId}
+          language={language}
+        />
+      </Suspense>
 
       {/* Logout Confirmation Modal */}
       {isLogoutConfirmOpen && (

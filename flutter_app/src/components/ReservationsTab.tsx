@@ -362,7 +362,7 @@ export default function ReservationsTab({
                   </div>
 
                   {sys.isReserved && (
-                    <span className="absolute top-2 left-2 text-[8px] bg-rose-500/20 border border-rose-500/30 text-rose-400 px-1.5 py-0.5 rounded-full font-bold">
+                    <span className="absolute top-2 left-2 text-[10px] bg-rose-500/20 border border-rose-500/30 text-rose-400 px-1.5 py-0.5 rounded-full font-bold">
                       {language === 'fa' && 'مشغول'}
                       {language === 'en' && 'In Use'}
                       {language === 'ru' && 'Занят'}
@@ -437,7 +437,7 @@ export default function ReservationsTab({
                       <div>
                         <div className="flex justify-between items-start gap-2">
                           <h4 className="text-white text-xs font-bold font-display">{res.systemName}</h4>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                             isCheckedIn
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                               : 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse'
@@ -458,11 +458,11 @@ export default function ReservationsTab({
                         
                         <div className="grid grid-cols-2 gap-2 mt-4 text-[10px] text-gray-400 font-mono">
                           <div>
-                            <span className="text-gray-600 block text-[9px] uppercase">{language === 'fa' ? 'سانس رزرو:' : 'Time slot:'}</span>
+                            <span className="text-gray-600 block text-[10px] uppercase">{language === 'fa' ? 'سانس رزرو:' : 'Time slot:'}</span>
                             <span className="text-gray-300 font-bold">{res.startTime} - {res.endTime}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600 block text-[9px] uppercase">{language === 'fa' ? 'هزینه پرداخت شده:' : 'Price:'}</span>
+                            <span className="text-gray-600 block text-[10px] uppercase">{language === 'fa' ? 'هزینه پرداخت شده:' : 'Price:'}</span>
                             <span className="text-primary font-black">{(res.totalPrice || 0).toLocaleString()} {t('common.currency', 'تومان')}</span>
                           </div>
                         </div>
@@ -618,7 +618,7 @@ export default function ReservationsTab({
               {/* Pagination Controls */}
               {totalPages > 1 && (
                 <div className="flex justify-between items-center border-t border-white/5 pt-4 mt-2">
-                  <span className="text-[11px] text-gray-500 font-bold font-mono">
+                  <span className="text-xs text-gray-500 font-bold font-mono">
                     {language === 'fa' && `صفحه ${historyPage} از ${totalPages}`}
                     {language === 'en' && `Page ${historyPage} of ${totalPages}`}
                     {language === 'ru' && `Страница ${historyPage} из ${totalPages}`}
@@ -668,7 +668,7 @@ export default function ReservationsTab({
                   <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
                   {language === 'fa' ? 'در حال اسکن بارکد...' : 'Scanning QR Entry Code...'}
                 </h4>
-                <p className="text-gray-400 text-[11px] mt-1.5 font-medium">
+                <p className="text-gray-400 text-xs mt-1.5 font-medium">
                   {language === 'fa' ? 'کد ورود شما با موفقیت شناسایی و پردازش شد.' : 'Capturing credentials from optical frame matrices...'}
                 </p>
               </div>
@@ -826,7 +826,7 @@ export default function ReservationsTab({
                 {/* Loyalty points display */}
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3.5 text-primary mt-2 relative overflow-hidden font-sans">
                   <div className="absolute -top-12 -right-12 w-16 h-16 bg-primary/5 blur-xl"></div>
-                  <div className="flex items-center gap-1.5 font-bold mb-1 relative z-10 font-display text-[11px] uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5 font-bold mb-1 relative z-10 font-display text-xs uppercase tracking-wider">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>{t('booking.pointsToEarn', 'امتیاز وفاداری دریافتی:')}</span>
                   </div>

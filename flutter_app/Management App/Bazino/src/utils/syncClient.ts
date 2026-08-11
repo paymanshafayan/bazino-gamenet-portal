@@ -9,7 +9,7 @@
  *  - Standalone (desktop build): this app runs its OWN local server + local SQLite
  *    database (see /desktop-app), and needs to reach the REAL website's server over the
  *    internet to exchange reservations/status. `webServerUrl` holds that website's base
- *    URL (e.g. "https://bazino.runasp.net"), configured in the Web Sync settings tab.
+ *    URL (e.g. "https://bazino.pro"), configured in the Web Sync settings tab.
  */
 
 /** Builds the full URL to call for a given `/api/sync/...` path, given the configured base URL (or '' for relative/co-located mode). */

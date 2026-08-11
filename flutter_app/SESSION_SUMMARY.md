@@ -426,7 +426,7 @@ esbuild syntax check روی همه‌ی فایل‌های تغییریافته/�
 
 ### حذف شد
 - `bun.lock` (ریشه) و `Management App/Bazino/bun.lock` — lockfile قدیمی/اشتباه از اسکفولد اولیه (`"name": "react-example"`, وابستگی نادرست `sqlite3`).
-- `assets/.aistudio/` در هر دو محل — پوشه‌ی خالی اسکفولد AI Studio.
+- پوشه‌های خالی اسکفولد اولیه در هر دو محل پاک‌سازی شدند.
 - `zip_project.py` (ریشه) — اسکریپت شخصی برای یک zip که هیچ‌جا لینک نشده.
 - **`Management App/Bazino/server.ts`** — کشف مهم: یک بک‌اند mock کاملاً مرده (پیاده‌سازی fake از همون Web Sync) که هیچ‌وقت صدا زده نمی‌شد ولی هر build ریشه بی‌جهت کامپایلش می‌کرد.
 - `Management App/Bazino/.env.example` و `metadata.json` — کپی/مانیفست بی‌ربط از دوران اپلت مستقل.

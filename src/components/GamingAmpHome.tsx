@@ -69,7 +69,7 @@ export default function GamingAmpHome({
       
       {/* 1. HERO SLIDER */}
       <section className="relative w-full aspect-[21/9] min-h-[600px] flex items-center justify-center border-b-2 border-[#00d8ff]/30" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 95%, 0% 100%)' }}>
-        <img 
+        <img loading="lazy" 
           src={heroGame?.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80"} 
           alt="Hero" 
           className="absolute inset-0 w-full h-full object-cover opacity-100" 
@@ -131,7 +131,7 @@ export default function GamingAmpHome({
                 </div>
                 <div className="w-full md:w-1/2 relative group">
                   <div className="absolute inset-0 bg-[#00d8ff]/20 opacity-0 group-hover:opacity-100 transition-opacity z-10 mix-blend-overlay"></div>
-                  <img src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover min-h-[400px] filter grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500" />
+                  <img loading="lazy" src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover min-h-[400px] filter grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500" />
                 </div>
               </div>
             ))}
@@ -161,7 +161,7 @@ export default function GamingAmpHome({
                  </div>
                  <div className="w-full md:w-1/2 relative">
                    <div className="absolute -inset-4 bg-gradient-to-r from-[#00d8ff]/20 to-transparent blur-2xl rounded-full opacity-50"></div>
-                   <img src={zone.imageUrl} alt="Zone" className="w-full rounded-2xl shadow-2xl relative z-10 border border-white/10" />
+                   <img loading="lazy" src={zone.imageUrl} alt="Zone" className="w-full rounded-2xl shadow-2xl relative z-10 border border-white/10" />
                  </div>
                </div>
              ))}
@@ -195,7 +195,7 @@ export default function GamingAmpHome({
                   </button>
                 </div>
                 <div className="w-full md:w-1/2 aspect-video md:aspect-auto min-h-[300px] relative bg-black">
-                   <img src={`https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80`} alt="Tournament" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                   <img loading="lazy" src={`https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80`} alt="Tournament" className="absolute inset-0 w-full h-full object-cover opacity-80" />
                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#161622]"></div>
                 </div>
               </div>
@@ -291,7 +291,7 @@ export default function GamingAmpHome({
             <div className="grid md:grid-cols-3 gap-8 relative z-10">
                {staffTeam.slice(0,3).map((coach: any, idx: number) => (
                  <div key={idx} className="flex gap-4 items-center bg-[#111119] p-6 rounded-xl border border-white/5 hover:border-[#00d8ff]/30 transition-colors">
-                   <img src={coach.imageUrl} alt={getLocText(coach.name)} className="w-20 h-20 rounded-full border-2 border-[#00d8ff] bg-black" />
+                   <img loading="lazy" src={coach.imageUrl} alt={getLocText(coach.name)} className="w-20 h-20 rounded-full border-2 border-[#00d8ff] bg-black" />
                    <div>
                      <h4 className="text-xl font-bold">{getLocText(coach.name)}</h4>
                      <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">{getLocText(coach.role)}</p>
@@ -358,7 +358,7 @@ export default function GamingAmpHome({
           <div className="flex flex-col md:flex-row gap-16 items-center">
             <div className="w-full md:w-1/2 h-[450px] bg-[#161622] rounded-2xl flex items-center justify-center relative overflow-hidden border border-white/5">
                {/* Cyberpunk Map placeholder */}
-               <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity filter invert hue-rotate-[180deg]" />
+               <img loading="lazy" src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity filter invert hue-rotate-[180deg]" />
                <div className="absolute inset-0 bg-[#00d8ff]/10 mix-blend-overlay"></div>
                
                {/* Custom Marker */}

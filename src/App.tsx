@@ -1,25 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
-import bazinoLogo from './assets/images/bazino_logo_user.png';
-import backgroundBg from './assets/images/background.png';
-import LoyaltyProfileTab from './components/LoyaltyProfileTab';
-import ReservationsTab from './components/ReservationsTab';
-import CafeTab from './components/CafeTab';
-import ShopTab from './components/ShopTab';
-import TournamentsTab from './components/TournamentsTab';
-import BlogTab from './components/BlogTab';
-import CsharpCodeViewer from './components/CsharpCodeViewer';
-import AdminPanelTab from './components/AdminPanelTab';
+import bazinoLogo from './assets/images/bazino_logo_user.webp';
+import {
+  BUILT_IN_THEMES,
+  getStoredThemeId,
+  loadCustomThemes,
+  loadThemeStylesheet,
+  saveCustomThemes,
+  type ThemeInfo
+} from './themes';
+// تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند (کد اسپلیتینگ):
+// فقط HomeTab (صفحه اصلی/LCP) به‌صورت eager می‌ماند — بقیه با کلیک کاربر
+// دانلود می‌شوند تا باندل اولیه کوچک بماند (توصیه اصلی GTmetrix/PageSpeed).
 import HomeTab from './components/HomeTab';
-import FlutterCodeViewer from './components/FlutterCodeViewer';
-import PresentationTab from './components/PresentationTab';
-import AuthModal from './components/AuthModal';
-import InstallPage from './components/InstallPage';
-import ChatTab from './components/ChatTab';
-import ThemeSelectorModal from './components/ThemeSelectorModal';
-import ConsoleHubView from './components/ConsoleHubView';
-import ConsoleGridClassic from './components/ConsoleGridClassic';
-import VisualHelpGuide from './components/VisualHelpGuide';
+const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
+const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
+const CafeTab = lazy(() => import('./components/CafeTab'));
+const ShopTab = lazy(() => import('./components/ShopTab'));
+const TournamentsTab = lazy(() => import('./components/TournamentsTab'));
+const BlogTab = lazy(() => import('./components/BlogTab'));
+const CsharpCodeViewer = lazy(() => import('./components/CsharpCodeViewer'));
+const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
+const FlutterCodeViewer = lazy(() => import('./components/FlutterCodeViewer'));
+const PresentationTab = lazy(() => import('./components/PresentationTab'));
+const AuthModal = lazy(() => import('./components/AuthModal'));
+const InstallPage = lazy(() => import('./components/InstallPage'));
+const ChatTab = lazy(() => import('./components/ChatTab'));
+const ThemeSelectorModal = lazy(() => import('./components/ThemeSelectorModal'));
+const ConsoleHubView = lazy(() => import('./components/ConsoleHubView'));
+const ConsoleGridClassic = lazy(() => import('./components/ConsoleGridClassic'));
+const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
 import { useLanguage } from './context/LanguageContext';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
@@ -27,29 +37,89 @@ import {
   Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight, Palette
 } from 'lucide-react';
 
+/* ────────────────────────────────────────────────────────────────
+   THEME BOOTSTRAP (یک‌بار قبل از اولین رندر)
+   فایل CSS قالب ذخیره‌شده را قبل از paint اولیه اعمال می‌کند تا
+   هنگام بارگذاری صفحه هیچ پرش ظاهری (flash) رخ ندهد.
+   ──────────────────────────────────────────────────────────────── */
+const __initialCustomThemes = loadCustomThemes();
+const __initialThemeId = getStoredThemeId();
+const __initialTheme = [...BUILT_IN_THEMES, ...__initialCustomThemes]
+  .find(t => t.id === __initialThemeId) ?? BUILT_IN_THEMES[0];
+document.body.setAttribute('data-theme', __initialTheme.id);
+loadThemeStylesheet(__initialTheme);
+
 export default function App() {
   const { language, setLanguage, t, dir } = useLanguage();
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [themeId, setThemeId] = useState(() => {
-    const saved = localStorage.getItem('themeId') || "dark-gold";
-    return saved === "gaming-hub" ? "dark-gold" : saved;
+    const saved = getStoredThemeId();
+    const known = [...BUILT_IN_THEMES, ...loadCustomThemes()];
+    return known.some(t => t.id === saved) ? saved : 'dark-gold';
   });
   const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
-  const [availableThemes, setAvailableThemes] = useState([
-    { id: 'dark-gold', name: 'Dark Gold', type: 'built-in' },
-    { id: 'cyberpunk-cyan', name: 'Cyberpunk Cyan', type: 'built-in' },
-    { id: 'geco-purple', name: 'Geco Purple', type: 'built-in' },
-    { id: 'gaming-amp', name: 'Gaming AMP', type: 'built-in' },
-    { id: 'console-grid', name: 'قالب گرید کنسولی (کلاسیک)', type: 'built-in' }
+  const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
+    ...BUILT_IN_THEMES,
+    ...loadCustomThemes()
   ]);
+
+  // نسخه‌ی هوشمند setAvailableThemes: قالب‌های سفارشی (محلی) را در
+  // localStorage ذخیره می‌کند — قالب‌های سروری (نصب‌شده با پوشه assets
+  // روی سرور) در localStorage ذخیره نمی‌شوند چون روی سرور ثبت شده‌اند.
+  const setAvailableThemes = (updater: React.SetStateAction<ThemeInfo[]>) => {
+    setAvailableThemesState(prev => {
+      const next = typeof updater === 'function'
+        ? (updater as (p: ThemeInfo[]) => ThemeInfo[])(prev)
+        : updater;
+      saveCustomThemes(next.filter(t => t.type === 'custom' && t.kind !== 'server'));
+      return next;
+    });
+  };
+
+  // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
+  useEffect(() => {
+    fetch('/api/themes')
+      .then(r => r.json())
+      .then((data: { serverThemes?: any[] }) => {
+        if (!data.serverThemes || data.serverThemes.length === 0) return;
+        const serverThemes: ThemeInfo[] = data.serverThemes.map(t => ({
+          id: t.id,
+          name: t.name,
+          type: 'custom',
+          kind: 'server',
+          version: t.version,
+          description: t.description,
+          colors: t.colors,
+          cssUrl: t.cssUrl,
+          hasAssets: t.hasAssets,
+          assetFiles: t.assetFiles,
+          assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
+        }));
+        setAvailableThemesState(prev => {
+          const existing = new Set(prev.map(t => t.id));
+          const merged = [...prev, ...serverThemes.filter(t => !existing.has(t.id))];
+          // اگر قالب فعال یک قالب سروری است، استایلش الان بارگذاری می‌شود
+          // (useEffect پایین با تغییر availableThemes دوباره اجرا می‌شود)
+          return merged;
+        });
+      })
+      .catch(err => console.error('[Themes] Failed to fetch server themes:', err));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('themeId', themeId);
     document.body.setAttribute('data-theme', themeId);
     setLayoutMode('classic');
   }, [themeId]);
+
+  // بارگذاری فایل CSS مجزای قالب فعال — با تغییر قالب، استایل قبلی
+  // حذف و استایل کامل قالب جدید روی «تمام صفحات» اعمال می‌شود.
+  useEffect(() => {
+    const theme = availableThemes.find(t => t.id === themeId) ?? BUILT_IN_THEMES[0];
+    loadThemeStylesheet(theme);
+  }, [themeId, availableThemes]);
 
   useEffect(() => {
     localStorage.setItem('layoutMode', layoutMode);
@@ -200,6 +270,11 @@ export default function App() {
   };
 
   const renderTabContent = () => (
+    <Suspense fallback={
+      <div className="w-full flex items-center justify-center py-24">
+        <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    }>
     <div className="max-w-7xl mx-auto w-full flex-grow relative pb-20">
       {activeTab === 'home' && (
         layoutMode === 'hub' ? (
@@ -241,7 +316,17 @@ export default function App() {
             refreshData={fetchData}
           />
         ) : (
-          <HomeTab themeId={themeId} tournaments={tournaments} onNavigate={setActiveTab} />
+          <HomeTab 
+            themeId={themeId} 
+            tournaments={tournaments} 
+            onNavigate={setActiveTab} 
+            themeComponent={(() => {
+              const th = availableThemes.find(x => x.id === themeId);
+              return th && th.kind === 'server' && th.cssUrl
+                ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
+                : null;
+            })()}
+          />
         )
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
@@ -266,6 +351,7 @@ export default function App() {
       {activeTab === 'presentation' && <PresentationTab addNotification={addNotification} />}
       {activeTab === 'chat' && <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} />}
     </div>
+    </Suspense>
   );
 
   if (isInstalled === null) {
@@ -278,12 +364,18 @@ export default function App() {
 
   if (isInstalled === false) {
     return (
-      <InstallPage 
-        onInstallationComplete={() => {
-          setIsInstalled(true);
-          fetchData();
-        }} 
-      />
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#050714] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+        </div>
+      }>
+        <InstallPage 
+          onInstallationComplete={() => {
+            setIsInstalled(true);
+            fetchData();
+          }} 
+        />
+      </Suspense>
     );
   }
 
@@ -339,21 +431,10 @@ export default function App() {
         ))}
       </div>
 
-      {themeId === 'gaming-hub' && (
-        <>
-          {/* Cyber scanlines overlay for Hub Theme */}
-          <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden opacity-[0.06] mix-blend-overlay">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_4px,3px_100%]" />
-          </div>
-          {/* Subtle Cyber vignette glow overlay in neon purple instead of green */}
-          <div className="pointer-events-none fixed inset-0 z-40 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(168,85,247,0.05)_100%)]" />
-        </>
-      )}
-
       {!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin' && (
-        <header className="h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
+        <header className="site-header h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
-               <img src={bazinoLogo} alt="Bazino Pro" className="h-10 w-auto" />
+               <img src={bazinoLogo} alt="Bazino Pro" width="40" height="40" className="brand-logo-guard h-10 w-auto" />
                <span className="font-display font-black text-xl tracking-wider text-white hidden md:block">BAZINO <span className="text-primary">PRO</span></span>
             </div>
             
@@ -388,7 +469,7 @@ export default function App() {
                ) : (
                  <div className="flex items-center gap-3">
                    <span className="text-xs font-bold text-primary">@{user.username}</span>
-                   <button onClick={handleLogout} className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
+                   <button onClick={handleLogout} aria-label="Logout" className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
                  </div>
                )}
                <button 
@@ -442,28 +523,30 @@ export default function App() {
             {renderTabContent()}
           </main>
 
-      {/* Modals */}
-      <VisualHelpGuide 
-        isOpen={isHelpOpen} 
-        onClose={() => setIsHelpOpen(false)} 
-        mode={helpMode} 
-        language={language} 
-        dir={dir} 
-      />
-      <AuthModal 
-        addNotification={addNotification}
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={setUser}
-      />
-      <ThemeSelectorModal 
-        isOpen={isThemeModalOpen}
-        onClose={() => setIsThemeModalOpen(false)}
-        availableThemes={availableThemes}
-        themeId={themeId}
-        setThemeId={setThemeId}
-        language={language}
-      />
+      {/* Modals — lazy: هنگام اولین باز شدن دانلود می‌شوند */}
+      <Suspense fallback={null}>
+        <VisualHelpGuide 
+          isOpen={isHelpOpen} 
+          onClose={() => setIsHelpOpen(false)} 
+          mode={helpMode} 
+          language={language} 
+          dir={dir} 
+        />
+        <AuthModal 
+          addNotification={addNotification}
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={setUser}
+        />
+        <ThemeSelectorModal 
+          isOpen={isThemeModalOpen}
+          onClose={() => setIsThemeModalOpen(false)}
+          availableThemes={availableThemes}
+          themeId={themeId}
+          setThemeId={setThemeId}
+          language={language}
+        />
+      </Suspense>
 
       {/* Logout Confirmation Modal */}
       {isLogoutConfirmOpen && (

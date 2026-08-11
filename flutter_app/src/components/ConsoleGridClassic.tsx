@@ -421,7 +421,7 @@ export default function ConsoleGridClassic({
               <div className="text-right">
                 <span className="block text-[10px] text-gray-500 font-bold uppercase font-mono">Verified Gamer Account</span>
                 <span className="block text-sm font-black text-white">@{user.username}</span>
-                <span className="text-[11px] font-black text-[#00ff66] flex items-center gap-1 mt-0.5 font-mono">
+                <span className="text-xs font-black text-[#00ff66] flex items-center gap-1 mt-0.5 font-mono">
                   <Coins className="w-3.5 h-3.5" />
                   <span>{user.loyaltyPoints} PTS</span>
                 </span>
@@ -459,7 +459,7 @@ export default function ConsoleGridClassic({
                 }`}
               >
                 <div className="flex justify-between items-start">
-                  <span className={`text-[9px] px-2 py-0.5 rounded font-black font-mono uppercase ${
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-black font-mono uppercase ${
                     sys.type === 'PC' ? 'bg-cyan-500/10 text-cyan-400' : 'bg-purple-500/10 text-purple-400'
                   }`}>
                     {sys.type}
@@ -565,7 +565,7 @@ export default function ConsoleGridClassic({
           <div className="bg-gradient-to-br from-[#00ff66]/10 to-transparent border border-[#00ff66]/20 rounded-xl p-4 space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-[10px] text-gray-500 font-bold uppercase font-mono">Loyalty Tier Status</span>
-              <span className="px-2.5 py-0.5 bg-[#00ff66]/20 text-[#00ff66] border border-[#00ff66]/30 text-[9px] font-black rounded font-mono">
+              <span className="px-2.5 py-0.5 bg-[#00ff66]/20 text-[#00ff66] border border-[#00ff66]/30 text-[10px] font-black rounded font-mono">
                 {user && user.loyaltyPoints > 1000 ? 'ELITE GURU' : 'PRO GAMER'}
               </span>
             </div>
@@ -586,7 +586,7 @@ export default function ConsoleGridClassic({
                   style={{ width: `${Math.min(100, (user ? user.loyaltyPoints / 5000 : 0) * 100)}%` }}
                 />
               </div>
-              <div className="flex justify-between text-[8px] text-gray-500 font-bold font-mono">
+              <div className="flex justify-between text-[10px] text-gray-500 font-bold font-mono">
                 <span>0 PTS</span>
                 <span>LEVEL UP AT 5,000 PTS</span>
               </div>
@@ -604,7 +604,7 @@ export default function ConsoleGridClassic({
               >
                 <span className="text-[10px] text-gray-500 font-bold">100 امتیاز</span>
                 <span className="text-xs font-black text-white mt-1">۱۵,۰۰۰ تومان</span>
-                <span className="text-[9px] font-mono font-bold text-[#00ff66] mt-2 block">کد تخفیف بازی نو</span>
+                <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">کد تخفیف بازی نو</span>
               </button>
 
               <button 
@@ -613,7 +613,7 @@ export default function ConsoleGridClassic({
               >
                 <span className="text-[10px] text-gray-500 font-bold">250 امتیاز</span>
                 <span className="text-xs font-black text-white mt-1">۴۰,۰۰۰ تومان</span>
-                <span className="text-[9px] font-mono font-bold text-[#00ff66] mt-2 block">کد تخفیف بازی نو</span>
+                <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">کد تخفیف بازی نو</span>
               </button>
             </div>
           </div>
@@ -668,7 +668,7 @@ export default function ConsoleGridClassic({
 
                   {/* Quantity selector */}
                   <div className="flex items-center justify-between gap-1 pt-2 border-t border-white/5">
-                    <span className="text-[9px] text-gray-500 font-bold font-mono">{language === 'fa' ? 'تعداد:' : 'Qty:'}</span>
+                    <span className="text-[10px] text-gray-500 font-bold font-mono">{language === 'fa' ? 'تعداد:' : 'Qty:'}</span>
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => setCafeCart(prev => ({...prev, [item.id]: Math.max(0, (prev[item.id] || 0) as number - 1)}))}
@@ -696,7 +696,7 @@ export default function ConsoleGridClassic({
             <div className="mt-2 p-3 bg-black/40 border border-[#00ff66]/20 rounded-xl space-y-3 animate-slide-in">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[9px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'شماره میز / سیستم' : 'Seat / Desk'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'شماره میز / سیستم' : 'Seat / Desk'}</label>
                   <input 
                     type="text" 
                     required 
@@ -708,7 +708,7 @@ export default function ConsoleGridClassic({
                 </div>
 
                 <div>
-                  <label className="text-[9px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'کد تخفیف بوفه' : 'Food Voucher'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'کد تخفیف بوفه' : 'Food Voucher'}</label>
                   <select 
                     value={cafeCoupon}
                     onChange={(e) => setCafeCoupon(e.target.value)}
@@ -767,7 +767,7 @@ export default function ConsoleGridClassic({
 
                   {/* Quantity selector */}
                   <div className="flex items-center justify-between gap-1 pt-2 border-t border-white/5">
-                    <span className="text-[9px] text-gray-500 font-bold font-mono">{language === 'fa' ? 'تعداد:' : 'Qty:'}</span>
+                    <span className="text-[10px] text-gray-500 font-bold font-mono">{language === 'fa' ? 'تعداد:' : 'Qty:'}</span>
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => setShopCart(prev => ({...prev, [acc.id]: Math.max(0, (prev[acc.id] || 0) as number - 1)}))}
@@ -804,7 +804,7 @@ export default function ConsoleGridClassic({
               </div>
 
               <div className="grid grid-cols-1 gap-1">
-                <label className="text-[9px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'اعمال کد تخفیف سخت افزار' : 'Promo Code'}</label>
+                <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'اعمال کد تخفیف سخت افزار' : 'Promo Code'}</label>
                 <select 
                   value={shopCoupon}
                   onChange={(e) => setShopCoupon(e.target.value)}
@@ -861,13 +861,13 @@ export default function ConsoleGridClassic({
                 const isSelf = user && msg.username === user.username;
                 return (
                   <div key={index} className={`flex flex-col max-w-[85%] ${isSelf ? 'self-end items-end' : 'self-start items-start'}`}>
-                    <span className="text-[9px] text-gray-500 font-bold mb-0.5">@{msg.username}</span>
+                    <span className="text-[10px] text-gray-500 font-bold mb-0.5">@{msg.username}</span>
                     <div className={`p-2.5 rounded-xl text-xs font-medium leading-relaxed ${
                       isSelf ? 'bg-[#00ff66]/10 border border-[#00ff66]/30 text-white rounded-tr-none' : 'bg-white/5 border border-white/10 text-gray-300 rounded-tl-none'
                     }`}>
                       {msg.message}
                     </div>
-                    <span className="text-[8px] text-gray-600 font-mono mt-0.5">{msg.timestamp || 'همین الان'}</span>
+                    <span className="text-[10px] text-gray-600 font-mono mt-0.5">{msg.timestamp || 'همین الان'}</span>
                   </div>
                 );
               })
@@ -927,7 +927,7 @@ export default function ConsoleGridClassic({
 
                   <div className="text-right">
                     <span className="block text-[10px] text-[#00ff66] font-mono font-black">{tour.registeredTeamsCount} / {tour.maxTeams} TEAMS</span>
-                    <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold uppercase tracking-wider block mt-1">{tour.status}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold uppercase tracking-wider block mt-1">{tour.status}</span>
                   </div>
                 </div>
               ))
@@ -946,7 +946,7 @@ export default function ConsoleGridClassic({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[9px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'نام تیم' : 'Team Name'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'نام تیم' : 'Team Name'}</label>
                   <input 
                     type="text" 
                     required 
@@ -958,7 +958,7 @@ export default function ConsoleGridClassic({
                 </div>
 
                 <div>
-                  <label className="text-[9px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'آیدی کاپیتان' : 'Leader Gamertag'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'آیدی کاپیتان' : 'Leader Gamertag'}</label>
                   <input 
                     type="text" 
                     required 

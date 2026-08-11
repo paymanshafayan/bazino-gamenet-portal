@@ -426,7 +426,7 @@ esbuild syntax check روی همه‌ی فایل‌های تغییریافته/�
 
 ### حذف شد
 - `bun.lock` (ریشه) و `Management App/Bazino/bun.lock` — lockfile قدیمی/اشتباه از اسکفولد اولیه (`"name": "react-example"`, وابستگی نادرست `sqlite3`).
-- `assets/.aistudio/` در هر دو محل — پوشه‌ی خالی اسکفولد AI Studio.
+- پوشه‌های خالی اسکفولد اولیه در هر دو محل پاک‌سازی شدند.
 - `zip_project.py` (ریشه) — اسکریپت شخصی برای یک zip که هیچ‌جا لینک نشده.
 - **`Management App/Bazino/server.ts`** — کشف مهم: یک بک‌اند mock کاملاً مرده (پیاده‌سازی fake از همون Web Sync) که هیچ‌وقت صدا زده نمی‌شد ولی هر build ریشه بی‌جهت کامپایلش می‌کرد.
 - `Management App/Bazino/.env.example` و `metadata.json` — کپی/مانیفست بی‌ربط از دوران اپلت مستقل.
@@ -604,3 +604,110 @@ esbuild sweep روی کل `Management App/Bazino/src` → بدون خطا. ظا�
 
 ### تست
 esbuild syntax check روی فایل‌های TS تغییریافته → بدون خطا. Dart فایل با بالانس پرانتز چک شد.
+
+---
+
+## ۳۳. بازطراحی سیستم قالب‌بندی (Theming) — هر قالب فایل CSS مجزا + پوشش تمام صفحات
+
+### مشکل قبلی
+همه‌ی CSS قالب‌ها در یک فایل `index.css` بود، قالب `console-grid` هیچ CSS نداشت، قالب‌های سفارشی ادمین فقط اسم/رنگ داشتند (بدون استایل واقعی)، و تغییر قالب فقط متغیرهای رنگی را عوض می‌کرد (بقیه صفحات دست‌نخورده می‌ماندند).
+
+### تغییرات
+- **`src/themes/`** — موتور جدید قالب‌بندی:
+  - هر قالب فایل CSS مستقل خودش را دارد: `dark-gold.css`, `cyberpunk-cyan.css`, `geco-purple.css`, `gaming-amp.css`, `console-grid.css` (+ `gaming-hub.css` legacy)
+  - هر فایل «تمام صفحات» را پوشش می‌دهد: متغیرهای رنگی + `.theme-<id> .site-header`, `.bg-dark-card`, `.btn`, input ها, مودال‌ها, اسکرول‌بارها, `::selection`, پس‌زمینه اختصاصی
+  - `index.ts` — موتور: فقط CSS قالب فعال در یک `<style>` تزریق می‌شود (تگ قبلی حذف می‌شود)؛ قالب پیش‌فرض ایستا (بدون flash)
+  - `themeZipCore.ts` — هسته‌ی مشترک خالص (بدون وابستگی Vite) برای پارس/ساخت ZIP؛ هم کلاینت و هم سرور استفاده می‌کنند
+  - `zip.ts` — لایه‌ی کلاینت: `parseThemeZip`, `buildThemeZip`, `buildSampleThemeZip`, `downloadZip`
+- **`src/themeSdk/sdk.ts`** — SDK کامپوننت قالب: قالب ZIP می‌تواند `theme.js` داشته باشد که با `window.BazinoThemeSDK.registerComponent('home', factory)` یک صفحه‌ی اصلی اختصاصی ثبت می‌کند (همان قرارداد داده‌ی GecoPurpleHome/GamingAmpHome)
+- **`server/themeStore.ts`** — ذخیره‌ساز قالب‌ها روی سرور: هر قالب پوشه‌ی اختصاصی `themes/<id>/` دارد (theme.json + theme.css + theme.js + assets/)؛ حذف قالب = حذف کامل پوشه
+- **API های جدید:** `POST /api/admin/themes/install` (آپلود خام ZIP), `GET /api/themes/:id/theme.css`, `GET /api/themes/:id/theme.js`, `GET /api/themes/:id/assets/*`, `GET /api/themes/:id/export`, `DELETE /api/admin/themes/:id`
+- **فرمت ZIP جدید:** `theme.json` (اختیاری) + `theme.css` (اجباری) + `assets/` (اختیاری — تصویر/ویدئو/فونت) + `theme.js` (اختیاری — کامپوننت)
+- مسیرهای نسبی assets در CSS هنگام سرو بازنویسی می‌شوند: `url('assets/banner.jpg')` ← `/api/themes/<id>/assets/banner.jpg`
+- پنل ادمین: نصب از ZIP با پیش‌نمایش متادیتا، «ساخت سریع با رنگ»، دانلود قالب نمونه، خروجی ZIP از هر قالب، نشان تعداد assets
+
+### تست
+`scripts/verify-themes.ts`, `scripts/test-theme-store.mts`, `scripts/test-theme-http.mts`, `scripts/test-theme-sdk.mts` — همه پاس. (نیاز به سرور running برای دو تست آخر)
+
+---
+
+## ۳۴. منبع داده نمونه/دیتابیس (Sample ⇄ Database) — پیش‌فرض: نمونه
+
+### تغییرات
+- **`server/sampleData.ts`** — منبع واحد داده‌های نمونه (۴-۵ مورد برای هر بخش): سیستم‌ها، کافه، فروشگاه، تورنمنت‌ها، مقالات، اسلایدرها، کدهای تخفیف، تراکنش‌ها، اتاق‌های چت، رزروها، تنظیمات کلوپ
+- `server/dataProviders.ts` — seed داده‌ها از همین فایل خوانده می‌شود (یک منبع واحد)
+- **حالت نمونه (پیش‌فرض):** همه‌ی لیست‌ها از داده‌های نمونه می‌آیند؛ **حالت دیتابیس:** از دیتابیس، و جدول خالی → فال‌بک خودکار به نمونه
+- جستجوی by-id (رزرو/سفارش/ثبت‌نام/نظر/کد تخفیف) در حالت نمونه هم کار می‌کند
+- API ها: `GET /api/data-source` (وضعیت + شمارنده‌ها), `POST /api/admin/data-source` (سوییچ)
+- پنل ادمین ← سفارشی‌سازی کلوپ ← «منبع داده سایت و اپلیکیشن»: دو کارت قابل‌انتخاب با شمارنده‌ی زنده
+
+---
+
+## ۳۵. قانون لوگوی سایت مادر + پوشه‌ی assets در فرمت قالب
+
+- **لوگو متعلق به سایت مادر است** — هیچ قالبی حق تغییر/مخفی‌کردن آن را ندارد:
+  - `public/logo.png` → آدرس استاندارد `/logo.png` (پایدار در dev و production)
+  - متغیر CSS سراسری `--brand-logo-url`
+  - کلاس `brand-logo-guard` روی لوگوی هدر + قانون CSS که برای هر `[class*='theme-']` نمایش را اجباری می‌کند
+  - مستندسازی کامل در `src/themes/README.md` (راهنمای قالب)
+- **پوشه‌ی `assets/`** به فرمت ZIP اضافه شد (تصویر/ویدئو/فونت) — استخراج به پوشه‌ی قالب روی سرور، سرو از `/api/themes/<id>/assets/*`
+- **کامپوننت قالب (`theme.js`)** — قالب‌های ZIP می‌توانند صفحه‌ی اصلی اختصاصی با SDK داشته باشند (مثل GecoPurpleHome)
+
+---
+
+## ۳۶. حذف برندینگ Google AI Studio از کل پروژه
+
+جستجوی سراسری `google ai studio | aistudio | AI Studio` → صفر نتیجه. فایل‌های اصلاح‌شده: `index.html` (تایتل → «Bazino Pro | بازینو پرو — گیم‌نت و کلوپ گیمینگ»), README ها, `.env.example`, `server.ts` (User-Agent → bazino-pro-server), `AdminPanelTab.tsx` (راهنمای Gemini API → محیط میزبانی + لینک console.cloud.google.com), `PresentationTab.tsx`, `vite.config.ts`, `package.json` (نام → bazino-pro).
+
+---
+
+## ۳۷. CI — ورک‌فلو بیلد و تست بک‌اند + فرانت‌اند
+
+- `.github/workflows/build-test.yml` (فعال‌سازی دستی از `ci/build-test.workflow.yml` — GitHub App permission «workflows» ندارد):
+  - `typecheck-and-tests`: tsc + تست‌های موتور/ذخیره‌ساز قالب
+  - `frontend-build`: vite build + بررسی dist
+  - `backend-build`: rebuild بهتر-sqlite3 + esbuild + بوت production + smoke تست ۹ endpoint
+- رفع باگ: `createRequire` در `server/dataProviders.ts` fallback به مسیر مطلق (باندل CJS قبلاً boot نمی‌شد)
+- رفع باگ CI: `flutter_app` به exclude تایپ‌چک اضافه شد؛ job بک‌اند public را در dist کپی می‌کند (لوگو 404 → 200)
+
+---
+
+## ۳۸. بهینه‌سازی عملکرد بر اساس گزارش GTmetrix (Performance 75 → هدف 90+)
+
+گزارش واقعی GTmetrix (۱۰ آگوست): Performance 75 | Structure 92 | LCP 1.7s | TBT 196ms | CLS 0.05 | حجم کل 2.08MB (۱.۶۷MB تصویر!)
+
+### رفع‌شده
+- **تصاویر:** لوگو ۸۴۰KB→۱۵KB (WebP 256px)، پس‌زمینه ۳.۵MB کرپت→۱۸KB JPG، bg.png کرپت→۲۷۶KB JPG
+- **کد اسپلیتینگ:** React.lazy برای همه‌ی تب‌ها/مودال‌های غیر landing — باندل اصلی 1.1MB→345KB (gzip 298→109KB)
+- **کش:** assets هش‌شده immutable یک‌ساله، بقیه ۷ روز + ETag
+- **فونت‌ها:** از `@import` به `<link>` در HTML + کاهش وزن‌ها + preconnect (fonts, gstatic, unsplash, dicebear)
+- **Lazy loading:** ۳۷ تصویر خارجی + فقط اسلاید فعال hero eager
+- **width/height صریح** روی لوگوها (کاهش CLS)
+
+### باقی‌مانده (پیکربندی هاست، نه کد)
+TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Cloudflare Analytics؛ انیمیشن‌های غیرکامپوزیت کوچک.
+
+---
+
+## ۳۹. وضعیت نهایی اسناد
+
+- `ARCHITECTURE.md` — چک‌لیست وضعیت به‌روز (همه موارد اصلی ✅)، بخش هاستینگ (bazino.pro + Cloudflare)، تاریخچه
+- `README.md` — بازنویسی کامل با معرفی بازینو پرو، امکانات، اجرا، تست‌ها، تنظیمات، ساختار
+- `src/themes/README.md` — راهنمای کامل موتور قالب‌بندی (فرمت ZIP، assets، لوگو، کامپوننت، API ها)
+- `ci/README.md` — راهنمای فعال‌سازی ورک‌فلو CI
+
+---
+
+## ۴۰. دامنه‌ی سرور اپ فلاتر: xerxes.biz → bazino.pro
+
+کاربر اعلام کرد سرور اپ فلاتر باید `https://bazino.pro` باشد (دامنه‌ی فعلی سایت، پشت Cloudflare).
+
+### تغییرات
+- `flutter_app/lib/api_config.dart`: مقدار پیش‌فرض `kApiBaseUrl` از `https://xerxes.biz` به `https://bazino.pro` تغییر کرد. (WebSocket چت به‌صورت خودکار `wss://bazino.pro/api/chat/ws` می‌شود — نیازی به تغییر جداگانه نیست.)
+- `Management App/Bazino` (و کپی داخل `flutter_app/`): متن راهنما و placeholder مودال Web Sync + کامنت‌های `types.ts` / `syncClient.ts` از `xerxes.biz` (و `bazino.runasp.net` در نسخه‌ی قدیمی‌تر) به `bazino.pro` به‌روزرسانی شدند.
+- `ARCHITECTURE.md` (و کپی داخل `flutter_app/`): یادداشت دامنه‌ی فعلی `bazino.pro` + تاریخچه‌ی دامنه (runasp.net → xerxes.biz → bazino.pro).
+- `PUBLISH_AND_DATABASE_GUIDE.md`: مثال Nginx (`server_name` و `certbot -d`) به `bazino.pro` به‌روزرسانی شد.
+
+### نکته
+- از sandbox نمی‌توان به `bazino.pro` دسترسی گرفت (HTTP 000 — محدودیت شبکه‌ی sandbox)؛ تست زنده روی خود دامنه انجام شود.
+- مقدار پیش‌فرض طبق درخواست کاربر با اسلش انتهایی ثبت شد (`https://bazino.pro/`) اما `api_config.dart` یک نرمال‌سازی دارد: اسلش(های) انتهایی حذف می‌شوند (`_kApiBaseUrlConfigured` → `kApiBaseUrl`) تا الحاق رشته‌ای `'$kApiBaseUrl/api/...'` هرگز `//api` نسازد. پس هر دو حالت (با یا بدون اسلش، چه در `--dart-define` چه در پیش‌فرض) امن است.

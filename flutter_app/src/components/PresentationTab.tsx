@@ -74,7 +74,7 @@ export default function PresentationTab({ addNotification }: Props) {
           </p>
           <p className="mt-1">
             {language === 'fa' 
-              ? 'محیط ویرایشگر کد (AI Studio File Explorer) به دلیل محدودیت امنیتی مرورگر قادر به نمایش مستقیم فایل‌های باینری PDF نیست و پیغام "Failed to load PDF document" را نشان می‌دهد. فایل‌های تولید شده کاملا سالم هستند و می‌توانید آن‌ها را مستقیماً از دکمه‌های زیر دانلود کرده یا به صورت آنلاین اسلایدهای تعاملی را در زیر ورق بزنید.' 
+              ? 'محیط مرورگر به دلیل محدودیت امنیتی قادر به نمایش مستقیم فایل‌های باینری PDF نیست و پیغام "Failed to load PDF document" را نشان می‌دهد. فایل‌های تولید شده کاملا سالم هستند و می‌توانید آن‌ها را مستقیماً از دکمه‌های زیر دانلود کرده یا به صورت آنلاین اسلایدهای تعاملی را در زیر ورق بزنید.' 
               : 'The built-in file explorer inside the code editor cannot render binary PDF documents directly, resulting in "Failed to load PDF document". The files are 100% valid and correct. Please download them using the links below or view the interactive HTML version.'}
           </p>
         </div>
@@ -167,7 +167,7 @@ export default function PresentationTab({ addNotification }: Props) {
             </div>
             
             {/* Quick action info under slider */}
-            <div className="p-4 bg-black/60 border-t border-white/10 flex items-center justify-between text-[11px] text-gray-400 font-semibold">
+            <div className="p-4 bg-black/60 border-t border-white/10 flex items-center justify-between text-xs text-gray-400 font-semibold">
               <span>{language === 'fa' ? 'ورق‌زدن با لمس یا دکمه‌های جهت‌نما' : 'Navigate using touch gestures or keys'}</span>
               <a 
                 href={activeMode === 'desktop' ? '/Bazino_Pro_Presentation.html' : '/Bazino_Pro_Mobile_Presentation.html'}

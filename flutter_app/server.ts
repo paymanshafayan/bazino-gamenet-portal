@@ -1,5 +1,5 @@
 // Loads a `.env` file at the project root into process.env, if one exists (safe no-op
-// otherwise — e.g. under Google AI Studio, where GEMINI_API_KEY/APP_URL are injected
+// otherwise — e.g. under a managed hosting platform, where GEMINI_API_KEY/APP_URL are injected
 // directly into the environment and no .env file is present). `dotenv` was already an
 // installed dependency but was never actually imported anywhere; see PUBLISH_AND_DATABASE_GUIDE.md.
 import "dotenv/config";
@@ -2184,7 +2184,7 @@ namespace GameNet.Infrastructure.Migrations
         apiKey: key,
         httpOptions: {
           headers: {
-            'User-Agent': 'aistudio-build',
+            'User-Agent': 'bazino-pro-server',
           }
         }
       });
@@ -2529,7 +2529,16 @@ Example format:
   } else {
     // Serve static files in production
     const distPath = path.join(staticRoot, "dist");
-    app.use(express.static(distPath));
+    // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML بدون کش (برای به‌روزرسانی فوری)
+    app.use(express.static(distPath, {
+      maxAge: "7d",
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (/\/assets\//.test(filePath)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });

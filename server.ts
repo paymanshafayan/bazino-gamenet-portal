@@ -34,6 +34,14 @@ import {
   SAMPLE_SETTINGS,
   SAMPLE_COUNTS
 } from "./server/sampleData";
+import {
+  listInstalledThemes,
+  installThemeZip,
+  deleteTheme,
+  readThemeCss,
+  getThemeAsset,
+  exportThemeZip
+} from "./server/themeStore";
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 
@@ -1993,9 +2001,100 @@ Decide whether one of the available functions matches what the user is asking fo
       const store = getActiveDataProvider();
       const themes = await store.listThemes();
       const activeThemeId = await store.getSetting("activeThemeId");
-      res.json({ themes, activeThemeId: activeThemeId || "dark-gold" });
+      // قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
+      const serverThemes = listInstalledThemes();
+      res.json({ themes, serverThemes, activeThemeId: activeThemeId || "dark-gold" });
     } catch (e) {
       res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // THEME STORE — نصب/حذف/سرو قالب‌های سروری (پوشه اختصاصی هر قالب)
+  // ═══════════════════════════════════════════════════════════════════
+
+  // نصب قالب از فایل ZIP (body خام با Content-Type: application/zip)
+  // ساختار: theme.json + theme.css + assets/
+  app.post(
+    "/api/admin/themes/install",
+    express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
+    (req, res) => {
+      try {
+        const buffer = req.body as Buffer | undefined;
+        if (!buffer || buffer.length === 0) {
+          return res.status(400).json({ error: "فایل ZIP ارسال نشده است" });
+        }
+        const fallbackName = (req.query.name as string) || undefined;
+        const result = installThemeZip(new Uint8Array(buffer), fallbackName);
+        if ("error" in result) {
+          return res.status(400).json({ error: result.error });
+        }
+        logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${result.theme.id}" installed (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
+        res.json({ success: true, theme: result.theme });
+      } catch (e) {
+        console.error("Theme install error:", e);
+        res.status(500).json({ error: String(e) });
+      }
+    }
+  );
+
+  // سرو فایل CSS قالب (با بازنویسی مسیرهای assets)
+  app.get("/api/themes/:id/theme.css", (req, res) => {
+    try {
+      const result = readThemeCss(req.params.id);
+      if (!result) return res.status(404).json({ error: "Theme not found" });
+      res.setHeader("Content-Type", result.contentType);
+      res.setHeader("Cache-Control", "no-cache");
+      res.send(result.css);
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // سرو فایل‌های assets قالب (تصویر/ویدئو/فونت/...)
+  const ASSET_MIME: Record<string, string> = {
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+    webp: "image/webp", svg: "image/svg+xml", avif: "image/avif", ico: "image/x-icon",
+    mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", ogv: "video/ogg",
+    mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg",
+    woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", otf: "font/otf", eot: "application/vnd.ms-fontobject",
+    css: "text/css", js: "text/javascript", json: "application/json", txt: "text/plain",
+  };
+  app.get("/api/themes/:id/assets/*", (req, res) => {
+    try {
+      const rel = (req.params[0] as string) || "";
+      const asset = getThemeAsset(req.params.id, rel);
+      if (!asset) return res.status(404).json({ error: "Asset not found" });
+      res.setHeader("Content-Type", ASSET_MIME[asset.ext] || "application/octet-stream");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(Buffer.from(asset.data));
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // خروجی ZIP از قالب نصب‌شده (شامل پوشه assets)
+  app.get("/api/themes/:id/export", (req, res) => {
+    try {
+      const zip = exportThemeZip(req.params.id);
+      if (!zip) return res.status(404).json({ error: "Theme not found" });
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${req.params.id}.zip"`);
+      res.send(Buffer.from(zip));
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
+    }
+  });
+
+  // حذف قالب (پوشه کامل قالب حذف می‌شود)
+  app.delete("/api/admin/themes/:id", (req, res) => {
+    try {
+      const removed = deleteTheme(req.params.id);
+      if (!removed) return res.status(404).json({ error: "Theme not found" });
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${req.params.id}" deleted (folder removed)`);
+      res.json({ success: true, serverThemes: listInstalledThemes() });
+    } catch (e) {
+      res.status(400).json({ error: String(e) });
     }
   });
 

@@ -80,31 +80,39 @@ try {
   const sampleZipBytes = zip.buildSampleThemeZip();
   const parsed = zip.parseThemeZip(sampleZipBytes, 'sample.zip');
   if ('error' in parsed) throw new Error('parseThemeZip failed on sample: ' + parsed.error);
-  console.log('\nzip sample parsed:', parsed.theme.id, '| name:', parsed.theme.name,
-    '| css:', parsed.css.length, 'bytes | colors:', JSON.stringify(parsed.theme.colors));
-  if (parsed.theme.id !== 'neon-storm') throw new Error('Expected id neon-storm from sample CSS');
-  if (!parsed.theme.css || parsed.theme.css !== parsed.css) throw new Error('theme.css must be carried on ThemeInfo');
+  const assetsCount = Object.keys(parsed.assets).length;
+  console.log('\nzip sample parsed:', parsed.meta.id, '| name:', parsed.meta.name,
+    '| css:', parsed.css.length, 'bytes | assets:', assetsCount, '| colors:', JSON.stringify(parsed.meta.colors));
+  if (parsed.meta.id !== 'neon-storm') throw new Error('Expected id neon-storm from sample CSS');
+  if (assetsCount < 2) throw new Error('Sample zip must include assets folder files');
 
-  // ZIP theme CSS is injected verbatim (not regenerated)
-  await themes.loadThemeStylesheet(parsed.theme as any);
-  const zipTag = styleTags[styleTags.length - 1];
-  if (zipTag.textContent !== parsed.css) throw new Error('ZIP theme css must be injected verbatim');
-  console.log('zip theme css injected verbatim: OK');
+  // URL rewriting of assets paths in CSS
+  const rewritten = (await import('../src/themes/themeZipCore')).rewriteCssAssetUrls(
+    `body{background:url('assets/banner.svg')} .a{src:url("./assets/logo.svg")}`,
+    '/api/themes/neon-storm'
+  );
+  if (!rewritten.includes("/api/themes/neon-storm/assets/banner.svg") || !rewritten.includes("/api/themes/neon-storm/assets/logo.svg")) {
+    throw new Error('rewriteCssAssetUrls must rewrite relative asset urls: ' + rewritten);
+  }
+  console.log('rewriteCssAssetUrls: OK —', rewritten.slice(0, 90), '...');
 
   // Invalid zip → clear error code
   const bad = zip.parseThemeZip(new Uint8Array([1, 2, 3]), 'bad.zip');
   if (!('error' in bad) || bad.code !== 'invalid-zip') throw new Error('Invalid zip should return invalid-zip error');
   console.log('invalid zip rejected with code:', bad.code);
 
-  // Round-trip: build zip from an installed theme → parse again
-  const rebuilt = zip.buildThemeZip(parsed.theme as any);
+  // Round-trip: build zip from css+meta+assets → parse again
+  const { buildThemeZip } = await import('../src/themes/themeZipCore');
+  const { strToU8 } = await import('fflate');
+  const rebuilt = buildThemeZip(parsed.css, parsed.meta, parsed.assets);
   const reparsed = zip.parseThemeZip(rebuilt, 'rebuilt.zip');
   if ('error' in reparsed) throw new Error('reparse of rebuilt zip failed: ' + reparsed.error);
-  if (reparsed.theme.id !== parsed.theme.id || reparsed.css !== parsed.css) throw new Error('zip round-trip mismatch');
-  console.log('zip round-trip (build → parse): OK');
+  if (reparsed.meta.id !== parsed.meta.id || reparsed.css !== parsed.css) throw new Error('zip round-trip mismatch');
+  if (JSON.stringify(reparsed.assets) !== JSON.stringify(parsed.assets)) throw new Error('zip assets round-trip mismatch');
+  console.log('zip round-trip (build → parse, incl. assets): OK');
 
   // CSS-only zip: no theme.json → metadata derived from CSS + filename
-  const { zipSync, strToU8 } = await import('fflate');
+  const { zipSync } = await import('fflate');
   const cssOnlyZip = zipSync({
     'my-theme.css': strToU8(
       `body[data-theme='my-theme'] { --primary-color: #123456; --dark-bg-color: #0a0a0a; --dark-card-color: #1a1a1a; }\n` +
@@ -113,10 +121,19 @@ try {
   });
   const cssOnly = zip.parseThemeZip(cssOnlyZip, 'My Theme.zip');
   if ('error' in cssOnly) throw new Error('CSS-only zip should parse: ' + cssOnly.error);
-  if (cssOnly.theme.id !== 'my-theme') throw new Error('CSS-only zip id must come from CSS, got: ' + cssOnly.theme.id);
-  if (cssOnly.theme.name !== 'My Theme') throw new Error('CSS-only zip name must come from filename, got: ' + cssOnly.theme.name);
-  if (cssOnly.theme.colors?.primary !== '#123456') throw new Error('CSS-only zip colors must be extracted from CSS');
+  if (cssOnly.meta.id !== 'my-theme') throw new Error('CSS-only zip id must come from CSS, got: ' + cssOnly.meta.id);
+  if (cssOnly.meta.name !== 'My Theme') throw new Error('CSS-only zip name must come from filename, got: ' + cssOnly.meta.name);
+  if (cssOnly.meta.colors?.primary !== '#123456') throw new Error('CSS-only zip colors must be extracted from CSS');
   console.log('css-only zip (no theme.json): OK — id/name/colors auto-derived');
+
+  // Path traversal must be rejected
+  const evilZip = zipSync({
+    'theme.css': strToU8(`body[data-theme='evil'] { color: red; }\n.theme-evil .x { color: red; }`),
+    '../evil.txt': strToU8('pwned'),
+  });
+  const evil = zip.parseThemeZip(evilZip, 'evil.zip');
+  if (!('error' in evil) || evil.code !== 'unsafe-path') throw new Error('Path traversal must be rejected');
+  console.log('unsafe path rejected: OK');
 
   // 5) CSS validity: braces balanced
   const check = (css: string) => {

@@ -62,17 +62,47 @@ export default function App() {
     ...loadCustomThemes()
   ]);
 
-  // نسخه‌ی هوشمند setAvailableThemes: قالب‌های سفارشی را در localStorage
-  // ذخیره می‌کند تا بعد از رفرش صفحه از بین نروند.
+  // نسخه‌ی هوشمند setAvailableThemes: قالب‌های سفارشی (محلی) را در
+  // localStorage ذخیره می‌کند — قالب‌های سروری (نصب‌شده با پوشه assets
+  // روی سرور) در localStorage ذخیره نمی‌شوند چون روی سرور ثبت شده‌اند.
   const setAvailableThemes = (updater: React.SetStateAction<ThemeInfo[]>) => {
     setAvailableThemesState(prev => {
       const next = typeof updater === 'function'
         ? (updater as (p: ThemeInfo[]) => ThemeInfo[])(prev)
         : updater;
-      saveCustomThemes(next.filter(t => t.type === 'custom'));
+      saveCustomThemes(next.filter(t => t.type === 'custom' && t.kind !== 'server'));
       return next;
     });
   };
+
+  // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
+  useEffect(() => {
+    fetch('/api/themes')
+      .then(r => r.json())
+      .then((data: { serverThemes?: any[] }) => {
+        if (!data.serverThemes || data.serverThemes.length === 0) return;
+        const serverThemes: ThemeInfo[] = data.serverThemes.map(t => ({
+          id: t.id,
+          name: t.name,
+          type: 'custom',
+          kind: 'server',
+          version: t.version,
+          description: t.description,
+          colors: t.colors,
+          cssUrl: t.cssUrl,
+          hasAssets: t.hasAssets,
+          assetFiles: t.assetFiles,
+        }));
+        setAvailableThemesState(prev => {
+          const existing = new Set(prev.map(t => t.id));
+          const merged = [...prev, ...serverThemes.filter(t => !existing.has(t.id))];
+          // اگر قالب فعال یک قالب سروری است، استایلش الان بارگذاری می‌شود
+          // (useEffect پایین با تغییر availableThemes دوباره اجرا می‌شود)
+          return merged;
+        });
+      })
+      .catch(err => console.error('[Themes] Failed to fetch server themes:', err));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('themeId', themeId);

@@ -103,8 +103,10 @@ export default function AdminPanelTab({
   // ZIP theme install states
   const [zipFileName, setZipFileName] = useState('');
   const [zipParsed, setZipParsed] = useState<ParsedZipTheme | null>(null);
+  const [zipFileBytes, setZipFileBytes] = useState<Uint8Array | null>(null);
   const [zipError, setZipError] = useState('');
   const [isParsingZip, setIsParsingZip] = useState(false);
+  const [isInstallingZip, setIsInstallingZip] = useState(false);
 
   // Messages form and states
   const [recipient, setRecipient] = useState('All');
@@ -688,7 +690,9 @@ export default function AdminPanelTab({
     setShowUploadForm(false);
   };
 
-  /* ---------- نصب قالب از فایل ZIP (فرمت جدید) ---------- */
+  /* ---------- نصب قالب از فایل ZIP (فرمت جدید: theme.json + theme.css + assets/) ----------
+   * پیش‌نمایش متادیتا به‌صورت محلی انجام می‌شود؛ اما خود نصب روی سرور
+   * انجام می‌شود تا قالب پوشه اختصاصی خودش (با assets) را داشته باشد. */
   const handleZipFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -698,10 +702,12 @@ export default function AdminPanelTab({
     setZipFileName(file.name);
     setZipError('');
     setZipParsed(null);
+    setZipFileBytes(null);
     setIsParsingZip(true);
 
     try {
       const buffer = new Uint8Array(await file.arrayBuffer());
+      setZipFileBytes(buffer);
       const result = parseThemeZip(buffer, file.name);
 
       if ('error' in result) {
@@ -710,28 +716,20 @@ export default function AdminPanelTab({
         return;
       }
 
-      // بررسی تکراری نبودن شناسه
-      if (availableThemes.some(t => t.id === result.theme.id)) {
+      // بررسی تکراری نبودن شناسه (بین قالب‌های محلی و سروری)
+      if (availableThemes.some(t => t.id === result.meta.id)) {
         setZipError(language === 'fa'
-          ? `قالبی با شناسه «${result.theme.id}» قبلاً نصب شده است`
-          : `A theme with id "${result.theme.id}" is already installed`);
+          ? `قالبی با شناسه «${result.meta.id}» قبلاً نصب شده است`
+          : `A theme with id "${result.meta.id}" is already installed`);
         addNotification(language === 'fa' ? 'قالب تکراری است' : 'Duplicate theme', 'error');
         return;
       }
 
-      // بررسی حجم ذخیره‌سازی مرورگر (localStorage ≈ 5MB)
-      const estimated = JSON.stringify([...availableThemes, result.theme]).length;
-      if (estimated > 3_500_000) {
-        setZipError(language === 'fa'
-          ? 'حجم کل قالب‌های نصب‌شده از حد مجاز ذخیره‌سازی مرورگر بیشتر است؛ ابتدا چند قالب را حذف کنید'
-          : 'Total installed themes exceed browser storage limit; delete some themes first');
-        return;
-      }
-
+      const assetCount = Object.keys(result.assets).length;
       setZipParsed(result);
       addNotification(language === 'fa'
-        ? `فایل ZIP با موفقیت خوانده شد: «${result.theme.name}» (${(result.css.length / 1024).toFixed(1)}KB CSS)`
-        : `ZIP parsed: "${result.theme.name}" (${(result.css.length / 1024).toFixed(1)}KB CSS)`, 'success');
+        ? `فایل ZIP با موفقیت خوانده شد: «${result.meta.name}» (${(result.css.length / 1024).toFixed(1)}KB CSS${assetCount > 0 ? ` + ${assetCount} فایل assets` : ''})`
+        : `ZIP parsed: "${result.meta.name}" (${(result.css.length / 1024).toFixed(1)}KB CSS${assetCount > 0 ? ` + ${assetCount} assets` : ''})`, 'success');
     } catch (err) {
       console.error('[Themes] ZIP parse error:', err);
       setZipError(language === 'fa' ? 'خطا در خواندن فایل ZIP' : 'Failed to read ZIP file');
@@ -740,23 +738,58 @@ export default function AdminPanelTab({
     }
   };
 
-  const handleInstallZip = () => {
-    if (!zipParsed) return;
+  /* ---------- نصب روی سرور (پوشه اختصاصی قالب + assets) ---------- */
+  const handleInstallZip = async () => {
+    if (!zipParsed || !zipFileBytes) return;
     if (!setAvailableThemes) return;
 
-    setAvailableThemes(prev => [...prev, zipParsed.theme]);
-    addNotification(language === 'fa'
-      ? `قالب "${zipParsed.theme.name}" با موفقیت نصب و فعال شد`
-      : `Theme "${zipParsed.theme.name}" installed & activated`, 'success');
+    setIsInstallingZip(true);
+    try {
+      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: zipFileBytes as unknown as BodyInit,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setZipError(data.error || 'خطا در نصب قالب');
+        addNotification(language === 'fa' ? `خطا در نصب: ${data.error || ''}` : `Install error: ${data.error || ''}`, 'error');
+        return;
+      }
 
-    // فعال‌سازی فوری تا اثر قالب روی همه صفحات دیده شود
-    if (setThemeId) setThemeId(zipParsed.theme.id);
+      const serverTheme: ThemeInfo = {
+        id: data.theme.id,
+        name: data.theme.name,
+        type: 'custom',
+        kind: 'server',
+        version: data.theme.version,
+        description: data.theme.description,
+        colors: data.theme.colors,
+        cssUrl: data.theme.cssUrl,
+        hasAssets: data.theme.hasAssets,
+        assetFiles: data.theme.assetFiles,
+      };
 
-    setZipParsed(null);
-    setZipFileName('');
-    setZipError('');
-    setShowUploadForm(false);
-    setUploadMode('zip');
+      setAvailableThemes(prev => [...prev, serverTheme]);
+      addNotification(language === 'fa'
+        ? `قالب «${serverTheme.name}» روی سرور نصب و فعال شد${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} فایل assets)` : ''}`
+        : `Theme "${serverTheme.name}" installed on server & activated${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} assets)` : ''}`, 'success');
+
+      // فعال‌سازی فوری
+      if (setThemeId) setThemeId(serverTheme.id);
+
+      setZipParsed(null);
+      setZipFileBytes(null);
+      setZipFileName('');
+      setZipError('');
+      setShowUploadForm(false);
+      setUploadMode('zip');
+    } catch (err) {
+      console.error('[Themes] Install error:', err);
+      setZipError(language === 'fa' ? 'خطا در ارتباط با سرور' : 'Server connection error');
+    } finally {
+      setIsInstallingZip(false);
+    }
   };
 
   /* ---------- دانلود قالب نمونه (فرمت جدید ZIP) ---------- */
@@ -772,10 +805,26 @@ export default function AdminPanelTab({
     }
   };
 
-  /* ---------- خروجی گرفتن ZIP از یک قالب نصب‌شده ---------- */
-  const handleExportThemeZip = (theme: ThemeInfo) => {
+  /* ---------- خروجی گرفتن ZIP از یک قالب نصب‌شده ----------
+   * قالب‌های سروری از سرور دانلود می‌شوند (شامل پوشه assets)؛
+   * قالب‌های محلی با buildThemeZip ساخته می‌شوند. */
+  const handleExportThemeZip = async (theme: ThemeInfo) => {
     try {
-      downloadZip(buildThemeZip(theme), `${theme.id}.zip`);
+      if (theme.kind === 'server') {
+        const res = await fetch(`/api/themes/${encodeURIComponent(theme.id)}/export`);
+        if (!res.ok) throw new Error('export failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${theme.id}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      } else {
+        downloadZip(buildThemeZip(theme), `${theme.id}.zip`);
+      }
       addNotification(language === 'fa' ? `پکیج ZIP قالب «${theme.name}» دانلود شد` : `Theme "${theme.name}" zip downloaded`, 'success');
     } catch (e) {
       console.error(e);
@@ -783,14 +832,35 @@ export default function AdminPanelTab({
     }
   };
 
-  const handleDeleteTheme = (id: string, name: string) => {
-    if (setAvailableThemes) {
-      setAvailableThemes(prev => prev.filter(t => t.id !== id));
+  const handleDeleteTheme = async (theme: ThemeInfo) => {
+    // قالب‌های سروری: پوشه اختصاصی قالب روی سرور هم حذف می‌شود
+    if (theme.kind === 'server') {
+      try {
+        const res = await fetch(`/api/admin/themes/${encodeURIComponent(theme.id)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          addNotification(language === 'fa' ? 'خطا در حذف قالب از سرور' : 'Failed to delete theme on server', 'error');
+          return;
+        }
+      } catch (e) {
+        console.error(e);
+        addNotification(language === 'fa' ? 'خطا در ارتباط با سرور' : 'Server connection error', 'error');
+        return;
+      }
     }
-    if (themeId === id && setThemeId) {
+
+    if (setAvailableThemes) {
+      setAvailableThemes(prev => prev.filter(t => t.id !== theme.id));
+    }
+    if (themeId === theme.id && setThemeId) {
       setThemeId('dark-gold');
     }
-    addNotification(language === 'fa' ? `قالب "${name}" با موفقیت حذف شد` : `Theme "${name}" deleted successfully`, 'success');
+    addNotification(
+      language === 'fa'
+        ? (theme.kind === 'server' ? `قالب "${theme.name}" و پوشه آن حذف شد` : `قالب "${theme.name}" با موفقیت حذف شد`)
+        : (theme.kind === 'server' ? `Theme "${theme.name}" and its folder deleted` : `Theme "${theme.name}" deleted successfully`),
+      'success'
+    );
   };
 
   useEffect(() => {
@@ -1620,7 +1690,7 @@ export default function AdminPanelTab({
                               <span className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
                                 <Check className="w-5 h-5" strokeWidth={3} />
                               </span>
-                              <span className="text-xs font-black text-emerald-400">{zipParsed.theme.name}</span>
+                              <span className="text-xs font-black text-emerald-400">{zipParsed.meta.name}</span>
                               <span className="text-[10px] text-gray-500 font-mono">{zipFileName}</span>
                             </>
                           ) : (
@@ -1629,7 +1699,7 @@ export default function AdminPanelTab({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                               </svg>
                               <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors text-center">{language === 'fa' ? 'فایل zip قالب را انتخاب کنید' : 'Select theme zip file'}</span>
-                              <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'فقط فایل CSS کافی است — theme.json اختیاری' : 'CSS file is enough — theme.json is optional'}</span>
+                              <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'فرمت: theme.json + theme.css + پوشه assets/ (اختیاری)' : 'Format: theme.json + theme.css + assets/ folder (optional)'}</span>
                             </>
                           )}
                         </div>
@@ -1657,33 +1727,33 @@ export default function AdminPanelTab({
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
                             <div>
                               <span className="block text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نام' : 'Name'}</span>
-                              <span className="text-white font-black">{zipParsed.theme.name}</span>
+                              <span className="text-white font-black">{zipParsed.meta.name}</span>
                             </div>
                             <div>
                               <span className="block text-[9px] text-gray-500 font-bold uppercase">ID</span>
-                              <span className="text-primary font-mono font-bold" dir="ltr">{zipParsed.theme.id}</span>
+                              <span className="text-primary font-mono font-bold" dir="ltr">{zipParsed.meta.id}</span>
                             </div>
                             <div>
                               <span className="block text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نسخه' : 'Version'}</span>
-                              <span className="text-white font-mono font-bold">{zipParsed.theme.version || '—'}</span>
+                              <span className="text-white font-mono font-bold">{zipParsed.meta.version || '—'}</span>
                             </div>
                             <div>
-                              <span className="block text-[9px] text-gray-500 font-bold uppercase">CSS</span>
-                              <span className="text-white font-mono font-bold">{(zipParsed.css.length / 1024).toFixed(1)}KB</span>
+                              <span className="block text-[9px] text-gray-500 font-bold uppercase">CSS / Assets</span>
+                              <span className="text-white font-mono font-bold">{(zipParsed.css.length / 1024).toFixed(1)}KB{Object.keys(zipParsed.assets).length > 0 ? ` + ${Object.keys(zipParsed.assets).length}` : ''}</span>
                             </div>
                           </div>
-                          {zipParsed.theme.description && (
-                            <p className="text-[11px] text-gray-400 leading-relaxed">{zipParsed.theme.description}</p>
+                          {zipParsed.meta.description && (
+                            <p className="text-[11px] text-gray-400 leading-relaxed">{zipParsed.meta.description}</p>
                           )}
                           <div className="flex items-center gap-3 pt-2 border-t border-white/5">
                             <span className="text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ‌ها:' : 'Colors:'}</span>
                             {(['primary', 'bg', 'card'] as const).map(k => (
                               <span key={k} className="flex items-center gap-1.5 text-[10px] font-mono text-gray-300">
-                                <span className="w-4 h-4 rounded border border-white/20" style={{ backgroundColor: zipParsed.theme.colors?.[k] || '#333' }} />
-                                <span className="hidden md:inline">{zipParsed.theme.colors?.[k]}</span>
+                                <span className="w-4 h-4 rounded border border-white/20" style={{ backgroundColor: zipParsed.meta.colors?.[k] || '#333' }} />
+                                <span className="hidden md:inline">{zipParsed.meta.colors?.[k]}</span>
                               </span>
                             ))}
-                            <span className="text-[9px] text-gray-500 font-mono mr-auto">{zipParsed.theme.type === 'custom' && zipParsed.theme.kind === 'zip' ? 'ZIP' : ''}</span>
+                            <span className="text-[9px] text-gray-500 font-mono mr-auto">{Object.keys(zipParsed.assets).length > 0 ? `assets: ${Object.keys(zipParsed.assets).join(', ')}` : 'بدون assets'}</span>
                           </div>
                         </div>
                       )}
@@ -1710,10 +1780,15 @@ export default function AdminPanelTab({
                           <button 
                             type="button" 
                             onClick={handleInstallZip}
-                            disabled={!zipParsed || !!zipError || isParsingZip}
-                            className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                            disabled={!zipParsed || !!zipError || isParsingZip || isInstallingZip}
+                            className="px-5 py-2 text-xs font-black uppercase rounded-xl bg-primary text-black hover:opacity-90 shadow-[0_0_15px_rgba(255,184,0,0.3)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
                           >
-                            {language === 'fa' ? 'نصب و فعال‌سازی' : 'Install & Activate'}
+                            {isInstallingZip && (
+                              <span className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                            )}
+                            {isInstallingZip
+                              ? (language === 'fa' ? 'در حال نصب روی سرور...' : 'Installing on server...')
+                              : (language === 'fa' ? 'نصب و فعال‌سازی' : 'Install & Activate')}
                           </button>
                         </div>
                       </div>
@@ -1815,10 +1890,17 @@ export default function AdminPanelTab({
                             <span className="text-[10px] uppercase tracking-wider text-gray-500">
                               {theme.type === 'built-in' 
                                 ? (language === 'fa' ? 'سیستمی' : 'Built-in') 
+                                : theme.kind === 'server'
+                                    ? (language === 'fa' ? 'سروری (پوشه اختصاصی)' : 'Server (own folder)')
                                 : (theme.kind === 'zip' 
                                     ? (language === 'fa' ? 'پکیج ZIP' : 'ZIP Package')
                                     : (language === 'fa' ? 'سفارشی (رنگ)' : 'Custom (Colors)'))}
                             </span>
+                            {theme.hasAssets && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] font-mono font-bold" title={theme.assetFiles?.join(', ')}>
+                                📁 {theme.assetFiles?.length || 0} assets
+                              </span>
+                            )}
                             {theme.type === 'custom' && theme.css && (
                               <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[8px] font-mono font-bold">
                                 CSS {(theme.css.length / 1024).toFixed(1)}KB
@@ -1848,9 +1930,9 @@ export default function AdminPanelTab({
                               </svg>
                             </button>
                             <button 
-                              onClick={() => handleDeleteTheme(theme.id, theme.name)}
+                              onClick={() => handleDeleteTheme(theme)}
                               className="p-1.5 text-gray-500 hover:text-accent-red hover:bg-red-500/10 rounded-lg transition-colors"
-                              title={language === 'fa' ? 'حذف' : 'Delete'}
+                              title={language === 'fa' ? 'حذف (پوشه قالب نیز حذف می‌شود)' : 'Delete (theme folder removed too)'}
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

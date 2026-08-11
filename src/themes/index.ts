@@ -49,7 +49,13 @@ export interface ThemeInfo {
   version?: string;
   description?: string;
   /** نحوه ساخت قالب سفارشی: 'zip' = نصب از فایل ZIP، 'colors' = ساخت با رنگ */
-  kind?: 'zip' | 'colors';
+  kind?: 'zip' | 'colors' | 'server';
+  /** قالب‌های نصب‌شده روی سرور: آدرس فایل CSS (با assets بازنویسی‌شده) */
+  cssUrl?: string;
+  /** آیا قالب پوشه assets دارد؟ */
+  hasAssets?: boolean;
+  /** لیست فایل‌های داخل پوشه assets قالب */
+  assetFiles?: string[];
 }
 
 /* ---------- قالب‌های سیستمی ---------- */
@@ -83,6 +89,11 @@ import darkGoldCss from './dark-gold.css?inline';
  * حالت dev/build آدرس صحیح (هش‌شده) را تولید کند. */
 import defaultBgUrl from '../assets/images/background.png';
 
+/* هسته مشترک پکیج قالب — توابع خالص (بدون وابستگی Vite) */
+import { sanitizeThemeId, extractColorsFromCss } from './themeZipCore';
+
+export { sanitizeThemeId, extractColorsFromCss } from './themeZipCore';
+
 const staticCss: Record<string, string> = {
   'dark-gold': darkGoldCss
 };
@@ -104,14 +115,39 @@ function injectStyleTag(themeId: string, css: string) {
   activeStyleTag = tag;
 }
 
+/** کش CSS قالب‌های سروری (تا هر بار تعویض قالب، fetch تکراری نشود) */
+const serverCssCache = new Map<string, string>();
+
 /** بارگذاری و اعمال استایل یک قالب (built-in یا custom). */
 export function loadThemeStylesheet(theme: ThemeInfo): Promise<void> | void {
   if (!theme) return;
 
   // قالب‌های سفارشی:
-  //  - اگر فایل CSS کامل دارد (نصب از ZIP با فرمت جدید) → عیناً تزریق می‌شود
+  //  - قالب سروری (نصب‌شده با پوشه assets روی سرور) → fetch فایل CSS
+  //  - اگر فایل CSS کامل دارد (ZIP محلی) → عیناً تزریق می‌شود
   //  - در غیر این صورت CSS از روی رنگ‌ها تولید می‌شود (ساخت سریع)
   if (theme.type === 'custom') {
+    if (theme.cssUrl) {
+      const cached = serverCssCache.get(theme.id);
+      if (cached !== undefined) {
+        injectStyleTag(theme.id, cached);
+        return;
+      }
+      return fetch(theme.cssUrl)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
+        .then(css => {
+          serverCssCache.set(theme.id, css);
+          injectStyleTag(theme.id, css);
+        })
+        .catch(err => {
+          console.error(`[Themes] Failed to load server css for "${theme.id}":`, err);
+          // در صورت خطا: سقوط به CSS تولیدی از رنگ‌ها تا قالب بدون استایل نماند
+          injectStyleTag(theme.id, generateCustomThemeCss(theme));
+        });
+    }
     const css = (theme.css && theme.css.trim().length > 0)
       ? theme.css
       : generateCustomThemeCss(theme);
@@ -198,39 +234,6 @@ export function hexToRgba(hex: string, alpha: number): string {
   const g = (num >> 8) & 0xff;
   const b = num & 0xff;
   return `rgba(${r},${g},${b},${alpha})`;
-}
-
-/** پاک‌سازی شناسه قالب برای استفاده امن در کلاس/سلکتور CSS */
-export function sanitizeThemeId(id: string): string {
-  const clean = (id || '')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  return clean || 'custom-theme-' + Date.now().toString(36);
-}
-
-/* ---------- استخراج رنگ‌ها از فایل CSS یک قالب ----------
- * وقتی قالب ZIP فایل `colors` در متادیتا نداشته باشد، رنگ‌های
- * پیش‌نمایش (اسکرین‌شات) از روی متغیرهای خود فایل CSS خوانده می‌شوند.
- */
-export function extractColorsFromCss(
-  css: string,
-  fallback: ThemeColorConfig = { primary: '#ffb800', bg: '#050608', card: '#0D0E15' }
-): ThemeColorConfig {
-  // کامنت‌های CSS ممکن است شامل نمونه‌هایی از متغیرها باشند → حذف قبل از الگویابی
-  const code = (css || '').replace(/\/\*[\s\S]*?\*\//g, '');
-  const getVar = (prop: string): string | null => {
-    const m = code.match(new RegExp(prop + '\\s*:\\s*(#[0-9a-fA-F]{3,8}|rgba?\\([^)]*\\))'));
-    return m ? m[1] : null;
-  };
-  return {
-    primary: getVar('--primary-color') || fallback.primary,
-    bg: getVar('--dark-bg-color') || getVar('--theme-bg') || fallback.bg,
-    card: getVar('--dark-card-color') || getVar('--theme-card-bg') || fallback.card,
-  };
 }
 
 /* ---------- تولید CSS برای قالب‌های سفارشی ----------

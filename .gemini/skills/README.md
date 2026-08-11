@@ -42,8 +42,6 @@ Code** (هر اسکیل یک پوشه با `SKILL.md` + frontmatter YAML و زی
   `~/.claude/skills/` (همه‌ی پروژه‌ها) نصب شده‌اند.
 - **Cursor:** نسخه‌ی همین اسکیل‌ها در `/.cursor/skills/` نصب شده.
 - **Windsurf:** نسخه‌ی همین اسکیل‌ها در `/.windsurf/skills/` نصب شده.
-- **Gemini CLI:** نسخه‌ی همین اسکیل‌ها در `/.gemini/skills/` نصب شده (با دستور
-  `npx ui-ux-pro-max-cli init --ai gemini`).
 - بعد از هر نصب، ابزار را Restart کنید.
 - **انسان‌ها:** هر `SKILL.md` را مستقیم بخوانید و مراحلش را دنبال کنید.
 

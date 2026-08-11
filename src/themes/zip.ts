@@ -6,14 +6,17 @@
  *  فرمت استاندارد پکیج قالب (فایل .zip):
  *  ─────────────────────────────────────
  *    theme.zip
- *    ├── theme.json        ← متادیتای قالب (اجباری)
- *    └── theme.css         ← استایل کامل قالب (اجباری) — همان فرمت
- *                            فایل‌های src/themes/*.css
+ *    ├── theme.css         ← استایل کامل قالب (اجباری) — همان فرمت
+ *    │                        فایل‌های src/themes/*.css
+ *    └── theme.json        ← متادیتای قالب (اختیاری — اگر نباشد، نام/شناسه/
+ *                             رنگ‌ها به‌صورت خودکار از CSS و نام فایل استخراج می‌شوند)
  *
- *  theme.json:
+ *  یعنی ساده‌ترین حالت: یک ZIP که فقط فایل CSS داخلش است هم قابل نصب است.
+ *
+ *  theme.json (اختیاری):
  *  {
- *    "name": "Neon Storm",              // نام قالب (اجباری)
- *    "id": "neon-storm",                // شناسه (اختیاری — از نام ساخته می‌شود)
+ *    "name": "Neon Storm",              // نام قالب (اگر نباشد از نام فایل ZIP می‌آید)
+ *    "id": "neon-storm",                // شناسه (اگر نباشد از body[data-theme] در CSS می‌آید)
  *    "version": "1.0.0",                // نسخه (اختیاری)
  *    "description": "...",              // توضیح کوتاه (اختیاری)
  *    "colors": {                        // رنگ‌ها برای پیش‌نمایش (اختیاری)
@@ -53,7 +56,7 @@ export interface ParsedZipTheme {
 export interface ZipParseError {
   error: string;
   /** کد خطا برای ترجمه پیام‌ها در رابط کاربری */
-  code: 'invalid-zip' | 'no-json' | 'no-css' | 'empty-css' | 'wrong-format' | 'duplicate-id';
+  code: 'invalid-zip' | 'no-css' | 'empty-css' | 'wrong-format' | 'duplicate-id';
 }
 
 const isZipParseError = (r: ParsedZipTheme | ZipParseError): r is ZipParseError => 'error' in r;
@@ -106,19 +109,19 @@ export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZi
     return { error: 'فایل ZIP خالی است', code: 'invalid-zip' };
   }
 
-  /* ۱) متادیتا (theme.json) */
+  /* ۱) متادیتا (theme.json) — اختیاری!
+   * اگر فایل theme.json داخل ZIP نباشد، نام/شناسه/رنگ‌ها به‌صورت خودکار
+   * از داخل CSS و نام فایل استخراج می‌شوند؛ یعنی ZIP فقط-CSS هم نصب می‌شود. */
   const jsonKey = findEntry(entries, ['theme.json', 'bazino/theme.json', 'theme/theme.json']);
   let meta: any = {};
-  if (!jsonKey) {
-    return { error: 'فایل theme.json داخل ZIP پیدا نشد', code: 'no-json' };
-  }
-  try {
-    meta = JSON.parse(strFromU8(files[jsonKey]));
-  } catch (e) {
-    return { error: 'فایل theme.json قابل خواندن نیست (JSON معتبر نیست)', code: 'no-json' };
-  }
-  if (!meta || typeof meta !== 'object') {
-    return { error: 'ساختار theme.json نامعتبر است', code: 'no-json' };
+  if (jsonKey) {
+    try {
+      meta = JSON.parse(strFromU8(files[jsonKey]));
+    } catch (e) {
+      console.warn('[Themes] theme.json is invalid JSON — ignoring it:', e);
+      meta = {};
+    }
+    if (!meta || typeof meta !== 'object') meta = {};
   }
 
   /* ۲) استایل قالب (theme.css) */
@@ -144,13 +147,17 @@ export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZi
     };
   }
 
-  /* ۳) شناسه قالب: اولویت با CSS، سپس theme.json، سپس نام فایل */
-  const name = (typeof meta.name === 'string' && meta.name.trim())
-    ? meta.name.trim()
-    : (fallbackName || 'Custom Theme').replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+  /* ۳) شناسه و نام قالب:
+   *  شناسه: اولویت با CSS (body[data-theme])، سپس theme.json، سپس نام فایل
+   *  نام:    theme.json، سپس نام فایل ZIP، سپس خود شناسه */
   const cssId = extractIdFromCss(css);
   const metaId = typeof meta.id === 'string' ? meta.id : '';
-  const id = cssId || sanitizeThemeId(metaId || name);
+  const fileBase = (fallbackName || 'Custom Theme')
+    .replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+  const id = cssId || sanitizeThemeId(metaId || fileBase);
+  const name = (typeof meta.name === 'string' && meta.name.trim())
+    ? meta.name.trim()
+    : (fileBase || id || 'Custom Theme');
 
   /* ۴) رنگ‌های پیش‌نمایش: از متادیتا، یا استخراج از CSS */
   let colors: ThemeColorConfig | undefined;

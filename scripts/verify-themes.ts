@@ -103,6 +103,21 @@ try {
   if (reparsed.theme.id !== parsed.theme.id || reparsed.css !== parsed.css) throw new Error('zip round-trip mismatch');
   console.log('zip round-trip (build → parse): OK');
 
+  // CSS-only zip: no theme.json → metadata derived from CSS + filename
+  const { zipSync, strToU8 } = await import('fflate');
+  const cssOnlyZip = zipSync({
+    'my-theme.css': strToU8(
+      `body[data-theme='my-theme'] { --primary-color: #123456; --dark-bg-color: #0a0a0a; --dark-card-color: #1a1a1a; }\n` +
+      `.theme-my-theme .site-header { color: #123456; }\n`
+    ),
+  });
+  const cssOnly = zip.parseThemeZip(cssOnlyZip, 'My Theme.zip');
+  if ('error' in cssOnly) throw new Error('CSS-only zip should parse: ' + cssOnly.error);
+  if (cssOnly.theme.id !== 'my-theme') throw new Error('CSS-only zip id must come from CSS, got: ' + cssOnly.theme.id);
+  if (cssOnly.theme.name !== 'My Theme') throw new Error('CSS-only zip name must come from filename, got: ' + cssOnly.theme.name);
+  if (cssOnly.theme.colors?.primary !== '#123456') throw new Error('CSS-only zip colors must be extracted from CSS');
+  console.log('css-only zip (no theme.json): OK — id/name/colors auto-derived');
+
   // 5) CSS validity: braces balanced
   const check = (css: string) => {
     let d = 0;

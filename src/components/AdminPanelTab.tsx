@@ -1411,8 +1411,8 @@ export default function AdminPanelTab({
                   <h3 className="text-xl font-black uppercase mb-1">{language === 'fa' ? 'مدیریت قالب‌ها' : 'Theme Management'}</h3>
                   <p className="text-gray-400 text-sm">
                     {language === 'fa'
-                      ? 'قالب‌ها را از فایل ZIP (فرمت جدید: theme.json + theme.css) نصب کنید یا با رنگ‌ها قالب بسازید.'
-                      : 'Install themes from ZIP packages (new format: theme.json + theme.css) or build with colors.'}
+                      ? 'قالب را با فایل ZIP نصب کنید (فقط فایل CSS کافی است؛ theme.json اختیاری است) یا با رنگ‌ها قالب بسازید.'
+                      : 'Install themes from ZIP packages (CSS file is enough; theme.json optional) or build with colors.'}
                   </p>
                   <p className="text-[10px] text-gray-500 font-mono mt-1">
                     {language === 'fa'
@@ -1585,7 +1585,7 @@ export default function AdminPanelTab({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                               </svg>
                               <span className="text-xs font-bold text-gray-400 group-hover:text-white transition-colors text-center">{language === 'fa' ? 'فایل zip قالب را انتخاب کنید' : 'Select theme zip file'}</span>
-                              <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'فرمت: theme.json + theme.css' : 'Format: theme.json + theme.css'}</span>
+                              <span className="text-[10px] text-gray-600 font-bold text-center">{language === 'fa' ? 'فقط فایل CSS کافی است — theme.json اختیاری' : 'CSS file is enough — theme.json is optional'}</span>
                             </>
                           )}
                         </div>

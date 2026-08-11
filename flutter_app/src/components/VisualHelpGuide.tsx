@@ -306,7 +306,7 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
           <div className="lg:col-span-7 bg-[#07080f] border border-white/10 rounded-2xl relative overflow-hidden flex flex-col min-h-[300px] justify-center items-center p-4">
             
             {/* Guide simulation label */}
-            <div className="absolute top-3 left-3 px-2 py-0.5 bg-black/70 border border-white/10 rounded-md text-[9px] text-gray-400 font-mono tracking-wider flex items-center gap-1">
+            <div className="absolute top-3 left-3 px-2 py-0.5 bg-black/70 border border-white/10 rounded-md text-[10px] text-gray-400 font-mono tracking-wider flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>SIMULATED_INTERFACE_VIEW</span>
             </div>
@@ -359,17 +359,17 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="bg-black/40 p-2 rounded-lg">
                       <Clock className="w-4 h-4 mx-auto text-primary mb-1" />
-                      <span className="text-[9px] text-gray-500 block">Time Left</span>
+                      <span className="text-[10px] text-gray-500 block">Time Left</span>
                       <span className="text-xs font-black text-white font-mono">01:42:10</span>
                     </div>
                     <div className="bg-black/40 p-2 rounded-lg">
                       <DollarSign className="w-4 h-4 mx-auto text-primary mb-1" />
-                      <span className="text-[9px] text-gray-500 block">Rate/Hr</span>
+                      <span className="text-[10px] text-gray-500 block">Rate/Hr</span>
                       <span className="text-xs font-black text-white font-mono">35K T</span>
                     </div>
                     <div className="bg-black/40 p-2 rounded-lg">
                       <Cpu className="w-4 h-4 mx-auto text-primary mb-1" />
-                      <span className="text-[9px] text-gray-500 block">Usage XP</span>
+                      <span className="text-[10px] text-gray-500 block">Usage XP</span>
                       <span className="text-xs font-black text-white font-mono">+120 XP</span>
                     </div>
                   </div>
@@ -394,10 +394,10 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                         <Coffee className="w-3.5 h-3.5 text-primary" />
                         <div>
                           <span className="text-xs font-bold text-white block">RedBull Energy + HotDog</span>
-                          <span className="text-[9px] text-gray-400 block font-mono">STATION_08 (Console) • 120,000 T</span>
+                          <span className="text-[10px] text-gray-400 block font-mono">STATION_08 (Console) • 120,000 T</span>
                         </div>
                       </div>
-                      <span className="text-[9px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-black">PENDING</span>
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-black">PENDING</span>
                     </div>
                     
                     <div className="flex items-center justify-between p-2.5 bg-black/40 rounded-lg border border-white/5 opacity-60">
@@ -405,10 +405,10 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                         <Coffee className="w-3.5 h-3.5 text-emerald-400" />
                         <div>
                           <span className="text-xs font-bold text-white block">Double Espresso Shot</span>
-                          <span className="text-[9px] text-gray-400 block font-mono">STATION_01 (PC VIP) • 45,000 T</span>
+                          <span className="text-[10px] text-gray-400 block font-mono">STATION_01 (PC VIP) • 45,000 T</span>
                         </div>
                       </div>
-                      <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-md font-black">DELIVERED</span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-md font-black">DELIVERED</span>
                     </div>
                   </div>
                 </div>
@@ -423,16 +423,16 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-black/40 p-2.5 rounded-lg border border-white/5 flex flex-col items-center text-center space-y-1">
                       <ShoppingBag className="w-6 h-6 text-primary" />
-                      <span className="text-[11px] font-bold text-white">Razer DeathAdder V3</span>
-                      <span className="text-[9px] text-primary font-bold">1,450 Points</span>
-                      <span className="text-[9px] text-gray-400">Stock: 4 units</span>
+                      <span className="text-xs font-bold text-white">Razer DeathAdder V3</span>
+                      <span className="text-[10px] text-primary font-bold">1,450 Points</span>
+                      <span className="text-[10px] text-gray-400">Stock: 4 units</span>
                     </div>
                     
                     <div className="bg-black/40 p-2.5 rounded-lg border border-white/5 flex flex-col items-center text-center space-y-1">
                       <ShoppingBag className="w-6 h-6 text-primary" />
-                      <span className="text-[11px] font-bold text-white">HyperX Cloud II</span>
-                      <span className="text-[9px] text-primary font-bold">2,800 Points</span>
-                      <span className="text-[9px] text-gray-400">Stock: 2 units</span>
+                      <span className="text-xs font-bold text-white">HyperX Cloud II</span>
+                      <span className="text-[10px] text-primary font-bold">2,800 Points</span>
+                      <span className="text-[10px] text-gray-400">Stock: 2 units</span>
                     </div>
                   </div>
                 </div>
@@ -448,15 +448,15 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2.5">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-white">CS2 Major Gamenet Cup</span>
-                      <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-mono">8 TEAMS MAX</span>
+                      <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-mono">8 TEAMS MAX</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-gray-400">
                       <span>Prize: 15,000,000 T</span>
                       <span>Starts: 1405/05/15</span>
                     </div>
                     <div className="pt-2 border-t border-white/5 flex gap-1.5 justify-end">
-                      <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Active Brackets</span>
-                      <span className="text-[9px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">Live Teams (6/8)</span>
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Active Brackets</span>
+                      <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">Live Teams (6/8)</span>
                     </div>
                   </div>
                 </div>
@@ -480,8 +480,8 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                     <div className="space-y-1">
                       <span className="text-[10px] text-gray-400 block font-bold">Step 2: Choose Duration</span>
                       <div className="flex gap-2">
-                        <span className="flex-1 py-1 text-center text-[9px] font-bold border border-white/5 text-gray-400 rounded-lg">2 Hours</span>
-                        <span className="flex-1 py-1 text-center text-[9px] font-bold border border-primary text-primary rounded-lg bg-primary/5">4 Hours Pass</span>
+                        <span className="flex-1 py-1 text-center text-[10px] font-bold border border-white/5 text-gray-400 rounded-lg">2 Hours</span>
+                        <span className="flex-1 py-1 text-center text-[10px] font-bold border border-primary text-primary rounded-lg bg-primary/5">4 Hours Pass</span>
                       </div>
                     </div>
                   </div>
@@ -497,14 +497,14 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                     <div className="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col items-center">
                       <Coffee className="w-5 h-5 text-primary mb-1" />
                       <span className="text-[10px] font-bold text-white">Iced Latte</span>
-                      <span className="text-[9px] text-gray-400">45,000 T</span>
-                      <button className="mt-1.5 px-3 py-1 bg-primary text-black font-black text-[9px] rounded-md">Order Now</button>
+                      <span className="text-[10px] text-gray-400">45,000 T</span>
+                      <button className="mt-1.5 px-3 py-1 bg-primary text-black font-black text-[10px] rounded-md">Order Now</button>
                     </div>
                     <div className="bg-black/30 p-2 rounded-lg border border-white/5 flex flex-col items-center">
                       <Coffee className="w-5 h-5 text-primary mb-1" />
                       <span className="text-[10px] font-bold text-white">Monster Blue</span>
-                      <span className="text-[9px] text-gray-400">75,000 T</span>
-                      <button className="mt-1.5 px-3 py-1 bg-primary text-black font-black text-[9px] rounded-md">Order Now</button>
+                      <span className="text-[10px] text-gray-400">75,000 T</span>
+                      <button className="mt-1.5 px-3 py-1 bg-primary text-black font-black text-[10px] rounded-md">Order Now</button>
                     </div>
                   </div>
                 </div>
@@ -519,13 +519,13 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 space-y-2">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-black text-white">Level 12 (Elite Vanguard)</span>
-                      <span className="text-[9px] text-primary font-black">4,500 XP</span>
+                      <span className="text-[10px] text-primary font-black">4,500 XP</span>
                     </div>
                     {/* XP Progress bar */}
                     <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                       <div className="h-full bg-primary shadow-[0_0_8px_rgba(255,184,0,0.6)]" style={{ width: '75%' }}></div>
                     </div>
-                    <span className="text-[9px] text-gray-400 block">Play 3 more hours to unlock Level 13 (Aura booster)</span>
+                    <span className="text-[10px] text-gray-400 block">Play 3 more hours to unlock Level 13 (Aura booster)</span>
                   </div>
                 </div>
               </div>
@@ -565,7 +565,7 @@ export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection,
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-gray-300 text-[11px] leading-relaxed font-medium">
+                  <p className="text-gray-300 text-xs leading-relaxed font-medium">
                     {hsInfo.desc}
                   </p>
                 </div>

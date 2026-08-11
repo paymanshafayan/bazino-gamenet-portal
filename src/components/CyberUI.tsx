@@ -248,7 +248,7 @@ export const HudSquareButton = ({ icon, badge, onClick, active = false }: HudSqu
         {icon}
       </div>
       {badge && (
-        <span className="absolute top-1 right-1 bg-purple-600 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-purple-400 animate-pulse">
+        <span className="absolute top-1 right-1 bg-purple-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-purple-400 animate-pulse">
           {badge}
         </span>
       )}

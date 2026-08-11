@@ -711,3 +711,6 @@ html, body {
 
 /* ─── قوانین UX: کنتراست متنهای کمرنگ روی زمینه تیره (gray-500 → gray-400) ─── */
 body[data-theme] .text-gray-500 { color: #9ca3af; }
+
+/* قانون UX: line-height بدنه 1.5 (اسکیل UI/UX Pro Max) */
+body { line-height: 1.5; }

@@ -755,7 +755,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
 
                 {/* Tag header */}
                 <div className="absolute top-4 left-4 z-20">
-                  <span className="px-2.5 py-1 text-[9px] font-black tracking-wider bg-black/80 text-primary border border-primary/40 rounded-none notched-clip-sm font-mono">
+                  <span className="px-2.5 py-1 text-[10px] font-black tracking-wider bg-black/80 text-primary border border-primary/40 rounded-none notched-clip-sm font-mono">
                     {genre.tag}
                   </span>
                 </div>
@@ -769,7 +769,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                     {getLocText(genre.subtitle)}
                   </p>
                   <div className="pt-2 border-t border-white/10 mt-1">
-                    <span className="block text-[9px] text-gray-500 font-bold uppercase tracking-widest font-mono">
+                    <span className="block text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">
                       {language === 'fa' ? 'بازی‌های شاخص:' : 'Featured Games:'}
                     </span>
                     <span className="text-[10px] text-primary font-bold">
@@ -882,7 +882,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                 <Sword className="w-5 h-5 text-primary" />
                 <span className="text-xs font-bold font-display uppercase text-white">Esports Arena Matches</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-none notched-clip-sm text-[9px] font-mono font-bold uppercase">
+              <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-none notched-clip-sm text-[10px] font-mono font-bold uppercase">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                 <span>Lobby Connected</span>
               </div>
@@ -893,12 +893,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                 <div key={match.id} className="p-5 flex flex-col md:flex-row items-center justify-between gap-4 hover:bg-[#141624]/30 transition-all">
                   {/* Game badge & Title */}
                   <div className="flex items-center gap-3 w-full md:w-1/3">
-                    <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[9px] border border-primary/30 notched-clip-sm shrink-0">
+                    <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[10px] border border-primary/30 notched-clip-sm shrink-0">
                       {match.game}
                     </span>
                     <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       <h4 className="text-xs font-bold text-white font-display line-clamp-1">{getLocText(match.title)}</h4>
-                      <span className="text-[9px] text-gray-500 font-bold">{match.time}</span>
+                      <span className="text-[10px] text-gray-500 font-bold">{match.time}</span>
                     </div>
                   </div>
 
@@ -920,18 +920,18 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                   {/* Status indicator */}
                   <div className="flex items-center justify-end w-full md:w-1/4 gap-3">
                     {match.status === 'Live' && (
-                      <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[9px] font-black uppercase notched-clip-sm">
+                      <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase notched-clip-sm">
                         <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
                         <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
                       </span>
                     )}
                     {match.status === 'Finished' && (
-                      <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[9px] font-black uppercase notched-clip-sm">
+                      <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[10px] font-black uppercase notched-clip-sm">
                         {language === 'fa' ? 'پایان یافته' : 'Finished'}
                       </span>
                     )}
                     {match.status === 'Scheduled' && (
-                      <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[9px] font-black uppercase notched-clip-sm">
+                      <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase notched-clip-sm">
                         {language === 'fa' ? 'برنامه‌ریزی شده' : 'Scheduled'}
                       </span>
                     )}
@@ -1030,7 +1030,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                     </span>
 
                     {/* Game badge */}
-                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[9px] font-mono font-bold rounded-none notched-clip-sm">
+                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[10px] font-mono font-bold rounded-none notched-clip-sm">
                       {tournament.game}
                     </span>
                   </div>
@@ -1044,7 +1044,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                       
                       <div className="grid grid-cols-2 gap-3 text-[10px] border-y border-white/5 py-3 font-medium text-gray-400">
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'هزینه ثبت‌نام تیم'}
                             {language === 'en' && 'Team Entry Fee'}
                             {language === 'ru' && 'Взнос с команды'}
@@ -1055,7 +1055,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                           </span>
                         </div>
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'ظرفیت ثبت‌نام'}
                             {language === 'en' && 'Capacity Status'}
                             {language === 'ru' && 'Зарегистрировано'}
@@ -1128,7 +1128,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
             >
               {/* Popular Tag */}
               {pack.popular && (
-                <span className="absolute top-4 right-4 bg-primary text-black font-black text-[9px] px-3 py-1 notched-clip-sm uppercase tracking-widest font-display animate-pulse">
+                <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 notched-clip-sm uppercase tracking-widest font-display animate-pulse">
                   {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
                 </span>
               )}
@@ -1204,7 +1204,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
                   alt={getLocText(staff.name)}
                   className="rounded-full bg-dark-bg w-full h-full object-cover"
                 />
-                <span className="absolute -bottom-1 -right-1 bg-primary text-black font-mono font-black text-[9px] px-2 py-0.5 notched-clip-sm shadow-md">
+                <span className="absolute -bottom-1 -right-1 bg-primary text-black font-mono font-black text-[10px] px-2 py-0.5 notched-clip-sm shadow-md">
                   PRO
                 </span>
               </div>
@@ -1224,7 +1224,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
 
               {/* Specialty */}
               <div className="w-full pt-3.5 border-t border-white/10 flex flex-col items-center gap-1.5">
-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest font-mono">
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">
                   {language === 'fa' ? 'حوزه تخصصی:' : 'Core Specialty:'}
                 </span>
                 <span className="text-xs text-gray-300 font-black">{staff.specialty}</span>
@@ -1353,12 +1353,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId,
               />
 
               {/* Custom overlay tracker */}
-              <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[9px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md notched-clip-sm">
+              <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[10px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md notched-clip-sm">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                 <span>GPS Tracking: Live Lock</span>
               </div>
               
-              <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[9px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono notched-clip-sm">
+              <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono notched-clip-sm">
                 <span>Lat: 35.7810° N | Lon: 51.4340° E</span>
               </div>
             </div>

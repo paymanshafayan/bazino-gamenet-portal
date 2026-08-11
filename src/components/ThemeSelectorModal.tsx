@@ -167,7 +167,7 @@ export default function ThemeSelectorModal({
                         <h4 className="font-bold text-sm text-white group-hover:text-primary transition-colors">
                           {theme.name}
                         </h4>
-                        <span className="text-[9px] uppercase font-mono tracking-widest text-gray-500">
+                        <span className="text-[10px] uppercase font-mono tracking-widest text-gray-500">
                           {theme.type === 'built-in' 
                             ? (language === 'fa' ? 'سیستمی' : 'BUILT-IN') 
                             : (language === 'fa' ? 'پوسته سفارشی' : 'CUSTOM')}

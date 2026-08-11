@@ -239,7 +239,7 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
             <p className="text-sm text-gray-300 mb-8 max-w-md mx-auto leading-relaxed">{t.successDesc}</p>
             
             {/* Terminal output summary */}
-            <div className="bg-black/80 border border-white/5 rounded-2xl p-4 text-left font-mono text-[11px] text-emerald-400/80 mb-8 max-w-lg mx-auto overflow-y-auto max-h-48" dir="ltr">
+            <div className="bg-black/80 border border-white/5 rounded-2xl p-4 text-left font-mono text-xs text-emerald-400/80 mb-8 max-w-lg mx-auto overflow-y-auto max-h-48" dir="ltr">
               <div className="flex items-center gap-1.5 text-gray-500 border-b border-white/5 pb-2 mb-2">
                 <Terminal className="w-3.5 h-3.5" />
                 <span>Installation Log Terminal</span>
@@ -417,7 +417,7 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
                 dbType !== 'sqlite' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-black/20 border border-white/5 animate-fade-in">
                     <div>
-                      <label className="text-[11px] text-gray-400 block mb-1.5 font-bold">{t.host}</label>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{t.host}</label>
                       <input 
                         type="text" 
                         required
@@ -428,7 +428,7 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-gray-400 block mb-1.5 font-bold">{t.port}</label>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{t.port}</label>
                       <input 
                         type="text" 
                         required
@@ -439,7 +439,7 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-gray-400 block mb-1.5 font-bold">{t.dbNameLabel}</label>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{t.dbNameLabel}</label>
                       <input 
                         type="text" 
                         required
@@ -450,7 +450,7 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-gray-400 block mb-1.5 font-bold">{t.dbUser}</label>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{t.dbUser}</label>
                       <input 
                         type="text" 
                         value={dbUsername}
@@ -460,7 +460,7 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="text-[11px] text-gray-400 block mb-1.5 font-bold">{t.dbPass}</label>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{t.dbPass}</label>
                       <input 
                         type="password" 
                         value={dbPassword}

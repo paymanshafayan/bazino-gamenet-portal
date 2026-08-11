@@ -677,7 +677,7 @@ export default function TournamentsTab({
                           </span>
                           
                           {isToday && !isSelected && (
-                            <span className="absolute top-0.5 text-[7px] text-primary font-black scale-90">امروز</span>
+                            <span className="absolute top-0.5 text-[10px] text-primary font-black scale-90">امروز</span>
                           )}
 
                           {hasEvents && (
@@ -705,7 +705,7 @@ export default function TournamentsTab({
                       </span>
                     </h4>
                     {selectedDay === 22 && currentMonth === 4 && currentYear === 1405 && (
-                      <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-black border border-primary/20">امروز</span>
+                      <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-black border border-primary/20">امروز</span>
                     )}
                   </div>
 
@@ -750,7 +750,7 @@ export default function TournamentsTab({
                               </p>
                             )}
 
-                            <div className="flex justify-between items-center text-[9px] text-gray-500 font-bold border-t border-white/5 pt-1.5 mt-1">
+                            <div className="flex justify-between items-center text-[10px] text-gray-500 font-bold border-t border-white/5 pt-1.5 mt-1">
                               <span>{language === 'fa' ? 'بازی:' : 'Game:'} {ev.game}</span>
                               <span className="truncate max-w-[120px] text-left">{ev.tournamentTitle}</span>
                             </div>

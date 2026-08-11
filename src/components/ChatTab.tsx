@@ -352,7 +352,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
               {/* Optional Active status */}
               <div className="flex items-center gap-1 shrink-0">
                 <span className={`w-1.5 h-1.5 rounded-full ${activeRoom === room ? 'bg-black' : 'bg-green-500'}`} />
-                <span className={`text-[9px] ${activeRoom === room ? 'text-black/70' : 'text-gray-500'} font-mono`}>
+                <span className={`text-[10px] ${activeRoom === room ? 'text-black/70' : 'text-gray-500'} font-mono`}>
                   {room === 'عمومی (General)' ? '12' : '3'}
                 </span>
               </div>
@@ -401,7 +401,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
                 <MessageSquare className="w-4 h-4 text-primary" />
                 <h4 className="text-xs font-black text-white">{activeRoom}</h4>
               </div>
-              <span className="text-[9px] text-gray-500 font-bold block mt-0.5">
+              <span className="text-[10px] text-gray-500 font-bold block mt-0.5">
                 {language === 'fa' ? 'گفتگوی آنی و هماهنگی هم‌تیمی‌ها' : 'Instant group chat and strategy sync'}
               </span>
             </div>
@@ -448,7 +448,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
                   <div className="space-y-1">
                     <div className={`flex items-center gap-1.5 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
                       <span className="text-[10px] font-black text-white">@{msg.username}</span>
-                      <span className="text-[9px] text-gray-500 font-bold font-mono">{msg.timestamp}</span>
+                      <span className="text-[10px] text-gray-500 font-bold font-mono">{msg.timestamp}</span>
                     </div>
 
                     <div className={`p-3 rounded-2xl text-xs font-semibold leading-relaxed break-words ${

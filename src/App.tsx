@@ -469,7 +469,7 @@ export default function App() {
                ) : (
                  <div className="flex items-center gap-3">
                    <span className="text-xs font-bold text-primary">@{user.username}</span>
-                   <button onClick={handleLogout} className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
+                   <button onClick={handleLogout} aria-label="Logout" className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
                  </div>
                )}
                <button 

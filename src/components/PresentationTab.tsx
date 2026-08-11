@@ -167,7 +167,7 @@ export default function PresentationTab({ addNotification }: Props) {
             </div>
             
             {/* Quick action info under slider */}
-            <div className="p-4 bg-black/60 border-t border-white/10 flex items-center justify-between text-[11px] text-gray-400 font-semibold">
+            <div className="p-4 bg-black/60 border-t border-white/10 flex items-center justify-between text-xs text-gray-400 font-semibold">
               <span>{language === 'fa' ? 'ورق‌زدن با لمس یا دکمه‌های جهت‌نما' : 'Navigate using touch gestures or keys'}</span>
               <a 
                 href={activeMode === 'desktop' ? '/Bazino_Pro_Presentation.html' : '/Bazino_Pro_Mobile_Presentation.html'}

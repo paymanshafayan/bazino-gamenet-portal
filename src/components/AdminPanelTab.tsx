@@ -1488,7 +1488,7 @@ export default function AdminPanelTab({
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover transition-transform group-hover:scale-105"
                           />
-                          <div className="absolute top-2 left-2 bg-black/65 px-2.5 py-1 rounded-full text-[9px] font-mono text-amber-500 font-bold uppercase tracking-wider border border-white/5">
+                          <div className="absolute top-2 left-2 bg-black/65 px-2.5 py-1 rounded-full text-[10px] font-mono text-amber-500 font-bold uppercase tracking-wider border border-white/5">
                             {slide.target}
                           </div>
                         </div>
@@ -1707,7 +1707,7 @@ export default function AdminPanelTab({
 
                       {/* Parse Error */}
                       {zipError && (
-                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] font-bold leading-relaxed flex items-start gap-2">
+                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold leading-relaxed flex items-start gap-2">
                           <X className="w-4 h-4 shrink-0 mt-0.5" />
                           <span>{zipError}</span>
                         </div>
@@ -1720,40 +1720,40 @@ export default function AdminPanelTab({
                             <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                               {language === 'fa' ? 'پیش‌نمایش متادیتای قالب' : 'Parsed Theme Metadata'}
                             </span>
-                            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[9px] font-mono font-bold">
+                            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[10px] font-mono font-bold">
                               {language === 'fa' ? 'آماده نصب' : 'READY TO INSTALL'}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                             <div>
-                              <span className="block text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نام' : 'Name'}</span>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نام' : 'Name'}</span>
                               <span className="text-white font-black">{zipParsed.meta.name}</span>
                             </div>
                             <div>
-                              <span className="block text-[9px] text-gray-500 font-bold uppercase">ID</span>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">ID</span>
                               <span className="text-primary font-mono font-bold" dir="ltr">{zipParsed.meta.id}</span>
                             </div>
                             <div>
-                              <span className="block text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نسخه' : 'Version'}</span>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'نسخه' : 'Version'}</span>
                               <span className="text-white font-mono font-bold">{zipParsed.meta.version || '—'}</span>
                             </div>
                             <div>
-                              <span className="block text-[9px] text-gray-500 font-bold uppercase">CSS / Assets</span>
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">CSS / Assets</span>
                               <span className="text-white font-mono font-bold">{(zipParsed.css.length / 1024).toFixed(1)}KB{Object.keys(zipParsed.assets).length > 0 ? ` + ${Object.keys(zipParsed.assets).length}` : ''}</span>
                             </div>
                           </div>
                           {zipParsed.meta.description && (
-                            <p className="text-[11px] text-gray-400 leading-relaxed">{zipParsed.meta.description}</p>
+                            <p className="text-xs text-gray-400 leading-relaxed">{zipParsed.meta.description}</p>
                           )}
                           <div className="flex items-center gap-3 pt-2 border-t border-white/5">
-                            <span className="text-[9px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ‌ها:' : 'Colors:'}</span>
+                            <span className="text-[10px] text-gray-500 font-bold uppercase">{language === 'fa' ? 'رنگ‌ها:' : 'Colors:'}</span>
                             {(['primary', 'bg', 'card'] as const).map(k => (
                               <span key={k} className="flex items-center gap-1.5 text-[10px] font-mono text-gray-300">
                                 <span className="w-4 h-4 rounded border border-white/20" style={{ backgroundColor: zipParsed.meta.colors?.[k] || '#333' }} />
                                 <span className="hidden md:inline">{zipParsed.meta.colors?.[k]}</span>
                               </span>
                             ))}
-                            <span className="text-[9px] text-gray-500 font-mono mr-auto">{Object.keys(zipParsed.assets).length > 0 ? `assets: ${Object.keys(zipParsed.assets).join(', ')}` : 'بدون assets'}</span>
+                            <span className="text-[10px] text-gray-500 font-mono mr-auto">{Object.keys(zipParsed.assets).length > 0 ? `assets: ${Object.keys(zipParsed.assets).join(', ')}` : 'بدون assets'}</span>
                           </div>
                         </div>
                       )}
@@ -1818,7 +1818,7 @@ export default function AdminPanelTab({
                                 onChange={(e) => setNewThemePrimary(e.target.value)}
                                 className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
                               />
-                              <span className="text-[9px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
+                              <span className="text-[10px] font-mono text-gray-400 truncate">{newThemePrimary}</span>
                             </div>
                           </div>
 
@@ -1831,7 +1831,7 @@ export default function AdminPanelTab({
                                 onChange={(e) => setNewThemeBg(e.target.value)}
                                 className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
                               />
-                              <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeBg}</span>
+                              <span className="text-[10px] font-mono text-gray-400 truncate">{newThemeBg}</span>
                             </div>
                           </div>
 
@@ -1844,7 +1844,7 @@ export default function AdminPanelTab({
                                 onChange={(e) => setNewThemeCard(e.target.value)}
                                 className="w-6 h-6 bg-transparent border-none cursor-pointer rounded-md overflow-hidden shrink-0"
                               />
-                              <span className="text-[9px] font-mono text-gray-400 truncate">{newThemeCard}</span>
+                              <span className="text-[10px] font-mono text-gray-400 truncate">{newThemeCard}</span>
                             </div>
                           </div>
                         </div>
@@ -1897,17 +1897,17 @@ export default function AdminPanelTab({
                                     : (language === 'fa' ? 'سفارشی (رنگ)' : 'Custom (Colors)'))}
                             </span>
                             {theme.hasAssets && (
-                              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] font-mono font-bold" title={theme.assetFiles?.join(', ')}>
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono font-bold" title={theme.assetFiles?.join(', ')}>
                                 📁 {theme.assetFiles?.length || 0} assets
                               </span>
                             )}
                             {theme.type === 'custom' && theme.css && (
-                              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[8px] font-mono font-bold">
+                              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-mono font-bold">
                                 CSS {(theme.css.length / 1024).toFixed(1)}KB
                               </span>
                             )}
                             {theme.version && (
-                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10 text-[8px] font-mono font-bold">
+                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10 text-[10px] font-mono font-bold">
                                 v{theme.version}
                               </span>
                             )}
@@ -1974,7 +1974,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'کل درآمد فروشگاه و بوفه' : 'Total Revenue'}</span>
                   <span className="text-xl font-black text-white mt-1">{(stats.totalSales || 0).toLocaleString()} <span className="text-xs text-primary font-bold">تومان</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Real-time ledger audit log</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Real-time ledger audit log</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1983,7 +1983,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'تعداد رزرو سانس‌ها' : 'Total System Bookings'}</span>
                   <span className="text-xl font-black text-white mt-1">{stats.totalReservations || 0} <span className="text-xs text-primary font-bold">سانس</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Active schedule pool size</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Active schedule pool size</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -1992,7 +1992,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'سیستم‌های در حال بازی' : 'Occupied PCs/Consoles'}</span>
                   <span className="text-xl font-black text-cyan-400 mt-1">{stats.activeReservations || 0} / {stats.activeSystems || 8} <span className="text-xs font-bold text-white">روشن</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Live bandwidth load check</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Live bandwidth load check</p>
                 </div>
 
                 <div className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1 relative overflow-hidden group">
@@ -2001,7 +2001,7 @@ export default function AdminPanelTab({
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'fa' ? 'گیمرهای ثبت‌شده' : 'Registered Gamers'}</span>
                   <span className="text-xl font-black text-white mt-1">{stats.totalUsers || 147} <span className="text-xs text-purple-400 font-bold">نفر</span></span>
-                  <p className="text-[9px] text-gray-500 font-bold mt-2 font-mono">Loyalty club members list</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Loyalty club members list</p>
                 </div>
               </div>
 
@@ -2017,7 +2017,7 @@ export default function AdminPanelTab({
                         <h3 className="font-bold text-sm text-white">
                           {language === 'fa' ? 'وضعیت اتصال و همگام‌سازی نرم‌افزار مدیریت دسکتاپ (بازینو پرو دسکتاپ)' : 'Bazino Pro Desktop Software Sync Status'}
                         </h3>
-                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full ${stats.gamenetSyncStatus ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'}`}>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${stats.gamenetSyncStatus ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'}`}>
                           {stats.gamenetSyncStatus 
                             ? (language === 'fa' ? 'متصل و فعال (Live)' : 'Connected & Live') 
                             : (language === 'fa' ? 'در انتظار اولین اتصال (Offline)' : 'Pending First Sync')}
@@ -2394,14 +2394,14 @@ export default function AdminPanelTab({
                         <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
                           <span className="text-[10px] text-gray-400 font-mono">{item.price.toLocaleString()} تومان</span>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             موجودی: {item.inventory}
                           </span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این آیتم مطمئن هستید؟')) handleDeleteCafeItem(item.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2510,14 +2510,14 @@ export default function AdminPanelTab({
                         <h4 className="text-xs font-bold text-white truncate">{acc.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
                           <span className="text-[10px] text-gray-400 font-mono">{acc.price.toLocaleString()} تومان</span>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             موجودی: {acc.stock}
                           </span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این کالا مطمئن هستید؟')) handleDeleteAccessory(acc.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2616,7 +2616,7 @@ export default function AdminPanelTab({
                           <span className="px-2.5 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold">{tour.status}</span>
                           <button
                             onClick={() => { if (confirm('آیا از حذف این تورنومنت مطمئن هستید؟')) handleDeleteTournament(tour.id); }}
-                            className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400"
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400"
                           >
                             حذف
                           </button>
@@ -2723,13 +2723,13 @@ export default function AdminPanelTab({
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{art.title}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold font-mono bg-primary/10 text-primary">{art.category}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-primary/10 text-primary">{art.category}</span>
                           <span className="text-[10px] text-gray-500 font-mono">{art.date}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این مقاله مطمئن هستید؟')) handleDeleteArticle(art.id); }}
-                        className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2775,7 +2775,7 @@ export default function AdminPanelTab({
                       <span className="text-xs font-bold text-white truncate">{room}</span>
                       <button
                         onClick={() => { if (confirm('آیا از حذف این اتاق گفتگو مطمئن هستید؟ تمام پیام‌های آن نیز حذف نمی‌شوند ولی اتاق دیگر در دسترس نخواهد بود.')) handleDeleteChatRoom(room); }}
-                        className="px-2.5 py-1 rounded-lg text-[9px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
                       >
                         حذف
                       </button>
@@ -2890,10 +2890,10 @@ export default function AdminPanelTab({
                           <span className="text-[10px] text-gray-500 font-mono">{m.date}</span>
                         </div>
                         <h4 className="text-xs font-bold text-white mt-1">{m.title}</h4>
-                        <p className="text-[11px] text-gray-400 font-medium leading-relaxed">{m.body}</p>
+                        <p className="text-xs text-gray-400 font-medium leading-relaxed">{m.body}</p>
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className={`w-1.5 h-1.5 rounded-full ${m.type === 'notification' ? 'bg-amber-400' : 'bg-blue-400'}`}></span>
-                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
                             {m.type === 'notification' ? (language === 'fa' ? 'نوع: نوتیفیکیشن لایو' : 'Type: Live Notification') : (m.type === 'news' ? (language === 'fa' ? 'نوع: خبر بلاگ' : 'Type: Blog News') : (language === 'fa' ? 'نوع: صندوق پیام معمولی' : 'Type: Inbox Message'))}
                           </span>
                         </div>
@@ -2927,8 +2927,8 @@ export default function AdminPanelTab({
                   </button>
                 </div>
 
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-[11px] leading-relaxed text-slate-300 text-left" style={{ direction: 'ltr' }}>
-                  <div className="absolute top-3 right-3 text-slate-500 select-none text-[9px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold">
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-xs leading-relaxed text-slate-300 text-left" style={{ direction: 'ltr' }}>
+                  <div className="absolute top-3 right-3 text-slate-500 select-none text-[10px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold">
                     InitialGameNetDb.cs (C# Code First)
                   </div>
                   <pre className="overflow-x-auto max-h-[500px] whitespace-pre p-2 scrollbar-thin scrollbar-thumb-slate-800">
@@ -2937,7 +2937,7 @@ export default function AdminPanelTab({
                   </pre>
                 </div>
 
-                <div className="mt-4 p-4 rounded-xl bg-[#A855F7]/5 border border-[#A855F7]/20 text-[11px] leading-relaxed text-purple-300">
+                <div className="mt-4 p-4 rounded-xl bg-[#A855F7]/5 border border-[#A855F7]/20 text-xs leading-relaxed text-purple-300">
                   <p className="font-bold mb-1 flex items-center gap-2 text-white">
                     <span>💡 راهنمای پیکربندی پایگاه داده رابطه‌ای در دات‌نت:</span>
                   </p>
@@ -2960,7 +2960,7 @@ export default function AdminPanelTab({
                     <h3 className="text-sm font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
                       <Database className="w-4 h-4 text-cyan-400" />
                       <span>{language === 'fa' ? 'منبع داده سایت و اپلیکیشن' : 'Site & App Data Source'}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
                         dataSource === 'sample'
                           ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
                           : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
@@ -3018,7 +3018,7 @@ export default function AdminPanelTab({
                     {dataSourceInfo && (
                       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
                         {Object.entries(dataSourceInfo.sample).map(([k, v]) => (
-                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[8px] font-mono text-gray-400">
+                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[10px] font-mono text-gray-400">
                             {k}: <span className="text-cyan-400 font-black">{v}</span>
                           </span>
                         ))}
@@ -3057,7 +3057,7 @@ export default function AdminPanelTab({
                     {dataSourceInfo && (
                       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
                         {Object.entries(dataSourceInfo.database).map(([k, v]) => (
-                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[8px] font-mono text-gray-400">
+                          <span key={k} className="px-1.5 py-0.5 bg-black/30 border border-white/10 rounded text-[10px] font-mono text-gray-400">
                             {k}: <span className="text-emerald-400 font-black">{v}</span>
                           </span>
                         ))}
@@ -3108,7 +3108,7 @@ export default function AdminPanelTab({
                   
                   <div className="md:col-span-2 bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <h4 className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                      <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>{language === 'fa' ? 'دستیار ترجمه هوش مصنوعی (جمینای)' : 'Gemini AI Translation Assistant'}</span>
                       </h4>
@@ -3248,7 +3248,7 @@ export default function AdminPanelTab({
                           referrerPolicy="no-referrer"
                         />
                         <div className="flex-1 min-w-0">
-                          <span className="text-[8px] px-2 py-0.5 bg-primary/20 text-primary border border-primary/20 rounded-full font-mono uppercase font-bold">
+                          <span className="text-[10px] px-2 py-0.5 bg-primary/20 text-primary border border-primary/20 rounded-full font-mono uppercase font-bold">
                             Target: {slide.target}
                           </span>
                           <h5 className="text-xs font-bold text-white mt-1 truncate" title={slide.titleFa}>{slide.titleFa}</h5>
@@ -3325,7 +3325,7 @@ export default function AdminPanelTab({
                       
                       {/* Section Toggle */}
                       <div className="flex items-center gap-2">
-                        <label className="text-[11px] text-gray-400 font-bold cursor-pointer select-none" htmlFor="secEnable">
+                        <label className="text-xs text-gray-400 font-bold cursor-pointer select-none" htmlFor="secEnable">
                           {language === 'fa' ? 'وضعیت نمایش:' : 'Visibility:'}
                         </label>
                         <button
@@ -3345,7 +3345,7 @@ export default function AdminPanelTab({
                     {/* Translation Wizard Card */}
                     <div className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
                       <div className="space-y-0.5">
-                        <h4 className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                        <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                           <Sparkles className="w-3.5 h-3.5" />
                           <span>{language === 'fa' ? 'دستیار ترجمه هوش مصنوعی (جمینای)' : 'Gemini AI Translation Assistant'}</span>
                         </h4>
@@ -3598,7 +3598,7 @@ export default function AdminPanelTab({
                         {socialMediaList.map((item) => (
                           <div key={item.id} className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-center justify-between group">
                             <div className="flex items-center gap-2.5">
-                              <span className="text-[9px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-primary font-mono font-bold uppercase">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-primary font-mono font-bold uppercase">
                                 {item.platform}
                               </span>
                               <div>
@@ -3755,7 +3755,7 @@ export default function AdminPanelTab({
                       <Database className="w-5 h-5 text-emerald-500 animate-pulse" />
                       <span>{language === 'fa' ? 'لاگ موتور دیتابیس فعال' : 'Active Database Provider Logs'}</span>
                     </h3>
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {language === 'fa' 
                         ? 'مشاهده لاگ درخواست‌ها، دستورات SQL یا فرامین NoSQL (MongoDB) و مدت زمان اجرای آن‌ها' 
                         : 'Review native SQL / NoSQL operations executed by the current BaseDataProvider.'}
@@ -3790,7 +3790,7 @@ export default function AdminPanelTab({
                             <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-400 rounded border border-emerald-900 font-bold">
                               {log.provider}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
                               log.operation === 'INSERT' || log.operation === 'UPDATE' ? 'bg-amber-950 text-amber-400' :
                               log.operation === 'SELECT' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400'
                             }`}>
@@ -3799,7 +3799,7 @@ export default function AdminPanelTab({
                           </div>
                           <span className="text-gray-500 font-mono">{log.timestamp}</span>
                         </div>
-                        <p className="text-gray-300 font-mono text-[11px] leading-relaxed break-words">{log.query}</p>
+                        <p className="text-gray-300 font-mono text-xs leading-relaxed break-words">{log.query}</p>
                         {log.params && log.params.length > 0 && (
                           <div className="text-[10px] text-gray-500 font-mono bg-black/40 p-1 rounded">
                             Parameters: <span className="text-gray-400">{JSON.stringify(log.params)}</span>
@@ -3822,7 +3822,7 @@ export default function AdminPanelTab({
                       <Key className="w-5 h-5 text-blue-500 animate-pulse" />
                       <span>{language === 'fa' ? 'تنظیمات API Key ها' : 'API Keys Settings'}</span>
                     </h3>
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {language === 'fa' 
                         ? 'مدیریت کلیدهای امنیتی برای ارتباط با سرویس‌های خارجی مانند هوش مصنوعی' 
                         : 'Manage security keys for integrating with external services like AI.'}
@@ -3849,7 +3849,7 @@ export default function AdminPanelTab({
                     </p>
 
                     <div className="bg-[#0a0e21] border border-white/5 p-4 rounded-lg">
-                      <h5 className="text-[11px] font-bold text-blue-400 uppercase tracking-wider mb-3">
+                      <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3">
                         {language === 'fa' ? 'راهنمای دریافت و ثبت کلید' : 'How to get and set the key'}
                       </h5>
                       <ol className="list-decimal list-inside text-xs text-gray-300 space-y-2 leading-loose">
@@ -3877,7 +3877,7 @@ export default function AdminPanelTab({
                       </ol>
                     </div>
 
-                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-[11px] text-blue-200 flex items-start gap-2">
+                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-200 flex items-start gap-2">
                       <FileText className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                       <p>
                         {language === 'fa' 

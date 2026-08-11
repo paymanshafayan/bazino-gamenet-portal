@@ -440,7 +440,7 @@ export default function DarkGoldHome({
 
                 <button
                   onClick={() => onNavigate(sect.id === 'consoles' ? 'reservations' : (sect.id as any))}
-                  className="w-full py-2.5 btn btn-primary-outline display-4 text-[11px] flex items-center justify-center gap-1.5 theme-btn"
+                  className="w-full py-2.5 btn btn-primary-outline display-4 text-xs flex items-center justify-center gap-1.5 theme-btn"
                 >
                   <span>{getLocText(sect.btnText)}</span>
                   {dir === 'rtl' ? <ArrowLeft className="w-3.5 h-3.5 group-hover:translate-x-[-3px] transition-transform" /> : <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-[3px] transition-transform" />}
@@ -481,7 +481,7 @@ export default function DarkGoldHome({
                 {language === 'fa' ? 'جدول زنده مسابقات و نبردها' : 'Esports Live Matchboard'}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-lg text-[9px] font-mono font-bold uppercase">
+            <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
               <span>Lobby Connected</span>
             </div>
@@ -492,12 +492,12 @@ export default function DarkGoldHome({
               <div key={match.id} className="p-5 flex flex-row items-center justify-between gap-4 hover:bg-[#141624]/40 transition-all duration-200">
                 {/* 1. Right Side (RTL): Title & Game Badge */}
                 <div className="flex items-center gap-3 w-1/3 justify-start">
-                  <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[9px] border border-primary/30 rounded-md shrink-0">
+                  <span className="px-2.5 py-1 bg-black text-primary font-mono font-bold text-[10px] border border-primary/30 rounded-md shrink-0">
                     {match.game}
                   </span>
                   <div className="text-right">
                     <h4 className="text-xs font-bold text-white font-display line-clamp-1">{getLocText(match.title)}</h4>
-                    <span className="text-[9px] text-gray-500 font-bold">{match.time}</span>
+                    <span className="text-[10px] text-gray-500 font-bold">{match.time}</span>
                   </div>
                 </div>
 
@@ -515,18 +515,18 @@ export default function DarkGoldHome({
                 {/* 3. Left Side (RTL): Action & Status badge */}
                 <div className="flex items-center gap-3 w-1/3 justify-end">
                   {match.status === 'Live' && (
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[9px] font-black uppercase rounded-md">
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase rounded-md">
                       <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
                       <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
                     </span>
                   )}
                   {match.status === 'Finished' && (
-                    <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[9px] font-black uppercase rounded-md">
+                    <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[10px] font-black uppercase rounded-md">
                       {language === 'fa' ? 'پایان یافته' : 'Finished'}
                     </span>
                   )}
                   {match.status === 'Scheduled' && (
-                    <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[9px] font-black uppercase rounded-md">
+                    <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase rounded-md">
                       {language === 'fa' ? 'برنامه‌ریزی شده' : 'Scheduled'}
                     </span>
                   )}
@@ -626,7 +626,7 @@ export default function DarkGoldHome({
                     </span>
 
                     {/* Game badge */}
-                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[9px] font-mono font-bold rounded-md">
+                    <span className="absolute bottom-4 right-4 px-3 py-1 bg-black/80 border border-white/10 text-white text-[10px] font-mono font-bold rounded-md">
                       {tournament.game}
                     </span>
                   </div>
@@ -640,7 +640,7 @@ export default function DarkGoldHome({
                       
                       <div className="grid grid-cols-2 gap-3 text-[10px] border-y border-white/5 py-3 font-medium text-gray-400">
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'هزینه ثبت‌نام تیم'}
                             {language === 'en' && 'Team Entry Fee'}
                             {language === 'ru' && 'Взнос с команды'}
@@ -651,7 +651,7 @@ export default function DarkGoldHome({
                           </span>
                         </div>
                         <div className="space-y-1">
-                          <span className="block text-gray-500 text-[9px] font-bold">
+                          <span className="block text-gray-500 text-[10px] font-bold">
                             {language === 'fa' && 'ظرفیت ثبت‌نام'}
                             {language === 'en' && 'Capacity Status'}
                             {language === 'ru' && 'Зарегистрировано'}
@@ -676,7 +676,7 @@ export default function DarkGoldHome({
 
                     <button
                       onClick={() => onNavigate('tournaments')}
-                      className="w-full py-2.5 btn btn-primary-outline display-4 text-[11px] flex items-center justify-center gap-1.5 theme-btn"
+                      className="w-full py-2.5 btn btn-primary-outline display-4 text-xs flex items-center justify-center gap-1.5 theme-btn"
                     >
                       <span>
                         {language === 'fa' && 'مشاهده جدول مسابقات و ثبت‌نام'}
@@ -720,7 +720,7 @@ export default function DarkGoldHome({
             {pricingPackages.map((pack) => (
               <div key={pack.id} className={`theme-box border flex flex-col justify-between bg-dark-card transition-all duration-300 ${pack.popular ? 'border-primary shadow-[0_0_30px_rgba(27,194,202,0.15)] -translate-y-2 relative' : 'border-white/10 hover:border-white/20'}`}>
                 {pack.popular && (
-                  <span className="absolute top-4 right-4 bg-primary text-black font-black text-[9px] px-3 py-1 theme-btn uppercase tracking-widest font-display animate-pulse">
+                  <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 theme-btn uppercase tracking-widest font-display animate-pulse">
                     {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
                   </span>
                 )}
@@ -742,7 +742,7 @@ export default function DarkGoldHome({
                       </li>
                     ))}
                   </ul>
-                  <button onClick={() => onNavigate('reservations')} className="w-full py-3 btn btn-primary-outline display-4 text-[11px] flex items-center justify-center theme-btn">
+                  <button onClick={() => onNavigate('reservations')} className="w-full py-3 btn btn-primary-outline display-4 text-xs flex items-center justify-center theme-btn">
                     {language === 'fa' ? 'شارژ حساب و خرید پکیج' : 'Purchase Pass Ticket'}
                   </button>
                 </div>
@@ -970,12 +970,12 @@ export default function DarkGoldHome({
             />
 
             {/* Custom overlay tracker */}
-            <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[9px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md rounded-md">
+            <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[10px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md rounded-md">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
               <span>GPS Tracking: Live Lock</span>
             </div>
             
-            <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[9px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono rounded-md">
+            <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono rounded-md">
               <span>Lat: 35.7810° N | Lon: 51.4340° E</span>
             </div>
           </div>

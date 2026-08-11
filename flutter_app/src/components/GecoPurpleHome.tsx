@@ -246,22 +246,22 @@ export default function GecoPurpleHome({
               <div className="flex justify-between w-full text-center px-4">
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.days)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'روز' : 'DAYS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'روز' : 'DAYS'}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.hours)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ساعت' : 'HRS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ساعت' : 'HRS'}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.mins)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'دقیقه' : 'MINS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'دقیقه' : 'MINS'}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.secs)}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ثانیه' : 'SECS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ثانیه' : 'SECS'}</span>
                 </div>
               </div>
             </div>
@@ -380,7 +380,7 @@ export default function GecoPurpleHome({
               </div>
               <div className="flex items-center gap-4 pt-6 border-t border-white/5">
                  <div className="flex-1">
-                   <span className="text-[#ffb800] border border-[#ffb800] text-[9px] font-black uppercase px-2 py-0.5 mb-2 inline-block">BAZINO</span>
+                   <span className="text-[#ffb800] border border-[#ffb800] text-[10px] font-black uppercase px-2 py-0.5 mb-2 inline-block">BAZINO</span>
                    <h4 className="text-sm font-bold leading-tight">{language === 'fa' ? 'کلیک کنید و کشف کنید' : 'Click to discover'}</h4>
                  </div>
                  <div className="w-12 h-12 bg-[#1a1c29] border border-white/10 shrink-0 flex items-center justify-center rounded-full">
@@ -455,7 +455,7 @@ export default function GecoPurpleHome({
                 </div>
               </div>
               <div className="p-6 flex flex-col items-center text-center">
-                <span className="bg-[#ffb800] text-black text-[9px] font-black uppercase px-3 py-1 mb-4 inline-block">{prod.id}</span>
+                <span className="bg-[#ffb800] text-black text-[10px] font-black uppercase px-3 py-1 mb-4 inline-block">{prod.id}</span>
                 <h4 className="text-sm font-black uppercase mb-4 group-hover:text-[#ffb800] transition-colors">
                   {getLocText(prod.name)}
                 </h4>

@@ -168,6 +168,7 @@ body {
   background-attachment: fixed;
   color: #f3f4f6;
   font-family: var(--font-sans);
+  line-height: 1.5;
 }
 
 .app-bg-main {

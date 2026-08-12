@@ -104,6 +104,28 @@ async function startServer() {
 
   app.use(compression());
 
+  // Cloudflare Web Analytics injects beacon.min.js at the edge when enabled. Its CDN TTL
+  // is controlled by Cloudflare (not this origin), so an origin cache header cannot make
+  // that 24-hour asset cache longer. Keep third-party scripts out of production pages;
+  // this prevents the injected beacon from being fetched at all while retaining the
+  // explicitly deferred Google Font stylesheet and external images/embeds used by themes.
+  if (process.env.NODE_ENV === "production") {
+    app.use((_req, res, next) => {
+      res.setHeader("Content-Security-Policy", [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "connect-src 'self' https: ws: wss:",
+        "frame-src 'self' https:"
+      ].join("; "));
+      next();
+    });
+  }
+
   // Create HTTP server from express app
   const server = http.createServer(app);
 

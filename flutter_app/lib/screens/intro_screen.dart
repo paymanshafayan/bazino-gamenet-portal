@@ -103,8 +103,8 @@ class _BazinoIntroScreenState extends State<BazinoIntroScreen> {
                     const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
-                        'بازی نو',
-                        textDirection: TextDirection.rtl,
+                        'BAZINO',
+                        textDirection: TextDirection.ltr,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,

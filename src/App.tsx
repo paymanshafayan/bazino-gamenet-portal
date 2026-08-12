@@ -169,6 +169,7 @@ export default function App() {
   // cards and effects, so mounting it only after the load event's first idle window avoids
   // competing style/layout work with the hero image paint.
   const [isHomeContentReady, setIsHomeContentReady] = useState(false);
+  const [isAppDownloadWidgetReady, setIsAppDownloadWidgetReady] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
   const [user, setUser] = useState<UserState | null>(null);
@@ -296,6 +297,29 @@ export default function App() {
       }
     };
   }, []);
+
+  // کارت QR دانلود اپلیکیشن عمداً بعد از LCP و در idle mount می‌شود تا chunk کوچک
+  // خودش و درخواست تصویر QR وارد مسیر بحرانی صفحه اصلی/GTmetrix نشوند.
+  useEffect(() => {
+    if (activeTab !== 'home' || layoutMode === 'hub' || !isHomeContentReady) {
+      setIsAppDownloadWidgetReady(false);
+      return;
+    }
+    let timer: number | undefined;
+    const win = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (typeof win.requestIdleCallback === 'function') {
+      timer = win.requestIdleCallback(() => setIsAppDownloadWidgetReady(true), { timeout: 2500 });
+    } else {
+      timer = window.setTimeout(() => setIsAppDownloadWidgetReady(true), 1600);
+    }
+    return () => {
+      if (timer !== undefined && typeof win.cancelIdleCallback === 'function') win.cancelIdleCallback(timer);
+      else if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activeTab, layoutMode, isHomeContentReady]);
 
   const handleRedeemPoints = async (points: number, couponValue: number, code: string) => {
     if (!user) return;
@@ -662,7 +686,7 @@ export default function App() {
         )}
       </Suspense>
 
-      {activeTab === 'home' && layoutMode !== 'hub' && (
+      {activeTab === 'home' && layoutMode !== 'hub' && isAppDownloadWidgetReady && (
         <Suspense fallback={null}>
           <MobileAppDownloadWidget onOpenDownloadPage={openAppDownloadPage} />
         </Suspense>

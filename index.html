@@ -5,8 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="بازینو پرو — سامانه مدیریت و رزرو کلوپ گیمینگ؛ رزرو سیستم، کافه، فروشگاه تجهیزات، مسابقات و باشگاه وفاداری" />
     <meta name="theme-color" content="#07080a" />
-    <!-- Unsplash contains the selected hero artwork, so retaining this connection improves its LCP. -->
-    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <!-- LCP preload: the hero image is rendered by the client bundle, so without this it
+         is only discovered after JS parses. Preloading it (same srcset/sizes the <img>
+         uses) makes the request discoverable in the initial document and starts the fetch
+         immediately, with high priority. -->
+    <link rel="preload" as="image" fetchpriority="high"
+          imagesrcset="/images/home/esports-480.webp 480w, /images/home/esports-800.webp 800w, /images/home/esports-960.webp 960w"
+          imagesizes="(min-width: 1024px) 960px, 100vw" />
     <link rel="icon" type="image/webp" href="/src/assets/images/bazino_logo_user.webp" />
     <!-- Typography deliberately uses the local/system stack declared in index.css.
          A late webfont swap was moving the brand header and the hero below it. -->

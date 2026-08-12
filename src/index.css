@@ -40,13 +40,17 @@
   --brand-logo-url: url('/logo.png');
 }
 
-/* محافظ لوگو: هیچ قالبی نمی‌تواند لوگوی هدر را پنهان یا حذف کند */
+/* محافظ لوگو: هیچ قالبی نمی‌تواند لوگوی هدر را پنهان یا حذف کند.
+   ارتفاع روی ۲.۵رم (معادل h-10) قفل می‌شود تا فضای لوگو قبل و بعد از بارگذاری
+   ثابت بماند و CLS (پرش چیدمان لوگو) ایجاد نشود؛ object-fit:contain هم از
+   کش‌آمدن/تغییر نسبت تصویر جلوگیری می‌کند. */
 .brand-logo-guard {
   display: inline-block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  height: 2.5rem !important;
   width: auto !important;
-  height: auto !important;
+  object-fit: contain !important;
   pointer-events: none !important;
 }
 .theme-dark-gold .brand-logo-guard,
@@ -59,16 +63,18 @@
   display: inline-block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  height: 2.5rem !important;
   width: auto !important;
-  height: auto !important;
+  object-fit: contain !important;
 }
 /* برای هر قالب سفارشی که کلاس theme-<id> دارد */
 [class*='theme-'] .brand-logo-guard {
   display: inline-block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  height: 2.5rem !important;
   width: auto !important;
-  height: auto !important;
+  object-fit: contain !important;
 }
 
 @theme {

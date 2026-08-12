@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense, startTransition } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
 import bazinoLogo from './assets/images/bazino_logo_user.webp';
 import {
@@ -49,6 +49,21 @@ const __initialTheme = [...BUILT_IN_THEMES, ...__initialCustomThemes]
   .find(t => t.id === __initialThemeId) ?? BUILT_IN_THEMES[0];
 document.body.setAttribute('data-theme', __initialTheme.id);
 loadThemeStylesheet(__initialTheme);
+
+/**
+ * نقشه‌ی «تب → دیتاست‌هایی که آن تب نیاز دارد». صفحه‌ی اصلی (home) فقط به
+ * tournaments (+ user برای هدر) نیاز دارد؛ بقیه‌ی داده‌ها هنگام باز شدن تبِ
+ * مربوطه بارگذاری می‌شوند تا درخواست‌های /api از زنجیره‌ی بحرانیِ اولیه حذف
+ * شوند (رفع ممیزی Lighthouse «Avoid chaining critical requests»).
+ */
+const TAB_DATASETS: Record<string, string[]> = {
+  reservations: ['systems'],
+  cafe: ['cafe'],
+  shop: ['accessories'],
+  tournaments: ['tournaments'],
+  blog: ['articles'],
+  loyalty: ['transactions', 'coupons', 'user'],
+};
 
 export default function App() {
   const { language, setLanguage, t, dir } = useLanguage();
@@ -173,88 +188,61 @@ export default function App() {
   };
 
   // Fetch initial data & allow live refreshes
-  const fetchData = async () => {
-    try {
-      // داده‌های حیاتی برای رندر فوری صفحه‌ی اصلی (سیستم‌ها/کافه/فروشگاه/تورنومنت‌ها)
-      // همان‌جا — این‌ها محتوای بالای صفحه (LCP) را می‌سازند.
-      const [sysRes, cafeRes, accRes, tourRes] = await Promise.all([
-        fetch('/api/systems').then(res => res.json()).catch(() => []),
-        fetch('/api/cafe').then(res => res.json()).catch(() => []),
-        fetch('/api/accessories').then(res => res.json()).catch(() => []),
-        fetch('/api/tournaments').then(res => res.json()).catch(() => [])
-      ]);
+  // ── Lazy, per-dataset data loading ──────────────────────────────────────
+  // هر دیتاست یک‌بار بارگذاری و در loadedRef به‌عنوان کش ثبت می‌شود (مگر آنکه
+  // refreshAll پس از تغییرات ادمین/رزرو/سفارش، همه را مجبور به refresh کند).
+  // داده‌های غیرضروری برای صفحه‌ی اصلی، فقط هنگام باز شدن تبِ مربوطه
+  // (useEffect روی activeTab) دریافت می‌شوند تا تعداد درخواست‌های /api در
+  // زنجیره‌ی بحرانیِ اولیه کم شود.
+  const loadedRef = useRef<Set<string>>(new Set());
 
-      // API responses can be sizeable. Mark their resulting tree update as non-urgent so
-      // React may yield to a tap/scroll instead of making response parsing + rendering one
-      // long main-thread task during the landing page's first seconds.
-      startTransition(() => {
-        if (Array.isArray(sysRes)) setSystems(sysRes);
-        if (Array.isArray(cafeRes)) setCafeItems(cafeRes);
-        if (Array.isArray(accRes)) setAccessories(accRes);
-        if (Array.isArray(tourRes)) setTournaments(tourRes);
-      });
-    } catch (err) {
-      console.error("Error fetching data:", err);
-    }
-
-    // داده‌های غیربحرانی (مقالات/تراکنش‌های باشگاه/کوپن‌ها/کاربر) — بعد از idle تا
-    // پردازش پاسخ‌ها (JSON.parse + setState + رندر مجدد) در پنجره‌ی بحرانی TBT
-    // قرار نگیرند. این‌ها فقط برای تب‌های blog/loyalty و نوار بالایی هستند.
-    scheduleIdle(() => {
-      Promise.all([
-        fetch('/api/articles').then(res => res.json()).catch(() => []),
-        fetch('/api/transactions').then(res => res.json()).catch(() => []),
-        fetch('/api/coupons').then(res => res.json()).catch(() => []),
-        fetch('/api/user').then(res => res.json()).catch(() => null)
-      ]).then(([artRes, transRes, coupRes, userRes]) => {
-        startTransition(() => {
-          if (Array.isArray(artRes)) setArticles(artRes);
-          if (Array.isArray(transRes)) setTransactions(transRes);
-          if (Array.isArray(coupRes)) setActiveCoupons(coupRes);
-          if (userRes && userRes.username && userRes.username !== 'Guest') {
-            setUser(userRes);
-          } else {
-            setUser(null);
-          }
-        });
-      }).catch(err => console.error("Error fetching secondary data:", err));
-    });
+  const fetchDataset: Record<string, () => Promise<void>> = {
+    systems:      async () => { const r = await fetch('/api/systems').then(res => res.json()).catch(() => []);      startTransition(() => { if (Array.isArray(r)) setSystems(r); }); },
+    cafe:         async () => { const r = await fetch('/api/cafe').then(res => res.json()).catch(() => []);         startTransition(() => { if (Array.isArray(r)) setCafeItems(r); }); },
+    accessories:  async () => { const r = await fetch('/api/accessories').then(res => res.json()).catch(() => []);  startTransition(() => { if (Array.isArray(r)) setAccessories(r); }); },
+    tournaments:  async () => { const r = await fetch('/api/tournaments').then(res => res.json()).catch(() => []);  startTransition(() => { if (Array.isArray(r)) setTournaments(r); }); },
+    articles:     async () => { const r = await fetch('/api/articles').then(res => res.json()).catch(() => []);     startTransition(() => { if (Array.isArray(r)) setArticles(r); }); },
+    transactions: async () => { const r = await fetch('/api/transactions').then(res => res.json()).catch(() => []); startTransition(() => { if (Array.isArray(r)) setTransactions(r); }); },
+    coupons:      async () => { const r = await fetch('/api/coupons').then(res => res.json()).catch(() => []);      startTransition(() => { if (Array.isArray(r)) setActiveCoupons(r); }); },
+    user:         async () => { const r = await fetch('/api/user').then(res => res.json()).catch(() => null);        startTransition(() => { if (r && r.username && r.username !== 'Guest') setUser(r); else setUser(null); }); },
   };
 
-  const checkInstallStatus = async () => {
-    // BYPASSED: Temporarily bypass installation page and load main app directly
-    setIsInstalled(true);
-    fetchData();
-
-    /* 
-    --- HOW TO REVERT TO ORIGINAL INSTALLATION SCREEN ---
-    If you want to re-enable the installation step, simply delete or comment out 
-    the two lines above (setIsInstalled(true) and fetchData()) and uncomment 
-    the original checking block below:
-
-    try {
-      const res = await fetch('/api/install/status');
-      const data = await res.json();
-      setIsInstalled(data.isInstalled);
-      if (data.isInstalled) {
-        fetchData();
-      }
-    } catch (e) {
-      setIsInstalled(true); // default fallback so it doesn't get stuck
-      fetchData();
+  const ensureLoaded = (keys: string[]) => {
+    for (const k of keys) {
+      if (loadedRef.current.has(k)) continue;
+      loadedRef.current.add(k);
+      void fetchDataset[k]?.();
     }
-    */
   };
 
+  // بارگذاریِ همه‌ی دیتاست‌ها (برای refresh بعد از تغییرات ادمین/رزرو/سفارش)
+  const refreshAll = () => {
+    loadedRef.current = new Set(Object.keys(fetchDataset));
+    Object.values(fetchDataset).forEach(fn => void fn());
+  };
+
+  // نصب در حالت bypass است (isInstalled از ابتدا true)؛ بنابراین صفحه‌ی install
+  // نمایش داده نمی‌شود و نیاز به checkInstallStatus نیست. اگر خواستید نصب را
+  // دوباره فعال کنید، isInstalled اولیه را null کنید و یک fetch از /api/install/status
+  // به‌صورت زیر اضافه کنید:
+  //   const data = await fetch('/api/install/status').then(r => r.json());
+  //   setIsInstalled(data.isInstalled); if (data.isInstalled) refreshAll();
+
+  // بارگذاریِ اولیه: در حالت عادی فقط داده‌های صفحه‌ی اصلی (tournaments) و هدر
+  // (user). اما قالب console-grid یا نمای hub، همه‌ی داده‌ها را روی صفحه‌ی اصلی
+  // نشان می‌دهند، پس در آن حالت‌ها همه‌ی دیتاست‌ها بارگذاری می‌شوند. این افکت
+  // با تغییر قالب/نما هم دوباره اجرا می‌شود.
   useEffect(() => {
-    // The fallback landing page already has its hero and navigation without these API
-    // payloads. Give the first paint and its input window a short head start; opening a
-    // data-backed tab later still receives the same data through fetchData.
-    const timer = window.setTimeout(() => {
-      scheduleIdle(checkInstallStatus);
-    }, 2500);
-    return () => window.clearTimeout(timer);
-  }, []);
+    const comprehensive = themeId === 'console-grid' || layoutMode === 'hub';
+    scheduleIdle(() => ensureLoaded(comprehensive ? Object.keys(fetchDataset) : ['tournaments', 'user']));
+  }, [themeId, layoutMode]);
+
+  // بارگذاریِ داده‌های هر تب فقط هنگام باز شدن آن تب (در idle)، تا درخواست‌های
+  // /api از زنجیره‌ی بحرانیِ اولیه حذف شوند.
+  useEffect(() => {
+    const keys = TAB_DATASETS[activeTab];
+    if (keys) scheduleIdle(() => ensureLoaded(keys));
+  }, [activeTab]);
 
   useEffect(() => {
     let delayTimer: number | undefined;
@@ -363,7 +351,7 @@ export default function App() {
             onAddLoyaltyPoints={handleAddLoyaltyPoints} 
             onOpenAuth={() => setIsAuthModalOpen(true)}
             addNotification={addNotification}
-            refreshData={fetchData}
+            refreshData={refreshAll}
             onBackToClassic={() => {
               setLayoutMode('classic');
               addNotification(language === 'fa' ? 'نمای کلاسیک فعال شد' : 'Classic View Activated', 'info');
@@ -385,7 +373,7 @@ export default function App() {
             onAddLoyaltyPoints={handleAddLoyaltyPoints} 
             onOpenAuth={() => setIsAuthModalOpen(true)}
             addNotification={addNotification}
-            refreshData={fetchData}
+            refreshData={refreshAll}
           />
         ) : !isHomeContentReady ? (
           <LandingHero onNavigate={() => setActiveTab('reservations')} />
@@ -448,7 +436,7 @@ export default function App() {
         <InstallPage 
           onInstallationComplete={() => {
             setIsInstalled(true);
-            fetchData();
+            refreshAll();
           }} 
         />
       </Suspense>
@@ -482,8 +470,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Decorative neon background blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      {/* Decorative neon background blobs.
+          `fixed` (not `absolute`) keeps them viewport-locked so they never resize or
+          reposition when the page content height changes (e.g. when HomeTab mounts and
+          the document grows from ~100dvh to several screens). An absolute inset-0 layer
+          here was the single largest CLS source (score 1.0). Fixed ambient lighting is
+          also the intended visual for these subtle blurred glows. */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-[#A855F7]/5 rounded-full blur-[150px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-[#06B6D4]/5 rounded-full blur-[150px]" />
       </div>

@@ -2,7 +2,76 @@ import tailwindcss from '@tailwindcss/vite';
 import preact from '@preact/preset-vite';
 import legacy from '@vitejs/plugin-legacy';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, type Plugin} from 'vite';
+
+/**
+ * Inline the main render-blocking CSS into index.html as a <style> block.
+ *
+ * Why: this is a client-rendered (Preact) SPA — #root is empty until JS mounts,
+ * so the *first* paint is gated on BOTH the CSS download and JS execution. A
+ * separate <link rel="stylesheet"> in <head> is render-blocking (the Lighthouse
+ * "Eliminate render-blocking resources" audit) and adds a network round trip to
+ * the critical path. Inlining the CSS removes that blocking request entirely and,
+ * because the styles are present the instant JS mounts, it also avoids any FOUC.
+ *
+ * Runs only during `vite build` (ctx.bundle is undefined in dev, where Vite ships
+ * CSS via JS/HMR anyway). After inlining, the standalone CSS asset is dropped from
+ * the bundle so an unreferenced ~25 KiB file isn't shipped.
+ *
+ * CSS url() paths are rewritten: they were relative to the CSS file at
+ * `assets/<file>.css`, but once inlined they must resolve relative to the HTML
+ * document at the root — otherwise `url(./background.webp)` and `url(../logo.png)`
+ * would 404.
+ */
+function inlineRenderBlockingCss(): Plugin {
+  // Resolve a url() path that was relative to the CSS asset so it is correct
+  // relative to the HTML document root, then prefix with "./" (matches base:'./').
+  const rewriteCssUrls = (css: string, cssAssetName: string): string => {
+    const cssDir = cssAssetName.replace(/\/[^/]*$/, ''); // e.g. "assets"
+    const resolveToRoot = (p: string): string => {
+      const parts = (cssDir + '/' + p).split('/');
+      const out: string[] = [];
+      for (const part of parts) {
+        if (part === '' || part === '.') continue;
+        if (part === '..') { out.pop(); continue; }
+        out.push(part);
+      }
+      return './' + out.join('/');
+    };
+    return css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (full, q, url) => {
+      // Leave absolute, root-relative, data:, and hash refs untouched.
+      if (/^(data:|https?:|\/\/|#|\/)/i.test(url)) return full;
+      return `url(${q}${resolveToRoot(url)}${q})`;
+    });
+  };
+
+  return {
+    name: 'bazino-inline-render-blocking-css',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html: string, ctx: { bundle?: Record<string, any> } | undefined) {
+        if (!ctx || !ctx.bundle) return html;
+        const linkRe = /<link\b[^>]*rel="stylesheet"[^>]*>/g;
+        let out = html;
+        let match: RegExpExecArray | null;
+        while ((match = linkRe.exec(html)) !== null) {
+          const tag = match[0];
+          const hrefMatch = tag.match(/href="([^"]+)"/);
+          if (!hrefMatch) continue;
+          const assetName = hrefMatch[1].replace(/^\.?\//, '');
+          const asset = ctx.bundle[assetName];
+          if (asset && asset.type === 'asset' && assetName.endsWith('.css')) {
+            const css = rewriteCssUrls(String(asset.source), assetName);
+            out = out.replace(tag, `<style>\n${css}\n</style>`);
+            delete ctx.bundle[assetName]; // drop the now-inlined, unreferenced file
+          }
+        }
+        return out;
+      },
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
@@ -12,7 +81,8 @@ export default defineConfig(() => {
       tailwindcss(),
       legacy({
         targets: ['defaults', 'not IE 11']
-      })
+      }),
+      inlineRenderBlockingCss(),
     ],
     resolve: {
       alias: {

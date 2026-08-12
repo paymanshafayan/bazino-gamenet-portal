@@ -187,15 +187,15 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   const getTournamentImage = (game: string) => {
     const lowercaseGame = game.toLowerCase();
     if (lowercaseGame.includes('cs') || lowercaseGame.includes('counter')) {
-      return 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80';
+      return '/images/home/esports-960.webp';
     }
     if (lowercaseGame.includes('fifa') || lowercaseGame.includes('soccer') || lowercaseGame.includes('football')) {
-      return 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=800&q=80';
+      return '/images/home/sports-console-960.webp';
     }
     if (lowercaseGame.includes('dota') || lowercaseGame.includes('lol') || lowercaseGame.includes('league')) {
-      return 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80';
+      return '/images/home/rpg-openworld-960.webp';
     }
-    return 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80';
+    return '/images/home/rpg-openworld-960.webp';
   };
 
 
@@ -217,7 +217,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Испытайте безупречный FPS и минимальный пинг на игровых ПК с картами RTX 5080. Создайте команду и побеждайте в турнирах.',
         tr: 'NVIDIA RTX 5080 sistemlerimizle yüksek kare hızı ve tek haneli pingi deneyimleyin. Takımınızı kurun, turnuvaya katılın ve şampiyon olun.'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=960&q=70',
+      imageUrl: '/images/home/esports-1600.webp',
       badge: 'FPS GLOBAL CHALLENGE'
     },
     {
@@ -234,7 +234,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Играйте в лучшую MOBA-игру мира на новейших мониторах ROG 360 Гц. Командные сражения с физическими призами и поддержкой тренеров.',
         tr: 'BAZINO\'ta elit ROG 360Hz monitörlerle dünyanın en çok tercih edilen MOBA oyununu oynayın. Harika ödüllü takım savaşları sizi bekliyor.'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=960&q=70',
+      imageUrl: '/images/home/rpg-openworld-1600.webp',
       badge: 'MOBA ARENA PRO'
     },
     {
@@ -251,7 +251,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Консольные VIP-кабины с PS5 и большими 85" телевизорами LG OLED. Сражайтесь с друзьями в уютной атмосфере киберклуба.',
         tr: 'PlayStation 5 ve devasa LG OLED 85 inç ekranlı VIP kabinler. En konforlu lounge alanında arkadaşlarınızla futbol heyecanını yaşayın.'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=960&q=70',
+      imageUrl: '/images/home/sports-console-1600.webp',
       badge: 'VIP CONSOLE ROOM'
     }
   ];
@@ -272,7 +272,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Захватывающие бои 5 на 5',
         tr: 'Nefes kesen 5v5 FPS düelloları'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/esports-960.webp',
       tag: 'FPS AREA',
       games: 'CS2, Valorant, Apex Legends'
     },
@@ -290,7 +290,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Глубокие сюжеты и графика',
         tr: 'Sürükleyici hikayeler ve grafikler'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/rpg-openworld-960.webp',
       tag: 'RTX ULTRA',
       games: 'Cyberpunk, Elden Ring, Witcher 3'
     },
@@ -308,7 +308,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Быстрые тактики и игра в клане',
         tr: 'Hızlı taktikler ve takım oyunu'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1553481187-be93c21490a9?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/moba-strategy-960.webp',
       tag: 'TACTICAL ZONE',
       games: 'Dota 2, League of Legends, SC2'
     },
@@ -326,7 +326,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Скоростные дуэли на консолях',
         tr: 'Derbi heyecanı ve yüksek hız'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/sports-console-960.webp',
       tag: 'VIP LOUNGE',
       games: 'FIFA 26, Forza Horizon, NBA 2K'
     }
@@ -457,7 +457,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         tr: 'Yeni nesil Intel Core i9, RTX 5080 grafik kartları, ASUS ROG 360Hz monitörler ve birinci sınıf Razer kulaklıklar ile donatılmıştır. Sınırsız güçle oyna!'
       },
       icon: <Gamepad2 className="w-6 h-6 text-primary" />,
-      imageUrl: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/pc-arena-1200.webp',
       color: 'border-primary/20 hover:border-primary hover:shadow-[0_0_20px_rgba(255,184,0,0.15)]',
       btnText: {
         fa: 'رزرو آنلاین سیستم',
@@ -481,7 +481,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         tr: 'Özel deri uzanma koltuklarına sahip rahat bir ortam, PS5 ve Xbox Series X üzerinde devasa 85" LG OLED 120Hz ekranlar ile yılın en popüler oyunları.'
       },
       icon: <Tv className="w-6 h-6 text-primary" />,
-      imageUrl: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/sports-console-1200.webp',
       color: 'border-primary/20 hover:border-primary hover:shadow-[0_0_20px_rgba(255,184,0,0.15)]',
       btnText: {
         fa: 'رزرو سیستم و کنسول',
@@ -505,7 +505,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         tr: 'Oyununuzu hiç bölmeden çift köfteli burger, özel pepperoni pizza, RedBull veya dikey espresso sipariş edin, personelimiz doğrudan masanıza getirsin!'
       },
       icon: <Utensils className="w-6 h-6 text-primary" />,
-      imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/cafe-1200.webp',
       color: 'border-primary/20 hover:border-primary hover:shadow-[0_0_20px_rgba(255,184,0,0.15)]',
       btnText: {
         fa: 'سفارش آنلاین بوفه',
@@ -529,7 +529,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         tr: 'Dünya markalarından (Razer, Logitech, Redragon) orijinal ekipmanları salon garantisiyle alın. Sadakat puanlarınızı büyük indirim kuponlarına dönüştürün.'
       },
       icon: <ShoppingBag className="w-6 h-6 text-primary" />,
-      imageUrl: 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/images/home/gear-shop-1200.webp',
       color: 'border-primary/20 hover:border-primary hover:shadow-[0_0_20px_rgba(255,184,0,0.15)]',
       btnText: {
         fa: 'مشاهده فروشگاه جانبی',
@@ -765,7 +765,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               loading="eager"
               fetchpriority="high"
               src={activeGame.imageUrl}
-              srcSet={getResponsiveSrcSet(activeGame.imageUrl, [480, 720, 960])}
+              srcSet={getResponsiveSrcSet(activeGame.imageUrl, [480, 800, 960])}
               sizes="(min-width: 1024px) 960px, 100vw"
               width="1200"
               height="514"
@@ -862,7 +862,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 {/* Image banner */}
                 <img loading="lazy"
                   src={genre.imageUrl}
-                  srcSet={getResponsiveSrcSet(genre.imageUrl, [320, 480, 600])}
+                  srcSet={getResponsiveSrcSet(genre.imageUrl, [320, 480, 640])}
                   sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                   width="600"
                   height="600"
@@ -939,7 +939,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden border-b border-white/10">
                   <img loading="lazy"
                     src={sect.imageUrl}
-                    srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 480, 600])}
+                    srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 480, 640])}
                     sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw"
                     width="600"
                     height="375"
@@ -1139,7 +1139,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden">
                     <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
-                      srcSet={getResponsiveSrcSet(getTournamentImage(tournament.game), [320, 480, 640, 800])}
+                      srcSet={getResponsiveSrcSet(getTournamentImage(tournament.game), [320, 480, 640, 960])}
                       sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
                       width="800"
                       height="500"

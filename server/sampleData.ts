@@ -63,10 +63,10 @@ export const SAMPLE_ACCESSORIES: AccessoryRow[] = [
 
 /* ---------- اسلایدرهای اپلیکیشن/سایت (۴ مورد) ---------- */
 export const SAMPLE_SLIDERS: SliderRow[] = [
-  { id: 'slide-1', imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80', target: 'reserve', titleFa: 'رزرو سیستم‌های گیمینگ فوق پیشرفته', titleEn: 'Reserve High-End Gaming Rigs', titleRu: 'Забронировать мощные игровые ПК', titleTr: 'Son Teknoloji Oyun Bilgisayarlarını Rezerve Edin' },
+  { id: 'slide-1', imageUrl: '/images/home/esports-960.webp', target: 'reserve', titleFa: 'رزرو سیستم‌های گیمینگ فوق پیشرفته', titleEn: 'Reserve High-End Gaming Rigs', titleRu: 'Забронировать мощные игровые ПК', titleTr: 'Son Teknoloji Oyun Bilgisayarlarını Rezerve Edin' },
   { id: 'slide-2', imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80', target: 'cafe', titleFa: 'سفارش آنلاین انواع پیتزا و نوشیدنی انرژی‌زا', titleEn: 'Order Pizza & Energy Drinks Online', titleRu: 'Заказать пиццу и энергетики онлайн', titleTr: 'Online Pizza ve Enerji İçeceği Sipariş Et' },
   { id: 'slide-3', imageUrl: 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?auto=format&fit=crop&w=800&q=80', target: 'shop', titleFa: 'تجهیزات اورجینال گیمینگ با گارانتی کلوپ', titleEn: 'Original Gaming Gear with Club Warranty', titleRu: 'Оригинальные игровые девайсы с гарантией', titleTr: 'Kulüp Garantili Orijinal Oyun Ekipmanları' },
-  { id: 'slide-4', imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80', target: 'tournaments', titleFa: 'ثبت‌نام در مسابقات با جوایز نقدی بزرگ', titleEn: 'Join Tournaments with Big Cash Prizes', titleRu: 'Участвуйте в турнирах с крупными призами', titleTr: 'Büyük Nakit Ödüllü Turnuvalara Katılın' }
+  { id: 'slide-4', imageUrl: '/images/home/rpg-openworld-960.webp', target: 'tournaments', titleFa: 'ثبت‌نام در مسابقات با جوایز نقدی بزرگ', titleEn: 'Join Tournaments with Big Cash Prizes', titleRu: 'Участвуйте в турнирах с крупными призами', titleTr: 'Büyük Nakit Ödüllü Turnuvalara Katılın' }
 ];
 
 /* ---------- مسابقات و تورنمنت‌ها (۴ مورد) ---------- */

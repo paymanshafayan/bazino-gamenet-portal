@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import sharp from 'sharp';
 import { strFromU8, strToU8 } from 'fflate';
-import { optimizeUploadedTheme } from '../server/themePerformance';
+import { optimizeThemeImages, optimizeUploadedTheme } from '../server/themePerformance';
 import type { ParsedZipTheme } from '../src/themes/themeZipCore';
 
 const theme: ParsedZipTheme = {
@@ -24,11 +25,27 @@ assert.ok(optimized.report.findings.some(finding => finding.id === 'google-font-
 assert.ok(optimized.report.findings.some(finding => finding.id === 'recurring-javascript'));
 assert.equal(strFromU8(optimized.theme.assets['icon.svg']).includes('<!--'), false);
 
-const tooLarge = optimizeUploadedTheme({
+const jpeg = await sharp({ create: { width: 1800, height: 1200, channels: 3, background: '#8866cc' } })
+  .jpeg({ quality: 100 })
+  .toBuffer();
+const converted = await optimizeThemeImages(optimizeUploadedTheme({
+  ...theme,
+  css: '.hero { background-image: url(assets/banner.jpg); }',
+  componentJs: 'const image = "assets/banner.jpg";',
+  assets: { 'banner.jpg': new Uint8Array(jpeg) },
+}));
+assert.equal(converted.canInstall, true);
+assert.ok(converted.theme.assets['banner.webp']);
+assert.equal(converted.theme.assets['banner.jpg'], undefined);
+assert.match(converted.theme.css, /banner\.webp/);
+assert.match(converted.theme.componentJs, /banner\.webp/);
+assert.ok(converted.report.findings.some(finding => finding.id === 'image-converted-webp'));
+
+const tooLarge = await optimizeThemeImages(optimizeUploadedTheme({
   ...theme,
   assets: { 'oversized.webp': new Uint8Array(3 * 1024 * 1024 + 1) },
-});
+}));
 assert.equal(tooLarge.canInstall, false);
-assert.ok(tooLarge.report.findings.some(finding => finding.id === 'asset-too-large' && finding.severity === 'error'));
+assert.ok(tooLarge.report.findings.some(finding => finding.id === 'asset-still-too-large' && finding.severity === 'error'));
 
 console.log('Theme performance gate tests passed.');

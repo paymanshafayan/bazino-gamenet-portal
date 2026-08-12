@@ -2041,14 +2041,14 @@ Decide whether one of the available functions matches what the user is asking fo
   app.post(
     "/api/admin/themes/install",
     express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
-    (req, res) => {
+    async (req, res) => {
       try {
         const buffer = req.body as Buffer | undefined;
         if (!buffer || buffer.length === 0) {
           return res.status(400).json({ error: "فایل ZIP ارسال نشده است" });
         }
         const fallbackName = (req.query.name as string) || undefined;
-        const result = installThemeZip(new Uint8Array(buffer), fallbackName);
+        const result = await installThemeZip(new Uint8Array(buffer), fallbackName);
         if ("error" in result) {
           return res.status(400).json({ error: result.error, performance: result.performance });
         }

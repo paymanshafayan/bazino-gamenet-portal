@@ -26,7 +26,7 @@ import {
   isZipParseError,
   type ParsedZipTheme
 } from "../src/themes/themeZipCore";
-import { optimizeUploadedTheme, type ThemePerformanceReport } from "./themePerformance";
+import { optimizeThemeImages, optimizeUploadedTheme, type ThemePerformanceReport } from "./themePerformance";
 
 /** پوشه ریشه قالب‌های نصب‌شده روی سرور */
 export const THEMES_DIR = path.join(process.cwd(), "themes");
@@ -116,13 +116,14 @@ function listFilesRecursive(dir: string): string[] {
 /* ═══════════════════════════════════════════════════════════════
  *  نصب قالب از ZIP — استخراج به پوشه اختصاصی قالب
  * ═══════════════════════════════════════════════════════════════ */
-export function installThemeZip(buffer: Uint8Array, fallbackName?: string): { theme: InstalledThemeInfo; parsed: ParsedZipTheme; performance: ThemePerformanceReport } | { error: string; performance?: ThemePerformanceReport } {
+export async function installThemeZip(buffer: Uint8Array, fallbackName?: string): Promise<{ theme: InstalledThemeInfo; parsed: ParsedZipTheme; performance: ThemePerformanceReport } | { error: string; performance?: ThemePerformanceReport }> {
   const parsed = parseThemeZip(buffer, fallbackName);
   if (isZipParseError(parsed)) return { error: parsed.error };
 
   // This gate runs before any file is written. It safely applies deterministic fixes
   // (SVG/font policy/Google Fonts) and rejects only package-size violations.
-  const performanceResult = optimizeUploadedTheme(parsed);
+  const staticPerformanceResult = optimizeUploadedTheme(parsed);
+  const performanceResult = await optimizeThemeImages(staticPerformanceResult);
   if (!performanceResult.canInstall) {
     const blockers = performanceResult.report.findings
       .filter(finding => finding.severity === "error")

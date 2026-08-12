@@ -305,7 +305,7 @@ document.body.setAttribute('data-theme', 'cyberpunk-cyan');
 
 ## Performance gate for uploaded ZIP themes
 
-Every ZIP uploaded through `POST /api/admin/themes/install` is audited **before any file is written**. The server applies safe automatic fixes (removing Google Fonts imports, adding `font-display: optional` to local font faces, and compacting SVG comments/whitespace), reports external origins and recurring timers, and rejects packages with a single asset over 3 MB or total assets over 8 MB.
+Every ZIP uploaded through `POST /api/admin/themes/install` is audited **before any file is written**. The server applies safe automatic fixes: removing Google Fonts imports, adding `font-display: optional` to local font faces, compacting SVG comments/whitespace, and converting uploaded JPEG/PNG assets to WebP (quality 72, maximum 1600px side) when doing so saves bytes. CSS and `theme.js` asset references are updated with the new `.webp` name. It reports external origins and recurring timers, then rejects only files that still exceed 3 MB per asset or 8 MB total after optimization.
 
 The installation response includes a `performance` report; the Admin Panel shows counts for automatic fixes and warnings. To audit a ZIP in CI or before upload:
 

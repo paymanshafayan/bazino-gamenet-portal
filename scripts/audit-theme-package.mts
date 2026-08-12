@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildThemeZip, isZipParseError, parseThemeZip } from '../src/themes/themeZipCore';
-import { optimizeUploadedTheme } from '../server/themePerformance';
+import { optimizeThemeImages, optimizeUploadedTheme } from '../server/themePerformance';
 
 const [inputPath, command, outputPath] = process.argv.slice(2);
 if (!inputPath) {
@@ -32,7 +32,7 @@ if (isZipParseError(parsed)) {
   process.exit(1);
 }
 
-const result = optimizeUploadedTheme(parsed);
+const result = await optimizeThemeImages(optimizeUploadedTheme(parsed));
 console.log(JSON.stringify({
   canInstall: result.canInstall,
   originalAssetBytes: result.report.originalAssetBytes,

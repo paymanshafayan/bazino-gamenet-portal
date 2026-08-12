@@ -127,6 +127,10 @@ export default function App() {
   }, [layoutMode]);
 
   const [activeTab, setActiveTab] = useState('home');
+  // Keep the LCP-only LandingHero as the first commit. HomeTab contains all below-fold
+  // cards and effects, so mounting it only after the load event's first idle window avoids
+  // competing style/layout work with the hero image paint.
+  const [isHomeContentReady, setIsHomeContentReady] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
   const [user, setUser] = useState<UserState | null>(null);
@@ -252,6 +256,37 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    let delayTimer: number | undefined;
+    let idleHandle: number | undefined;
+    const win = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const mountHomeWhenIdle = () => {
+      // A short post-load delay ensures the eager hero has had a chance to become LCP,
+      // even when the browser reports an idle slice while the image is decoding.
+      delayTimer = window.setTimeout(() => {
+        if (typeof win.requestIdleCallback === 'function') {
+          idleHandle = win.requestIdleCallback(() => setIsHomeContentReady(true), { timeout: 2000 });
+        } else {
+          setIsHomeContentReady(true);
+        }
+      }, 750);
+    };
+
+    if (document.readyState === 'complete') mountHomeWhenIdle();
+    else window.addEventListener('load', mountHomeWhenIdle, { once: true });
+
+    return () => {
+      window.removeEventListener('load', mountHomeWhenIdle);
+      if (delayTimer !== undefined) window.clearTimeout(delayTimer);
+      if (idleHandle !== undefined && typeof win.cancelIdleCallback === 'function') {
+        win.cancelIdleCallback(idleHandle);
+      }
+    };
+  }, []);
+
   const handleRedeemPoints = async (points: number, couponValue: number, code: string) => {
     if (!user) return;
     try {
@@ -352,6 +387,8 @@ export default function App() {
             addNotification={addNotification}
             refreshData={fetchData}
           />
+        ) : !isHomeContentReady ? (
+          <LandingHero onNavigate={() => setActiveTab('reservations')} />
         ) : (
           <Suspense fallback={<LandingHero onNavigate={() => setActiveTab('reservations')} />}>
             <HomeTab

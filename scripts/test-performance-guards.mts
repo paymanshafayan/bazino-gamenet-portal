@@ -19,6 +19,9 @@ const viteConfig = read('../vite.config.ts');
 // LandingHero is in the entry chunk; the much larger HomeTab follows as a lazy chunk.
 assert.match(app, /import LandingHero from '\.\/components\/LandingHero'/);
 assert.match(app, /const HomeTab = lazy\(\(\) => import\('\.\/components\/HomeTab'\)\)/);
+assert.match(app, /const \[isHomeContentReady, setIsHomeContentReady\] = useState\(false\)/);
+assert.match(app, /document\.readyState === 'complete'/);
+assert.match(app, /requestIdleCallback\(\(\) => setIsHomeContentReady\(true\)/);
 assert.match(app, /<Suspense fallback=\{<LandingHero/);
 assert.match(landingHero, /loading="eager"[\s\S]{0,80}fetchPriority="high"/);
 assert.match(landingHero, /sizes="\(min-width: 1024px\) 960px, 100vw"/);

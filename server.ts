@@ -2317,6 +2317,30 @@ Decide whether one of the available functions matches what the user is asking fo
     });
   });
 
+  app.get("/api/mobile-app/qr.png", async (req, res) => {
+    try {
+      const rawSize = Number(req.query.size || 1400);
+      const size = Math.min(Math.max(Number.isFinite(rawSize) ? rawSize : 1400, 512), 2200);
+      const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+      const proto = forwardedProto || req.protocol || "https";
+      const host = req.get("host");
+      const downloadPageUrl = `${proto}://${host}/app-download`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=64&format=png&data=${encodeURIComponent(downloadPageUrl)}`;
+      const qrResponse = await fetch(qrUrl);
+      if (!qrResponse.ok) {
+        throw new Error(`QR provider responded with ${qrResponse.status}`);
+      }
+      const buffer = Buffer.from(await qrResponse.arrayBuffer());
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Content-Disposition", `attachment; filename=BAZINO_APP_DOWNLOAD_QR_${size}.png`);
+      res.setHeader("Cache-Control", "no-store");
+      res.send(buffer);
+    } catch (e) {
+      console.error("Mobile app QR generation failed:", e);
+      res.status(502).json({ error: "خطا در ساخت QR Code دانلود اپلیکیشن" });
+    }
+  });
+
   app.post("/api/admin/mobile-app/upload-apk", async (req, res) => {
     try {
       const { fileName, dataBase64 } = req.body || {};

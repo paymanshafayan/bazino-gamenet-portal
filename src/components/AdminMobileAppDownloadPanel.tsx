@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Download, Edit, ExternalLink, Github, PackageOpen, Play, Plus, Save, Smartphone, Store, Trash2, Upload, X, Apple } from 'lucide-react';
+import { Check, Download, Edit, ExternalLink, Github, PackageOpen, Play, Plus, QrCode, Save, Smartphone, Store, Trash2, Upload, X, Apple } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import type { MobileAppDownloadConfig, MobileAppStoreKind, MobileAppStoreLink } from '../types/mobileApp';
 
@@ -179,10 +179,16 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
               </p>
             </div>
           </div>
-          <a href="/app-download" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white text-slate-950 px-4 py-3 text-xs font-black">
-            <ExternalLink className="w-4 h-4" />
-            {isFa ? 'مشاهده صفحه دانلود' : 'View download page'}
-          </a>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <a href="/api/mobile-app/qr.png?size=1600" className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-300 text-slate-950 px-4 py-3 text-xs font-black">
+              <QrCode className="w-4 h-4" />
+              {isFa ? 'دانلود QR باکیفیت' : 'Download hi-res QR'}
+            </a>
+            <a href="/app-download" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white text-slate-950 px-4 py-3 text-xs font-black">
+              <ExternalLink className="w-4 h-4" />
+              {isFa ? 'مشاهده صفحه دانلود' : 'View download page'}
+            </a>
+          </div>
         </div>
       </div>
 

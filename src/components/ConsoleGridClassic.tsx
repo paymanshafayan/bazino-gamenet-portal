@@ -9,6 +9,7 @@ import {
   UserState 
 } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
+import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 import { 
   Gamepad2, 
   Tv, 
@@ -90,6 +91,7 @@ export default function ConsoleGridClassic({
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatRoom, setChatRoom] = useState('عمومی (General)');
+  const [isChatPanelVisible, setIsChatPanelVisible] = useState(false);
 
   // Fetch chat history
   const fetchChatMessages = async () => {
@@ -107,10 +109,14 @@ export default function ConsoleGridClassic({
   };
 
   useEffect(() => {
-    fetchChatMessages();
-    const interval = setInterval(fetchChatMessages, 5000);
+    if (!isChatPanelVisible) return;
+    const pollChatMessages = () => {
+      if (document.visibilityState === 'visible') fetchChatMessages();
+    };
+    pollChatMessages();
+    const interval = setInterval(pollChatMessages, 5000);
     return () => clearInterval(interval);
-  }, [chatRoom]);
+  }, [chatRoom, isChatPanelVisible]);
 
   const handleSendChatMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -390,7 +396,7 @@ export default function ConsoleGridClassic({
         <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-[#00ff66]/10 to-transparent pointer-events-none" />
         <div className="space-y-2 z-10 text-center md:text-right">
           <div className="flex items-center gap-2 justify-center md:justify-start">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00ff66] animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00ff66] "></span>
             <span className="text-[10px] uppercase font-mono tracking-widest text-[#00ff66] font-bold">Consolidated Dashboard Command</span>
           </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
@@ -466,7 +472,7 @@ export default function ConsoleGridClassic({
                   </span>
                   
                   <span className={`w-2 h-2 rounded-full ${
-                    !sys.isActive ? 'bg-gray-600' : sys.isReserved ? 'bg-rose-500' : 'bg-[#00ff66] animate-pulse'
+                    !sys.isActive ? 'bg-gray-600' : sys.isReserved ? 'bg-rose-500' : 'bg-[#00ff66] '
                   }`} />
                 </div>
 
@@ -575,7 +581,7 @@ export default function ConsoleGridClassic({
                 <span className="block text-2xl font-black text-white font-mono">{user ? user.loyaltyPoints : '0'}</span>
                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{language === 'fa' ? 'امتیاز وفاداری جمع شده' : 'Accumulated Loyalty Points'}</span>
               </div>
-              <Flame className="w-8 h-8 text-[#00ff66] animate-pulse shrink-0" />
+              <Flame className="w-8 h-8 text-[#00ff66]  shrink-0" />
             </div>
 
             {/* Micro Progress Bar */}
@@ -641,6 +647,7 @@ export default function ConsoleGridClassic({
 
       </div>
 
+      <DeferredSection minHeight={620} render={() => (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mt-8">
         
         {/* PANEL 3: Cafe Cyber-Snack Buffet (Col: 6) */}
@@ -657,9 +664,10 @@ export default function ConsoleGridClassic({
           <div className="grid grid-cols-2 gap-3 max-h-[320px] overflow-y-auto scrollbar-thin pr-1">
             {cafeItems.map((item) => {
               const qty = cafeCart[item.id] || 0;
+              const imageUrl = item.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400';
               return (
                 <div key={item.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
-                  <img loading="lazy" src={item.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200'} alt={item.name} className="h-20 w-full object-cover rounded-lg" />
+                  <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [200, 400])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={item.name} className="h-20 w-full object-cover rounded-lg" />
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{item.name}</h3>
@@ -756,9 +764,10 @@ export default function ConsoleGridClassic({
           <div className="grid grid-cols-2 gap-3 max-h-[320px] overflow-y-auto scrollbar-thin pr-1">
             {accessories.map((acc) => {
               const qty = shopCart[acc.id] || 0;
+              const imageUrl = acc.imageUrl || 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=400';
               return (
                 <div key={acc.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
-                  <img loading="lazy" src={acc.imageUrl || 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=200'} alt={acc.name} className="h-20 w-full object-cover rounded-lg" />
+                  <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [200, 400])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={acc.name} className="h-20 w-full object-cover rounded-lg" />
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{acc.name}</h3>
@@ -828,7 +837,9 @@ export default function ConsoleGridClassic({
         </div>
 
       </div>
+      )} />
 
+      <DeferredSection minHeight={620} onVisible={() => setIsChatPanelVisible(true)} render={() => (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mt-8">
         
         {/* PANEL 5: Live Chat Room & Support (Col: 6) */}
@@ -981,6 +992,7 @@ export default function ConsoleGridClassic({
         </div>
 
       </div>
+      )} />
 
     </div>
   );

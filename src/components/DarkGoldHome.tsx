@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Tournament } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
+import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 import { 
   Gamepad2, 
   Tv, 
@@ -49,6 +50,7 @@ export default function DarkGoldHome({
   
   const [activeBanner, setActiveBanner] = useState(0);
   const [activeTournamentSlide, setActiveTournamentSlide] = useState(0);
+  const [isTournamentSectionVisible, setIsTournamentSectionVisible] = useState(false);
   const tournamentRefs = useRef<(HTMLDivElement | null)[]>([]);
   const tournamentContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,21 +61,25 @@ export default function DarkGoldHome({
   const [contactSubmitting, setContactSubmitting] = useState(false);
 
   useEffect(() => {
+    if (featuredGames.length === 0) return;
     const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       setActiveBanner((prev: number) => (prev + 1) % featuredGames.length);
-    }, 6000);
+    }, 8000);
     return () => clearInterval(interval);
   }, [featuredGames.length]);
 
   useEffect(() => {
-    if (tournaments.length === 0) return;
+    if (!isTournamentSectionVisible || tournaments.length === 0) return;
     const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       setActiveTournamentSlide((prev: number) => (prev + 1) % tournaments.length);
     }, 4500);
     return () => clearInterval(interval);
-  }, [tournaments.length]);
+  }, [isTournamentSectionVisible, tournaments.length]);
 
   useEffect(() => {
+    if (!isTournamentSectionVisible) return;
     const container = tournamentContainerRef.current;
     const activeEl = tournamentRefs.current[activeTournamentSlide];
     if (container && activeEl) {
@@ -85,7 +91,7 @@ export default function DarkGoldHome({
       const targetScrollLeft = relativeLeft - (containerWidth / 2) + (elementWidth / 2);
       container.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
     }
-  }, [activeTournamentSlide]);
+  }, [activeTournamentSlide, isTournamentSectionVisible]);
 
   const getLocText = (obj: any) => {
     if (!obj) return '';
@@ -186,6 +192,7 @@ export default function DarkGoldHome({
   };
 
   let themeId = 'dark-gold' as string;
+  const activeGame = featuredGames[activeBanner] ?? featuredGames[0];
 
   return (
     <div className="space-y-16 animate-fade-in" dir={dir}>
@@ -193,7 +200,7 @@ export default function DarkGoldHome({
       {/* 1. HERO GAME SLIDER (FULL WIDTH, SLANTED & MOBIRISE GAMINGAMP STYLED) */}
       {themeId === 'geco-purple' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-black shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[500px] flex items-center" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 85%, 0% 100%)' }}>
-          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
+          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80', [640, 960, 1280, 1600])} sizes="100vw" width="1600" height="900" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
           
           <div className="relative z-10 w-full max-w-7xl mx-auto px-8 py-20 flex flex-col justify-center h-full">
@@ -217,7 +224,7 @@ export default function DarkGoldHome({
         </section>
       ) : themeId === 'cyberpunk-cyan' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#070b19] min-h-[650px] flex items-center justify-start border-b-[3px] border-[#00f0ff] shadow-[0_10px_50px_rgba(0,240,255,0.2)]">
-          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
+          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80', [640, 960, 1280, 1600])} sizes="100vw" width="1600" height="900" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
           
           {/* Cyberpunk Grid Overlay */}
           <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: '0.2' }}></div>
@@ -225,11 +232,11 @@ export default function DarkGoldHome({
           
           <div className="relative z-10 w-full max-w-7xl mx-auto px-8 py-20 flex flex-col items-start border-l-4 border-[#ff003c] pl-8 ml-4 md:ml-8 bg-black/20 backdrop-blur-sm">
             <div className="flex items-center gap-3 mb-4">
-              <span className="w-8 h-1 bg-[#00f0ff] animate-pulse"></span>
+              <span className="w-8 h-1 bg-[#00f0ff]"></span>
               <h2 className="text-[#00f0ff] tracking-[0.4em] uppercase text-xs md:text-sm font-black text-shadow-[0_0_10px_#00f0ff]">SYSTEM OVERRIDE</h2>
             </div>
             <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 uppercase leading-[1.1] mb-2 font-display relative">
-              <span className="absolute -inset-1 blur-sm bg-gradient-to-r from-[#00f0ff]/50 to-[#ff003c]/50 bg-clip-text text-transparent opacity-50 animate-pulse">NEON FUTURE</span>
+              <span className="absolute -inset-1 blur-sm bg-gradient-to-r from-[#00f0ff]/50 to-[#ff003c]/50 bg-clip-text text-transparent opacity-50">NEON FUTURE</span>
               NEON FUTURE
             </h1>
             <h2 className="text-3xl md:text-5xl font-black text-[#ff003c] uppercase leading-tight mb-8 font-display tracking-widest text-shadow-[2px_2px_0px_#00f0ff]">
@@ -250,7 +257,7 @@ export default function DarkGoldHome({
           
           {/* Decorative Elements */}
           <div className="absolute top-10 right-10 flex gap-2 opacity-50">
-            <div className="w-2 h-2 bg-[#ff003c] animate-ping"></div>
+            <div className="w-2 h-2 bg-[#ff003c]"></div>
             <div className="w-2 h-2 bg-[#00f0ff]"></div>
             <div className="w-2 h-2 bg-[#00f0ff]"></div>
           </div>
@@ -258,55 +265,55 @@ export default function DarkGoldHome({
         </section>
       ) : (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-dark-bg shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
-          {featuredGames.map((game: any, idx: number) => (
-            <div
-              key={game.id}
-              className={`absolute inset-0 transition-opacity duration-1000 ${
-                idx === activeBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'
-              }`}
-            >
-              <img loading="lazy"
-                src={game.imageUrl}
-                alt={getLocText(game.title)}
+          {activeGame && (
+            <div className="absolute inset-0 z-10">
+              <img
+                loading="eager"
+                fetchpriority="high"
+                src={activeGame.imageUrl}
+                srcSet={getResponsiveSrcSet(activeGame.imageUrl, [640, 960, 1200, 1600])}
+                sizes="100vw"
+                width="1200"
+                height="514"
+                alt={getLocText(activeGame.title)}
                 className="w-full h-full object-cover opacity-100 scale-105 group-hover:scale-100 transition-transform duration-[10s] ease-out"
                 referrerPolicy="no-referrer"
               />
               {/* Soft Gradient Overlay to keep text readable */}
               <div className="absolute inset-0 bg-gradient-to-r from-dark-bg/85 via-dark-bg/25 to-transparent z-10"></div>
-              
+
               <div className="absolute inset-0 flex items-center">
                 <div className="px-6 md:px-16 lg:px-24 w-full max-w-7xl mx-auto transform -translate-y-4">
-                  {/* ... Existing hero content ... */}
-                  <span className="text-primary font-bold text-xs uppercase tracking-[0.2em] mb-4 block font-display animate-pulse">
+                  <span className="text-primary font-bold text-xs uppercase tracking-[0.2em] mb-4 block font-display">
                     {language === 'fa' ? 'ویژه فصل' : 'SEASONAL FEATURED'}
                   </span>
-                  
+
                   <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white uppercase tracking-tight leading-[1.1] mb-4 max-w-2xl font-display">
-                    {getLocText(game.title)}
+                    {getLocText(activeGame.title)}
                   </h1>
-                  
+
                   <p className="text-gray-300 text-sm md:text-base max-w-xl mb-8 leading-relaxed font-medium">
-                    {getLocText(game.desc)}
+                    {getLocText(activeGame.desc)}
                   </p>
-                  
+
                   <div className="flex flex-wrap gap-3 mt-2">
                     <button
                       onClick={() => {
-                        const targetRoute = game.target === 'reserve' ? 'reservations' : (game.target || 'reservations');
+                        const targetRoute = activeGame.target === 'reserve' ? 'reservations' : (activeGame.target || 'reservations');
                         onNavigate(targetRoute);
                       }}
                       className="btn btn-primary-outline display-4 flex items-center gap-2 notched-clip-sm"
                     >
-                      {getButtonIcon(game.target || 'reserve')}
+                      {getButtonIcon(activeGame.target || 'reserve')}
                       <span>
-                        {getButtonText(game.target || 'reserve')[language] || getButtonText(game.target || 'reserve')['en']}
+                        {getButtonText(activeGame.target || 'reserve')[language] || getButtonText(activeGame.target || 'reserve')['en']}
                       </span>
                     </button>
                   </div>
                 </div>
               </div>
             </div>
-          ))}
+          )}
 
           {/* Slider Controls */}
           <div className="absolute bottom-6 right-6 md:right-16 lg:right-24 z-20 flex gap-2">
@@ -344,6 +351,10 @@ export default function DarkGoldHome({
                 {/* Image banner */}
                 <img loading="lazy"
                   src={genre.imageUrl}
+                  srcSet={getResponsiveSrcSet(genre.imageUrl, [320, 640, 800])}
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                  width="800"
+                  height="960"
                   alt={getLocText(genre.title)}
                   className="w-full h-full object-cover opacity-60 group-hover:scale-110 group-hover:opacity-80 transition-[transform,opacity] duration-500"
                   referrerPolicy="no-referrer"
@@ -384,6 +395,7 @@ export default function DarkGoldHome({
       </section>
 
       {/* 3. LOUNGE SECTIONS INTRO (SLANTED CYBER FRAMING) */}
+      <DeferredSection minHeight={620} render={() => (
       <section className="space-y-8">
         <div className="flex flex-col gap-2">
           <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
@@ -415,6 +427,10 @@ export default function DarkGoldHome({
               <div className="relative aspect-[16/10] w-full bg-dark-bg overflow-hidden border-b border-white/10 shrink-0">
                 <img loading="lazy"
                   src={sect.imageUrl}
+                  srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 640, 800])}
+                  sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw"
+                  width="800"
+                  height="500"
                   alt={getLocText(sect.title)}
                   className="w-full h-full object-cover group-hover:scale-105 opacity-75 group-hover:opacity-90 transition-[transform,opacity] duration-500"
                   referrerPolicy="no-referrer"
@@ -450,8 +466,10 @@ export default function DarkGoldHome({
           ))}
         </div>
       </section>
+      )} />
 
       {/* 4. MATCH RESULTS BOARD (NEW SIGNATURE MOBIRISE SECTION) */}
+      <DeferredSection minHeight={620} render={() => (
       <section className="space-y-8">
         <div className="flex flex-col gap-2">
           <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
@@ -482,7 +500,7 @@ export default function DarkGoldHome({
               </span>
             </div>
             <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
               <span>Lobby Connected</span>
             </div>
           </div>
@@ -516,7 +534,7 @@ export default function DarkGoldHome({
                 <div className="flex items-center gap-3 w-1/3 justify-end">
                   {match.status === 'Live' && (
                     <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase rounded-md">
-                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                       <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
                     </span>
                   )}
@@ -542,8 +560,10 @@ export default function DarkGoldHome({
           </div>
         </div>
       </section>
+      )} />
 
       {/* 5. TOURNAMENTS CAROUSEL (SLANTED DESIGN) */}
+      <DeferredSection minHeight={720} onVisible={() => setIsTournamentSectionVisible(true)} render={() => (
       <section className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex flex-col gap-1.5">
@@ -606,6 +626,10 @@ export default function DarkGoldHome({
                   <div className="relative aspect-[16/10] w-full bg-dark-bg overflow-hidden rounded-t-2xl">
                     <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
+                      srcSet={getResponsiveSrcSet(getTournamentImage(tournament.game), [480, 800])}
+                      sizes="(min-width: 768px) 50vw, 100vw"
+                      width="800"
+                      height="450"
                       alt={tournament.title}
                       className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
@@ -693,8 +717,10 @@ export default function DarkGoldHome({
         
         )}
       </section>
+      )} />
 
       {/* 6. LOUNGE PASSES & PRICING PLANS (NEW SIGNATURE MOBIRISE SECTION) */}
+      <DeferredSection minHeight={620} render={() => (
       <section className="space-y-8">
         <div className="flex flex-col gap-2 text-center items-center">
           <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
@@ -720,7 +746,7 @@ export default function DarkGoldHome({
             {pricingPackages.map((pack) => (
               <div key={pack.id} className={`theme-box border flex flex-col justify-between bg-dark-card transition-all duration-300 ${pack.popular ? 'border-primary shadow-[0_0_30px_rgba(27,194,202,0.15)] -translate-y-2 relative' : 'border-white/10 hover:border-white/20'}`}>
                 {pack.popular && (
-                  <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 theme-btn uppercase tracking-widest font-display animate-pulse">
+                  <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 theme-btn uppercase tracking-widest font-display">
                     {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
                   </span>
                 )}
@@ -751,8 +777,10 @@ export default function DarkGoldHome({
           </div>
         
       </section>
+      )} />
 
       {/* 8. FAQ & CONTACT US FORM */}
+      <DeferredSection minHeight={720} render={() => (
       <section className="pt-4">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             {/* FAQ - 7 Cols */}
@@ -882,8 +910,10 @@ export default function DarkGoldHome({
           </div>
         
       </section>
+      )} />
 
       {/* 9. ADDRESS, CONSOLE TICKETING & DARK-THEMED OSM LOCATION MAP */}
+      <DeferredSection minHeight={620} render={() => (
       <section className="w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 bg-dark-card px-6 md:px-16 lg:px-24 xl:px-32 py-12 md:py-16 border-t-4 border-primary rounded-none shadow-[0_-10px_50px_rgba(0,0,0,0.3)]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           
@@ -971,7 +1001,7 @@ export default function DarkGoldHome({
 
             {/* Custom overlay tracker */}
             <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[10px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md rounded-md">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+              <span className="w-2 h-2 rounded-full bg-primary"></span>
               <span>GPS Tracking: Live Lock</span>
             </div>
             
@@ -982,6 +1012,7 @@ export default function DarkGoldHome({
 
         </div>
       </section>
+      )} />
     </div>
   );
 }

@@ -129,7 +129,9 @@ export default function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
   const [user, setUser] = useState<UserState | null>(null);
-  const [isInstalled, setIsInstalled] = useState<boolean | null>(null);
+  // نصب در checkInstallStatus عمداً bypass است؛ مقدار اولیه‌ی true از paint واسط
+  // spinner و جابه‌جایی کامل layout در mount دوم جلوگیری می‌کند (CLS/TBT گزارش).
+  const [isInstalled, setIsInstalled] = useState<boolean | null>(true);
   
   // Data States
   const [systems, setSystems] = useState<GameSystem[]>([]);
@@ -294,9 +296,7 @@ export default function App() {
 
   const renderTabContent = () => (
     <Suspense fallback={
-      <div className="w-full flex items-center justify-center py-24">
-        <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-      </div>
+      <div className="w-full min-h-[600px]" aria-hidden="true" />
     }>
     <div className="max-w-7xl mx-auto w-full flex-grow relative pb-20">
       {activeTab === 'home' && (
@@ -500,7 +500,7 @@ export default function App() {
                  className="p-2 text-white bg-white/5 rounded-full hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
                  title={language === 'fa' ? 'راهنمای تصویری کلوپ' : 'Client Visual Guide'}
                >
-                 <HelpCircle className="w-4 h-4 text-primary animate-pulse" />
+                 <HelpCircle className="w-4 h-4 text-primary" />
                </button>
                <button onClick={() => setIsThemeModalOpen(true)} className="p-2 text-white bg-white/5 rounded-full hover:bg-white/10">
                  <Palette className="w-4 h-4"/>

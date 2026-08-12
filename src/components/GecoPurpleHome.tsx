@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 import { 
   Gamepad2, Trophy, Clock, Search, ShoppingBag, Facebook, Twitter, Youtube, 
   User, Play, Star, MessageSquare, ShieldAlert, Plus, ArrowRight, ArrowLeft
@@ -19,9 +20,12 @@ export default function GecoPurpleHome({
 
   // 1. Ticking Countdown Timer (To next Friday 9 PM)
   const [timeLeft, setTimeLeft] = useState({ days: 3, hours: 8, mins: 24, secs: 15 });
+  const [isMatchSectionVisible, setIsMatchSectionVisible] = useState(false);
 
   useEffect(() => {
+    if (!isMatchSectionVisible) return;
     const timer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       setTimeLeft(prev => {
         if (prev.secs > 0) {
           return { ...prev, secs: prev.secs - 1 };
@@ -36,7 +40,7 @@ export default function GecoPurpleHome({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isMatchSectionVisible]);
 
   // Format numbers to have zero prefixes
   const padZero = (n: number) => n.toString().padStart(2, '0');
@@ -46,7 +50,18 @@ export default function GecoPurpleHome({
       
       {/* 1. HERO SECTION */}
       <section className="relative w-full h-[600px] flex items-center justify-center -mt-[90px] pt-[90px]">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=2000&q=80')] bg-cover bg-center opacity-100"></div>
+        <img
+          loading="eager"
+          fetchpriority="high"
+          src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80"
+          srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80', [640, 960, 1280, 1600])}
+          sizes="100vw"
+          width="1600"
+          height="900"
+          alt="Bazino gaming arena"
+          className="absolute inset-0 w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+        />
         <div className="absolute inset-0 bg-transparent"></div>
         
         <div className="relative z-10 flex flex-col items-center text-center max-w-4xl px-4">
@@ -95,6 +110,7 @@ export default function GecoPurpleHome({
       </section>
 
       {/* 3. LATEST RELEASES / DETAILED RIGS */}
+      <DeferredSection minHeight={620} render={() => (
       <section className="max-w-7xl mx-auto px-4 mb-24">
         <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
@@ -118,7 +134,7 @@ export default function GecoPurpleHome({
           {featuredGames?.slice(0, 3).map((game: any, i: number) => (
             <div key={i} className="group cursor-pointer bg-[#111119] border border-white/5 p-4 transition-all hover:border-[#ffb800]/20" onClick={() => onNavigate('reservations')}>
               <div className="relative aspect-video overflow-hidden border border-white/10 mb-6">
-                <img loading="lazy" src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <img loading="lazy" src={game.imageUrl} srcSet={getResponsiveSrcSet(game.imageUrl, [320, 640, 800])} sizes="(min-width: 768px) 33vw, 100vw" width="800" height="450" alt={getLocText(game.title)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 <div className="absolute bottom-4 left-4 bg-[#ffb800] text-black text-[10px] font-black px-3 py-1 uppercase tracking-wider">
                   {game.badge || 'GAMING'}
                 </div>
@@ -137,8 +153,10 @@ export default function GecoPurpleHome({
           ))}
         </div>
       </section>
+      )} />
 
       {/* 4. ABOUT STORY */}
+      <DeferredSection minHeight={620} render={() => (
       <section className="bg-[#111119] border-y border-white/5 py-24 mb-24">
         <div className="max-w-7xl mx-auto px-4 flex flex-col lg:flex-row gap-16 items-center">
           <div className="w-full lg:w-1/2">
@@ -175,7 +193,7 @@ export default function GecoPurpleHome({
           </div>
           <div className="w-full lg:w-1/2 relative group cursor-pointer" onClick={() => onNavigate('tournaments')}>
             <div className="absolute inset-0 bg-[#ffb800] transform translate-x-4 translate-y-4 border border-white/10 opacity-20 group-hover:translate-x-2 group-hover:translate-y-2 transition-transform"></div>
-            <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80" alt="About" className="relative z-10 w-full h-[360px] object-cover border-4 border-white/10" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80', [400, 640, 800])} sizes="(min-width: 768px) 50vw, 100vw" width="800" height="450" alt="About" className="relative z-10 w-full h-[360px] object-cover border-4 border-white/10" />
             <div className="absolute inset-0 z-20 flex items-center justify-center">
               <div className="w-20 h-20 bg-black/60 rounded-full flex items-center justify-center border-2 border-[#ffb800] group-hover:scale-110 transition-transform backdrop-blur-sm">
                 <Play className="w-8 h-8 text-[#ffb800] ml-1" fill="currentColor" />
@@ -184,8 +202,10 @@ export default function GecoPurpleHome({
           </div>
         </div>
       </section>
+      )} />
 
       {/* 5. MATCHES - FOCUS AND GAME MANAGE */}
+      <DeferredSection minHeight={720} onVisible={() => setIsMatchSectionVisible(true)} render={() => (
       <section className="max-w-7xl mx-auto px-4 mb-24">
         <div className="text-center mb-16">
           <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-2">
@@ -268,8 +288,10 @@ export default function GecoPurpleHome({
           ))}
         </div>
       </section>
+      )} />
 
       {/* 6. JOINING TOURNAMENT (Fully Connected to dynamic database tournaments) */}
+      <DeferredSection minHeight={680} render={() => (
       <section className="bg-[#111119] border-y border-white/5 py-24 mb-24">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 border-b border-white/10 pb-4">
@@ -328,8 +350,10 @@ export default function GecoPurpleHome({
           </div>
         </div>
       </section>
+      )} />
 
       {/* 7. WHY CHOOSE US & STATS */}
+      <DeferredSection minHeight={720} render={() => (
       <section className="max-w-7xl mx-auto px-4 mb-24">
         <div className="text-center mb-16">
           <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-2">
@@ -423,8 +447,10 @@ export default function GecoPurpleHome({
           </div>
         </div>
       </section>
+      )} />
 
       {/* 8. PRODUCTS CORNER */}
+      <DeferredSection minHeight={620} render={() => (
       <section className="max-w-7xl mx-auto px-4 mb-24">
         <div className="text-center mb-16">
           <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-2">
@@ -451,7 +477,7 @@ export default function GecoPurpleHome({
               <div className="h-64 p-8 flex items-center justify-center bg-[#161824] border-b border-white/5 relative overflow-hidden">
                 <ShoppingBag className="w-24 h-24 text-white/5 group-hover:scale-125 transition-transform duration-500" />
                 <div className="absolute inset-0 flex items-center justify-center p-8">
-                   <img loading="lazy" src={prod.url} alt={prod.name} className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
+                   <img loading="lazy" src={prod.url} srcSet={getResponsiveSrcSet(prod.url, [240, 400])} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" width="400" height="400" alt={getLocText(prod.name)} className="max-w-full max-h-full object-contain mix-blend-screen opacity-50 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
               <div className="p-6 flex flex-col items-center text-center">
@@ -468,6 +494,7 @@ export default function GecoPurpleHome({
           ))}
         </div>
       </section>
+      )} />
 
     </div>
   );

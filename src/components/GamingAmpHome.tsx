@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Phone, Mail, Youtube, Facebook, Twitter, Trophy, Gamepad2, CalendarDays, Sparkles, Send } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 
 export default function GamingAmpHome({ 
   featuredGames, 
@@ -13,8 +14,6 @@ export default function GamingAmpHome({
   tournaments 
 }: any) {
   const { language, dir } = useLanguage();
-  const [activeSlide, setActiveSlide] = useState(0);
-
   const getLocText = (obj: any) => {
     if (!obj) return '';
     return obj[language] || obj.fa || '';
@@ -62,6 +61,7 @@ export default function GamingAmpHome({
   };
 
   const heroGame = featuredGames?.[0];
+  const heroImageUrl = heroGame?.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80';
   const spotlightGames = featuredGames?.slice(1) || [];
 
   return (
@@ -69,16 +69,21 @@ export default function GamingAmpHome({
       
       {/* 1. HERO SLIDER */}
       <section className="relative w-full aspect-[21/9] min-h-[600px] flex items-center justify-center border-b-2 border-[#00d8ff]/30" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 95%, 0% 100%)' }}>
-        <img loading="eager" fetchpriority="high" 
-          src={heroGame?.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80"} 
-          alt="Hero" 
-          className="absolute inset-0 w-full h-full object-cover opacity-100" 
+        <img loading="eager" fetchpriority="high"
+          src={heroImageUrl}
+          srcSet={getResponsiveSrcSet(heroImageUrl, [640, 960, 1280, 1600])}
+          sizes="100vw"
+          width="1600"
+          height="686"
+          alt={getLocText(heroGame?.title) || 'Bazino gaming arena'}
+          className="absolute inset-0 w-full h-full object-cover opacity-100"
+          referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-transparent"></div>
         
         <div className="relative z-10 flex flex-col items-start px-8 md:px-24 w-full max-w-7xl mx-auto">
           <div className="flex items-center gap-3 mb-4">
-            <span className="w-8 h-1 bg-[#00d8ff] animate-pulse"></span>
+            <span className="w-8 h-1 bg-[#00d8ff]"></span>
             <h2 className="text-[#00d8ff] text-sm md:text-lg tracking-[0.3em] uppercase font-bold text-shadow-[0_0_10px_#00d8ff]">
               {heroGame?.badge || 'GAMESITE TEMPLATE'}
             </h2>
@@ -107,6 +112,7 @@ export default function GamingAmpHome({
         
         {/* 2. IN THE SPOTLIGHT (Featured Games) */}
         {spotlightGames.length > 0 && (
+          <DeferredSection minHeight={700} render={() => (
           <section className="space-y-12 relative">
             <div className="absolute top-0 right-0 text-[150px] font-black text-white/5 uppercase select-none pointer-events-none -mt-20 -mr-10">SPOTLIGHT</div>
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-16 text-white relative inline-block w-full">
@@ -131,15 +137,17 @@ export default function GamingAmpHome({
                 </div>
                 <div className="w-full md:w-1/2 relative group">
                   <div className="absolute inset-0 bg-[#00d8ff]/20 opacity-0 group-hover:opacity-100 transition-opacity z-10 mix-blend-overlay"></div>
-                  <img loading="lazy" src={game.imageUrl} alt={getLocText(game.title)} className="w-full h-full object-cover min-h-[400px] filter grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500" />
+                  <img loading="lazy" src={game.imageUrl} srcSet={getResponsiveSrcSet(game.imageUrl, [480, 800, 1200])} sizes="(min-width: 768px) 50vw, 100vw" width="1200" height="800" alt={getLocText(game.title)} className="w-full h-full object-cover min-h-[400px] filter grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500" />
                 </div>
               </div>
             ))}
           </section>
+          )} />
         )}
 
         {/* 3. LOUNGE ZONES (VIRTUAL GAMING Style) */}
         {loungeSections && loungeSections.length > 0 && (
+          <DeferredSection minHeight={800} render={() => (
           <section className="space-y-24">
              {loungeSections.map((zone: any, i: number) => (
                <div key={i} className={`flex flex-col md:flex-row gap-12 items-center ${i % 2 !== 0 ? 'md:flex-row-reverse' : ''}`}>
@@ -161,15 +169,17 @@ export default function GamingAmpHome({
                  </div>
                  <div className="w-full md:w-1/2 relative">
                    <div className="absolute -inset-4 bg-gradient-to-r from-[#00d8ff]/20 to-transparent blur-2xl rounded-full opacity-50"></div>
-                   <img loading="lazy" src={zone.imageUrl} alt="Zone" className="w-full rounded-2xl shadow-2xl relative z-10 border border-white/10" />
+                   <img loading="lazy" src={zone.imageUrl} srcSet={getResponsiveSrcSet(zone.imageUrl, [480, 800, 1200])} sizes="(min-width: 768px) 50vw, 100vw" width="1200" height="800" alt={getLocText(zone.title)} className="w-full rounded-2xl shadow-2xl relative z-10 border border-white/10" />
                  </div>
                </div>
              ))}
           </section>
+          )} />
         )}
 
         {/* 4. TOURNAMENTS CAROUSEL */}
         {tournaments && tournaments.length > 0 && (
+          <DeferredSection minHeight={620} render={() => (
           <section className="relative w-full py-16">
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-12 text-white">
               {language === 'fa' ? 'تورنمنت‌های فعال' : 'ACTIVE TOURNAMENTS'}
@@ -195,16 +205,18 @@ export default function GamingAmpHome({
                   </button>
                 </div>
                 <div className="w-full md:w-1/2 aspect-video md:aspect-auto min-h-[300px] relative bg-black">
-                   <img loading="lazy" src={`https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80`} alt="Tournament" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                   <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80', [480, 800, 1200])} sizes="(min-width: 768px) 50vw, 100vw" width="1200" height="800" alt="Tournament" className="absolute inset-0 w-full h-full object-cover opacity-80" />
                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#161622]"></div>
                 </div>
               </div>
             </div>
           </section>
+          )} />
         )}
 
         {/* 5. LIVE ARENA MATCHBOARD (MASS DEFECT style) */}
         {matchHistory && matchHistory.length > 0 && (
+          <DeferredSection minHeight={620} render={() => (
           <section className="grid md:grid-cols-2 gap-16 py-12 bg-[#161622] p-8 md:p-12 rounded-2xl border border-white/5">
             <div>
               <div className="flex justify-between items-baseline mb-4">
@@ -235,15 +247,17 @@ export default function GamingAmpHome({
                   <div className="flex flex-col w-1/3 text-right">
                     <span className="font-bold text-sm truncate">{match.teamB}</span>
                   </div>
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${match.status === 'Live' ? 'bg-[#ff003c] animate-pulse' : 'bg-transparent'}`}></div>
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${match.status === 'Live' ? 'bg-[#ff003c]' : 'bg-transparent'}`}></div>
                 </div>
               ))}
             </div>
           </section>
+          )} />
         )}
 
         {/* 6. LOUNGE PASSES (RATINGS style but for pricing) */}
         {pricingPackages && pricingPackages.length > 0 && (
+          <DeferredSection minHeight={620} render={() => (
           <section className="py-16">
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-16 text-white">
               {language === 'fa' ? 'تعرفه‌های اشتراک' : 'LOUNGE PASSES'}
@@ -277,10 +291,12 @@ export default function GamingAmpHome({
               ))}
             </div>
           </section>
+          )} />
         )}
 
         {/* 7. COACHES / EXPERTS */}
         {staffTeam && staffTeam.length > 0 && (
+          <DeferredSection minHeight={520} render={() => (
           <section className="bg-[#161622] rounded-2xl p-12 relative overflow-hidden border border-white/5">
             <div className="absolute right-0 top-0 opacity-5 w-64 h-64 -mt-10 -mr-10">
               <Trophy className="w-full h-full" />
@@ -291,7 +307,7 @@ export default function GamingAmpHome({
             <div className="grid md:grid-cols-3 gap-8 relative z-10">
                {staffTeam.slice(0,3).map((coach: any, idx: number) => (
                  <div key={idx} className="flex gap-4 items-center bg-[#111119] p-6 rounded-xl border border-white/5 hover:border-[#00d8ff]/30 transition-colors">
-                   <img loading="lazy" src={coach.imageUrl} alt={getLocText(coach.name)} className="w-20 h-20 rounded-full border-2 border-[#00d8ff] bg-black" />
+                   <img loading="lazy" src={coach.imageUrl} srcSet={getResponsiveSrcSet(coach.imageUrl, [80, 160])} sizes="80px" width="80" height="80" alt={getLocText(coach.name)} className="w-20 h-20 rounded-full border-2 border-[#00d8ff] bg-black" />
                    <div>
                      <h4 className="text-xl font-bold">{getLocText(coach.name)}</h4>
                      <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">{getLocText(coach.role)}</p>
@@ -305,10 +321,12 @@ export default function GamingAmpHome({
                ))}
             </div>
           </section>
+          )} />
         )}
 
         {/* 8. FAQ */}
-        <section className="py-12 max-w-4xl mx-auto">
+        <DeferredSection minHeight={520} render={() => (
+          <section className="py-12 max-w-4xl mx-auto">
           <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-16 text-white">Q&A</h2>
           <div className="grid md:grid-cols-2 gap-x-12 gap-y-12">
             {[
@@ -329,9 +347,11 @@ export default function GamingAmpHome({
             ))}
           </div>
         </section>
+          )} />
 
         {/* 9. CONTACT FORM */}
-        <section className="max-w-4xl mx-auto py-12">
+        <DeferredSection minHeight={520} render={() => (
+          <section className="max-w-4xl mx-auto py-12">
           <div className="bg-[#161622] p-8 md:p-16 rounded-2xl border border-white/5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#00d8ff]/5 rounded-full blur-3xl"></div>
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-12 relative z-10">
@@ -352,18 +372,20 @@ export default function GamingAmpHome({
             </div>
           </div>
         </section>
+          )} />
 
         {/* 10. OUR CONTACTS & MAP */}
-        <section className="py-12 border-t border-white/10 pt-24 pb-12">
+        <DeferredSection minHeight={620} render={() => (
+          <section className="py-12 border-t border-white/10 pt-24 pb-12">
           <div className="flex flex-col md:flex-row gap-16 items-center">
             <div className="w-full md:w-1/2 h-[450px] bg-[#161622] rounded-2xl flex items-center justify-center relative overflow-hidden border border-white/5">
                {/* Cyberpunk Map placeholder */}
-               <img loading="lazy" src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity filter invert hue-rotate-[180deg]" />
+               <img loading="lazy" src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80', [400, 640, 800])} sizes="(min-width: 768px) 50vw, 100vw" width="800" height="450" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity filter invert hue-rotate-[180deg]" />
                <div className="absolute inset-0 bg-[#00d8ff]/10 mix-blend-overlay"></div>
                
                {/* Custom Marker */}
                <div className="relative z-10 flex flex-col items-center">
-                 <div className="w-16 h-16 bg-[#00d8ff]/20 rounded-full flex items-center justify-center animate-ping absolute"></div>
+                 <div className="w-16 h-16 bg-[#00d8ff]/20 rounded-full flex items-center justify-center absolute"></div>
                  <div className="w-12 h-12 bg-[#111119] border-2 border-[#00d8ff] rounded-full flex items-center justify-center relative shadow-[0_0_20px_#00d8ff]">
                    <MapPin className="w-5 h-5 text-[#00d8ff]" />
                  </div>
@@ -418,6 +440,7 @@ export default function GamingAmpHome({
             </div>
           </div>
         </section>
+          )} />
 
       </div>
     </div>

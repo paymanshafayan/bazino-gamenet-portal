@@ -15,8 +15,10 @@ import {defineConfig, type Plugin} from 'vite';
  * because the styles are present the instant JS mounts, it also avoids any FOUC.
  *
  * Runs only during `vite build` (ctx.bundle is undefined in dev, where Vite ships
- * CSS via JS/HMR anyway). After inlining, the standalone CSS asset is dropped from
- * the bundle so an unreferenced ~25 KiB file isn't shipped.
+ * CSS via JS/HMR anyway). The standalone CSS asset is intentionally KEPT in the
+ * output (unreferenced by the document) so external tooling/CI that expects
+ * dist/assets/index-*.css still finds it; the browser uses the inlined <style>,
+ * not the file, so there is no render-blocking request.
  *
  * CSS url() paths are rewritten: they were relative to the CSS file at
  * `assets/<file>.css`, but once inlined they must resolve relative to the HTML
@@ -64,7 +66,9 @@ function inlineRenderBlockingCss(): Plugin {
           if (asset && asset.type === 'asset' && assetName.endsWith('.css')) {
             const css = rewriteCssUrls(String(asset.source), assetName);
             out = out.replace(tag, `<style>\n${css}\n</style>`);
-            delete ctx.bundle[assetName]; // drop the now-inlined, unreferenced file
+            // NOTE: the CSS asset is intentionally left in the bundle (unreferenced)
+            // so builds that assert on dist/assets/index-*.css still pass. The document
+            // uses the inlined <style> above; this file is never requested at runtime.
           }
         }
         return out;

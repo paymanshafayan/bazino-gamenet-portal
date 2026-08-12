@@ -61,7 +61,7 @@ export default function GamingAmpHome({
   };
 
   const heroGame = featuredGames?.[0];
-  const heroImageUrl = heroGame?.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80';
+  const heroImageUrl = heroGame?.imageUrl || '/images/home/esports-1600.webp';
   const spotlightGames = featuredGames?.slice(1) || [];
 
   return (
@@ -71,7 +71,7 @@ export default function GamingAmpHome({
       <section className="relative w-full aspect-[21/9] min-h-[600px] flex items-center justify-center border-b-2 border-[#00d8ff]/30" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 95%, 0% 100%)' }}>
         <img loading="eager" fetchpriority="high"
           src={heroImageUrl}
-          srcSet={getResponsiveSrcSet(heroImageUrl, [640, 960, 1280, 1600])}
+          srcSet={getResponsiveSrcSet(heroImageUrl, [480, 800, 1200, 1600])}
           sizes="100vw"
           width="1600"
           height="686"
@@ -205,7 +205,7 @@ export default function GamingAmpHome({
                   </button>
                 </div>
                 <div className="w-full md:w-1/2 aspect-video md:aspect-auto min-h-[300px] relative bg-black">
-                   <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80', [480, 800, 1200])} sizes="(min-width: 768px) 50vw, 100vw" width="1200" height="800" alt="Tournament" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                   <img loading="lazy" src="/images/home/esports-1200.webp" srcSet={getResponsiveSrcSet('/images/home/esports-1200.webp', [480, 800, 1200])} sizes="(min-width: 768px) 50vw, 100vw" width="1200" height="800" alt="Tournament" className="absolute inset-0 w-full h-full object-cover opacity-80" />
                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#161622]"></div>
                 </div>
               </div>
@@ -380,7 +380,7 @@ export default function GamingAmpHome({
           <div className="flex flex-col md:flex-row gap-16 items-center">
             <div className="w-full md:w-1/2 h-[450px] bg-[#161622] rounded-2xl flex items-center justify-center relative overflow-hidden border border-white/5">
                {/* Cyberpunk Map placeholder */}
-               <img loading="lazy" src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=800&q=80', [400, 640, 800])} sizes="(min-width: 768px) 50vw, 100vw" width="800" height="450" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity filter invert hue-rotate-[180deg]" />
+               <img loading="lazy" src="/images/home/map-800.webp" srcSet={getResponsiveSrcSet('/images/home/map-800.webp', [400, 800])} sizes="(min-width: 768px) 50vw, 100vw" width="800" height="450" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity filter invert hue-rotate-[180deg]" />
                <div className="absolute inset-0 bg-[#00d8ff]/10 mix-blend-overlay"></div>
                
                {/* Custom Marker */}

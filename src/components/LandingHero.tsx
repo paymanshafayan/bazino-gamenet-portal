@@ -8,9 +8,13 @@ interface LandingHeroProps {
  * icons and interactive sections to be parsed and evaluated.
  *
  * HomeTab replaces this with the identical default slide once its lazy chunk is ready.
+ *
+ * The hero image is a first-party /images/home asset (same esports art the preload tag in
+ * index.html points at), so the LCP request is local and discoverable from the initial
+ * document instead of a cross-origin Unsplash fetch discovered only after JS runs.
  */
 export default function LandingHero({ onNavigate }: LandingHeroProps) {
-  const image = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=960&q=70';
+  const image = '/images/home/esports-960.webp';
 
   return (
     <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#050608] shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
@@ -18,13 +22,12 @@ export default function LandingHero({ onNavigate }: LandingHeroProps) {
         loading="eager"
         fetchPriority="high"
         src={image}
-        srcSet="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=480&q=70 480w, https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=720&q=70 720w, https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=960&q=70 960w"
+        srcSet="/images/home/esports-480.webp 480w, /images/home/esports-800.webp 800w, /images/home/esports-960.webp 960w"
         sizes="(min-width: 1024px) 960px, 100vw"
         width="1200"
         height="514"
         alt="رزرو سیستم‌های گیمینگ فوق پیشرفته"
         className="absolute inset-0 w-full h-full object-cover opacity-100"
-        referrerPolicy="no-referrer"
       />
       <div className="absolute inset-0 bg-transparent" />
       <div className="absolute inset-y-0 right-6 md:right-16 lg:right-24 xl:right-32 z-10 flex flex-col justify-center max-w-xl md:max-w-2xl gap-3.5 md:gap-4 text-right" dir="rtl">

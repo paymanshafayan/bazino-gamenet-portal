@@ -159,15 +159,15 @@ export default function DarkGoldHome({
   const getTournamentImage = (game: string) => {
     const lowercaseGame = game.toLowerCase();
     if (lowercaseGame.includes('cs2') || lowercaseGame.includes('counter') || lowercaseGame.includes('valorant')) {
-      return 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80';
+      return '/images/home/esports-960.webp';
     }
     if (lowercaseGame.includes('fifa') || lowercaseGame.includes('fc24') || lowercaseGame.includes('football')) {
-      return 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=800&q=80';
+      return '/images/home/sports-console-960.webp';
     }
     if (lowercaseGame.includes('dota') || lowercaseGame.includes('lol') || lowercaseGame.includes('league')) {
-      return 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80';
+      return '/images/home/rpg-openworld-960.webp';
     }
-    return 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80';
+    return '/images/home/rpg-openworld-960.webp';
   };
   
   const handleContactSubmit = async (e: React.FormEvent) => {
@@ -200,7 +200,7 @@ export default function DarkGoldHome({
       {/* 1. HERO GAME SLIDER (FULL WIDTH, SLANTED & MOBIRISE GAMINGAMP STYLED) */}
       {themeId === 'geco-purple' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-black shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[500px] flex items-center" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 85%, 0% 100%)' }}>
-          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80', [640, 960, 1280, 1600])} sizes="100vw" width="1600" height="900" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
+          <img loading="eager" fetchpriority="high" src="/images/home/esports-1600.webp" srcSet={getResponsiveSrcSet('/images/home/esports-1600.webp', [480, 800, 1200, 1600])} sizes="100vw" width="1600" height="900" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
           
           <div className="relative z-10 w-full max-w-7xl mx-auto px-8 py-20 flex flex-col justify-center h-full">
@@ -224,7 +224,7 @@ export default function DarkGoldHome({
         </section>
       ) : themeId === 'cyberpunk-cyan' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#070b19] min-h-[650px] flex items-center justify-start border-b-[3px] border-[#00f0ff] shadow-[0_10px_50px_rgba(0,240,255,0.2)]">
-          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" srcSet={getResponsiveSrcSet('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80', [640, 960, 1280, 1600])} sizes="100vw" width="1600" height="900" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
+          <img loading="eager" fetchpriority="high" src="/images/home/esports-1600.webp" srcSet={getResponsiveSrcSet('/images/home/esports-1600.webp', [480, 800, 1200, 1600])} sizes="100vw" width="1600" height="900" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
           
           {/* Cyberpunk Grid Overlay */}
           <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: '0.2' }}></div>
@@ -351,7 +351,7 @@ export default function DarkGoldHome({
                 {/* Image banner */}
                 <img loading="lazy"
                   src={genre.imageUrl}
-                  srcSet={getResponsiveSrcSet(genre.imageUrl, [320, 640, 800])}
+                  srcSet={getResponsiveSrcSet(genre.imageUrl, [320, 480, 640])}
                   sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                   width="800"
                   height="960"
@@ -427,7 +427,7 @@ export default function DarkGoldHome({
               <div className="relative aspect-[16/10] w-full bg-dark-bg overflow-hidden border-b border-white/10 shrink-0">
                 <img loading="lazy"
                   src={sect.imageUrl}
-                  srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 640, 800])}
+                  srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 480, 640])}
                   sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw"
                   width="800"
                   height="500"

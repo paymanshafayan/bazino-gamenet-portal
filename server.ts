@@ -57,6 +57,9 @@ import jwt from "jsonwebtoken";
    تنظیم در پنل مدیریت ← سفارشی‌سازی کلوپ ← «منبع داده» (کلید: data_source)
    ═══════════════════════════════════════════════════════════════════ */
 const DATA_SOURCE_SETTING = "data_source";
+const MOBILE_APP_STORE_LINKS_SETTING = "mobile_app_store_links";
+const MOBILE_APP_APK_META_SETTING = "mobile_app_apk_meta";
+const MOBILE_APP_APK_FILE_NAME = "bazino-app.apk";
 export type DataSourceMode = "sample" | "database";
 
 export async function getDataSourceMode(): Promise<DataSourceMode> {
@@ -173,8 +176,10 @@ async function startServer() {
     });
   });
 
-  // Middleware for parsing JSON requests
-  app.use(express.json());
+  // Middleware for parsing JSON requests. APK uploads from the admin panel are sent as
+  // base64 JSON so the upload progress can be tracked in-browser without adding a new
+  // multipart dependency.
+  app.use(express.json({ limit: "260mb" }));
 
   // CORS: needed for the Management App desktop build, which runs its OWN local server +
   // database and calls this server's /api/sync/* endpoints from a different origin over
@@ -2251,6 +2256,110 @@ Decide whether one of the available functions matches what the user is asking fo
       await store.deleteSlider(id);
       const list = await store.listSliders();
       res.json({ success: true, appSliders: list });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // =========================================================================
+  // MOBILE APP DOWNLOADS — مستقل از قالب سایت
+  // =========================================================================
+  const getMobileAppDownloadDir = () => path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "downloads");
+  const getMobileAppApkPath = () => path.join(getMobileAppDownloadDir(), MOBILE_APP_APK_FILE_NAME);
+
+  const getMobileAppConfig = async () => {
+    const store = getActiveDataProvider();
+    let storeLinks: any[] = [];
+    let apkMeta: any = {};
+    try {
+      const rawLinks = await store.getSetting(MOBILE_APP_STORE_LINKS_SETTING);
+      if (rawLinks) storeLinks = JSON.parse(rawLinks);
+    } catch {
+      storeLinks = [];
+    }
+    try {
+      const rawMeta = await store.getSetting(MOBILE_APP_APK_META_SETTING);
+      if (rawMeta) apkMeta = JSON.parse(rawMeta);
+    } catch {
+      apkMeta = {};
+    }
+    const apkPath = getMobileAppApkPath();
+    const apkAvailable = fs.existsSync(apkPath);
+    const stat = apkAvailable ? fs.statSync(apkPath) : null;
+    return {
+      apkAvailable,
+      apkFileName: apkMeta.originalName || MOBILE_APP_APK_FILE_NAME,
+      apkSize: stat?.size || apkMeta.size || 0,
+      apkUploadedAt: apkMeta.uploadedAt || (stat ? stat.mtime.toISOString() : ""),
+      directDownloadUrl: "/api/mobile-app/download",
+      storeLinks: Array.isArray(storeLinks) ? storeLinks : []
+    };
+  };
+
+  app.get("/api/mobile-app", async (_req, res) => {
+    try {
+      res.json(await getMobileAppConfig());
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.get("/api/mobile-app/download", async (_req, res) => {
+    const apkPath = getMobileAppApkPath();
+    if (!fs.existsSync(apkPath)) {
+      return res.status(404).json({ error: "فایل APK هنوز توسط مدیر آپلود نشده است." });
+    }
+    res.download(apkPath, MOBILE_APP_APK_FILE_NAME, (err) => {
+      if (err) {
+        console.error("Error downloading mobile APK:", err);
+        if (!res.headersSent) res.status(500).json({ error: "خطا در دانلود فایل APK" });
+      }
+    });
+  });
+
+  app.post("/api/admin/mobile-app/upload-apk", async (req, res) => {
+    try {
+      const { fileName, dataBase64 } = req.body || {};
+      if (!fileName || !String(fileName).toLowerCase().endsWith(".apk")) {
+        return res.status(400).json({ error: "Only .apk files are allowed" });
+      }
+      if (!dataBase64 || typeof dataBase64 !== "string") {
+        return res.status(400).json({ error: "Missing APK file data" });
+      }
+      const base64 = dataBase64.includes(",") ? dataBase64.split(",").pop()! : dataBase64;
+      const buffer = Buffer.from(base64, "base64");
+      if (buffer.length === 0) {
+        return res.status(400).json({ error: "Empty APK file" });
+      }
+      if (buffer.length > 160 * 1024 * 1024) {
+        return res.status(413).json({ error: "APK file is too large" });
+      }
+      fs.mkdirSync(getMobileAppDownloadDir(), { recursive: true });
+      fs.writeFileSync(getMobileAppApkPath(), buffer);
+      const meta = { originalName: fileName, size: buffer.length, uploadedAt: new Date().toISOString() };
+      await getActiveDataProvider().setSetting(MOBILE_APP_APK_META_SETTING, JSON.stringify(meta));
+      res.json({ success: true, ...(await getMobileAppConfig()) });
+    } catch (e) {
+      console.error("Mobile APK upload failed:", e);
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/admin/mobile-app/store-links", async (req, res) => {
+    try {
+      const links = Array.isArray(req.body?.links) ? req.body.links : [];
+      const cleanLinks = links
+        .filter((x: any) => x && typeof x.url === "string" && /^https?:\/\//i.test(x.url))
+        .map((x: any) => ({
+          id: String(x.id || "store-" + Math.random().toString(36).substring(2, 9)),
+          kind: String(x.kind || "other"),
+          labelFa: String(x.labelFa || x.labelEn || "دانلود اپلیکیشن"),
+          labelEn: String(x.labelEn || x.labelFa || "Download app"),
+          url: String(x.url),
+          isActive: x.isActive !== false
+        }));
+      await getActiveDataProvider().setSetting(MOBILE_APP_STORE_LINKS_SETTING, JSON.stringify(cleanLinks));
+      res.json({ success: true, storeLinks: cleanLinks });
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }

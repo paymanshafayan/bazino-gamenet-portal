@@ -25,3 +25,9 @@ database.json
 .gemini/
 .windsurf/
 .claude-plugin/
+
+# Runtime-uploaded mobile app binaries
+public/downloads/*.apk
+public/downloads/*.aab
+public/downloads/*.ipa
+!public/downloads/.gitkeep

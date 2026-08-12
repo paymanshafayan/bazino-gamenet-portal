@@ -32,11 +32,14 @@ import {
   RefreshCw,
   Key,
   HelpCircle,
-  MessageSquare
+  MessageSquare,
+  Smartphone,
+  Download
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
 import VisualHelpGuide from './VisualHelpGuide';
+import AdminMobileAppDownloadPanel from './AdminMobileAppDownloadPanel';
 import type { ThemeInfo } from '../themes';
 import {
   parseThemeZip,
@@ -66,7 +69,7 @@ export default function AdminPanelTab({
   setLayoutMode
 }: Props) {
   const { language, dir } = useLanguage();
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'systems' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'chat' | 'migrations' | 'messages' | 'themes' | 'appSlider' | 'customization' | 'dbLogs' | 'apiKeys'>('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'systems' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'chat' | 'migrations' | 'messages' | 'themes' | 'appSlider' | 'mobileAppDownload' | 'customization' | 'dbLogs' | 'apiKeys'>('dashboard');
   const [isLocalHelpOpen, setIsLocalHelpOpen] = useState(false);
   
   // Real-time server states
@@ -1330,6 +1333,17 @@ export default function AdminPanelTab({
             <span>{language === 'fa' ? 'اسلایدر اپلیکیشن فلاتر' : 'Flutter App Slider'}</span>
           </button>
           <button
+            onClick={() => setActiveSubTab('mobileAppDownload')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'mobileAppDownload'
+                ? 'bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.3)]'
+                : 'text-cyan-300 hover:text-white hover:bg-cyan-400/5'
+            }`}
+          >
+            <Smartphone className="w-4 h-4" />
+            <span>{language === 'fa' ? 'دانلود اپلیکیشن' : 'App Download'}</span>
+          </button>
+          <button
             onClick={() => setActiveSubTab('customization')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
               activeSubTab === 'customization'
@@ -1389,6 +1403,7 @@ export default function AdminPanelTab({
                         activeSubTab === 'messages' ? 'پیام‌ها و اعلان‌ها' :
                         activeSubTab === 'themes' ? 'قالب‌ها' :
                         activeSubTab === 'appSlider' ? 'اسلایدر اپ' :
+                        activeSubTab === 'mobileAppDownload' ? 'دانلود اپلیکیشن' :
                         activeSubTab === 'customization' ? 'سفارشی‌سازی' :
                         activeSubTab === 'dbLogs' ? 'لاگ‌های دیتابیس' :
                         'تنظیمات کلید‌ها'
@@ -1526,6 +1541,12 @@ export default function AdminPanelTab({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeSubTab === 'mobileAppDownload' && (
+            <div className="animate-fade-in">
+              <AdminMobileAppDownloadPanel addNotification={addNotification} />
             </div>
           )}
           

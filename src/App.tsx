@@ -31,6 +31,8 @@ const ThemeSelectorModal = lazy(() => import('./components/ThemeSelectorModal'))
 const ConsoleHubView = lazy(() => import('./components/ConsoleHubView'));
 const ConsoleGridClassic = lazy(() => import('./components/ConsoleGridClassic'));
 const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
+const MobileAppDownloadPage = lazy(() => import('./components/MobileAppDownloadPage'));
+const MobileAppDownloadWidget = lazy(() => import('./components/MobileAppDownloadWidget'));
 import { useLanguage } from './context/LanguageContext';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
@@ -94,6 +96,9 @@ export default function App() {
     });
   };
 
+  const [activeTab, setActiveTab] = useState('home');
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+
   // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
   useEffect(() => {
     fetch('/api/themes')
@@ -141,7 +146,25 @@ export default function App() {
     localStorage.setItem('layoutMode', layoutMode);
   }, [layoutMode]);
 
-  const [activeTab, setActiveTab] = useState('home');
+  useEffect(() => {
+    const onPopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const openAppDownloadPage = () => {
+    window.history.pushState({}, '', '/app-download');
+    setCurrentPath('/app-download');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const backToHomeFromDownload = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentPath('/');
+    setActiveTab('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Keep the LCP-only LandingHero as the first commit. HomeTab contains all below-fold
   // cards and effects, so mounting it only after the load event's first idle window avoids
   // competing style/layout work with the hero image paint.
@@ -163,7 +186,6 @@ export default function App() {
   const [activeCoupons, setActiveCoupons] = useState<DiscountCode[]>([]);
 
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; type: 'success' | 'error' | 'info' }>>([]);
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
@@ -443,6 +465,18 @@ export default function App() {
     );
   }
 
+  if (currentPath === '/app-download') {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#060914] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-300 rounded-full animate-spin"></div>
+        </div>
+      }>
+        <MobileAppDownloadPage onBackHome={backToHomeFromDownload} />
+      </Suspense>
+    );
+  }
+
   return (
     <div 
       className={`theme-${themeId || "dark-gold"} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} pb-[env(safe-area-inset-bottom,0px)] w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
@@ -627,6 +661,12 @@ export default function App() {
           />
         )}
       </Suspense>
+
+      {activeTab === 'home' && layoutMode !== 'hub' && (
+        <Suspense fallback={null}>
+          <MobileAppDownloadWidget onOpenDownloadPage={openAppDownloadPage} />
+        </Suspense>
+      )}
 
       {/* Logout Confirmation Modal */}
       {isLogoutConfirmOpen && (

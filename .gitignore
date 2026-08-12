@@ -16,8 +16,11 @@ database.json
 # Runtime-installed theme packages (installed via admin panel ZIP upload) — only at repo root
 /themes/
 
-# Deliverable/export archives — never commit zip bundles into the repo
+# Deliverable/export archives and transient root-level reports/logs — never commit into the repo
 *.zip
+/logs_*.zip
+/GTmetrix-report*.pdf
+/bazino.mp4
 
 # AI assistant skill folders (installed per-machine via CLI, not part of the project)
 .claude/
@@ -25,3 +28,9 @@ database.json
 .gemini/
 .windsurf/
 .claude-plugin/
+
+# Runtime-uploaded mobile app binaries
+public/downloads/*.apk
+public/downloads/*.aab
+public/downloads/*.ipa
+!public/downloads/.gitkeep

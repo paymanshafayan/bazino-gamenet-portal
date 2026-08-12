@@ -77,6 +77,14 @@ class _HubScreenState extends State<HubScreen> {
         _currentIndex = 4;
       } else if (target == 'loyalty') {
         _currentIndex = 5;
+      } else if (target == 'messages') {
+        _currentIndex = 6;
+      } else if (target == 'chat') {
+        _currentIndex = 7;
+      } else if (target == 'blog') {
+        _currentIndex = 8;
+      } else {
+        _currentIndex = 0;
       }
     });
   }
@@ -92,7 +100,7 @@ class _HubScreenState extends State<HubScreen> {
     // Index 2: Cafe
     // Index 3: Shop
     // Index 4: Tournament/Arena
-    // Index 5: Loyalty/Profile
+    // Index 5: Loyalty/Profile; 6-8 are voice-opened utility sections.
     final List<Widget> screens = [
       _buildHomeSlider(appState),
       const ReservationScreen(),
@@ -100,6 +108,9 @@ class _HubScreenState extends State<HubScreen> {
       const ShopScreen(),
       const TournamentScreen(),
       const LoyaltyScreen(),
+      const MessagesScreen(),
+      const ChatScreen(),
+      const BlogScreen(),
     ];
 
     return Scaffold(
@@ -374,7 +385,7 @@ class _HubScreenState extends State<HubScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    isFa ? slide.titleFa : slide.titleEn,
+                                    slide.titleFor(appState.language),
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Colors.white,
@@ -540,7 +551,7 @@ class _HubScreenState extends State<HubScreen> {
             context: context,
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
-            builder: (context) => const JarvisAssistantModal(),
+            builder: (context) => JarvisAssistantModal(onNavigate: _navigateToSection),
           );
         },
         child: const HexagonBadge(

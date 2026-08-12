@@ -6,6 +6,23 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_config.dart';
 
+String _localizedValue(Map<String, dynamic> json, String baseKey, String language, String fallback) {
+  final suffix = language == 'fa'
+      ? 'Fa'
+      : language == 'ru'
+          ? 'Ru'
+          : language == 'tr'
+              ? 'Tr'
+              : 'En';
+  return (json['$baseKey$suffix'] ?? json[baseKey] ?? fallback).toString();
+}
+
+String _resolveMediaUrl(String url) {
+  if (url.isEmpty || url.startsWith('http://') || url.startsWith('https://')) return url;
+  final base = kApiBaseUrl.endsWith('/') ? kApiBaseUrl.substring(0, kApiBaseUrl.length - 1) : kApiBaseUrl;
+  return '$base${url.startsWith('/') ? url : '/$url'}';
+}
+
 // -----------------------------------------------------------------------------
 // Domain Entities — each has a fromJson() that matches the REAL backend's
 // response shape (server.ts / server/dataProviders.ts), so nothing here is
@@ -18,6 +35,8 @@ class AppSlider {
   final String target;
   final String titleFa;
   final String titleEn;
+  final String titleRu;
+  final String titleTr;
 
   AppSlider({
     required this.id,
@@ -25,17 +44,29 @@ class AppSlider {
     required this.target,
     required this.titleFa,
     required this.titleEn,
+    required this.titleRu,
+    required this.titleTr,
   });
 
   factory AppSlider.fromJson(Map<String, dynamic> json) {
     return AppSlider(
       id: json['id'] ?? '',
-      imageUrl: json['imageUrl'] ?? '',
+      imageUrl: _resolveMediaUrl(json['mobileImageUrl'] ?? json['imageUrl'] ?? ''),
       target: json['target'] ?? '',
-      titleFa: json['titleFa'] ?? '',
-      titleEn: json['titleEn'] ?? '',
+      titleFa: json['titleFa'] ?? json['title'] ?? '',
+      titleEn: json['titleEn'] ?? json['title'] ?? '',
+      titleRu: json['titleRu'] ?? json['titleEn'] ?? json['title'] ?? '',
+      titleTr: json['titleTr'] ?? json['titleEn'] ?? json['title'] ?? '',
     );
   }
+
+  String titleFor(String language) => language == 'fa'
+      ? titleFa
+      : language == 'ru'
+          ? titleRu
+          : language == 'tr'
+              ? titleTr
+              : titleEn;
 }
 
 class UserState {
@@ -202,6 +233,10 @@ class GameSystem {
 class CafeItem {
   final String id;
   final String name;
+  final String nameFa;
+  final String nameEn;
+  final String nameRu;
+  final String nameTr;
   final String category; // 'Foods', 'Drinks', 'Snacks'
   final num price;
   final String imageUrl;
@@ -211,6 +246,10 @@ class CafeItem {
   CafeItem({
     required this.id,
     required this.name,
+    required this.nameFa,
+    required this.nameEn,
+    required this.nameRu,
+    required this.nameTr,
     required this.category,
     required this.price,
     required this.imageUrl,
@@ -219,16 +258,29 @@ class CafeItem {
   });
 
   factory CafeItem.fromJson(Map<String, dynamic> json) {
+    final name = (json['name'] ?? '').toString();
     return CafeItem(
       id: json['id'] ?? '',
-      name: json['name'] ?? '',
+      name: name,
+      nameFa: _localizedValue(json, 'name', 'fa', name),
+      nameEn: _localizedValue(json, 'name', 'en', name),
+      nameRu: _localizedValue(json, 'name', 'ru', name),
+      nameTr: _localizedValue(json, 'name', 'tr', name),
       category: json['category'] ?? 'Foods',
       price: json['price'] ?? 0,
-      imageUrl: json['imageUrl'] ?? '',
+      imageUrl: _resolveMediaUrl(json['mobileImageUrl'] ?? json['imageUrl'] ?? ''),
       inventory: (json['inventory'] ?? 0) as int,
       isAvailable: json['isAvailable'] ?? true,
     );
   }
+
+  String nameFor(String language) => language == 'fa'
+      ? nameFa
+      : language == 'ru'
+          ? nameRu
+          : language == 'tr'
+              ? nameTr
+              : nameEn;
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'category': category, 'price': price, 'imageUrl': imageUrl};
 }
@@ -236,7 +288,15 @@ class CafeItem {
 class Accessory {
   final String id;
   final String name;
+  final String nameFa;
+  final String nameEn;
+  final String nameRu;
+  final String nameTr;
   final String description;
+  final String descriptionFa;
+  final String descriptionEn;
+  final String descriptionRu;
+  final String descriptionTr;
   final num price;
   final String imageUrl;
   int stock;
@@ -245,7 +305,15 @@ class Accessory {
   Accessory({
     required this.id,
     required this.name,
+    required this.nameFa,
+    required this.nameEn,
+    required this.nameRu,
+    required this.nameTr,
     required this.description,
+    required this.descriptionFa,
+    required this.descriptionEn,
+    required this.descriptionRu,
+    required this.descriptionTr,
     required this.price,
     required this.imageUrl,
     required this.stock,
@@ -253,16 +321,42 @@ class Accessory {
   });
 
   factory Accessory.fromJson(Map<String, dynamic> json) {
+    final name = (json['name'] ?? '').toString();
+    final desc = (json['description'] ?? '').toString();
     return Accessory(
       id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
+      name: name,
+      nameFa: _localizedValue(json, 'name', 'fa', name),
+      nameEn: _localizedValue(json, 'name', 'en', name),
+      nameRu: _localizedValue(json, 'name', 'ru', name),
+      nameTr: _localizedValue(json, 'name', 'tr', name),
+      description: desc,
+      descriptionFa: _localizedValue(json, 'description', 'fa', desc),
+      descriptionEn: _localizedValue(json, 'description', 'en', desc),
+      descriptionRu: _localizedValue(json, 'description', 'ru', desc),
+      descriptionTr: _localizedValue(json, 'description', 'tr', desc),
       price: json['price'] ?? 0,
-      imageUrl: json['imageUrl'] ?? '',
+      imageUrl: _resolveMediaUrl(json['mobileImageUrl'] ?? json['imageUrl'] ?? ''),
       stock: (json['stock'] ?? 0) as int,
       category: json['category'] ?? '',
     );
   }
+
+  String nameFor(String language) => language == 'fa'
+      ? nameFa
+      : language == 'ru'
+          ? nameRu
+          : language == 'tr'
+              ? nameTr
+              : nameEn;
+
+  String descriptionFor(String language) => language == 'fa'
+      ? descriptionFa
+      : language == 'ru'
+          ? descriptionRu
+          : language == 'tr'
+              ? descriptionTr
+              : descriptionEn;
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'description': description, 'price': price, 'imageUrl': imageUrl};
 }
@@ -329,6 +423,10 @@ class TournamentBracket {
 class Tournament {
   final String id;
   final String title;
+  final String titleFa;
+  final String titleEn;
+  final String titleRu;
+  final String titleTr;
   final String game;
   final num registrationFee;
   final String startDate;
@@ -341,6 +439,10 @@ class Tournament {
   Tournament({
     required this.id,
     required this.title,
+    required this.titleFa,
+    required this.titleEn,
+    required this.titleRu,
+    required this.titleTr,
     required this.game,
     required this.registrationFee,
     required this.startDate,
@@ -352,9 +454,14 @@ class Tournament {
   });
 
   factory Tournament.fromJson(Map<String, dynamic> json) {
+    final title = (json['title'] ?? '').toString();
     return Tournament(
       id: json['id'] ?? '',
-      title: json['title'] ?? '',
+      title: title,
+      titleFa: _localizedValue(json, 'title', 'fa', title),
+      titleEn: _localizedValue(json, 'title', 'en', title),
+      titleRu: _localizedValue(json, 'title', 'ru', title),
+      titleTr: _localizedValue(json, 'title', 'tr', title),
       game: json['game'] ?? '',
       registrationFee: json['registrationFee'] ?? 0,
       startDate: json['startDate'] ?? '',
@@ -365,6 +472,14 @@ class Tournament {
       bracket: TournamentBracket.fromJson(json['bracket']),
     );
   }
+
+  String titleFor(String language) => language == 'fa'
+      ? titleFa
+      : language == 'ru'
+          ? titleRu
+          : language == 'tr'
+              ? titleTr
+              : titleEn;
 }
 
 class BlogComment {
@@ -383,36 +498,99 @@ class BlogComment {
 class Article {
   final String id;
   final String title;
+  final String titleFa;
+  final String titleEn;
+  final String titleRu;
+  final String titleTr;
   final String content;
+  final String contentFa;
+  final String contentEn;
+  final String contentRu;
+  final String contentTr;
   final String category;
   final String imageUrl;
   final String author;
+  final String authorFa;
+  final String authorEn;
+  final String authorRu;
+  final String authorTr;
   final String date;
   final List<BlogComment> comments;
 
   Article({
     required this.id,
     required this.title,
+    required this.titleFa,
+    required this.titleEn,
+    required this.titleRu,
+    required this.titleTr,
     required this.content,
+    required this.contentFa,
+    required this.contentEn,
+    required this.contentRu,
+    required this.contentTr,
     required this.category,
     required this.imageUrl,
     required this.author,
+    required this.authorFa,
+    required this.authorEn,
+    required this.authorRu,
+    required this.authorTr,
     required this.date,
     required this.comments,
   });
 
   factory Article.fromJson(Map<String, dynamic> json) {
+    final title = (json['title'] ?? '').toString();
+    final content = (json['content'] ?? '').toString();
+    final author = (json['author'] ?? '').toString();
     return Article(
       id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      content: json['content'] ?? '',
+      title: title,
+      titleFa: _localizedValue(json, 'title', 'fa', title),
+      titleEn: _localizedValue(json, 'title', 'en', title),
+      titleRu: _localizedValue(json, 'title', 'ru', title),
+      titleTr: _localizedValue(json, 'title', 'tr', title),
+      content: content,
+      contentFa: _localizedValue(json, 'content', 'fa', content),
+      contentEn: _localizedValue(json, 'content', 'en', content),
+      contentRu: _localizedValue(json, 'content', 'ru', content),
+      contentTr: _localizedValue(json, 'content', 'tr', content),
       category: json['category'] ?? '',
-      imageUrl: json['imageUrl'] ?? '',
-      author: json['author'] ?? '',
+      imageUrl: _resolveMediaUrl(json['mobileImageUrl'] ?? json['imageUrl'] ?? ''),
+      author: author,
+      authorFa: _localizedValue(json, 'author', 'fa', author),
+      authorEn: _localizedValue(json, 'author', 'en', author),
+      authorRu: _localizedValue(json, 'author', 'ru', author),
+      authorTr: _localizedValue(json, 'author', 'tr', author),
       date: json['date'] ?? '',
       comments: (json['comments'] as List?)?.map((e) => BlogComment.fromJson(e as Map<String, dynamic>)).toList() ?? [],
     );
   }
+
+  String titleFor(String language) => language == 'fa'
+      ? titleFa
+      : language == 'ru'
+          ? titleRu
+          : language == 'tr'
+              ? titleTr
+              : titleEn;
+
+  String contentFor(String language) => language == 'fa'
+      ? contentFa
+      : language == 'ru'
+          ? contentRu
+          : language == 'tr'
+              ? contentTr
+              : contentEn;
+
+  String authorFor(String language) => language == 'fa'
+      ? authorFa
+      : language == 'ru'
+          ? authorRu
+          : language == 'tr'
+              ? authorTr
+              : authorEn;
 }
 
 class AppMessage {
@@ -464,6 +642,7 @@ class AppState extends ChangeNotifier {
   TextDirection get textDirection => _language == 'fa' ? TextDirection.rtl : TextDirection.ltr;
 
   String? _authToken;
+  String? get authToken => _authToken;
   bool get isLoggedIn => _authToken != null && _user.username != 'Guest';
 
   UserState _user = UserState.guest();

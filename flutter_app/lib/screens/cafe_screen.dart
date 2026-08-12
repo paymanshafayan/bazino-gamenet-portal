@@ -122,7 +122,7 @@ class _CafeScreenState extends State<CafeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item.name,
+                              item.nameFor(appState.language),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),

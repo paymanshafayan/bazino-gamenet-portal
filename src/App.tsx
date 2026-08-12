@@ -31,6 +31,8 @@ const ThemeSelectorModal = lazy(() => import('./components/ThemeSelectorModal'))
 const ConsoleHubView = lazy(() => import('./components/ConsoleHubView'));
 const ConsoleGridClassic = lazy(() => import('./components/ConsoleGridClassic'));
 const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
+const MobileAppDownloadPage = lazy(() => import('./components/MobileAppDownloadPage'));
+const MobileAppDownloadWidget = lazy(() => import('./components/MobileAppDownloadWidget'));
 import { useLanguage } from './context/LanguageContext';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
@@ -94,6 +96,9 @@ export default function App() {
     });
   };
 
+  const [activeTab, setActiveTab] = useState('home');
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+
   // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
   useEffect(() => {
     fetch('/api/themes')
@@ -141,11 +146,30 @@ export default function App() {
     localStorage.setItem('layoutMode', layoutMode);
   }, [layoutMode]);
 
-  const [activeTab, setActiveTab] = useState('home');
+  useEffect(() => {
+    const onPopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const openAppDownloadPage = () => {
+    window.history.pushState({}, '', '/app-download');
+    setCurrentPath('/app-download');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const backToHomeFromDownload = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentPath('/');
+    setActiveTab('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Keep the LCP-only LandingHero as the first commit. HomeTab contains all below-fold
   // cards and effects, so mounting it only after the load event's first idle window avoids
   // competing style/layout work with the hero image paint.
   const [isHomeContentReady, setIsHomeContentReady] = useState(false);
+  const [isAppDownloadWidgetReady, setIsAppDownloadWidgetReady] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
   const [user, setUser] = useState<UserState | null>(null);
@@ -163,7 +187,6 @@ export default function App() {
   const [activeCoupons, setActiveCoupons] = useState<DiscountCode[]>([]);
 
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; type: 'success' | 'error' | 'info' }>>([]);
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
@@ -274,6 +297,29 @@ export default function App() {
       }
     };
   }, []);
+
+  // کارت QR دانلود اپلیکیشن عمداً بعد از LCP و در idle mount می‌شود تا chunk کوچک
+  // خودش و درخواست تصویر QR وارد مسیر بحرانی صفحه اصلی/GTmetrix نشوند.
+  useEffect(() => {
+    if (activeTab !== 'home' || layoutMode === 'hub' || !isHomeContentReady) {
+      setIsAppDownloadWidgetReady(false);
+      return;
+    }
+    let timer: number | undefined;
+    const win = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (typeof win.requestIdleCallback === 'function') {
+      timer = win.requestIdleCallback(() => setIsAppDownloadWidgetReady(true), { timeout: 2500 });
+    } else {
+      timer = window.setTimeout(() => setIsAppDownloadWidgetReady(true), 1600);
+    }
+    return () => {
+      if (timer !== undefined && typeof win.cancelIdleCallback === 'function') win.cancelIdleCallback(timer);
+      else if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activeTab, layoutMode, isHomeContentReady]);
 
   const handleRedeemPoints = async (points: number, couponValue: number, code: string) => {
     if (!user) return;
@@ -443,9 +489,37 @@ export default function App() {
     );
   }
 
+  if (currentPath === '/app-download') {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#060914] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-300 rounded-full animate-spin"></div>
+        </div>
+      }>
+        <MobileAppDownloadPage onBackHome={backToHomeFromDownload} />
+      </Suspense>
+    );
+  }
+
+  const isAdminView = activeTab === 'admin';
+  const adminShellVars = isAdminView ? {
+    '--primary-color': '#00e5ff',
+    '--primary-hover-color': '#67e8f9',
+    '--dark-bg-color': '#070b16',
+    '--dark-card-color': '#111827',
+    '--color-primary': '#00e5ff',
+    '--color-primary-hover': '#67e8f9',
+    '--color-dark-bg': '#070b16',
+    '--color-dark-card': '#111827',
+    '--theme-bg': '#070b16',
+    '--theme-card-bg': '#111827',
+    '--theme-card-border': 'rgba(255,255,255,0.10)',
+  } as React.CSSProperties : undefined;
+
   return (
     <div 
-      className={`theme-${themeId || "dark-gold"} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} pb-[env(safe-area-inset-bottom,0px)] w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
+      className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} pb-[env(safe-area-inset-bottom,0px)] w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
+      style={adminShellVars}
       dir={dir}
     >
       {/* Admin Ribbon Bar */}
@@ -627,6 +701,12 @@ export default function App() {
           />
         )}
       </Suspense>
+
+      {activeTab === 'home' && layoutMode !== 'hub' && isAppDownloadWidgetReady && (
+        <Suspense fallback={null}>
+          <MobileAppDownloadWidget onOpenDownloadPage={openAppDownloadPage} />
+        </Suspense>
+      )}
 
       {/* Logout Confirmation Modal */}
       {isLogoutConfirmOpen && (

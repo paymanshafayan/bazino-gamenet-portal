@@ -116,9 +116,28 @@ function listFilesRecursive(dir: string): string[] {
 /* ═══════════════════════════════════════════════════════════════
  *  نصب قالب از ZIP — استخراج به پوشه اختصاصی قالب
  * ═══════════════════════════════════════════════════════════════ */
+function validateThemeComponentJs(componentJs: string): string | null {
+  try {
+    // Parse-only syntax validation; does not execute uploaded code.
+    // Runtime execution remains sandboxed to the browser, but invalid syntax or a
+    // missing SDK registration would otherwise break the homepage after install.
+    // eslint-disable-next-line no-new-func
+    new Function(componentJs);
+  } catch (e: any) {
+    return `theme.js خطای syntax دارد: ${e?.message || String(e)}`;
+  }
+  if (!/BazinoThemeSDK/.test(componentJs) || !/\.registerComponent\s*\(\s*['"]home['"]/.test(componentJs)) {
+    return "theme.js باید کامپوننت صفحه اصلی را با window.BazinoThemeSDK.registerComponent('home', ...) ثبت کند";
+  }
+  return null;
+}
+
 export async function installThemeZip(buffer: Uint8Array, fallbackName?: string): Promise<{ theme: InstalledThemeInfo; parsed: ParsedZipTheme; performance: ThemePerformanceReport } | { error: string; performance?: ThemePerformanceReport }> {
   const parsed = parseThemeZip(buffer, fallbackName);
   if (isZipParseError(parsed)) return { error: parsed.error };
+
+  const componentError = validateThemeComponentJs(parsed.componentJs);
+  if (componentError) return { error: componentError };
 
   // This gate runs before any file is written. It safely applies deterministic fixes
   // (SVG/font policy/Google Fonts) and rejects only package-size violations.
@@ -132,6 +151,8 @@ export async function installThemeZip(buffer: Uint8Array, fallbackName?: string)
     return { error: blockers || "قالب معیارهای عملکرد را پاس نکرد", performance: performanceResult.report };
   }
   const optimized = performanceResult.theme;
+  const optimizedComponentError = validateThemeComponentJs(optimized.componentJs);
+  if (optimizedComponentError) return { error: optimizedComponentError, performance: performanceResult.report };
 
   const id = sanitizeThemeId(optimized.meta.id || "");
   const dir = getThemeDir(id);

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../api_config.dart';
@@ -51,11 +52,18 @@ class JarvisStateProvider extends ChangeNotifier {
   bool _isListening = false;
   bool _isMuted = false;
   bool _isProcessing = false;
+  bool _isSpeaking = false;
+  bool _handsFreeMode = false;
+  bool _isHandlingFinalSpeech = false;
+  double _voiceLevel = 0.0;
+  String? _pendingNavigationSection;
+  Timer? _speakingPulseTimer;
   final String _currentResponseText = "";
   String _liveTranscript = "";
   final List<JarvisMessage> _chatHistory = [];
 
   final stt.SpeechToText _speech = stt.SpeechToText();
+  final FlutterTts _tts = FlutterTts();
   bool _speechAvailable = false;
 
   JarvisCharacter get character => _character;
@@ -63,7 +71,16 @@ class JarvisStateProvider extends ChangeNotifier {
   bool get isListening => _isListening;
   bool get isMuted => _isMuted;
   bool get isProcessing => _isProcessing;
+  bool get isSpeaking => _isSpeaking;
+  bool get handsFreeMode => _handsFreeMode;
+  double get voiceLevel => _voiceLevel;
   String get currentResponseText => _currentResponseText;
+
+  String? consumePendingNavigationSection() {
+    final section = _pendingNavigationSection;
+    _pendingNavigationSection = null;
+    return section;
+  }
   String get liveTranscript => _liveTranscript;
   List<JarvisMessage> get chatHistory => _chatHistory;
   bool get speechAvailable => _speechAvailable;
@@ -75,7 +92,39 @@ class JarvisStateProvider extends ChangeNotifier {
       timestamp: _now(),
     ));
     _initSpeech();
+    _initTts();
   }
+
+  Future<void> _initTts() async {
+    await _tts.awaitSpeakCompletion(true);
+    await _tts.setSpeechRate(0.48);
+    await _tts.setVolume(1.0);
+    await _tts.setPitch(1.02);
+    _tts.setStartHandler(() {
+      _isSpeaking = true;
+      _avatarState = JarvisAvatarState.talking;
+      _startSpeakingPulse();
+      notifyListeners();
+    });
+    _tts.setCompletionHandler(() {
+      _isSpeaking = false;
+      _voiceLevel = 0.0;
+      _speakingPulseTimer?.cancel();
+      _avatarState = JarvisAvatarState.idle;
+      notifyListeners();
+      if (_handsFreeMode && _lastAppState != null) {
+        Future.delayed(const Duration(milliseconds: 450), () => startListening(_lastAppState!, continuous: true));
+      }
+    });
+    _tts.setErrorHandler((_) {
+      _isSpeaking = false;
+      _voiceLevel = 0.0;
+      _speakingPulseTimer?.cancel();
+      notifyListeners();
+    });
+  }
+
+  AppState? _lastAppState;
 
   String _now() {
     final now = DateTime.now();
@@ -108,12 +157,41 @@ class JarvisStateProvider extends ChangeNotifier {
 
   void toggleMute() {
     _isMuted = !_isMuted;
+    if (_isMuted) _tts.stop();
     notifyListeners();
+  }
+
+  void _startSpeakingPulse() {
+    _speakingPulseTimer?.cancel();
+    var tick = 0;
+    _speakingPulseTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+      tick++;
+      _voiceLevel = 0.35 + (math.sin(tick * 0.9).abs() * 0.55) + (math.Random().nextDouble() * 0.1);
+      notifyListeners();
+    });
+  }
+
+  Future<void> toggleHandsFreeConversation(AppState appState) async {
+    _lastAppState = appState;
+    _handsFreeMode = !_handsFreeMode;
+    if (_handsFreeMode) {
+      await startListening(appState, continuous: true);
+    } else {
+      await _speech.stop();
+      await _tts.stop();
+      _isListening = false;
+      _isSpeaking = false;
+      _voiceLevel = 0.0;
+      _avatarState = JarvisAvatarState.idle;
+      notifyListeners();
+    }
   }
 
   /// Starts REAL on-device speech recognition (microphone + OS speech engine).
   /// Requires RECORD_AUDIO permission, already declared in AndroidManifest.xml / Info.plist.
-  Future<void> startListening(AppState appState) async {
+  Future<void> startListening(AppState appState, {bool continuous = false}) async {
+    _lastAppState = appState;
+    if (_isSpeaking) await _tts.stop();
     if (!_speechAvailable) {
       await _initSpeech();
       if (!_speechAvailable) {
@@ -129,16 +207,35 @@ class JarvisStateProvider extends ChangeNotifier {
     }
 
     _isListening = true;
+    _isHandlingFinalSpeech = false;
     _liveTranscript = "";
+    _voiceLevel = 0.2;
     _avatarState = JarvisAvatarState.talking;
     notifyListeners();
 
-    final localeId = appState.language == 'fa' ? 'fa_IR' : 'en_US';
+    final localeId = appState.language == 'fa'
+        ? 'fa_IR'
+        : appState.language == 'ru'
+            ? 'ru_RU'
+            : appState.language == 'tr'
+                ? 'tr_TR'
+                : 'en_US';
     await _speech.listen(
       localeId: localeId,
+      listenFor: const Duration(minutes: 2),
+      pauseFor: const Duration(seconds: 2),
+      partialResults: true,
+      onSoundLevelChange: (level) {
+        _voiceLevel = ((level + 2) / 12).clamp(0.0, 1.0);
+        notifyListeners();
+      },
       onResult: (result) {
         _liveTranscript = result.recognizedWords;
         notifyListeners();
+        if (continuous && result.finalResult && !_isHandlingFinalSpeech) {
+          _isHandlingFinalSpeech = true;
+          Future.delayed(const Duration(milliseconds: 250), () => stopListeningAndProcess(appState));
+        }
       },
     );
   }
@@ -147,6 +244,7 @@ class JarvisStateProvider extends ChangeNotifier {
   Future<void> stopListeningAndProcess(AppState appState) async {
     await _speech.stop();
     _isListening = false;
+    _voiceLevel = 0.0;
     final spokenText = _liveTranscript.trim();
     _liveTranscript = "";
 
@@ -196,8 +294,11 @@ class JarvisStateProvider extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$kApiBaseUrl/api/assistant/command'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'command': command}),
+            headers: {
+              'Content-Type': 'application/json',
+              if (appState.authToken != null) 'Authorization': 'Bearer ${appState.authToken}',
+            },
+            body: jsonEncode({'command': command, 'language': appState.language}),
           )
           .timeout(const Duration(seconds: 20));
 
@@ -205,6 +306,16 @@ class JarvisStateProvider extends ChangeNotifier {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         final reply = data['reply'] as String? ?? '...';
         _chatHistory.add(JarvisMessage(content: reply, isUser: false, timestamp: _now()));
+        await _speak(reply, appState.language);
+
+        final clientCommand = data['clientCommand'];
+        if (clientCommand is Map) {
+          if (clientCommand['type'] == 'change_language') {
+            appState.setLanguage((clientCommand['language'] ?? 'fa').toString());
+          } else if (clientCommand['type'] == 'open_section') {
+            _pendingNavigationSection = (clientCommand['section'] ?? 'home').toString();
+          }
+        }
 
         final action = data['action'] as String?;
         _avatarState = (action == 'chitchat' || action == null)
@@ -237,6 +348,31 @@ class JarvisStateProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _speak(String text, String language) async {
+    if (_isMuted || text.trim().isEmpty) return;
+    final locale = language == 'fa'
+        ? 'fa-IR'
+        : language == 'ru'
+            ? 'ru-RU'
+            : language == 'tr'
+                ? 'tr-TR'
+                : 'en-US';
+    try {
+      await _tts.setLanguage(locale);
+      await _tts.speak(text.replaceAll(RegExp(r'[🎮🍕⚡🚨🔫✨😉]'), ''));
+    } catch (e) {
+      debugPrint('[Jarvis] TTS failed: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _speakingPulseTimer?.cancel();
+    _speech.stop();
+    _tts.stop();
+    super.dispose();
+  }
+
   void clearHistory() {
     _chatHistory.clear();
     _chatHistory.add(JarvisMessage(
@@ -254,12 +390,14 @@ class JarvisAvatar extends StatefulWidget {
   final JarvisCharacter character;
   final JarvisAvatarState state;
   final double size;
+  final double voiceLevel;
 
   const JarvisAvatar({
     super.key,
     required this.character,
     required this.state,
     this.size = 140.0,
+    this.voiceLevel = 0.0,
   });
 
   @override
@@ -316,6 +454,7 @@ class _JarvisAvatarState extends State<JarvisAvatar> with SingleTickerProviderSt
               character: widget.character,
               state: widget.state,
               glitch: _glitchFactor,
+              voiceLevel: widget.voiceLevel,
             ),
           ),
         );
@@ -343,12 +482,14 @@ class _JarvisCorePainter extends CustomPainter {
   final JarvisCharacter character;
   final JarvisAvatarState state;
   final double glitch;
+  final double voiceLevel;
 
   _JarvisCorePainter({
     required this.animationValue,
     required this.character,
     required this.state,
     required this.glitch,
+    required this.voiceLevel,
   });
 
   @override
@@ -508,7 +649,8 @@ class _JarvisCorePainter extends CustomPainter {
     for (int i = 0; i < barCount; i++) {
       // Create random/animated bouncing bar heights
       final offsetValue = math.sin(animationValue * 2 * math.pi * 4 + i) * 0.5 + 0.5;
-      final amplitude = (15.0 + 35.0 * offsetValue);
+      final reactiveBoost = voiceLevel.clamp(0.0, 1.0);
+      final amplitude = (10.0 + 18.0 * offsetValue + 42.0 * reactiveBoost * (0.55 + offsetValue * 0.45));
       final x = startX + i * barSpacing;
       
       canvas.drawLine(
@@ -537,13 +679,16 @@ class _JarvisCorePainter extends CustomPainter {
     return oldDelegate.animationValue != animationValue ||
            oldDelegate.state != state ||
            oldDelegate.character != character ||
-           oldDelegate.glitch != glitch;
+           oldDelegate.glitch != glitch ||
+           oldDelegate.voiceLevel != voiceLevel;
   }
 }
 
 /// Floating cybernetic voice assistant panel sliding from bottom
 class JarvisAssistantModal extends StatefulWidget {
-  const JarvisAssistantModal({super.key});
+  const JarvisAssistantModal({super.key, this.onNavigate});
+
+  final void Function(String section)? onNavigate;
 
   @override
   State<JarvisAssistantModal> createState() => _JarvisAssistantModalState();
@@ -585,6 +730,13 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
   Widget build(BuildContext context) {
     final jarvisState = Provider.of<JarvisStateProvider>(context);
     final appState = Provider.of<AppState>(context, listen: false);
+    final pendingSection = jarvisState.consumePendingNavigationSection();
+    if (pendingSection != null && widget.onNavigate != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+        widget.onNavigate!(pendingSection);
+      });
+    }
     final isFa = appState.language == 'fa';
 
     return Container(
@@ -712,6 +864,7 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
               child: JarvisAvatar(
                 character: jarvisState.character,
                 state: jarvisState.avatarState,
+                voiceLevel: jarvisState.voiceLevel,
                 size: 150,
               ),
             ),
@@ -884,32 +1037,50 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
                   
                   const SizedBox(width: 12),
 
-                  // Neon Microphone voice trigger button — real on-device speech recognition
+                  // Tap-to-talk microphone. In hands-free mode Jarvis keeps the
+                  // conversation going: listen → think/action → speak → listen again.
                   GestureDetector(
-                    onLongPressStart: (_) {
-                      jarvisState.startListening(appState);
+                    onTap: () async {
+                      if (jarvisState.handsFreeMode) {
+                        await jarvisState.toggleHandsFreeConversation(appState);
+                      } else if (jarvisState.isListening) {
+                        await jarvisState.stopListeningAndProcess(appState);
+                        _scrollToBottom();
+                      } else {
+                        await jarvisState.startListening(appState);
+                      }
                     },
-                    onLongPressEnd: (_) {
-                      jarvisState.stopListeningAndProcess(appState);
-                      _scrollToBottom();
-                    },
+                    onLongPress: () => jarvisState.toggleHandsFreeConversation(appState),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 250),
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: jarvisState.isListening ? GamingTheme.secondary : GamingTheme.primary,
+                        color: jarvisState.handsFreeMode
+                            ? GamingTheme.goldAccent
+                            : jarvisState.isListening
+                                ? GamingTheme.secondary
+                                : GamingTheme.primary,
                         boxShadow: [
                           BoxShadow(
-                            color: (jarvisState.isListening ? GamingTheme.secondary : GamingTheme.primary).withValues(alpha: 0.4),
-                            blurRadius: jarvisState.isListening ? 20 : 10,
-                            spreadRadius: jarvisState.isListening ? 4 : 1,
+                            color: (jarvisState.handsFreeMode
+                                    ? GamingTheme.goldAccent
+                                    : jarvisState.isListening
+                                        ? GamingTheme.secondary
+                                        : GamingTheme.primary)
+                                .withValues(alpha: 0.4),
+                            blurRadius: jarvisState.isListening || jarvisState.handsFreeMode ? 22 : 10,
+                            spreadRadius: jarvisState.isListening || jarvisState.handsFreeMode ? 4 : 1,
                           )
                         ],
                       ),
                       child: Icon(
-                        jarvisState.isListening ? Icons.mic : Icons.mic_none,
+                        jarvisState.handsFreeMode
+                            ? Icons.record_voice_over_rounded
+                            : jarvisState.isListening
+                                ? Icons.stop_rounded
+                                : Icons.mic_none,
                         color: Colors.black,
                         size: 24,
                       ),
@@ -927,13 +1098,17 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
                     ? (jarvisState.liveTranscript.isNotEmpty
                         ? jarvisState.liveTranscript
                         : (isFa ? "در حال گوش دادن..." : "Listening..."))
-                    : !jarvisState.speechAvailable
-                        ? (isFa
-                            ? "تشخیص گفتار روی این دستگاه در دسترس نیست، از تایپ استفاده کنید"
-                            : "Speech recognition unavailable on this device, please type")
-                        : (isFa
-                            ? "برای صحبت کردن دکمه میکروفون را نگه دارید و سپس رها کنید"
-                            : "Hold microphone button to speak, release to send"),
+                    : jarvisState.isSpeaking
+                        ? (isFa ? "جارویس در حال پاسخ صوتی است..." : "Jarvis is speaking...")
+                        : !jarvisState.speechAvailable
+                            ? (isFa
+                                ? "تشخیص گفتار روی این دستگاه در دسترس نیست، از تایپ استفاده کنید"
+                                : "Speech recognition unavailable on this device, please type")
+                            : jarvisState.handsFreeMode
+                                ? (isFa ? "حالت مکالمه فعال است؛ طبیعی صحبت کنید" : "Hands-free conversation is active; speak naturally")
+                                : (isFa
+                                    ? "یک‌بار میکروفون را لمس کنید؛ نگه‌داشتن طولانی = مکالمه پیوسته"
+                                    : "Tap mic to talk; long-press for hands-free conversation"),
                 style: TextStyle(
                   color: jarvisState.isListening ? GamingTheme.primary : Colors.white30,
                   fontSize: 9,

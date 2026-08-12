@@ -13,6 +13,7 @@ const guards = read('../src/components/PerformanceGuards.tsx');
 const app = read('../src/App.tsx');
 const html = read('../index.html');
 const server = read('../server.ts');
+const staticHeaders = read('../public/_headers');
 const viteConfig = read('../vite.config.ts');
 
 // GTmetrix: LCP image must never begin life as a lazy, inactive carousel image.
@@ -131,6 +132,9 @@ assert.doesNotMatch(html, /family=Space\+Grotesk|family=Inter|family=JetBrains\+
 // may execute in the production response.
 assert.match(server, /Content-Security-Policy/);
 assert.match(server, /script-src 'self' 'unsafe-inline'/);
+assert.match(staticHeaders, /Content-Security-Policy/);
+assert.match(staticHeaders, /script-src 'self' 'unsafe-inline'/);
 assert.doesNotMatch(server, /static\.cloudflareinsights\.com/);
+assert.doesNotMatch(staticHeaders, /static\.cloudflareinsights\.com/);
 
 console.log('Performance guard checks passed for all built-in templates.');

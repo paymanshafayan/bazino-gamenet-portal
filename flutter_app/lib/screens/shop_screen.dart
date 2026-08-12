@@ -79,12 +79,12 @@ class ShopScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item.name,
+                              item.nameFor(appState.language),
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              item.description,
+                              item.descriptionFor(appState.language),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 10, color: GamingTheme.textMuted, height: 1.4),

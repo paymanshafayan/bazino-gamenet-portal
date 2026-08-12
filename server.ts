@@ -844,7 +844,7 @@ async function startServer() {
   // otherwise a keyword-based fallback) and then performs the REAL action
   // against the REAL database — never just a scripted reply.
   // =========================================================================
-  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any }) {
+  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any; language?: string }) {
     if (process.env.GEMINI_API_KEY) {
       try {
         const client = getGeminiClient();
@@ -892,8 +892,9 @@ async function startServer() {
           ]
         }];
 
-        const systemPrompt = `You are Jarvis, the in-app voice/text assistant for BAZINO, a gaming lounge. The current user is ${context.user.username === "Guest" ? "a guest who is not logged in" : context.user.username}. ${context.activeReservation ? `They are currently on ${context.activeReservation.systemName}.` : "They have no active reservation right now."}
-Decide whether one of the available functions matches what the user is asking for, and call it with the best-guess parameters. If nothing matches (small talk, unclear request, or something outside these four actions), do not call any function — just reply conversationally and helpfully in Persian, explaining what you actually can do.`;
+        const replyLanguage = context.language === "en" ? "English" : context.language === "ru" ? "Russian" : context.language === "tr" ? "Turkish" : "Persian";
+        const systemPrompt = `You are Jarvis, the in-app voice assistant for BAZINO, a gaming lounge. The current user is ${context.user.username === "Guest" ? "a guest who is not logged in" : context.user.username}. ${context.activeReservation ? `They are currently on ${context.activeReservation.systemName}.` : "They have no active reservation right now."}
+Reply in ${replyLanguage}. Decide whether one of the available functions matches what the user is asking for, and call it with the best-guess parameters. If nothing matches (small talk, unclear request, or something outside these actions), do not call any function — just reply naturally and conversationally like a real assistant, and briefly explain what you can do in the app.`;
 
         const response = await client.models.generateContent({
           model: "gemini-3.6-flash",
@@ -1048,7 +1049,7 @@ Decide whether one of the available functions matches what the user is asking fo
 
   app.post("/api/assistant/command", async (req, res) => {
     try {
-      const { command } = req.body;
+      const { command, language } = req.body;
       if (!command || !String(command).trim()) {
         return res.status(400).json({ error: "دستور نمی‌تواند خالی باشد." });
       }
@@ -1057,7 +1058,7 @@ Decide whether one of the available functions matches what the user is asking fo
       const user = await getCurrentUser(req);
       const activeReservation = user.username !== "Guest" ? await store.getActiveReservationForUser(user.username) : undefined;
 
-      const intent = await resolveAssistantIntent(String(command), { user, activeReservation });
+      const intent = await resolveAssistantIntent(String(command), { user, activeReservation, language });
       const result = await executeAssistantIntent(intent, { user, activeReservation });
 
       // Real-time side effects: broadcast to WebSocket clients exactly like the normal endpoints do

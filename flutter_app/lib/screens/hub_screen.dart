@@ -374,7 +374,7 @@ class _HubScreenState extends State<HubScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    isFa ? slide.titleFa : slide.titleEn,
+                                    slide.titleFor(appState.language),
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Colors.white,

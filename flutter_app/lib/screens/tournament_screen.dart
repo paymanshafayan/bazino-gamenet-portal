@@ -70,7 +70,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            t.title,
+                            t.titleFor(appState.language),
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           Container(

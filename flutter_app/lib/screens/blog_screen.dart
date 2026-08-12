@@ -80,14 +80,14 @@ class _BlogScreenState extends State<BlogScreen> {
 
                     // Title
                     Text(
-                      article.title,
+                      article.titleFor(appState.language),
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                     const SizedBox(height: 8),
 
                     // Content
                     Text(
-                      article.content,
+                      article.contentFor(appState.language),
                       style: const TextStyle(fontSize: 11, color: Colors.white70, height: 1.6),
                     ),
                     const SizedBox(height: 12),
@@ -98,7 +98,7 @@ class _BlogScreenState extends State<BlogScreen> {
                         const Icon(Icons.person, size: 14, color: GamingTheme.textMuted),
                         const SizedBox(width: 4),
                         Text(
-                          '${isFa ? 'نویسنده:' : 'Author:'} ${article.author}',
+                          '${isFa ? 'نویسنده:' : 'Author:'} ${article.authorFor(appState.language)}',
                           style: const TextStyle(fontSize: 10, color: GamingTheme.textMuted),
                         ),
                       ],

@@ -3,6 +3,7 @@ import { readFileSync, statSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const home = read('../src/components/HomeTab.tsx');
+const landingHero = read('../src/components/LandingHero.tsx');
 const darkGold = read('../src/components/DarkGoldHome.tsx');
 const geco = read('../src/components/GecoPurpleHome.tsx');
 const gamingAmp = read('../src/components/GamingAmpHome.tsx');
@@ -11,8 +12,20 @@ const consoleHub = read('../src/components/ConsoleHubView.tsx');
 const guards = read('../src/components/PerformanceGuards.tsx');
 const app = read('../src/App.tsx');
 const html = read('../index.html');
+const server = read('../server.ts');
+const staticHeaders = read('../public/_headers');
+const viteConfig = read('../vite.config.ts');
 
 // GTmetrix: LCP image must never begin life as a lazy, inactive carousel image.
+// LandingHero is in the entry chunk; the much larger HomeTab follows as a lazy chunk.
+assert.match(app, /import LandingHero from '\.\/components\/LandingHero'/);
+assert.match(app, /const HomeTab = lazy\(\(\) => import\('\.\/components\/HomeTab'\)\)/);
+assert.match(app, /const \[isHomeContentReady, setIsHomeContentReady\] = useState\(false\)/);
+assert.match(app, /document\.readyState === 'complete'/);
+assert.match(app, /requestIdleCallback\(\(\) => setIsHomeContentReady\(true\)/);
+assert.match(app, /<Suspense fallback=\{<LandingHero/);
+assert.match(landingHero, /loading="eager"[\s\S]{0,80}fetchPriority="high"/);
+assert.match(landingHero, /sizes="\(min-width: 1024px\) 960px, 100vw"/);
 assert.match(home, /const activeGame = activeBanners\[activeBanner\] \?\? activeBanners\[0\]/);
 assert.match(home, /loading="eager"[\s\S]{0,80}fetchpriority="high"/);
 assert.doesNotMatch(home, /loading=\{activeBanner === idx \? 'eager' : 'lazy'\}/);
@@ -38,6 +51,11 @@ assert.ok((consoleGrid.match(/srcSet=\{getResponsiveSrcSet/g) ?? []).length >= 2
 assert.ok((consoleGrid.match(/width="400" height="240"/g) ?? []).length >= 2);
 assert.match(consoleHub, /srcSet=\{`\$\{panel\.bg\} 400w, \$\{panel\.bgLarge\} 800w`\}/);
 assert.match(consoleHub, /width=\{panel\.width\}[\s\S]{0,40}height=\{panel\.height\}/);
+// The initial Unsplash hero must select a compact responsive candidate rather than the
+// prior 1200px/q80 source, while keeping its eager LCP priority.
+assert.match(home, /getResponsiveSrcSet\(activeGame\.imageUrl, \[480, 720, 960\]\)/);
+assert.match(home, /sizes="\(min-width: 1024px\) 960px, 100vw"/);
+assert.match(guards, /url\.searchParams\.set\('q', '70'\)/);
 assert.match(html, /type="image\/webp" href="\/src\/assets\/images\/bazino_logo_user\.webp"/);
 
 // GTmetrix: next-gen format and payload guards for local backgrounds/panel images.
@@ -80,14 +98,43 @@ assert.match(consoleGrid, /if \(!isChatPanelVisible\) return/);
 assert.match(consoleGrid, /document\.visibilityState === 'visible'/);
 assert.doesNotMatch(gamingAmp, /activeSlide|setActiveSlide/);
 
+// Large API-derived trees must not monopolize the first interaction window.
+assert.match(app, /startTransition\(\(\) => \{[\s\S]{0,500}setSystems/);
+assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]{0,120}scheduleIdle\(checkInstallStatus\)/);
+assert.match(home, /window\.setTimeout\(\(\) => \{[\s\S]{0,300}fetch\('\/api\/settings'\)/);
+assert.match(home, /startTransition\(\(\) => \{/);
+
+// Keep the browser runtime compact: Preact compatibility is sufficient for the client
+// components, and a server renderer must never be pulled into the browser vendor chunk.
+assert.match(viteConfig, /@preact\/preset-vite/);
+assert.match(viteConfig, /'react': 'preact\/compat'/);
+assert.doesNotMatch(viteConfig, /'react-dom\/server'/);
+
+// ZIP decompression belongs to the lazy theme editor, not the public landing bundle.
+assert.match(themes, /from '\.\/themeCssUtils'/);
+assert.doesNotMatch(themes, /from '\.\/themeZipCore'/);
+
 // GTmetrix: reported always-running non-composited indicators are static now.
 for (const [name, source] of Object.entries({ home, darkGold, geco, gamingAmp, consoleGrid, consoleHub })) {
   assert.doesNotMatch(source, /animate-(?:pulse|ping)/, `${name} contains an always-running pulse/ping animation`);
 }
 
-// GTmetrix: avoid the spinner-only first commit and late webfont layout swap.
+// GTmetrix: avoid the spinner-only first commit and any late webfont layout swap.
+// The local/system stack renders on the first paint, so the brand header cannot push the
+// hero after a remote font response completes.
 assert.match(app, /useState<boolean \| null>\(true\)/);
 assert.match(app, /<div className="w-full min-h-\[600px\]" aria-hidden="true" \/>/);
-assert.match(html, /display=optional/);
+assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+assert.doesNotMatch(html, /family=Space\+Grotesk|family=Inter|family=JetBrains\+Mono/);
+
+// Cloudflare's injected Web Analytics beacon has a vendor-controlled 24-hour TTL. It is
+// excluded instead of downloaded on every visitor's first visit; only same-origin scripts
+// may execute in the production response.
+assert.match(server, /Content-Security-Policy/);
+assert.match(server, /script-src 'self' 'unsafe-inline'/);
+assert.match(staticHeaders, /Content-Security-Policy/);
+assert.match(staticHeaders, /script-src 'self' 'unsafe-inline'/);
+assert.doesNotMatch(server, /static\.cloudflareinsights\.com/);
+assert.doesNotMatch(staticHeaders, /static\.cloudflareinsights\.com/);
 
 console.log('Performance guard checks passed for all built-in templates.');

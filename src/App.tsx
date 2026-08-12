@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
 import bazinoLogo from './assets/images/bazino_logo_user.webp';
 import {
@@ -9,10 +9,11 @@ import {
   saveCustomThemes,
   type ThemeInfo
 } from './themes';
-// تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند (کد اسپلیتینگ):
-// فقط HomeTab (صفحه اصلی/LCP) به‌صورت eager می‌ماند — بقیه با کلیک کاربر
-// دانلود می‌شوند تا باندل اولیه کوچک بماند (توصیه اصلی GTmetrix/PageSpeed).
-import HomeTab from './components/HomeTab';
+// تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند. HomeTab هم شامل چندین
+// بخش/دادهٔ پایین صفحه است؛ Hero سبکِ LandingHero بلافاصله paint می‌شود و خود
+// HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
+import LandingHero from './components/LandingHero';
+const HomeTab = lazy(() => import('./components/HomeTab'));
 const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
 const CafeTab = lazy(() => import('./components/CafeTab'));
@@ -126,6 +127,10 @@ export default function App() {
   }, [layoutMode]);
 
   const [activeTab, setActiveTab] = useState('home');
+  // Keep the LCP-only LandingHero as the first commit. HomeTab contains all below-fold
+  // cards and effects, so mounting it only after the load event's first idle window avoids
+  // competing style/layout work with the hero image paint.
+  const [isHomeContentReady, setIsHomeContentReady] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
   const [user, setUser] = useState<UserState | null>(null);
@@ -179,10 +184,15 @@ export default function App() {
         fetch('/api/tournaments').then(res => res.json()).catch(() => [])
       ]);
 
-      if (Array.isArray(sysRes)) setSystems(sysRes);
-      if (Array.isArray(cafeRes)) setCafeItems(cafeRes);
-      if (Array.isArray(accRes)) setAccessories(accRes);
-      if (Array.isArray(tourRes)) setTournaments(tourRes);
+      // API responses can be sizeable. Mark their resulting tree update as non-urgent so
+      // React may yield to a tap/scroll instead of making response parsing + rendering one
+      // long main-thread task during the landing page's first seconds.
+      startTransition(() => {
+        if (Array.isArray(sysRes)) setSystems(sysRes);
+        if (Array.isArray(cafeRes)) setCafeItems(cafeRes);
+        if (Array.isArray(accRes)) setAccessories(accRes);
+        if (Array.isArray(tourRes)) setTournaments(tourRes);
+      });
     } catch (err) {
       console.error("Error fetching data:", err);
     }
@@ -197,14 +207,16 @@ export default function App() {
         fetch('/api/coupons').then(res => res.json()).catch(() => []),
         fetch('/api/user').then(res => res.json()).catch(() => null)
       ]).then(([artRes, transRes, coupRes, userRes]) => {
-        if (Array.isArray(artRes)) setArticles(artRes);
-        if (Array.isArray(transRes)) setTransactions(transRes);
-        if (Array.isArray(coupRes)) setActiveCoupons(coupRes);
-        if (userRes && userRes.username && userRes.username !== 'Guest') {
-          setUser(userRes);
-        } else {
-          setUser(null);
-        }
+        startTransition(() => {
+          if (Array.isArray(artRes)) setArticles(artRes);
+          if (Array.isArray(transRes)) setTransactions(transRes);
+          if (Array.isArray(coupRes)) setActiveCoupons(coupRes);
+          if (userRes && userRes.username && userRes.username !== 'Guest') {
+            setUser(userRes);
+          } else {
+            setUser(null);
+          }
+        });
       }).catch(err => console.error("Error fetching secondary data:", err));
     });
   };
@@ -235,7 +247,44 @@ export default function App() {
   };
 
   useEffect(() => {
-    checkInstallStatus();
+    // The fallback landing page already has its hero and navigation without these API
+    // payloads. Give the first paint and its input window a short head start; opening a
+    // data-backed tab later still receives the same data through fetchData.
+    const timer = window.setTimeout(() => {
+      scheduleIdle(checkInstallStatus);
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    let delayTimer: number | undefined;
+    let idleHandle: number | undefined;
+    const win = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const mountHomeWhenIdle = () => {
+      // A short post-load delay ensures the eager hero has had a chance to become LCP,
+      // even when the browser reports an idle slice while the image is decoding.
+      delayTimer = window.setTimeout(() => {
+        if (typeof win.requestIdleCallback === 'function') {
+          idleHandle = win.requestIdleCallback(() => setIsHomeContentReady(true), { timeout: 2000 });
+        } else {
+          setIsHomeContentReady(true);
+        }
+      }, 750);
+    };
+
+    if (document.readyState === 'complete') mountHomeWhenIdle();
+    else window.addEventListener('load', mountHomeWhenIdle, { once: true });
+
+    return () => {
+      window.removeEventListener('load', mountHomeWhenIdle);
+      if (delayTimer !== undefined) window.clearTimeout(delayTimer);
+      if (idleHandle !== undefined && typeof win.cancelIdleCallback === 'function') {
+        win.cancelIdleCallback(idleHandle);
+      }
+    };
   }, []);
 
   const handleRedeemPoints = async (points: number, couponValue: number, code: string) => {
@@ -338,18 +387,22 @@ export default function App() {
             addNotification={addNotification}
             refreshData={fetchData}
           />
+        ) : !isHomeContentReady ? (
+          <LandingHero onNavigate={() => setActiveTab('reservations')} />
         ) : (
-          <HomeTab 
-            themeId={themeId} 
-            tournaments={tournaments} 
-            onNavigate={setActiveTab} 
-            themeComponent={(() => {
-              const th = availableThemes.find(x => x.id === themeId);
-              return th && th.kind === 'server' && th.cssUrl
-                ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
-                : null;
-            })()}
-          />
+          <Suspense fallback={<LandingHero onNavigate={() => setActiveTab('reservations')} />}>
+            <HomeTab
+              themeId={themeId}
+              tournaments={tournaments}
+              onNavigate={setActiveTab}
+              themeComponent={(() => {
+                const th = availableThemes.find(x => x.id === themeId);
+                return th && th.kind === 'server' && th.cssUrl
+                  ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
+                  : null;
+              })()}
+            />
+          </Suspense>
         )
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}

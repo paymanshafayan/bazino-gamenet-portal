@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, startTransition } from 'react';
 import { Tournament } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
 import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
@@ -116,15 +116,29 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   };
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/settings').then(r => r.json()).catch(() => ({})),
-      fetch('/api/app-sliders').then(r => r.json()).catch(() => [])
-    ]).then(([settingsData, slidersData]) => {
-      setSiteSettings(settingsData || {});
-      if (slidersData && slidersData.length > 0) {
-        setAppSliders(slidersData);
-      }
-    }).catch(err => console.error('Error fetching settings/sliders:', err));
+    let cancelled = false;
+    // The built-in hero is immediately usable, so settings and carousel overrides do not
+    // need to compete with React's first render. Delaying their JSON work keeps the initial
+    // interaction window responsive on slower phones.
+    const timer = window.setTimeout(() => {
+      Promise.all([
+        fetch('/api/settings').then(r => r.json()).catch(() => ({})),
+        fetch('/api/app-sliders').then(r => r.json()).catch(() => [])
+      ]).then(([settingsData, slidersData]) => {
+        if (cancelled) return;
+        startTransition(() => {
+          setSiteSettings(settingsData || {});
+          if (slidersData && slidersData.length > 0) {
+            setAppSliders(slidersData);
+          }
+        });
+      }).catch(err => console.error('Error fetching settings/sliders:', err));
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   // Auto-slide game banners. فاصله‌ی ۸ ثانیه‌ای اجازه می‌دهد چرخه‌ی بارگذاری
@@ -203,7 +217,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Испытайте безупречный FPS и минимальный пинг на игровых ПК с картами RTX 5080. Создайте команду и побеждайте в турнирах.',
         tr: 'NVIDIA RTX 5080 sistemlerimizle yüksek kare hızı ve tek haneli pingi deneyimleyin. Takımınızı kurun, turnuvaya katılın ve şampiyon olun.'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=960&q=70',
       badge: 'FPS GLOBAL CHALLENGE'
     },
     {
@@ -220,7 +234,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Играйте в лучшую MOBA-игру мира на новейших мониторах ROG 360 Гц. Командные сражения с физическими призами и поддержкой тренеров.',
         tr: 'BAZINO\'ta elit ROG 360Hz monitörlerle dünyanın en çok tercih edilen MOBA oyununu oynayın. Harika ödüllü takım savaşları sizi bekliyor.'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=960&q=70',
       badge: 'MOBA ARENA PRO'
     },
     {
@@ -237,7 +251,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ru: 'Консольные VIP-кабины с PS5 и большими 85" телевизорами LG OLED. Сражайтесь с друзьями в уютной атмосфере киберклуба.',
         tr: 'PlayStation 5 ve devasa LG OLED 85 inç ekranlı VIP kabinler. En konforlu lounge alanında arkadaşlarınızla futbol heyecanını yaşayın.'
       },
-      imageUrl: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=1200&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=960&q=70',
       badge: 'VIP CONSOLE ROOM'
     }
   ];
@@ -751,8 +765,8 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               loading="eager"
               fetchpriority="high"
               src={activeGame.imageUrl}
-              srcSet={getResponsiveSrcSet(activeGame.imageUrl, [640, 960, 1200])}
-              sizes="100vw"
+              srcSet={getResponsiveSrcSet(activeGame.imageUrl, [480, 720, 960])}
+              sizes="(min-width: 1024px) 960px, 100vw"
               width="1200"
               height="514"
               alt={getLocText(activeGame.title)}

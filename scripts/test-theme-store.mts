@@ -10,12 +10,12 @@ if (fs.existsSync(path.join(THEMES_DIR, 'neon-storm'))) fs.rmSync(path.join(THEM
 
 // 1) نصب قالب نمونه (شامل assets)
 const zip = buildSampleThemeZip();
-const res = installThemeZip(zip, 'sample.zip');
+const res = await installThemeZip(zip, 'sample.zip');
 if ('error' in res) throw new Error('install failed: ' + res.error);
 console.log('installed:', res.theme.id, '| assets:', res.theme.assetFiles.join(','), '| cssUrl:', res.theme.cssUrl);
 
 // 1b) نصب تکراری باید خطا بدهد
-const resDup = installThemeZip(zip, 'sample.zip');
+const resDup = await installThemeZip(zip, 'sample.zip');
 if (!('error' in resDup)) throw new Error('duplicate install should fail');
 console.log('duplicate install rejected: OK');
 
@@ -55,7 +55,7 @@ const evil = zipSync({
   'theme.css': strToU8(`body[data-theme='evil2'] { color: red; }\n.theme-evil2 .x { color: red; }`),
   '../evil.txt': strToU8('pwned'),
 });
-const res3 = installThemeZip(evil, 'evil.zip');
+const res3 = await installThemeZip(evil, 'evil.zip');
 if (!('error' in res3)) throw new Error('unsafe zip should fail');
 console.log('unsafe zip rejected: OK');
 

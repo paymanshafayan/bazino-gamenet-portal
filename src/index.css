@@ -1,5 +1,6 @@
-/* فونت‌های گوگل از طریق <link> در index.html بارگذاری می‌شوند
-   (به‌جای @import که رندر را مسدود می‌کند — توصیه GTmetrix) */
+/* متن با stack محلی/سیستمی زیر رندر می‌شود. فونت وبِ با بارگذاری دیرهنگام
+   باعث جابه‌جایی لوگوی هدر و Hero می‌شد، بنابراین برای paint کاملاً پایدار
+   از آن استفاده نمی‌کنیم. */
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -76,9 +77,9 @@
   --color-accent-red: var(--accent-red-color, #ff3b30);
   --color-dark-bg: var(--dark-bg-color, #07080a);
   --color-dark-card: var(--dark-card-color, #12141c);
-  --font-sans: "Vazirmatn", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Orbitron", "Vazirmatn", sans-serif;
-  --font-mono: "JetBrains Mono", "Vazirmatn", monospace;
+  --font-sans: "Vazirmatn", ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif;
+  --font-display: "Orbitron", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", "Vazirmatn", monospace;
 }
 
 /* Custom Mobirise GamingAMP Utilities */

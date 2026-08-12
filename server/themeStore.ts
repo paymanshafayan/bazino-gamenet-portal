@@ -26,6 +26,7 @@ import {
   isZipParseError,
   type ParsedZipTheme
 } from "../src/themes/themeZipCore";
+import { optimizeThemeImages, optimizeUploadedTheme, type ThemePerformanceReport } from "./themePerformance";
 
 /** پوشه ریشه قالب‌های نصب‌شده روی سرور */
 export const THEMES_DIR = path.join(process.cwd(), "themes");
@@ -115,39 +116,52 @@ function listFilesRecursive(dir: string): string[] {
 /* ═══════════════════════════════════════════════════════════════
  *  نصب قالب از ZIP — استخراج به پوشه اختصاصی قالب
  * ═══════════════════════════════════════════════════════════════ */
-export function installThemeZip(buffer: Uint8Array, fallbackName?: string): { theme: InstalledThemeInfo; parsed: ParsedZipTheme } | { error: string } {
+export async function installThemeZip(buffer: Uint8Array, fallbackName?: string): Promise<{ theme: InstalledThemeInfo; parsed: ParsedZipTheme; performance: ThemePerformanceReport } | { error: string; performance?: ThemePerformanceReport }> {
   const parsed = parseThemeZip(buffer, fallbackName);
   if (isZipParseError(parsed)) return { error: parsed.error };
 
-  const id = sanitizeThemeId(parsed.meta.id || "");
+  // This gate runs before any file is written. It safely applies deterministic fixes
+  // (SVG/font policy/Google Fonts) and rejects only package-size violations.
+  const staticPerformanceResult = optimizeUploadedTheme(parsed);
+  const performanceResult = await optimizeThemeImages(staticPerformanceResult);
+  if (!performanceResult.canInstall) {
+    const blockers = performanceResult.report.findings
+      .filter(finding => finding.severity === "error")
+      .map(finding => finding.message)
+      .join(" ");
+    return { error: blockers || "قالب معیارهای عملکرد را پاس نکرد", performance: performanceResult.report };
+  }
+  const optimized = performanceResult.theme;
+
+  const id = sanitizeThemeId(optimized.meta.id || "");
   const dir = getThemeDir(id);
   ensureThemesDir();
 
   // اگر قالب قبلاً نصب شده → خطا (برای نصب مجدد ابتدا حذف شود)
   if (fs.existsSync(dir)) {
-    return { error: `قالبی با شناسه «${id}» قبلاً نصب شده است` };
+    return { error: `قالبی با شناسه «${id}» قبلاً نصب شده است`, performance: performanceResult.report };
   }
 
   fs.mkdirSync(dir, { recursive: true });
 
   // theme.json (متادیتای نرمال‌شده)
   const meta = {
-    name: parsed.meta.name || id,
+    name: optimized.meta.name || id,
     id,
-    version: parsed.meta.version || "1.0.0",
-    description: parsed.meta.description || "",
-    colors: parsed.meta.colors || undefined,
+    version: optimized.meta.version || "1.0.0",
+    description: optimized.meta.description || "",
+    colors: optimized.meta.colors || undefined,
   };
   fs.writeFileSync(path.join(dir, "theme.json"), JSON.stringify(meta, null, 2), "utf8");
 
   // theme.css
-  fs.writeFileSync(path.join(dir, "theme.css"), parsed.css, "utf8");
+  fs.writeFileSync(path.join(dir, "theme.css"), optimized.css, "utf8");
 
   // theme.js (کامپوننت صفحه اصلی قالب — اجباری؛ parseThemeZip بدون آن خطا می‌دهد)
-  fs.writeFileSync(path.join(dir, "theme.js"), parsed.componentJs, "utf8");
+  fs.writeFileSync(path.join(dir, "theme.js"), optimized.componentJs, "utf8");
 
   // assets/
-  const assetNames = Object.keys(parsed.assets);
+  const assetNames = Object.keys(optimized.assets);
   if (assetNames.length > 0) {
     const assetsDir = path.join(dir, "assets");
     fs.mkdirSync(assetsDir, { recursive: true });
@@ -158,12 +172,12 @@ export function installThemeZip(buffer: Uint8Array, fallbackName?: string): { th
       const dest = path.join(assetsDir, ...safeRel.split("/"));
       if (!dest.startsWith(assetsDir + path.sep)) continue;
       fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.writeFileSync(dest, parsed.assets[rel]);
+      fs.writeFileSync(dest, optimized.assets[rel]);
     }
   }
 
   const theme = listInstalledThemes().find(t => t.id === id)!;
-  return { theme, parsed };
+  return { theme, parsed: optimized, performance: performanceResult.report };
 }
 
 /* ═══════════════════════════════════════════════════════════════

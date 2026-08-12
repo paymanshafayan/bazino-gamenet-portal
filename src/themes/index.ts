@@ -95,9 +95,12 @@ import darkGoldCss from './dark-gold.css?inline';
 import defaultBgUrl from '../assets/images/background.webp';
 
 /* هسته مشترک پکیج قالب — توابع خالص (بدون وابستگی Vite) */
-import { sanitizeThemeId, extractColorsFromCss } from './themeZipCore';
+// These helpers intentionally live outside themeZipCore, whose ZIP/fflate code is only
+// needed by the lazy admin theme editor. Importing it here put decompression code in the
+// public landing bundle.
+import { sanitizeThemeId, extractColorsFromCss } from './themeCssUtils';
 
-export { sanitizeThemeId, extractColorsFromCss } from './themeZipCore';
+export { sanitizeThemeId, extractColorsFromCss } from './themeCssUtils';
 
 const staticCss: Record<string, string> = {
   'dark-gold': darkGoldCss

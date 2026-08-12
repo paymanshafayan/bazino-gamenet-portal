@@ -29,6 +29,21 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 import { unzipSync, zipSync, strFromU8, strToU8, type Zippable } from 'fflate';
+import {
+  sanitizeThemeId,
+  stripCssComments,
+  extractIdFromCss,
+  hasNewFormat,
+  extractColorsFromCss
+} from './themeCssUtils';
+
+export {
+  sanitizeThemeId,
+  stripCssComments,
+  extractIdFromCss,
+  hasNewFormat,
+  extractColorsFromCss
+} from './themeCssUtils';
 
 /* ---------- تایپ‌های متادیتا ---------- */
 export interface ThemeColorConfig {
@@ -65,55 +80,6 @@ export interface ZipParseError {
 export const isZipParseError = (r: ParsedZipTheme | ZipParseError): r is ZipParseError => 'error' in r;
 
 /* ---------- ابزارهای کمکی ---------- */
-
-/** پاک‌سازی شناسه قالب برای استفاده امن در مسیر/کلاس/سلکتور CSS */
-export function sanitizeThemeId(id: string): string {
-  const clean = (id || '')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  return clean || 'custom-theme-' + Date.now().toString(36);
-}
-
-/** حذف کامنت‌های CSS قبل از الگویابی (کامنت‌ها ممکن است نمونه داشته باشند) */
-export function stripCssComments(css: string): string {
-  return css.replace(/\/\*[\s\S]*?\*\//g, '');
-}
-
-/** استخراج شناسه از روی خود CSS */
-export function extractIdFromCss(css: string): string | null {
-  const code = stripCssComments(css);
-  const m = code.match(/body\s*\[\s*data-theme\s*=\s*['"]([^'"]+)['"]\s*\]/);
-  if (m) return sanitizeThemeId(m[1]);
-  const m2 = code.match(/\.theme-([a-zA-Z0-9][a-zA-Z0-9-_]*)/);
-  return m2 ? sanitizeThemeId(m2[1]) : null;
-}
-
-/** آیا CSS «فرمت جدید» (پوشش تمام صفحات) را دارد؟ */
-export function hasNewFormat(css: string): boolean {
-  const code = stripCssComments(css);
-  return /body\s*\[\s*data-theme\s*=/.test(code) || /\.theme-[a-zA-Z0-9_-]+\s/.test(code);
-}
-
-/** استخراج رنگ‌ها از متغیرهای CSS (کامنت‌ها نادیده گرفته می‌شوند) */
-export function extractColorsFromCss(
-  css: string,
-  fallback: ThemeColorConfig = { primary: '#ffb800', bg: '#050608', card: '#0D0E15' }
-): ThemeColorConfig {
-  const code = stripCssComments(css || '');
-  const getVar = (prop: string): string | null => {
-    const m = code.match(new RegExp(prop + '\\s*:\\s*(#[0-9a-fA-F]{3,8}|rgba?\\([^)]*\\))'));
-    return m ? m[1] : null;
-  };
-  return {
-    primary: getVar('--primary-color') || fallback.primary,
-    bg: getVar('--dark-bg-color') || getVar('--theme-bg') || fallback.bg,
-    card: getVar('--dark-card-color') || getVar('--theme-card-bg') || fallback.card,
-  };
-}
 
 /** پیدا کردن فایل داخل ZIP (بدون حساسیت به حروف و با نرمال‌سازی / ) */
 function findEntry(entries: string[], names: string[]): string | null {

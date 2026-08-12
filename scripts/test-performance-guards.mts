@@ -99,6 +99,10 @@ assert.match(viteConfig, /@preact\/preset-vite/);
 assert.match(viteConfig, /'react': 'preact\/compat'/);
 assert.doesNotMatch(viteConfig, /'react-dom\/server'/);
 
+// ZIP decompression belongs to the lazy theme editor, not the public landing bundle.
+assert.match(themes, /from '\.\/themeCssUtils'/);
+assert.doesNotMatch(themes, /from '\.\/themeZipCore'/);
+
 // GTmetrix: reported always-running non-composited indicators are static now.
 for (const [name, source] of Object.entries({ home, darkGold, geco, gamingAmp, consoleGrid, consoleHub })) {
   assert.doesNotMatch(source, /animate-(?:pulse|ping)/, `${name} contains an always-running pulse/ping animation`);

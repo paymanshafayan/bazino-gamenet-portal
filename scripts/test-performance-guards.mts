@@ -81,6 +81,12 @@ assert.match(consoleGrid, /if \(!isChatPanelVisible\) return/);
 assert.match(consoleGrid, /document\.visibilityState === 'visible'/);
 assert.doesNotMatch(gamingAmp, /activeSlide|setActiveSlide/);
 
+// Large API-derived trees must not monopolize the first interaction window.
+assert.match(app, /startTransition\(\(\) => \{[\s\S]{0,500}setSystems/);
+assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]{0,120}scheduleIdle\(checkInstallStatus\)/);
+assert.match(home, /window\.setTimeout\(\(\) => \{[\s\S]{0,300}fetch\('\/api\/settings'\)/);
+assert.match(home, /startTransition\(\(\) => \{/);
+
 // GTmetrix: reported always-running non-composited indicators are static now.
 for (const [name, source] of Object.entries({ home, darkGold, geco, gamingAmp, consoleGrid, consoleHub })) {
   assert.doesNotMatch(source, /animate-(?:pulse|ping)/, `${name} contains an always-running pulse/ping animation`);

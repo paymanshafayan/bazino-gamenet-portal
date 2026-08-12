@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
 import bazinoLogo from './assets/images/bazino_logo_user.webp';
 import {
@@ -179,10 +179,15 @@ export default function App() {
         fetch('/api/tournaments').then(res => res.json()).catch(() => [])
       ]);
 
-      if (Array.isArray(sysRes)) setSystems(sysRes);
-      if (Array.isArray(cafeRes)) setCafeItems(cafeRes);
-      if (Array.isArray(accRes)) setAccessories(accRes);
-      if (Array.isArray(tourRes)) setTournaments(tourRes);
+      // API responses can be sizeable. Mark their resulting tree update as non-urgent so
+      // React may yield to a tap/scroll instead of making response parsing + rendering one
+      // long main-thread task during the landing page's first seconds.
+      startTransition(() => {
+        if (Array.isArray(sysRes)) setSystems(sysRes);
+        if (Array.isArray(cafeRes)) setCafeItems(cafeRes);
+        if (Array.isArray(accRes)) setAccessories(accRes);
+        if (Array.isArray(tourRes)) setTournaments(tourRes);
+      });
     } catch (err) {
       console.error("Error fetching data:", err);
     }
@@ -197,14 +202,16 @@ export default function App() {
         fetch('/api/coupons').then(res => res.json()).catch(() => []),
         fetch('/api/user').then(res => res.json()).catch(() => null)
       ]).then(([artRes, transRes, coupRes, userRes]) => {
-        if (Array.isArray(artRes)) setArticles(artRes);
-        if (Array.isArray(transRes)) setTransactions(transRes);
-        if (Array.isArray(coupRes)) setActiveCoupons(coupRes);
-        if (userRes && userRes.username && userRes.username !== 'Guest') {
-          setUser(userRes);
-        } else {
-          setUser(null);
-        }
+        startTransition(() => {
+          if (Array.isArray(artRes)) setArticles(artRes);
+          if (Array.isArray(transRes)) setTransactions(transRes);
+          if (Array.isArray(coupRes)) setActiveCoupons(coupRes);
+          if (userRes && userRes.username && userRes.username !== 'Guest') {
+            setUser(userRes);
+          } else {
+            setUser(null);
+          }
+        });
       }).catch(err => console.error("Error fetching secondary data:", err));
     });
   };
@@ -235,7 +242,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    checkInstallStatus();
+    // The fallback landing page already has its hero and navigation without these API
+    // payloads. Give the first paint and its input window a short head start; opening a
+    // data-backed tab later still receives the same data through fetchData.
+    const timer = window.setTimeout(() => {
+      scheduleIdle(checkInstallStatus);
+    }, 2500);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const handleRedeemPoints = async (points: number, couponValue: number, code: string) => {

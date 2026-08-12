@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, startTransition } from 'react';
 import { Tournament } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
 import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
@@ -116,15 +116,29 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   };
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/settings').then(r => r.json()).catch(() => ({})),
-      fetch('/api/app-sliders').then(r => r.json()).catch(() => [])
-    ]).then(([settingsData, slidersData]) => {
-      setSiteSettings(settingsData || {});
-      if (slidersData && slidersData.length > 0) {
-        setAppSliders(slidersData);
-      }
-    }).catch(err => console.error('Error fetching settings/sliders:', err));
+    let cancelled = false;
+    // The built-in hero is immediately usable, so settings and carousel overrides do not
+    // need to compete with React's first render. Delaying their JSON work keeps the initial
+    // interaction window responsive on slower phones.
+    const timer = window.setTimeout(() => {
+      Promise.all([
+        fetch('/api/settings').then(r => r.json()).catch(() => ({})),
+        fetch('/api/app-sliders').then(r => r.json()).catch(() => [])
+      ]).then(([settingsData, slidersData]) => {
+        if (cancelled) return;
+        startTransition(() => {
+          setSiteSettings(settingsData || {});
+          if (slidersData && slidersData.length > 0) {
+            setAppSliders(slidersData);
+          }
+        });
+      }).catch(err => console.error('Error fetching settings/sliders:', err));
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   // Auto-slide game banners. فاصله‌ی ۸ ثانیه‌ای اجازه می‌دهد چرخه‌ی بارگذاری

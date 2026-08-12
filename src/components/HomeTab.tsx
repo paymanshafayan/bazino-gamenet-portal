@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'rea
 import { Tournament } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
 import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
+import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 
 // نماهای اختصاصی قالب‌ها — فقط وقتی قالب مربوطه فعال باشد دانلود می‌شوند
 const GamingAmpHome = lazy(() => import('./GamingAmpHome'));
@@ -50,6 +51,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
   const [activeBanner, setActiveBanner] = useState(0);
   const [activeTournamentSlide, setActiveTournamentSlide] = useState(0);
+  const [isTournamentSectionVisible, setIsTournamentSectionVisible] = useState(false);
   const tournamentRefs = useRef<(HTMLDivElement | null)[]>([]);
   const tournamentContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -125,23 +127,27 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     }).catch(err => console.error('Error fetching settings/sliders:', err));
   }, []);
 
-  // Auto-slide game banners
+  // Auto-slide game banners. فاصله‌ی ۸ ثانیه‌ای اجازه می‌دهد چرخه‌ی بارگذاری
+  // اولیه پیش از درخواست تصویر بعدی تمام شود (payload/LCP گزارش GTmetrix).
   useEffect(() => {
     if (typeof featuredGames === 'undefined' || featuredGames.length === 0) return;
     const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       setActiveBanner((prev) => (prev + 1) % featuredGames.length);
-    }, 6000);
+    }, 8000);
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-slide tournaments
+  // کار carousel دور از viewport تا زمان مشاهده‌ی بخش اجرا نمی‌شود؛ در غیر این
+  // صورت هر ۴.۵ ثانیه یک render و layout read غیرقابل‌مشاهده ایجاد می‌کرد.
   useEffect(() => {
-    if (tournaments.length === 0) return;
+    if (!isTournamentSectionVisible || tournaments.length === 0) return;
     const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       setActiveTournamentSlide((prev) => (prev + 1) % tournaments.length);
     }, 4500);
     return () => clearInterval(interval);
-  }, [tournaments.length]);
+  }, [isTournamentSectionVisible, tournaments.length]);
 
   // Smooth scroll active tournament horizontally
   useEffect(() => {
@@ -546,6 +552,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         ]
       }))
     : featuredGames;
+  const activeGame = activeBanners[activeBanner] ?? activeBanners[0];
 
   // mount کامپوننت قالب وقتی ثبت شد
   useEffect(() => {
@@ -679,7 +686,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
   if (themeId === 'geco-purple') {
     return (
-      <Suspense fallback={<div className="w-full py-24 flex justify-center"><div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>}>
+      <Suspense fallback={<div className="w-full min-h-[600px]" aria-hidden="true" />}>
       <GecoPurpleHome
         featuredGames={activeBanners}
         matchHistory={matchHistory}
@@ -714,7 +721,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
   if (themeId === 'gaming-amp') {
     return (
-      <Suspense fallback={<div className="w-full py-24 flex justify-center"><div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>}>
+      <Suspense fallback={<div className="w-full min-h-[600px]" aria-hidden="true" />}>
       <GamingAmpHome
         featuredGames={activeBanners}
         gameGenres={gameGenres}
@@ -734,57 +741,56 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       
       {/* 1. HERO GAME SLIDER (FULL WIDTH, SLANTED & MOBIRISE GAMINGAMP STYLED) */}
       <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#050608] shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
-        {activeBanners.map((game, idx) => (
-          <div
-            key={game.id}
-            className={`absolute inset-0 w-full h-full transition-all duration-1000 ease-in-out ${
-              activeBanner === idx ? 'opacity-100 z-10 scale-100' : 'opacity-0 z-0 scale-105 pointer-events-none'
-            }`}
-          >
+        {activeGame && (
+          <div key={activeGame.id} className="absolute inset-0 w-full h-full z-10">
             {/* Soft lightweight overlay removed to keep images bright as per user request */}
             <div className="absolute inset-0 bg-transparent z-10" />
-            
-            {/* Slide Image — فقط اسلاید فعال eager است (LCP)؛ بقیه lazy */}
+
+            {/* فقط تصویر قابل‌مشاهده در DOM است و از لحظه‌ی mount با اولویت LCP دریافت می‌شود. */}
             <img
-              loading={activeBanner === idx ? 'eager' : 'lazy'}
-              fetchpriority={activeBanner === idx ? 'high' : 'auto'}
-              src={game.imageUrl}
-              alt={getLocText(game.title)}
+              loading="eager"
+              fetchpriority="high"
+              src={activeGame.imageUrl}
+              srcSet={getResponsiveSrcSet(activeGame.imageUrl, [640, 960, 1200])}
+              sizes="100vw"
+              width="1200"
+              height="514"
+              alt={getLocText(activeGame.title)}
               className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-transform duration-[10s] ease-out"
               referrerPolicy="no-referrer"
             />
- 
+
             {/* Slider Content */}
             <div className={`absolute inset-y-0 ${dir === 'rtl' ? 'right-6 md:right-16 lg:right-24 xl:right-32 text-right' : 'left-6 md:left-16 lg:left-24 xl:left-32 text-left'} z-20 flex flex-col justify-center max-w-xl md:max-w-2xl gap-3.5 md:gap-4`}>
               <span className="self-start px-3 py-1 bg-primary/20 border border-primary text-primary notched-clip-sm text-[10px] md:text-xs font-black tracking-widest uppercase font-display neon-text-glow">
-                {game.badge}
+                {activeGame.badge}
               </span>
-              
+
               <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)] font-display uppercase tracking-tight">
-                {getLocText(game.title)}
+                {getLocText(activeGame.title)}
               </h1>
-              
+
               <p className="text-xs sm:text-sm md:text-base text-gray-300 leading-relaxed max-w-xl">
-                {getLocText(game.desc)}
+                {getLocText(activeGame.desc)}
               </p>
- 
+
               <div className="flex flex-wrap gap-3 mt-2">
                 <button
                   onClick={() => {
-                    const targetRoute = game.target === 'reserve' ? 'reservations' : (game.target || 'reservations');
+                    const targetRoute = activeGame.target === 'reserve' ? 'reservations' : (activeGame.target || 'reservations');
                     onNavigate(targetRoute);
                   }}
                   className="px-6 py-3 bg-primary hover:bg-primary-hover text-black font-black text-xs notched-clip-sm shadow-[0_0_20px_rgba(255,184,0,0.4)] border border-primary transition-all flex items-center gap-2 cursor-pointer font-display uppercase tracking-wider"
                 >
-                  {getButtonIcon(game.target || 'reserve')}
+                  {getButtonIcon(activeGame.target || 'reserve')}
                   <span>
-                    {getButtonText(game.target || 'reserve')[language] || getButtonText(game.target || 'reserve')['en']}
+                    {getButtonText(activeGame.target || 'reserve')[language] || getButtonText(activeGame.target || 'reserve')['en']}
                   </span>
                 </button>
               </div>
             </div>
           </div>
-        ))}
+        )}
  
         {/* Slider Controls (Manual Arrow Navigation) */}
         <button
@@ -842,6 +848,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 {/* Image banner */}
                 <img loading="lazy"
                   src={genre.imageUrl}
+                  srcSet={getResponsiveSrcSet(genre.imageUrl, [320, 480, 600])}
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                  width="600"
+                  height="600"
                   alt={getLocText(genre.title)}
                   className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-[transform,opacity] duration-500"
                   referrerPolicy="no-referrer"
@@ -887,6 +897,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
       {/* 3. LOUNGE SECTIONS INTRO (SLANTED CYBER FRAMING) */}
       {isSectionEnabled('services') && (
+        <DeferredSection minHeight={520} render={() => (
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
@@ -914,6 +925,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden border-b border-white/10">
                   <img loading="lazy"
                     src={sect.imageUrl}
+                    srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 480, 600])}
+                    sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw"
+                    width="600"
+                    height="375"
                     alt={getLocText(sect.title)}
                     className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-[transform,opacity] duration-500"
                     referrerPolicy="no-referrer"
@@ -949,10 +964,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             ))}
           </div>
         </section>
+        )} />
       )}
 
       {/* 4. MATCH RESULTS BOARD (NEW SIGNATURE MOBIRISE SECTION) */}
       {isSectionEnabled('matches') && (
+        <DeferredSection minHeight={390} render={() => (
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
@@ -977,7 +994,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 <span className="text-xs font-bold font-display uppercase text-white">Esports Arena Matches</span>
               </div>
               <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-none notched-clip-sm text-[10px] font-mono font-bold uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
                 <span>Lobby Connected</span>
               </div>
             </div>
@@ -1015,7 +1032,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   <div className="flex items-center justify-end w-full md:w-1/4 gap-3">
                     {match.status === 'Live' && (
                       <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase notched-clip-sm">
-                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                         <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
                       </span>
                     )}
@@ -1041,10 +1058,15 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             </div>
           </div>
         </section>
+        )} />
       )}
 
       {/* 5. TOURNAMENTS CAROUSEL (SLANTED DESIGN) */}
       {isSectionEnabled('tournaments') && (
+        <DeferredSection
+          minHeight={520}
+          onVisible={() => setIsTournamentSectionVisible(true)}
+          render={() => (
         <section className="space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex flex-col gap-1.5">
@@ -1103,6 +1125,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden">
                     <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
+                      srcSet={getResponsiveSrcSet(getTournamentImage(tournament.game), [320, 480, 640, 800])}
+                      sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                      width="800"
+                      height="500"
                       alt={tournament.title}
                       className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
@@ -1189,10 +1215,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
           </div>
         )}
       </section>
+        )} />
       )}
 
       {/* 6. LOUNGE PASSES & PRICING PLANS (NEW SIGNATURE MOBIRISE SECTION) */}
       {isSectionEnabled('pricing') && (
+        <DeferredSection minHeight={560} render={() => (
         <section className="space-y-8">
           <div className="flex flex-col gap-2 text-center items-center">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
@@ -1221,7 +1249,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             >
               {/* Popular Tag */}
               {pack.popular && (
-                <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 notched-clip-sm uppercase tracking-widest font-display animate-pulse">
+                <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 notched-clip-sm uppercase tracking-widest font-display">
                   {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
                 </span>
               )}
@@ -1262,10 +1290,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
           ))}
         </div>
       </section>
+        )} />
       )}
 
       {/* 7. MEET THE COACHES & EXPERTS (NEW SIGNATURE MOBIRISE SECTION) */}
       {isSectionEnabled('coaches') && (
+        <DeferredSection minHeight={500} render={() => (
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
@@ -1293,6 +1323,8 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-transform duration-300">
                 <img loading="lazy"
                   src={staff.avatar}
+                  width="96"
+                  height="96"
                   alt={getLocText(staff.name)}
                   className="rounded-full bg-dark-bg w-full h-full object-cover"
                 />
@@ -1338,10 +1370,12 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
           ))}
         </div>
       </section>
+        )} />
       )}
 
       {/* 8. ADDRESS, CONSOLE TICKETING & DARK-THEMED OSM LOCATION MAP */}
       {isSectionEnabled('address') && (
+        <DeferredSection minHeight={500} render={() => (
         <section className="w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 bg-dark-card px-6 md:px-16 lg:px-24 xl:px-32 py-12 md:py-16 border-t-4 border-primary rounded-none shadow-[0_-10px_50px_rgba(0,0,0,0.3)]">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
@@ -1416,7 +1450,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                         rel="noreferrer"
                         className="flex items-center gap-2 px-3.5 py-2 bg-black/60 border border-white/10 hover:border-primary hover:text-primary transition-all text-xs font-bold group notched-clip-sm"
                       >
-                        <span className="text-gray-400 group-hover:text-primary transition-colors animate-pulse">
+                        <span className="text-gray-400 group-hover:text-primary transition-colors">
                           {getSocialIcon(item.platform)}
                         </span>
                         <span>{item.name}</span>
@@ -1446,7 +1480,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
               {/* Custom overlay tracker */}
               <div className="absolute top-4 right-4 bg-black border border-primary/40 px-3 py-1.5 text-[10px] font-black text-primary flex items-center gap-1.5 backdrop-blur-sm pointer-events-none uppercase font-mono shadow-md notched-clip-sm">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                <span className="w-2 h-2 rounded-full bg-primary"></span>
                 <span>GPS Tracking: Live Lock</span>
               </div>
               
@@ -1457,6 +1491,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
           </div>
         </section>
+        )} />
       )}
 
     </div>

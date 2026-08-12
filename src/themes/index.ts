@@ -92,7 +92,7 @@ import darkGoldCss from './dark-gold.css?inline';
 
 /* تصویر پس‌زمینه پیش‌فرض — به‌صورت ایمپورت Asset تا Vite در هر دو
  * حالت dev/build آدرس صحیح (هش‌شده) را تولید کند. */
-import defaultBgUrl from '../assets/images/background.jpg';
+import defaultBgUrl from '../assets/images/background.webp';
 
 /* هسته مشترک پکیج قالب — توابع خالص (بدون وابستگی Vite) */
 import { sanitizeThemeId, extractColorsFromCss } from './themeZipCore';

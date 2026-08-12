@@ -56,6 +56,7 @@ class JarvisStateProvider extends ChangeNotifier {
   bool _handsFreeMode = false;
   bool _isHandlingFinalSpeech = false;
   double _voiceLevel = 0.0;
+  String? _pendingNavigationSection;
   Timer? _speakingPulseTimer;
   final String _currentResponseText = "";
   String _liveTranscript = "";
@@ -74,6 +75,12 @@ class JarvisStateProvider extends ChangeNotifier {
   bool get handsFreeMode => _handsFreeMode;
   double get voiceLevel => _voiceLevel;
   String get currentResponseText => _currentResponseText;
+
+  String? consumePendingNavigationSection() {
+    final section = _pendingNavigationSection;
+    _pendingNavigationSection = null;
+    return section;
+  }
   String get liveTranscript => _liveTranscript;
   List<JarvisMessage> get chatHistory => _chatHistory;
   bool get speechAvailable => _speechAvailable;
@@ -300,6 +307,15 @@ class JarvisStateProvider extends ChangeNotifier {
         final reply = data['reply'] as String? ?? '...';
         _chatHistory.add(JarvisMessage(content: reply, isUser: false, timestamp: _now()));
         await _speak(reply, appState.language);
+
+        final clientCommand = data['clientCommand'];
+        if (clientCommand is Map) {
+          if (clientCommand['type'] == 'change_language') {
+            appState.setLanguage((clientCommand['language'] ?? 'fa').toString());
+          } else if (clientCommand['type'] == 'open_section') {
+            _pendingNavigationSection = (clientCommand['section'] ?? 'home').toString();
+          }
+        }
 
         final action = data['action'] as String?;
         _avatarState = (action == 'chitchat' || action == null)
@@ -670,7 +686,9 @@ class _JarvisCorePainter extends CustomPainter {
 
 /// Floating cybernetic voice assistant panel sliding from bottom
 class JarvisAssistantModal extends StatefulWidget {
-  const JarvisAssistantModal({super.key});
+  const JarvisAssistantModal({super.key, this.onNavigate});
+
+  final void Function(String section)? onNavigate;
 
   @override
   State<JarvisAssistantModal> createState() => _JarvisAssistantModalState();
@@ -712,6 +730,13 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
   Widget build(BuildContext context) {
     final jarvisState = Provider.of<JarvisStateProvider>(context);
     final appState = Provider.of<AppState>(context, listen: false);
+    final pendingSection = jarvisState.consumePendingNavigationSection();
+    if (pendingSection != null && widget.onNavigate != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+        widget.onNavigate!(pendingSection);
+      });
+    }
     final isFa = appState.language == 'fa';
 
     return Container(

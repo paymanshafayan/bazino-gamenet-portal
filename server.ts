@@ -888,7 +888,18 @@ async function startServer() {
                 },
                 required: ["message"]
               }
-            }
+            },
+            { name: "reserve_system", description: "Reserve a free gaming system for the user.", parameters: { type: Type.OBJECT, properties: { systemType: { type: Type.STRING }, startTime: { type: Type.STRING }, hours: { type: Type.NUMBER } }, required: [] } },
+            { name: "cancel_reservation", description: "Cancel the user's active reservation.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
+            { name: "show_wallet", description: "Show the user's loyalty points, coupons, and recent transactions.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
+            { name: "suggest_best_system", description: "Suggest the best currently available gaming system.", parameters: { type: Type.OBJECT, properties: { systemType: { type: Type.STRING } }, required: [] } },
+            { name: "list_tournaments", description: "List active/upcoming tournaments.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
+            { name: "register_tournament", description: "Register a team for a tournament.", parameters: { type: Type.OBJECT, properties: { tournamentName: { type: Type.STRING }, teamName: { type: Type.STRING }, leader: { type: Type.STRING }, members: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: [] } },
+            { name: "search_shop", description: "Search gaming accessories in the shop.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING } }, required: ["query"] } },
+            { name: "purchase_shop_item", description: "Purchase one accessory from the shop.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, couponCode: { type: Type.STRING } }, required: ["query"] } },
+            { name: "read_messages", description: "Read the user's latest app messages and notifications.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
+            { name: "change_language", description: "Change app language. Supported: fa, en, ru, tr.", parameters: { type: Type.OBJECT, properties: { language: { type: Type.STRING } }, required: ["language"] } },
+            { name: "open_app_section", description: "Open/navigate to a section in the mobile app.", parameters: { type: Type.OBJECT, properties: { section: { type: Type.STRING, description: "home, reserve, cafe, shop, tournaments, loyalty, messages, chat, blog" } }, required: ["section"] } }
           ]
         }];
 
@@ -927,6 +938,17 @@ Reply in ${replyLanguage}. Decide whether one of the available functions matches
     if (/(چت|ارسال پیام|پیام بفرست)/.test(cmd)) {
       return { action: "send_chat_message", params: { room: "", message: command }, aiReply: "" };
     }
+    if (/(رزرو کن|رزرو سیستم|سیستم بگیر|کامپیوتر بگیر)/.test(cmd)) return { action: "reserve_system", params: { hours: 1 }, aiReply: "" };
+    if (/(لغو رزرو|کنسل رزرو|رزرو را لغو)/.test(cmd)) return { action: "cancel_reservation", params: {}, aiReply: "" };
+    if (/(کیف پول|امتیاز|کوپن|کد تخفیف)/.test(cmd)) return { action: "show_wallet", params: {}, aiReply: "" };
+    if (/(بهترین سیستم|سیستم آزاد|پیشنهاد سیستم)/.test(cmd)) return { action: "suggest_best_system", params: {}, aiReply: "" };
+    if (/(تورنمنت|مسابقه)/.test(cmd) && /(لیست|چی|نمایش)/.test(cmd)) return { action: "list_tournaments", params: {}, aiReply: "" };
+    if (/(ثبت.?نام).*(تورنمنت|مسابقه)/.test(cmd)) return { action: "register_tournament", params: { tournamentName: command }, aiReply: "" };
+    if (/(جستجو|پیدا کن).*(فروشگاه|کالا|موس|کیبورد|هدست)/.test(cmd)) return { action: "search_shop", params: { query: command }, aiReply: "" };
+    if (/(بخر|خرید).*(موس|کیبورد|هدست|دسته|ماوس)/.test(cmd)) return { action: "purchase_shop_item", params: { query: command }, aiReply: "" };
+    if (/(پیام‌ها|پیام ها|نوتیفیکیشن|اعلان)/.test(cmd)) return { action: "read_messages", params: {}, aiReply: "" };
+    if (/(زبان|language)/.test(cmd)) return { action: "change_language", params: { language: cmd.includes('english') || cmd.includes('انگلیسی') ? 'en' : cmd.includes('روسی') ? 'ru' : cmd.includes('ترکی') ? 'tr' : 'fa' }, aiReply: "" };
+    if (/(برو به|باز کن|نشان بده)/.test(cmd)) return { action: "open_app_section", params: { section: command }, aiReply: "" };
     return { action: "chitchat", params: {}, aiReply: "" };
   }
 
@@ -1042,8 +1064,112 @@ Reply in ${replyLanguage}. Decide whether one of the available functions matches
         return { reply: `پیامت با موفقیت توی اتاق «${roomMatch}» فرستاده شد. 🔫`, chatMsg };
       }
 
+      case "reserve_system": {
+        if (user.username === "Guest") return { reply: "برای رزرو سیستم باید اول وارد حساب کاربری بشی." };
+        const systems = await resolveSampleList(await store.listSystems(), SAMPLE_SYSTEMS);
+        const wanted = String(intent.params.systemType || "").toLowerCase();
+        const system = systems.find(s => s.isActive && !s.isReserved && (!wanted || s.type.toLowerCase().includes(wanted) || s.name.toLowerCase().includes(wanted)))
+          || systems.find(s => s.isActive && !s.isReserved);
+        if (!system) return { reply: "فعلاً سیستم آزادی برای رزرو پیدا نکردم." };
+        const startTime = String(intent.params.startTime || new Date().toTimeString().slice(0, 5));
+        const hours = Math.max(1, Math.min(6, Number(intent.params.hours) || 1));
+        const endTime = addHoursToTimeString(startTime, hours);
+        const overlapping = await store.hasOverlappingReservation(system.id, "امروز", startTime, endTime);
+        if (overlapping) return { reply: `سیستم پیشنهادی در بازه ${startTime} تا ${endTime} رزرو است؛ یک بازه دیگر بگو.` };
+        await store.setSystemReserved(system.id, true);
+        const totalPrice = Math.round(system.hourlyRate * hours);
+        const pointsEarned = Math.floor(totalPrice / 10000);
+        await store.addLoyaltyPointsToUser(user.username, pointsEarned);
+        const log = { id: "res-" + Math.random().toString(36).substring(2, 9), systemId: system.id, username: user.username, systemName: system.name, startTime, endTime, totalPrice, date: "امروز", checkedIn: false, timestamp: new Date().toISOString() };
+        await store.addReservationLog(log);
+        await store.addTransaction({ id: Math.random().toString(36).substring(2, 9), points: pointsEarned, description: `رزرو ${system.name} از طریق جارویس`, type: "Earned", date: "امروز" });
+        return { reply: `رزرو انجام شد: ${system.name} از ${startTime} تا ${endTime}. ${pointsEarned} امتیاز هم به حسابت اضافه شد.`, reservation: log };
+      }
+
+      case "cancel_reservation": {
+        if (user.username === "Guest") return { reply: "برای لغو رزرو باید وارد حساب کاربری باشی." };
+        const active = ctx.activeReservation || await store.getActiveReservationForUser(user.username);
+        if (!active) return { reply: "رزرو فعالی برای لغو پیدا نکردم." };
+        await store.deleteReservationLog(active.id);
+        await store.setSystemReserved(active.systemId, false);
+        return { reply: `رزرو ${active.systemName} لغو شد.` };
+      }
+
+      case "show_wallet": {
+        if (user.username === "Guest") return { reply: "برای دیدن کیف پول و امتیازها باید وارد حساب کاربری بشی." };
+        const fresh = await store.getUserByUsername(user.username);
+        const coupons = await resolveSampleList(await store.listCoupons(), SAMPLE_COUPONS);
+        const activeCoupons = coupons.filter(c => c.isActive).slice(0, 3).map(c => c.code).join("، ") || "کد فعالی نداری";
+        const tx = (await store.listTransactions()).slice(0, 3).map(t => `${t.description}: ${t.points}`).join(" | ");
+        return { reply: `امتیاز فعلی شما ${fresh?.loyaltyPoints ?? user.loyaltyPoints} است. کدهای فعال: ${activeCoupons}. آخرین تراکنش‌ها: ${tx || "هنوز تراکنشی ثبت نشده"}` };
+      }
+
+      case "suggest_best_system": {
+        const systems = await resolveSampleList(await store.listSystems(), SAMPLE_SYSTEMS);
+        const free = systems.filter(s => s.isActive && !s.isReserved).sort((a, b) => b.hourlyRate - a.hourlyRate);
+        if (free.length === 0) return { reply: "الان هیچ سیستم آزادی پیدا نکردم." };
+        const s = free[0];
+        return { reply: `پیشنهاد من ${s.name} است؛ نوع ${s.type} با تعرفه ${s.hourlyRate.toLocaleString()} تومان در ساعت و الان آزاد است.` };
+      }
+
+      case "list_tournaments": {
+        const tournaments = await resolveSampleList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
+        const list = tournaments.filter(t => t.status !== "Completed").slice(0, 4).map(t => `${t.title} (${t.game})`).join("، ");
+        return { reply: list ? `تورنمنت‌های فعال و آینده: ${list}` : "فعلاً تورنمنت فعالی نداریم." };
+      }
+
+      case "register_tournament": {
+        if (user.username === "Guest") return { reply: "برای ثبت‌نام تورنمنت باید وارد حساب کاربری باشی." };
+        const tournaments = await resolveSampleList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
+        const needle = String(intent.params.tournamentName || "").toLowerCase();
+        const tournament = tournaments.find(t => needle && (t.title.toLowerCase().includes(needle) || needle.includes(t.game.toLowerCase()))) || tournaments.find(t => t.status !== "Completed");
+        if (!tournament) return { reply: "تورنمنت مناسبی برای ثبت‌نام پیدا نکردم." };
+        const teams = JSON.parse(tournament.teams || "[]");
+        const team = { name: intent.params.teamName || `${user.username} Team`, leader: intent.params.leader || user.username, members: Array.isArray(intent.params.members) ? intent.params.members : [] };
+        teams.push(team);
+        await store.registerTournamentTeam(tournament.id, JSON.stringify(teams), tournament.registeredTeamsCount + 1);
+        return { reply: `تیم «${team.name}» برای تورنمنت «${tournament.title}» ثبت شد.` };
+      }
+
+      case "search_shop": {
+        const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
+        const q = String(intent.params.query || "").toLowerCase();
+        const matches = items.filter(i => i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())).slice(0, 5);
+        return { reply: matches.length ? `این کالاها را پیدا کردم: ${matches.map(i => `${i.name} (${i.price.toLocaleString()} تومان)`).join("، ")}` : "کالایی با این مشخصات پیدا نکردم." };
+      }
+
+      case "purchase_shop_item": {
+        const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
+        const q = String(intent.params.query || "").toLowerCase();
+        const item = items.find(i => i.name.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())) || items[0];
+        if (!item || item.stock < 1) return { reply: "این کالا موجود نیست." };
+        const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode);
+        await store.decrementAccessoryStock(item.id, 1);
+        const finalAmount = Math.max(0, item.price - discountAmount);
+        const pointsEarned = Math.floor(finalAmount / 10000);
+        if (user.username !== "Guest") await store.addLoyaltyPointsToUser(user.username, pointsEarned);
+        await store.addShopOrder({ id: "ACC-" + Math.floor(1000 + Math.random() * 9000), cart: JSON.stringify([{ item, quantity: 1 }]), totalPrice: item.price, discountApplied: discountAmount, finalAmount, couponCode: coupon ? intent.params.couponCode : "", date: "امروز", status: "Processing" });
+        return { reply: `خرید «${item.name}» ثبت شد. مبلغ نهایی ${finalAmount.toLocaleString()} تومان است.` };
+      }
+
+      case "read_messages": {
+        const messages = (await store.listUserMessages()).filter(m => m.recipient === "All" || m.recipient === user.username).slice(0, 5);
+        return { reply: messages.length ? `آخرین پیام‌ها: ${messages.map(m => `${m.title}: ${m.body}`).join(" | ")}` : "پیام جدیدی نداری." };
+      }
+
+      case "change_language": {
+        const lang = ["fa", "en", "ru", "tr"].includes(String(intent.params.language)) ? String(intent.params.language) : "fa";
+        return { reply: `زبان اپ به ${lang} تغییر کرد.`, clientCommand: { type: "change_language", language: lang } };
+      }
+
+      case "open_app_section": {
+        const raw = String(intent.params.section || "").toLowerCase();
+        const section = raw.includes("message") || raw.includes("پیام") || raw.includes("اعلان") ? "messages" : raw.includes("chat") || raw.includes("چت") ? "chat" : raw.includes("blog") || raw.includes("بلاگ") || raw.includes("خبر") ? "blog" : raw.includes("cafe") || raw.includes("کافه") ? "cafe" : raw.includes("shop") || raw.includes("فروشگاه") ? "shop" : raw.includes("tournament") || raw.includes("مسابق") ? "tournaments" : raw.includes("loyal") || raw.includes("باشگاه") || raw.includes("امتیاز") ? "loyalty" : raw.includes("reserve") || raw.includes("رزرو") ? "reserve" : "home";
+        return { reply: `بخش ${section} را باز می‌کنم.`, clientCommand: { type: "open_section", section } };
+      }
+
       default:
-        return { reply: intent.aiReply || "پیامت رو شنیدم! می‌تونم برات از بوفه سفارش بدم، زمان بازیت رو تمدید کنم، به ادمین خبر بدم یا توی چت‌روم پیام بفرستم. چیکار کنیم؟ 😉" };
+        return { reply: intent.aiReply || "پیامت رو شنیدم! می‌تونم رزرو کنم، رزرو رو لغو یا تمدید کنم، فروشگاه و تورنمنت‌ها رو مدیریت کنم، پیام‌هات رو بخونم، زبان اپ رو تغییر بدم یا به بخش‌های مختلف اپ ببرمت. چیکار کنیم؟ 😉" };
     }
   }
 
@@ -1072,7 +1198,7 @@ Reply in ${replyLanguage}. Decide whether one of the available functions matches
       }
 
       const updatedUser = await getCurrentUser(req);
-      res.json({ success: true, action: intent.action, reply: result.reply, user: updatedUser });
+      res.json({ success: true, action: intent.action, reply: result.reply, user: updatedUser, clientCommand: (result as any).clientCommand });
     } catch (e: any) {
       res.status(e.statusCode || 500).json({ error: e.message || String(e) });
     }

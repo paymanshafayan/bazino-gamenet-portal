@@ -9,10 +9,11 @@ import {
   saveCustomThemes,
   type ThemeInfo
 } from './themes';
-// تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند (کد اسپلیتینگ):
-// فقط HomeTab (صفحه اصلی/LCP) به‌صورت eager می‌ماند — بقیه با کلیک کاربر
-// دانلود می‌شوند تا باندل اولیه کوچک بماند (توصیه اصلی GTmetrix/PageSpeed).
-import HomeTab from './components/HomeTab';
+// تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند. HomeTab هم شامل چندین
+// بخش/دادهٔ پایین صفحه است؛ Hero سبکِ LandingHero بلافاصله paint می‌شود و خود
+// HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
+import LandingHero from './components/LandingHero';
+const HomeTab = lazy(() => import('./components/HomeTab'));
 const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
 const CafeTab = lazy(() => import('./components/CafeTab'));
@@ -352,17 +353,19 @@ export default function App() {
             refreshData={fetchData}
           />
         ) : (
-          <HomeTab 
-            themeId={themeId} 
-            tournaments={tournaments} 
-            onNavigate={setActiveTab} 
-            themeComponent={(() => {
-              const th = availableThemes.find(x => x.id === themeId);
-              return th && th.kind === 'server' && th.cssUrl
-                ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
-                : null;
-            })()}
-          />
+          <Suspense fallback={<LandingHero onNavigate={() => setActiveTab('reservations')} />}>
+            <HomeTab
+              themeId={themeId}
+              tournaments={tournaments}
+              onNavigate={setActiveTab}
+              themeComponent={(() => {
+                const th = availableThemes.find(x => x.id === themeId);
+                return th && th.kind === 'server' && th.cssUrl
+                  ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
+                  : null;
+              })()}
+            />
+          </Suspense>
         )
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}

@@ -3,6 +3,7 @@ import { readFileSync, statSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const home = read('../src/components/HomeTab.tsx');
+const landingHero = read('../src/components/LandingHero.tsx');
 const darkGold = read('../src/components/DarkGoldHome.tsx');
 const geco = read('../src/components/GecoPurpleHome.tsx');
 const gamingAmp = read('../src/components/GamingAmpHome.tsx');
@@ -15,6 +16,12 @@ const server = read('../server.ts');
 const viteConfig = read('../vite.config.ts');
 
 // GTmetrix: LCP image must never begin life as a lazy, inactive carousel image.
+// LandingHero is in the entry chunk; the much larger HomeTab follows as a lazy chunk.
+assert.match(app, /import LandingHero from '\.\/components\/LandingHero'/);
+assert.match(app, /const HomeTab = lazy\(\(\) => import\('\.\/components\/HomeTab'\)\)/);
+assert.match(app, /<Suspense fallback=\{<LandingHero/);
+assert.match(landingHero, /loading="eager"[\s\S]{0,80}fetchPriority="high"/);
+assert.match(landingHero, /sizes="\(min-width: 1024px\) 960px, 100vw"/);
 assert.match(home, /const activeGame = activeBanners\[activeBanner\] \?\? activeBanners\[0\]/);
 assert.match(home, /loading="eager"[\s\S]{0,80}fetchpriority="high"/);
 assert.doesNotMatch(home, /loading=\{activeBanner === idx \? 'eager' : 'lazy'\}/);

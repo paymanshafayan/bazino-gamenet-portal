@@ -15,3 +15,13 @@ database.json
 
 # Runtime-installed theme packages (installed via admin panel ZIP upload) — only at repo root
 /themes/
+
+# Deliverable/export archives — never commit zip bundles into the repo
+*.zip
+
+# AI assistant skill folders (installed per-machine via CLI, not part of the project)
+.claude/
+.cursor/
+.gemini/
+.windsurf/
+.claude-plugin/

@@ -811,3 +811,43 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - `vite.config.ts` — manualChunks vendor-react
 - `src/components/HomeTab.tsx`, `DarkGoldHome.tsx`, `GecoPurpleHome.tsx`, `ShopTab.tsx`, `CafeTab.tsx` — transition محدود به transform/opacity
 - `HANDOFF_CONTINUE_HERE.md` — بازنویسی کامل به وضعیت واقعی (۲۸ مورد ✅ + کارهای اخیر + کار بعدی)
+
+---
+
+## ۴۳. پاکسازی کامل پروژه — حذف فایل‌های زائد و تکراری
+
+به درخواست کاربر، یک پاکسازی کامل روی ریپو انجام شد: **۱۱۰۸ → ۲۹۵ فایل** (۸۱۳ فایل حذف از git).
+
+### حذف‌شده‌ها
+
+**۱. پوشه‌های اسکیل دستیاران AI — ۴ نسخه‌ی تکراری از یک محتوا (~۱۱.۶MB):**
+- `.claude/` (۱۵۵ فایل)، `.cursor/` (۱۵۴)، `.gemini/` (۱۵۵)، `.windsurf/` (۱۵۲)، `.claude-plugin/` (۲) — هر ۴ پوشه تقریباً محتوای یکسان (`ui-ux-pro-max`, `design-system`, `brand`, `design`, `slides`, `banner-design`, `bazino-*`...) بودند که از طریق CLI نصب شده‌اند. این‌ها کانفیگ ابزار شخصی هستند نه بخشی از پروژه → همه حذف شدند.
+
+**۲. کپی‌های قدیمی/تکراری داخل `flutter_app/` (فقط نسخه‌ی واقعی Flutter باقی ماند):**
+- `flutter_app/src/` (۳۸ فایل) — کپی قدیمی سایت → حذف
+- `flutter_app/server.ts` + `flutter_app/server/` — کپی قدیمی بک‌اند → حذف
+- `flutter_app/Management App/` (۳۹ فایل) — کپی نرم‌افزار مدیریت → حذف
+- `flutter_app/public/` (۷ فایل) — کپی یکسان از public ریشه → حذف
+- `flutter_app/desktop-app/` (۷) + `flutter_app/desktop-builds/` — کپی یکسان از ریشه → حذف
+- `flutter_app/index.html`, `package.json`, `package-lock.json`, `postcss.config.js`, `tsconfig.json`, `vite.config.ts` — کپی کانفیگ‌های ریشه → حذف
+- `flutter_app/metadata.json`, `.env.example`, `assets/theme-design-guide.md` — کپی‌های یکسان از ریشه → حذف
+- `flutter_app/*.md` — ۹ مستند که نسخه‌ی canonical آن‌ها در ریشه است (ARCHITECTURE, CLOUD_BUILD_GUIDE, HANDOFF_CONTINUE_HERE, ISSUES_FOUND, PUBLISHING_GUIDE, PUBLISH_AND_DATABASE_GUIDE, REFERENCE_IMAGE_INFO, SESSION_SUMMARY, BAZINO_PRO_Presentation) → حذف
+- `flutter_app/Bazino_Pro_Presentation.pdf/html` + `Bazino_Pro_Mobile_Presentation.pdf/html` — کپی پرزنتیشن‌های ریشه → حذف
+- `flutter_app/.git_flutter_backup_20260802/` (۷۶ فایل) — یک مخزن git کامل داخل پروژه → حذف
+
+**باقی‌مانده در flutter_app (پروژه‌ی واقعی):** `lib/` (۱۶ فایل Dart)، `pubspec.yaml/lock`، `analysis_options.yaml`، `.metadata`، `.gitignore`، `.vscode/`، پلتفرم‌های `android/ios/macos/windows/linux/web/test` و مستندات مخصوص خود Flutter (`README.md`, `HANDOFF.md`, `LOCAL_RUN_HANDOFF.md`, `REDESIGN_NOTES.md`).
+
+**۳. فایل‌های ریشه:**
+- `greeting.zip` (۳MB) — یک پروژه‌ی جدا (greeting card) که به این ریپو آپلود شده بود → حذف
+- `PROMPT_SKILL_INSTALL_AND_UI_IMPROVE.md` — پرامت نصب اسکیل که با حذف اسکیل‌ها منسوخ شد → حذف
+- `bazino-pro-latest.zip` — آرشیو قدیمی → حذف (نسخه‌ی تازه ساخته شد)
+
+### .gitignore به‌روزرسانی شد
+- `*.zip` — آرشیوهای خروجی دیگر commit نشوند
+- `.claude/`, `.cursor/`, `.gemini/`, `.windsurf/`, `.claude-plugin/` — پوشه‌های اسکیل AI دیگر وارد git نشوند
+
+### تأیید صحت بعد از پاکسازی
+- `tsc --noEmit` ریشه → صفر خطا ✅
+- `vite build` ریشه → موفق ✅ (vendor-react + index همان ۱۵۱KB)
+- flutter_app ساختار سالم (pubspec + lib + پلتفرم‌ها) ✅
+- هیچ ارجاعی در کد به مسیرهای حذف‌شده وجود ندارد ✅

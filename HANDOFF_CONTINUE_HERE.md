@@ -70,6 +70,7 @@
 - CI: `.github/workflows/build-test.yml` (تایپ‌چک + تست قالب + بیلد فرانت/بک + بوت + smoke تست ۹ endpoint) (بخش ۳۷)
 - بهینه‌سازی GTmetrix دور اول: تصاویر، کد اسپلیتینگ، کش، فونت‌ها، lazy loading (بخش ۳۸)
 - دامنه‌ی فلاتر: `bazino.pro` (بخش ۴۰)
+- **پاکسازی کامل پروژه (بخش ۴۳):** حذف ۸۱۳ فایل زائد/تکراری — ۴ پوشه‌ی اسکیل AI (`.claude/.cursor/.gemini/.windsurf`)، کپی‌های قدیمی سایت/مدیریت داخل `flutter_app` (حالا فقط Flutter خالص است: `lib/` + پلتفرم‌ها + pubspec)، `greeting.zip`، و پرامت نصب اسکیل. `.gitignore` هم با `*.zip` و پوشه‌های AI به‌روز شد.
 
 ---
 

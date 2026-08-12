@@ -85,9 +85,15 @@ for (const [name, source] of Object.entries({ home, darkGold, geco, gamingAmp, c
   assert.doesNotMatch(source, /animate-(?:pulse|ping)/, `${name} contains an always-running pulse/ping animation`);
 }
 
-// GTmetrix: avoid the spinner-only first commit and late webfont layout swap.
+// GTmetrix: avoid the spinner-only first commit and keep the Google font CSS off the
+// initial critical request chain. The fallback stack renders immediately; webfonts only
+// start after window load during an idle period.
 assert.match(app, /useState<boolean \| null>\(true\)/);
 assert.match(app, /<div className="w-full min-h-\[600px\]" aria-hidden="true" \/>/);
 assert.match(html, /display=optional/);
+assert.match(html, /window\.addEventListener\('load', scheduleFontLoad/);
+assert.match(html, /requestIdleCallback/);
+assert.doesNotMatch(html, /<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com/);
+assert.doesNotMatch(html, /family=Space\+Grotesk|family=Inter|family=JetBrains\+Mono/);
 
 console.log('Performance guard checks passed for all built-in templates.');

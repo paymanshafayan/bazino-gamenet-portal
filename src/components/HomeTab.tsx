@@ -728,7 +728,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               fetchpriority={activeBanner === idx ? 'high' : 'auto'}
               src={game.imageUrl}
               alt={getLocText(game.title)}
-              className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-all duration-[10s] ease-out"
+              className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-transform duration-[10s] ease-out"
               referrerPolicy="no-referrer"
             />
  
@@ -767,13 +767,13 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         {/* Slider Controls (Manual Arrow Navigation) */}
         <button
           onClick={handlePrevBanner}
-          className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-all opacity-0 group-hover:opacity-100 cursor-pointer`}
+          className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-[transform,background-color,border-color,opacity] opacity-0 group-hover:opacity-100 cursor-pointer`}
         >
           {dir === 'rtl' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </button>
         <button
           onClick={handleNextBanner}
-          className={`absolute ${dir === 'rtl' ? 'left-6' : 'right-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-all opacity-0 group-hover:opacity-100 cursor-pointer`}
+          className={`absolute ${dir === 'rtl' ? 'left-6' : 'right-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-[transform,background-color,border-color,opacity] opacity-0 group-hover:opacity-100 cursor-pointer`}
         >
           {dir === 'rtl' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
         </button>
@@ -821,7 +821,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 <img loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
-                  className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-all duration-500"
+                  className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-[transform,opacity] duration-500"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
@@ -893,7 +893,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   <img loading="lazy"
                     src={sect.imageUrl}
                     alt={getLocText(sect.title)}
-                    className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-all duration-500"
+                    className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-[transform,opacity] duration-500"
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
@@ -1082,7 +1082,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                     <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
-                      className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"
+                      className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
@@ -1268,7 +1268,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               className="group rounded-none notched-clip border border-white/10 hover:border-primary bg-dark-card p-6 flex flex-col items-center text-center gap-4 hover:shadow-[0_0_25px_rgba(255,184,0,0.15)] hover:-translate-y-1 transition-all duration-300"
             >
               {/* Avatar Frame with custom gold borders */}
-              <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-all duration-300">
+              <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-transform duration-300">
                 <img loading="lazy"
                   src={staff.avatar}
                   alt={getLocText(staff.name)}

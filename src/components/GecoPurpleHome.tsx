@@ -65,7 +65,7 @@ export default function GecoPurpleHome({
           </p>
           <button 
             onClick={() => onNavigate('reservations')} 
-            className="bg-[#ffb800] hover:bg-white text-black font-black uppercase tracking-wider px-10 py-4 transform -skew-x-12 hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,184,0,0.3)] cursor-pointer"
+            className="bg-[#ffb800] hover:bg-white text-black font-black uppercase tracking-wider px-10 py-4 transform -skew-x-12 hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,184,0,0.3)] cursor-pointer"
           >
             <span className="transform skew-x-12 inline-block">
               {language === 'fa' ? 'رزرو سریع سیستم ها' : 'BOOK STATION NOW'}
@@ -83,7 +83,7 @@ export default function GecoPurpleHome({
               onClick={() => onNavigate('reservations')}
               className="flex flex-col items-center gap-3 group cursor-pointer w-28 md:w-32"
             >
-              <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-[#111119] border-2 border-white/10 flex items-center justify-center hover:border-[#ffb800] hover:scale-110 hover:shadow-[0_0_25px_rgba(255,184,0,0.4)] transition-all duration-300">
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-[#111119] border-2 border-white/10 flex items-center justify-center hover:border-[#ffb800] hover:scale-110 hover:shadow-[0_0_25px_rgba(255,184,0,0.4)] transition-transform duration-300">
                 <Gamepad2 className={`w-8 h-8 md:w-10 md:h-10 ${idx === 0 ? 'text-[#ffb800]' : 'text-gray-400 group-hover:text-[#ffb800]'}`} />
               </div>
               <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-gray-400 group-hover:text-[#ffb800] transition-colors text-center w-full truncate">
@@ -106,7 +106,7 @@ export default function GecoPurpleHome({
             </h2>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => onNavigate('reservations')} className="px-5 py-2.5 bg-white/5 border border-white/10 hover:border-[#ffb800] text-[#ffb800] font-black text-xs uppercase tracking-wider transform -skew-x-12 hover:scale-105 transition-all cursor-pointer">
+            <button onClick={() => onNavigate('reservations')} className="px-5 py-2.5 bg-white/5 border border-white/10 hover:border-[#ffb800] text-[#ffb800] font-black text-xs uppercase tracking-wider transform -skew-x-12 hover:scale-105 transition-transform cursor-pointer">
               <span className="transform skew-x-12 inline-block">
                 {language === 'fa' ? 'مشاهده کاتالوگ' : 'VIEW ALL'}
               </span>

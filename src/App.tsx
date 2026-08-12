@@ -153,35 +153,58 @@ export default function App() {
     }, 5000);
   };
 
+  // اجرای کارهای غیربحرانی بعد از اولین paint — با fallback برای مرورگرهای بدون
+  // requestIdleCallback. `timeout: 2000` تضمین می‌کند کار حتی اگر مرورگر هیچ‌وقت
+  // idle نشود، حداکثر ~۲ ثانیه بعد اجرا شود (کاهش TBT در پنجره‌ی بحرانی).
+  const scheduleIdle = (cb: () => void) => {
+    const w = window as unknown as { requestIdleCallback?: (fn: () => void, opts?: { timeout: number }) => void };
+    if (typeof w.requestIdleCallback === 'function') {
+      w.requestIdleCallback(cb, { timeout: 2000 });
+    } else {
+      setTimeout(cb, 2000);
+    }
+  };
+
   // Fetch initial data & allow live refreshes
   const fetchData = async () => {
     try {
-      const [sysRes, cafeRes, accRes, tourRes, artRes, transRes, coupRes, userRes] = await Promise.all([
+      // داده‌های حیاتی برای رندر فوری صفحه‌ی اصلی (سیستم‌ها/کافه/فروشگاه/تورنومنت‌ها)
+      // همان‌جا — این‌ها محتوای بالای صفحه (LCP) را می‌سازند.
+      const [sysRes, cafeRes, accRes, tourRes] = await Promise.all([
         fetch('/api/systems').then(res => res.json()).catch(() => []),
         fetch('/api/cafe').then(res => res.json()).catch(() => []),
         fetch('/api/accessories').then(res => res.json()).catch(() => []),
-        fetch('/api/tournaments').then(res => res.json()).catch(() => []),
-        fetch('/api/articles').then(res => res.json()).catch(() => []),
-        fetch('/api/transactions').then(res => res.json()).catch(() => []),
-        fetch('/api/coupons').then(res => res.json()).catch(() => []),
-        fetch('/api/user').then(res => res.json()).catch(() => null)
+        fetch('/api/tournaments').then(res => res.json()).catch(() => [])
       ]);
 
       if (Array.isArray(sysRes)) setSystems(sysRes);
       if (Array.isArray(cafeRes)) setCafeItems(cafeRes);
       if (Array.isArray(accRes)) setAccessories(accRes);
       if (Array.isArray(tourRes)) setTournaments(tourRes);
-      if (Array.isArray(artRes)) setArticles(artRes);
-      if (Array.isArray(transRes)) setTransactions(transRes);
-      if (Array.isArray(coupRes)) setActiveCoupons(coupRes);
-      if (userRes && userRes.username && userRes.username !== 'Guest') {
-        setUser(userRes);
-      } else {
-        setUser(null);
-      }
     } catch (err) {
       console.error("Error fetching data:", err);
     }
+
+    // داده‌های غیربحرانی (مقالات/تراکنش‌های باشگاه/کوپن‌ها/کاربر) — بعد از idle تا
+    // پردازش پاسخ‌ها (JSON.parse + setState + رندر مجدد) در پنجره‌ی بحرانی TBT
+    // قرار نگیرند. این‌ها فقط برای تب‌های blog/loyalty و نوار بالایی هستند.
+    scheduleIdle(() => {
+      Promise.all([
+        fetch('/api/articles').then(res => res.json()).catch(() => []),
+        fetch('/api/transactions').then(res => res.json()).catch(() => []),
+        fetch('/api/coupons').then(res => res.json()).catch(() => []),
+        fetch('/api/user').then(res => res.json()).catch(() => null)
+      ]).then(([artRes, transRes, coupRes, userRes]) => {
+        if (Array.isArray(artRes)) setArticles(artRes);
+        if (Array.isArray(transRes)) setTransactions(transRes);
+        if (Array.isArray(coupRes)) setActiveCoupons(coupRes);
+        if (userRes && userRes.username && userRes.username !== 'Guest') {
+          setUser(userRes);
+        } else {
+          setUser(null);
+        }
+      }).catch(err => console.error("Error fetching secondary data:", err));
+    });
   };
 
   const checkInstallStatus = async () => {
@@ -523,29 +546,40 @@ export default function App() {
             {renderTabContent()}
           </main>
 
-      {/* Modals — lazy: هنگام اولین باز شدن دانلود می‌شوند */}
+      {/* Modals — lazy: چانک هر مودال فقط هنگام «اولین باز شدن» دانلود و اجرا می‌شود.
+          قبلاً بدون شرط mount می‌شدند (چون داخلاً return null می‌کنند) و React همین که
+          کامپوننت lazy رندر شود، چانکش را در startup دانلود/اجرا می‌کرد — همین باعث
+          TBT بالا و دانلود ThemeSelectorModal/AuthModal/VisualHelpGuide در بار اول
+          می‌شد (مشاهده‌شده در Waterfall گزارش GTmetrix). با شرطی کردن، این چانک‌ها
+          (شامل motion که فقط داخل ThemeSelectorModal است) از مسیر بحرانی حذف شدند. */}
       <Suspense fallback={null}>
-        <VisualHelpGuide 
-          isOpen={isHelpOpen} 
-          onClose={() => setIsHelpOpen(false)} 
-          mode={helpMode} 
-          language={language} 
-          dir={dir} 
-        />
-        <AuthModal 
-          addNotification={addNotification}
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-          onAuthSuccess={setUser}
-        />
-        <ThemeSelectorModal 
-          isOpen={isThemeModalOpen}
-          onClose={() => setIsThemeModalOpen(false)}
-          availableThemes={availableThemes}
-          themeId={themeId}
-          setThemeId={setThemeId}
-          language={language}
-        />
+        {isHelpOpen && (
+          <VisualHelpGuide
+            isOpen={isHelpOpen}
+            onClose={() => setIsHelpOpen(false)}
+            mode={helpMode}
+            language={language}
+            dir={dir}
+          />
+        )}
+        {isAuthModalOpen && (
+          <AuthModal
+            addNotification={addNotification}
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            onAuthSuccess={setUser}
+          />
+        )}
+        {isThemeModalOpen && (
+          <ThemeSelectorModal
+            isOpen={isThemeModalOpen}
+            onClose={() => setIsThemeModalOpen(false)}
+            availableThemes={availableThemes}
+            themeId={themeId}
+            setThemeId={setThemeId}
+            language={language}
+          />
+        )}
       </Suspense>
 
       {/* Logout Confirmation Modal */}

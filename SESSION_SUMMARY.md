@@ -711,3 +711,103 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 ### نکته
 - از sandbox نمی‌توان به `bazino.pro` دسترسی گرفت (HTTP 000 — محدودیت شبکه‌ی sandbox)؛ تست زنده روی خود دامنه انجام شود.
 - مقدار پیش‌فرض طبق درخواست کاربر با اسلش انتهایی ثبت شد (`https://bazino.pro/`) اما `api_config.dart` یک نرمال‌سازی دارد: اسلش(های) انتهایی حذف می‌شوند (`_kApiBaseUrlConfigured` → `kApiBaseUrl`) تا الحاق رشته‌ای `'$kApiBaseUrl/api/...'` هرگز `//api` نسازد. پس هر دو حالت (با یا بدون اسلش، چه در `--dart-define` چه در پیش‌فرض) امن است.
+
+---
+
+## ۴۱. بررسی کامل گزارش GTmetrix (bazino.pro — ۱۱ آگوست ۲۰۲۶) + رفع LCP lazy + تایپ‌چک واقعی هر دو پروژه
+
+### ۴۱.۱ تحلیل گزارش GTmetrix (`GTmetrix-report-bazino.pro-20260811T132722-56nZVqpM.pdf`)
+
+گزارش ۵ صفحه‌ای از `https://bazino.pro/` — تست از Seattle (Chrome 142, Lighthouse 12.6.1):
+
+| معیار | مقدار | حد خوب | وضعیت |
+|---|---|---|---|
+| Performance | 54% | — | ❌ ضعیف |
+| Structure | 93% | — | ✅ خوب |
+| FCP | 582ms | ≤0.9s | ✅ |
+| LCP | 2.0s | ≤2.5s | ✅ |
+| TTI | 2.0s | ≤2.5s | ✅ |
+| Speed Index | 4.4s | ≤1.3s | ❌ |
+| TBT | 729ms | ≤150ms | ❌ عامل اصلی افت امتیاز |
+| CLS | 0.07 | ≤0.1 | ✅ |
+| TTFB | 329ms (Backend 293ms) | ≤600ms | ✅ |
+| Onload / Fully Loaded | 484ms / 2.0s | — | ✅ |
+| حجم | 1.19MB / 50 req | — | IMG 808KB، JS 189KB، Font 121KB |
+
+**Top Issues:** ① Med: «LCP was lazy loaded» ② Med-Low: cache policy (فقط 4.52KB) ③ Low: 8 long task (266ms JS, main-thread 1.9s) ④ Low: 2 layout shift ⑤ Low: properly size images (149KB) + کاهش unused JS (74.5KB) + 18 critical chain.
+
+**تطبیق با کد:** هش‌های باندل در آبشار (`index-L-i_-Z0o.js`, `VisualHelpGuide-6rWFBpdW.js` و...) دقیقاً برابر خروجی `vite build` محلی هستند → کد ریپو = نسخه‌ی دیپلوی‌شده در زمان تست. Cache استاتیک از قبل درست است (`server.ts` L2778: `public,max-age=31536000,immutable` + etag). کش 4.52KB باقی‌مانده مربوط به unsplash/API است نه سایت.
+
+### ۴۱.۲ ریشه‌ی LCP lazy و رفع
+
+- تم پیش‌فرض dark-gold در مسیر اصلی `HomeTab.tsx` از قبل `loading="eager"` + `fetchpriority="high"` دارد (اسلاید فعال — اصلاح قبلی ✅).
+- **مشکل واقعی:** `GamingAmpHome.tsx:72` — hero این تم با `loading="lazy"` بود؛ اگر مدیر سایت تم gaming-amp را فعال کند، LCP lazy می‌شود (و همین در تست GTmetrix دیده شده).
+- `DarkGoldHome.tsx` دو hero با `loading="lazy"` داشت (فایل در حال حاضر import نمی‌شود ولی برای آینده اصلاح شد).
+- `GecoPurpleHome.tsx` از CSS `bg-[url(...)]` استفاده می‌کند (نه `<img lazy>`) — بدون مشکل LCP.
+
+**رفع:** هر ۳ hero → `loading="eager"` + `fetchpriority="high"` + کاهش `w=1920→1600` (کمک به Properly size images).
+
+### ۴۱.۳ یافته‌ی مهم: `@types/react` در devDependencies Management App وجود نداشت!
+
+با نصب `node_modules` و اجرای واقعی `tsc --noEmit` مشخص شد:
+- `@types/react`/`@types/react-dom` در `Management App/Bazino/package.json` نبود → `npm run lint` (= `tsc --noEmit`) در هر سیستم تمیزی ۳ خطای مجازی در `ErrorBoundary.tsx` می‌داد (فقط چون تایپ react resolve نمی‌شد، نه باگ واقعی کد).
+- بعد از `npm install -D @types/react @types/react-dom`: خطاهای ErrorBoundary رفت و **۲ خطای تایپی واقعی پنهان نمایان شد** در `App.tsx` (تایمر مورد ۳):
+  - `let nextStatus = st.status;` — TypeScript نوع را از باریک‌سازی به literal `'PLAYING'` محدود می‌کرد → تعیین تایپ صریح `let nextStatus: StationStatus = st.status;` + import `StationStatus`.
+- نتیجه: `tsc --noEmit` هر دو پروژه (ریشه + Management App) → **صفر خطا** ✅
+- بیلد production هر دو پروژه → **موفق** ✅
+
+### ۴۱.۴ فایل‌های تغییر یافته
+
+- `src/components/GamingAmpHome.tsx` — hero eager + fetchpriority + w=1600
+- `src/components/DarkGoldHome.tsx` — دو hero همین‌طور
+- `Management App/Bazino/package.json` + `package-lock.json` — @types/react و @types/react-dom اضافه شد
+- `Management App/Bazino/src/App.tsx` — رفع ۲ خطای تایپی nextStatus
+
+### ۴۱.۵ پیشنهاد برای ادامه
+
+1. **TBT 729ms بزرگ‌ترین فرصت** است (نه LCP): 8 long task از رندر اولیه + fetchهای موازی ۱۱ API + انیمیشن‌ها. گزینه: `defer`/batch کردن fetchها یا اسپلیت بیشتر باندل اصلی (345KB گزاف نیست ولی recharts/مابقی بررسی شود).
+2. Speed Index 4.4s با Onload 484ms تناقض دارد → محتوای بعد از onload (تصاویر پایین‌تر + فونت) دیر paint می‌شود؛ کاهش حجم unsplash ها کمک می‌کند.
+3. بعد از دیپلوی، دوباره GTmetrix بگیرید. تست از Seattle انجام شده؛ برای ایران/ترکیه تست از Frankfurt/Amsterdam واقعی‌تر است.
+4. **اختیاری:** `HANDOFF_CONTINUE_HERE.md` هنوز قدیمی است (۲۸ مورد را ناتمام نشان می‌دهد) — با وضعیت واقعی (همه ✅) هماهنگ شود.
+
+---
+
+## ۴۲. بهینه‌سازی TBT بر اساس گزارش GTmetrix (پاس دوم) — مودال‌های lazy، vendor splitting، انیمیشن‌ها
+
+پس از تحلیل گزارش GTmetrix (بخش ۴۱)، به‌درخواست کاربر هر سه مورد اجرا شد: بهینه‌سازی TBT + هماهنگ‌سازی سند Handoff + مستندسازی برای تست GTmetrix مجدد.
+
+### ۴۲.۱ شرطی کردن mount مودال‌های lazy — بزرگ‌ترین برد (App.tsx)
+
+**مشکل:** `VisualHelpGuide`, `AuthModal`, `ThemeSelectorModal` lazy بودند ولی بدون شرط داخل `<Suspense>` mount می‌شدند. React به‌محض رندر شدن کامپوننت lazy، چانکش را **در startup** دانلود/اجرا می‌کند — دقیقاً همان چیزی که در Waterfall گزارش دیده می‌شد (`ThemeSelectorModal-…` 135KB + `ThemeScreenshot` + `AuthModal` + `VisualHelpGuide` + `motion` که فقط داخل ThemeSelectorModal است). این سهم بزرگی در TBT 729ms داشت.
+
+**رفع:** `{isHelpOpen && ...}` / `{isAuthModalOpen && ...}` / `{isThemeModalOpen && ...}` — هر سه مودال داخلاً `return null` می‌کنند وقتی بسته‌اند، پس بدون تغییر رفتار، چانک‌ها فقط با اولین باز شدن دانلود می‌شوند.
+
+### ۴۲.۲ Defer کردن fetchهای غیربحرانی (App.tsx)
+
+`fetchData` قبلاً ۸ درخواست را با `Promise.all` هم‌زمان می‌فرستاد. حالا:
+- **بحرانی** (systems/cafe/accessories/tournaments — محتوای LCP) همان‌جا می‌ماند.
+- **غیربحرانی** (articles/transactions/coupons/user) با helper جدید `scheduleIdle` (requestIdleCallback با fallback setTimeout 2000ms) بعد از اولین paint اجرا می‌شود — پردازش پاسخ‌ها (JSON.parse + setState + رندر) از پنجره‌ی بحرانی TBT خارج شد.
+
+### ۴۲.۳ Vendor splitting (vite.config.ts)
+
+`manualChunks: { 'vendor-react': ['react','react-dom','react-dom/client','react-dom/server','scheduler'] }` →
+**باندل اصلی index: 333.6KB → 151.6KB (gzip 106.3→49.7KB)** + `vendor-react` 193KB جدا (کش دائمی). نکته: فرم object با فقط `['react','react-dom']` کار نکرد (react-dom جدا نمی‌شد) — اضافه‌کردن `react-dom/client` و `scheduler` صریح لازم بود.
+
+### ۴۲.۴ انیمیشن‌های non-composited (گزارش: «4 animated elements»)
+
+`transition-all` همراه `group-hover:scale` → `transition-transform` / `transition-[transform,opacity]` در: `HomeTab.tsx` (hero + کارت ژانر/سالن/بازی + فلش‌ها)، `DarkGoldHome.tsx` (۳ تصویر)، `GecoPurpleHome.tsx` (۳ دکمه)، `ShopTab.tsx`، `CafeTab.tsx`. `transition-all` مرورگر را مجبور به ترنزیشن همه‌ی properties می‌کرد (هزینه‌ی layout/paint)؛ `transform`/`opacity` کامپوزیت‌شونده و ارزان هستند.
+
+### ۴۲.۵ تست و تأیید
+
+- `tsc --noEmit` ریشه → صفر خطا ✅
+- `vite build` ریشه → موفق ✅ (index 151.6KB + vendor-react 193KB؛ HTML فقط index+vendor را در startup دارد)
+- `tsc --noEmit` Management App → صفر خطا ✅ (بعد از اضافه‌کردن @types/react و رفع nextStatus در بخش ۴۱)
+- `vite build` Management App → موفق ✅
+- Lighthouse/Chrome محلی ممکن نشد (دانلود Chromium از sandbox مسدود) — تست GTmetrix واقعی باید بعد از دیپلوی روی bazino.pro انجام شود. پیش‌بینی: TBT 729→~250-350ms، حذف «LCP lazy loaded»، Performance 54→~70+.
+
+### ۴۲.۶ فایل‌های تغییر یافته (این batch)
+
+- `src/App.tsx` — مودال‌های شرطی + scheduleIdle + fetchهای غیربحرانی defer
+- `vite.config.ts` — manualChunks vendor-react
+- `src/components/HomeTab.tsx`, `DarkGoldHome.tsx`, `GecoPurpleHome.tsx`, `ShopTab.tsx`, `CafeTab.tsx` — transition محدود به transform/opacity
+- `HANDOFF_CONTINUE_HERE.md` — بازنویسی کامل به وضعیت واقعی (۲۸ مورد ✅ + کارهای اخیر + کار بعدی)

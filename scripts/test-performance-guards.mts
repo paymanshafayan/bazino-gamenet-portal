@@ -12,6 +12,7 @@ const guards = read('../src/components/PerformanceGuards.tsx');
 const app = read('../src/App.tsx');
 const html = read('../index.html');
 const server = read('../server.ts');
+const viteConfig = read('../vite.config.ts');
 
 // GTmetrix: LCP image must never begin life as a lazy, inactive carousel image.
 assert.match(home, /const activeGame = activeBanners\[activeBanner\] \?\? activeBanners\[0\]/);
@@ -86,6 +87,12 @@ assert.match(app, /startTransition\(\(\) => \{[\s\S]{0,500}setSystems/);
 assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]{0,120}scheduleIdle\(checkInstallStatus\)/);
 assert.match(home, /window\.setTimeout\(\(\) => \{[\s\S]{0,300}fetch\('\/api\/settings'\)/);
 assert.match(home, /startTransition\(\(\) => \{/);
+
+// Keep the browser runtime compact: Preact compatibility is sufficient for the client
+// components, and a server renderer must never be pulled into the browser vendor chunk.
+assert.match(viteConfig, /@preact\/preset-vite/);
+assert.match(viteConfig, /'react': 'preact\/compat'/);
+assert.doesNotMatch(viteConfig, /'react-dom\/server'/);
 
 // GTmetrix: reported always-running non-composited indicators are static now.
 for (const [name, source] of Object.entries({ home, darkGold, geco, gamingAmp, consoleGrid, consoleHub })) {

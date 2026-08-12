@@ -1,5 +1,5 @@
 import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
+import preact from '@preact/preset-vite';
 import legacy from '@vitejs/plugin-legacy';
 import path from 'path';
 import {defineConfig} from 'vite';
@@ -8,7 +8,7 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [
-      react(), 
+      preact(),
       tailwindcss(),
       legacy({
         targets: ['defaults', 'not IE 11']
@@ -16,6 +16,10 @@ export default defineConfig(() => {
     ],
     resolve: {
       alias: {
+        'react': 'preact/compat',
+        'react-dom': 'preact/compat',
+        'react-dom/test-utils': 'preact/test-utils',
+        'react/jsx-runtime': 'preact/jsx-runtime',
         '@': path.resolve(__dirname, '.'),
       },
     },
@@ -36,13 +40,11 @@ export default defineConfig(() => {
       target: 'es2018',
       rollupOptions: {
         output: {
-          // Vendor splitting (TBT): react/react-dom (~140KB min) از باندل اصلی جدا
-          // می‌شوند تا (الف) index کوچک‌تر زودتر parse/اجرا شود، (ب) vendor با هش
-          // ثابت برای همیشه در کش مرورگر بماند. lazy-chunks (مودال‌ها/تب‌ها) از قبل
-          // جدا هستند — پس index باقی‌مانده فقط کد خودِ اپ + HomeTab است.
+          // Preact's lightweight React-compat runtime is isolated from the landing bundle,
+          // so it has a stable cache key. Do not add react-dom/server here: this is a
+          // browser-only app and server-rendering code would be downloaded on every visit.
           manualChunks: {
-            // جدا کردن react + react-dom (vendor ~140KB) از باندل اصلی
-            'vendor-react': ['react', 'react-dom', 'react-dom/client', 'react-dom/server', 'scheduler'],
+            'vendor-react': ['react', 'react-dom', 'react-dom/client'],
           },
         },
       },

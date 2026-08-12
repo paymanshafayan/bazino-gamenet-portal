@@ -501,9 +501,25 @@ export default function App() {
     );
   }
 
+  const isAdminView = activeTab === 'admin';
+  const adminShellVars = isAdminView ? {
+    '--primary-color': '#00e5ff',
+    '--primary-hover-color': '#67e8f9',
+    '--dark-bg-color': '#070b16',
+    '--dark-card-color': '#111827',
+    '--color-primary': '#00e5ff',
+    '--color-primary-hover': '#67e8f9',
+    '--color-dark-bg': '#070b16',
+    '--color-dark-card': '#111827',
+    '--theme-bg': '#070b16',
+    '--theme-card-bg': '#111827',
+    '--theme-card-border': 'rgba(255,255,255,0.10)',
+  } as React.CSSProperties : undefined;
+
   return (
     <div 
-      className={`theme-${themeId || "dark-gold"} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} pb-[env(safe-area-inset-bottom,0px)] w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
+      className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} pb-[env(safe-area-inset-bottom,0px)] w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
+      style={adminShellVars}
       dir={dir}
     >
       {/* Admin Ribbon Bar */}

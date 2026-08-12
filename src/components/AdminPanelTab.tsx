@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   BarChart3, 
   Monitor, 
@@ -71,6 +71,7 @@ export default function AdminPanelTab({
   const { language, dir } = useLanguage();
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'systems' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'chat' | 'migrations' | 'messages' | 'themes' | 'appSlider' | 'mobileAppDownload' | 'customization' | 'dbLogs' | 'apiKeys'>('dashboard');
   const [isLocalHelpOpen, setIsLocalHelpOpen] = useState(false);
+  const themeUploadPanelRef = useRef<HTMLDivElement | null>(null);
   
   // Real-time server states
   const [stats, setStats] = useState<any>(null);
@@ -235,7 +236,7 @@ export default function AdminPanelTab({
         fetch('/api/accessories').then(r => r.json()),
         fetch('/api/tournaments').then(r => r.json()),
         fetch('/api/articles').then(r => r.json()),
-        fetch('/api/csharp/migrations').then(r => r.json()),
+        fetch('/api/csharp/migrations').then(r => r.text()).then(text => ({ migrationsCode: text })).catch(() => ({ migrationsCode: '' })),
         fetch('/api/admin/users').then(r => r.json()),
         fetch('/api/messages').then(r => r.json()),
         fetch('/api/app-sliders').then(r => r.json()),
@@ -771,6 +772,26 @@ export default function AdminPanelTab({
         return;
       }
 
+      try {
+        // Parse-only check, not execution. Prevents installing a ZIP whose theme.js
+        // would later break homepage rendering or fail to register the home component.
+        // eslint-disable-next-line no-new-func
+        new Function(result.componentJs);
+      } catch (syntaxErr: any) {
+        const msg = language === 'fa' ? `theme.js خطای syntax دارد: ${syntaxErr?.message || syntaxErr}` : `theme.js has a syntax error: ${syntaxErr?.message || syntaxErr}`;
+        setZipError(msg);
+        addNotification(msg, 'error');
+        return;
+      }
+      if (!/BazinoThemeSDK/.test(result.componentJs) || !/\.registerComponent\s*\(\s*['"]home['"]/.test(result.componentJs)) {
+        const msg = language === 'fa'
+          ? "theme.js باید کامپوننت صفحه اصلی را با BazinoThemeSDK.registerComponent('home', ...) ثبت کند"
+          : "theme.js must register the homepage component with BazinoThemeSDK.registerComponent('home', ...)";
+        setZipError(msg);
+        addNotification(msg, 'error');
+        return;
+      }
+
       const assetCount = Object.keys(result.assets).length;
       setZipParsed(result);
       addNotification(language === 'fa'
@@ -850,6 +871,13 @@ export default function AdminPanelTab({
   };
 
   /* ---------- دانلود قالب نمونه (فرمت جدید ZIP) ---------- */
+  const openThemeUploadPanel = () => {
+    setShowUploadForm(true);
+    window.setTimeout(() => {
+      themeUploadPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
+
   const handleDownloadSampleZip = () => {
     try {
       downloadZip(buildSampleThemeZip(), 'bazino-theme-sample.zip');
@@ -1621,7 +1649,7 @@ export default function AdminPanelTab({
                      {language === 'fa' ? 'دانلود قالب نمونه' : 'Sample Theme'}
                    </button>
                    <button 
-                     onClick={() => setShowUploadForm(!showUploadForm)}
+                     onClick={openThemeUploadPanel}
                      className="btn btn-primary-outline text-xs px-4 py-2 flex items-center gap-2 rounded-xl"
                    >
                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1694,7 +1722,7 @@ export default function AdminPanelTab({
               </div>
 
               {showUploadForm && (
-                <div className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-4 animate-fade-in">
+                <div ref={themeUploadPanelRef} className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-4 animate-fade-in scroll-mt-24">
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
                     <h4 className="font-bold text-md text-primary flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-primary animate-pulse" />

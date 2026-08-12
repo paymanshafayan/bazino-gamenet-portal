@@ -34,10 +34,25 @@ export default defineConfig(() => {
       // coverage) while esbuild still downlevels the handful of newer constructs that
       // would otherwise slip through untouched.
       target: 'es2018',
+      rollupOptions: {
+        output: {
+          // Vendor splitting (TBT): react/react-dom (~140KB min) از باندل اصلی جدا
+          // می‌شوند تا (الف) index کوچک‌تر زودتر parse/اجرا شود، (ب) vendor با هش
+          // ثابت برای همیشه در کش مرورگر بماند. lazy-chunks (مودال‌ها/تب‌ها) از قبل
+          // جدا هستند — پس index باقی‌مانده فقط کد خودِ اپ + HomeTab است.
+          manualChunks: {
+            // جدا کردن react + react-dom (vendor ~140KB) از باندل اصلی
+            'vendor-react': ['react', 'react-dom', 'react-dom/client', 'react-dom/server', 'scheduler'],
+          },
+        },
+      },
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Allow the Arena live-preview host and any *.e2b.app subdomain to load the dev
+      // server (dev-only; the production server.ts does not use this config).
+      allowedHosts: process.env.ALLOWED_HOSTS === 'false' ? undefined : ['.e2b.app', '.localhost'],
     },
   };
 });

@@ -57,7 +57,9 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   const [appSliders, setAppSliders] = useState<any[]>([]);
   const themeComponentHostRef = useRef<HTMLDivElement | null>(null);
   const [themeComponentVersion, setThemeComponentVersion] = useState(0);
-  // بارگذاری theme.js قالب (فقط وقتی قالب کامپوننت دارد)
+  // بارگذاری theme.js قالب — برای قالب‌های نصب‌شده (server themes) اجباری است:
+  // صفحه اصلی قالب بدون کامپوننتش معنی ندارد، پس اگر بارگذاری/ثبت نشد، یک پیام
+  // خطای واضح در کنسول و یک placeholder با پیام خطا نمایش می‌دهیم (به‌جای سکوت).
   useEffect(() => {
     if (!themeComponent) return;
     let cancelled = false;
@@ -65,10 +67,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     script.src = themeComponent.cssUrl.replace(/\/theme\.css$/, '/theme.js');
     script.async = true;
     script.onload = () => {
-      if (!cancelled) setThemeComponentVersion(v => v + 1);
+      if (cancelled) return;
+      // ثبت نشدن کامپوننت یعنی theme.js اجرا شد ولی SDK.registerComponent صدا زده نشد
+      if (!hasComponent('home')) {
+        console.error('[ThemeSDK] theme.js loaded but did not register a home component:', script.src);
+      }
+      setThemeComponentVersion(v => v + 1);
     };
     script.onerror = () => {
-      console.warn('[ThemeSDK] theme.js failed to load:', script.src);
+      console.error('[ThemeSDK] Failed to load theme.js (اجباری برای این قالب):', script.src);
+      setThemeComponentVersion(v => v + 1); // برای نمایش حالت خطا
     };
     document.body.appendChild(script);
     return () => {
@@ -647,10 +655,24 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   // قالب‌های دارای کامپوننت اختصاصی (theme.js نصب‌شده با ZIP):
   // کامپوننت قالب در یک هاست رندر می‌شود تا چیدمان کاملاً اختصاصی
   // داشته باشد — دقیقاً مثل قالب‌های سیستمی Geco/GamingAmp.
-  if (themeComponent && hasComponent('home')) {
+  // برای قالب‌های نصب‌شده، theme.js اجباری است؛ اگر بارگذاری شد ولی
+  // کامپوننت ثبت نشد (یا load خطا داد) به‌جای سقوط بی‌صدا به پیش‌فرض،
+  // یک پیام خطا نمایش می‌دهیم تا مشکل فوراً دیده شود.
+  if (themeComponent) {
+    if (hasComponent('home')) {
+      return (
+        <div className="w-full animate-fade-in" dir={dir}>
+          <div ref={themeComponentHostRef} className="w-full" />
+        </div>
+      );
+    }
     return (
       <div className="w-full animate-fade-in" dir={dir}>
-        <div ref={themeComponentHostRef} className="w-full" />
+        <div className="min-h-[300px] flex items-center justify-center p-8 bg-red-950/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
+          {language === 'fa'
+            ? '⚠️ کامپوننت صفحه اصلی این قالب (theme.js) بارگذاری نشد یا خطا داد. لطفاً قالب را دوباره نصب کنید.'
+            : '⚠️ This theme\'s home component (theme.js) failed to load or did not register. Please re-install the theme.'}
+        </div>
       </div>
     );
   }
@@ -728,7 +750,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               fetchpriority={activeBanner === idx ? 'high' : 'auto'}
               src={game.imageUrl}
               alt={getLocText(game.title)}
-              className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-all duration-[10s] ease-out"
+              className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-transform duration-[10s] ease-out"
               referrerPolicy="no-referrer"
             />
  
@@ -767,13 +789,13 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         {/* Slider Controls (Manual Arrow Navigation) */}
         <button
           onClick={handlePrevBanner}
-          className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-all opacity-0 group-hover:opacity-100 cursor-pointer`}
+          className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-[transform,background-color,border-color,opacity] opacity-0 group-hover:opacity-100 cursor-pointer`}
         >
           {dir === 'rtl' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </button>
         <button
           onClick={handleNextBanner}
-          className={`absolute ${dir === 'rtl' ? 'left-6' : 'right-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-all opacity-0 group-hover:opacity-100 cursor-pointer`}
+          className={`absolute ${dir === 'rtl' ? 'left-6' : 'right-6'} top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-none notched-clip-sm bg-black/80 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary hover:scale-105 transition-[transform,background-color,border-color,opacity] opacity-0 group-hover:opacity-100 cursor-pointer`}
         >
           {dir === 'rtl' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
         </button>
@@ -821,7 +843,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 <img loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
-                  className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-all duration-500"
+                  className="w-full h-full object-cover opacity-50 group-hover:scale-110 group-hover:opacity-60 transition-[transform,opacity] duration-500"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
@@ -893,7 +915,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   <img loading="lazy"
                     src={sect.imageUrl}
                     alt={getLocText(sect.title)}
-                    className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-all duration-500"
+                    className="w-full h-full object-cover group-hover:scale-105 opacity-70 group-hover:opacity-85 transition-[transform,opacity] duration-500"
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
@@ -1082,7 +1104,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                     <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
-                      className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"
+                      className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
@@ -1268,7 +1290,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               className="group rounded-none notched-clip border border-white/10 hover:border-primary bg-dark-card p-6 flex flex-col items-center text-center gap-4 hover:shadow-[0_0_25px_rgba(255,184,0,0.15)] hover:-translate-y-1 transition-all duration-300"
             >
               {/* Avatar Frame with custom gold borders */}
-              <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-all duration-300">
+              <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-transform duration-300">
                 <img loading="lazy"
                   src={staff.avatar}
                   alt={getLocText(staff.name)}

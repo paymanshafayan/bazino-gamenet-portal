@@ -193,7 +193,7 @@ export default function DarkGoldHome({
       {/* 1. HERO GAME SLIDER (FULL WIDTH, SLANTED & MOBIRISE GAMINGAMP STYLED) */}
       {themeId === 'geco-purple' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-black shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[500px] flex items-center" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 85%, 0% 100%)' }}>
-          <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
+          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" alt="Hero Background" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
           
           <div className="relative z-10 w-full max-w-7xl mx-auto px-8 py-20 flex flex-col justify-center h-full">
@@ -217,7 +217,7 @@ export default function DarkGoldHome({
         </section>
       ) : themeId === 'cyberpunk-cyan' ? (
         <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#070b19] min-h-[650px] flex items-center justify-start border-b-[3px] border-[#00f0ff] shadow-[0_10px_50px_rgba(0,240,255,0.2)]">
-          <img loading="lazy" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
+          <img loading="eager" fetchpriority="high" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80" alt="Cyberpunk Background" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity filter contrast-125 brightness-75" />
           
           {/* Cyberpunk Grid Overlay */}
           <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: '0.2' }}></div>
@@ -345,7 +345,7 @@ export default function DarkGoldHome({
                 <img loading="lazy"
                   src={genre.imageUrl}
                   alt={getLocText(genre.title)}
-                  className="w-full h-full object-cover opacity-60 group-hover:scale-110 group-hover:opacity-80 transition-all duration-500"
+                  className="w-full h-full object-cover opacity-60 group-hover:scale-110 group-hover:opacity-80 transition-[transform,opacity] duration-500"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10" />
@@ -416,7 +416,7 @@ export default function DarkGoldHome({
                 <img loading="lazy"
                   src={sect.imageUrl}
                   alt={getLocText(sect.title)}
-                  className="w-full h-full object-cover group-hover:scale-105 opacity-75 group-hover:opacity-90 transition-all duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 opacity-75 group-hover:opacity-90 transition-[transform,opacity] duration-500"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
@@ -607,7 +607,7 @@ export default function DarkGoldHome({
                     <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       alt={tournament.title}
-                      className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-all duration-500"
+                      className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />

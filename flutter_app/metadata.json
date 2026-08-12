@@ -1,6 +1,0 @@
-{
-  "name": "BAZINO",
-  "description": "A comprehensive gaming center platform featuring reservation, café ordering, tournament brackets, accessories shop, blog, loyalty club, and ASP.NET Core C# code generator.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

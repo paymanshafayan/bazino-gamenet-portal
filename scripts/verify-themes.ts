@@ -101,18 +101,19 @@ try {
   if (!('error' in bad) || bad.code !== 'invalid-zip') throw new Error('Invalid zip should return invalid-zip error');
   console.log('invalid zip rejected with code:', bad.code);
 
-  // Round-trip: build zip from css+meta+assets → parse again
-  const { buildThemeZip } = await import('../src/themes/themeZipCore');
-  const { strToU8 } = await import('fflate');
-  const rebuilt = buildThemeZip(parsed.css, parsed.meta, parsed.assets);
+  // Round-trip: build zip from css+meta+assets+componentJs → parse again
+  const { buildThemeZip, generateSampleThemeJs } = await import('../src/themes/themeZipCore');
+  const rebuilt = buildThemeZip(parsed.css, parsed.meta, parsed.assets, generateSampleThemeJs());
   const reparsed = zip.parseThemeZip(rebuilt, 'rebuilt.zip');
   if ('error' in reparsed) throw new Error('reparse of rebuilt zip failed: ' + reparsed.error);
   if (reparsed.meta.id !== parsed.meta.id || reparsed.css !== parsed.css) throw new Error('zip round-trip mismatch');
   if (JSON.stringify(reparsed.assets) !== JSON.stringify(parsed.assets)) throw new Error('zip assets round-trip mismatch');
-  console.log('zip round-trip (build → parse, incl. assets): OK');
+  if (!reparsed.componentJs || reparsed.componentJs.length === 0) throw new Error('zip round-trip: componentJs missing (theme.js is required)');
+  console.log('zip round-trip (build → parse, incl. assets + theme.js): OK');
 
-  // CSS-only zip: no theme.json → metadata derived from CSS + filename
+  // CSS-only zip (بدون theme.js): حالا باید رد شود چون theme.js اجباری است
   const { zipSync } = await import('fflate');
+  const { strToU8 } = await import('fflate');
   const cssOnlyZip = zipSync({
     'my-theme.css': strToU8(
       `body[data-theme='my-theme'] { --primary-color: #123456; --dark-bg-color: #0a0a0a; --dark-card-color: #1a1a1a; }\n` +
@@ -120,15 +121,28 @@ try {
     ),
   });
   const cssOnly = zip.parseThemeZip(cssOnlyZip, 'My Theme.zip');
-  if ('error' in cssOnly) throw new Error('CSS-only zip should parse: ' + cssOnly.error);
-  if (cssOnly.meta.id !== 'my-theme') throw new Error('CSS-only zip id must come from CSS, got: ' + cssOnly.meta.id);
-  if (cssOnly.meta.name !== 'My Theme') throw new Error('CSS-only zip name must come from filename, got: ' + cssOnly.meta.name);
-  if (cssOnly.meta.colors?.primary !== '#123456') throw new Error('CSS-only zip colors must be extracted from CSS');
-  console.log('css-only zip (no theme.json): OK — id/name/colors auto-derived');
+  if (!('error' in cssOnly) || cssOnly.code !== 'no-js') throw new Error('ZIP without theme.js must be rejected with no-js, got: ' + JSON.stringify(cssOnly));
+  console.log('zip بدون theme.js (فقط CSS): رد شد با کد no-js ✅ (theme.js اجباری است)');
+
+  // Metadata from CSS + filename (با وجود theme.js) — id/name/colors از CSS مشتق می‌شوند
+  const fullZip = zipSync({
+    'my-theme.css': strToU8(
+      `body[data-theme='my-theme'] { --primary-color: #123456; --dark-bg-color: #0a0a0a; --dark-card-color: #1a1a1a; }\n` +
+      `.theme-my-theme .site-header { color: #123456; }\n`
+    ),
+    'theme.js': strToU8('window.BazinoThemeSDK && window.BazinoThemeSDK.registerComponent("home", function(){ return { apiVersion: 1, render: function(p){ return null; } }; });'),
+  });
+  const full = zip.parseThemeZip(fullZip, 'My Theme.zip');
+  if ('error' in full) throw new Error('ZIP with theme.js should parse: ' + full.error);
+  if (full.meta.id !== 'my-theme') throw new Error('zip id must come from CSS, got: ' + full.meta.id);
+  if (full.meta.name !== 'My Theme') throw new Error('zip name must come from filename, got: ' + full.meta.name);
+  if (full.meta.colors?.primary !== '#123456') throw new Error('zip colors must be extracted from CSS');
+  console.log('zip کامل (css+js، بدون theme.json): OK — id/name/colors auto-derived');
 
   // Path traversal must be rejected
   const evilZip = zipSync({
     'theme.css': strToU8(`body[data-theme='evil'] { color: red; }\n.theme-evil .x { color: red; }`),
+    'theme.js': strToU8('window.BazinoThemeSDK && window.BazinoThemeSDK.registerComponent("home", function(){ return { apiVersion: 1, render: function(p){ return null; } }; });'),
     '../evil.txt': strToU8('pwned'),
   });
   const evil = zip.parseThemeZip(evilZip, 'evil.zip');

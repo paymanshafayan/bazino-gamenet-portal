@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Tag, HelpCircle } from 'lucide-react';
-import { Station, StationType, BuffetItem, Customer, TariffRate, ShopExpense, Invoice, Operator, AppTheme, SoundAlarmConfig, CurrencyCode, WalletTransaction, ServiceItem, PaymentType, BackupSettings, WebSyncStatus } from './types';
+import { Station, StationType, BuffetItem, Customer, TariffRate, ShopExpense, Invoice, Operator, AppTheme, SoundAlarmConfig, CurrencyCode, WalletTransaction, ServiceItem, PaymentType, BackupSettings, WebSyncStatus, StationStatus } from './types';
 import { INITIAL_STATIONS, INITIAL_BUFFET_ITEMS, INITIAL_CUSTOMERS, INITIAL_TARIFFS, INITIAL_EXPENSES, INITIAL_OPERATORS, THEMES_LIST, DEFAULT_SOUND_CONFIG } from './data/mockData';
 import { playAlarmSound } from './utils/audio';
 import { safeGetStorage, safeSetStorage, safeRemoveStorage } from './utils/storage';
@@ -148,7 +148,7 @@ export default function App() {
         prevStations.map((st) => {
           if (st.status === 'PLAYING' && st.activeSession && !st.activeSession.isPaused) {
             const nextElapsed = st.activeSession.elapsedSeconds + 1;
-            let nextStatus = st.status;
+            let nextStatus: StationStatus = st.status;
             let nextLastAlarmAt = st.activeSession.lastAlarmAt;
 
             if (st.activeSession.durationMinutes) {

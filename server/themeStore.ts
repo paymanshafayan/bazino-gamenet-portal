@@ -143,10 +143,8 @@ export function installThemeZip(buffer: Uint8Array, fallbackName?: string): { th
   // theme.css
   fs.writeFileSync(path.join(dir, "theme.css"), parsed.css, "utf8");
 
-  // theme.js (کامپوننت قالب — اختیاری)
-  if (parsed.componentJs && parsed.componentJs.trim().length > 0) {
-    fs.writeFileSync(path.join(dir, "theme.js"), parsed.componentJs, "utf8");
-  }
+  // theme.js (کامپوننت صفحه اصلی قالب — اجباری؛ parseThemeZip بدون آن خطا می‌دهد)
+  fs.writeFileSync(path.join(dir, "theme.js"), parsed.componentJs, "utf8");
 
   // assets/
   const assetNames = Object.keys(parsed.assets);
@@ -245,5 +243,11 @@ export function exportThemeZip(id: string): Uint8Array | null {
     }
   }
 
-  return buildThemeZip(css, meta, assets);
+  // theme.js هم باید در خروجی باشد (اجباری) — از پوشه قالب خوانده می‌شود
+  const jsPath = path.join(dir, "theme.js");
+  let componentJs = "// theme.js missing\n";
+  if (fs.existsSync(jsPath)) {
+    componentJs = fs.readFileSync(jsPath, "utf8");
+  }
+  return buildThemeZip(css, meta, assets, componentJs);
 }

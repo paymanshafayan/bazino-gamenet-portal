@@ -6,11 +6,12 @@
  *  است. منطق خالص پارس/ساخت ZIP در core قرار دارد تا سرور هم بتواند
  *  دقیقاً همان فرمت را بخواند.
  *
- *  فرمت پکیج:
+ *  فرمت پکیج (یکپارچه و اجباری):
  *    theme.zip
- *    ├── theme.json   ← متادیتا (اختیاری)
- *    ├── theme.css    ← استایل کامل قالب (اجباری)
- *    └── assets/      ← تصویر/ویدئو/فونت/... (اختیاری)
+ *    ├── theme.json   ← اجباری — متادیتا (نام قالب، id، نسخه)
+ *    ├── theme.css    ← اجباری — استایل کامل قالب
+ *    ├── theme.js     ← اجباری — کامپوننت صفحه اصلی قالب (با SDK)
+ *    └── assets/      ← اختیاری — تصویر/ویدئو/فونت/...
  * ═══════════════════════════════════════════════════════════════════
  */
 import {
@@ -23,6 +24,7 @@ import {
   type ZipThemeMeta
 } from './themeZipCore';
 import { generateCustomThemeCss, type ThemeInfo } from './index';
+import { generateSampleThemeJs } from './themeZipCore';
 
 export type { ParsedZipTheme, ZipParseError, ZipThemeMeta, ThemeColorConfig } from './themeZipCore';
 export { isZipParseError, sanitizeThemeId, parseThemeZip, buildSampleThemeZip } from './themeZipCore';
@@ -41,7 +43,10 @@ export function buildThemeZip(theme: ThemeInfo): Uint8Array {
     description: theme.description || '',
     colors: theme.colors,
   };
-  return coreBuildThemeZip(css, meta, {});
+  // theme.js برای قالب‌های محلی ساخته‌شده در پنل ادمین: از نمونه‌ی پیش‌فرض
+  // استفاده می‌شود تا پکیج همیشه «فرمت واحد» (شامل theme.js اجباری) را داشته باشد.
+  const componentJs = theme.componentJs || generateSampleThemeJs();
+  return coreBuildThemeZip(css, meta, {}, componentJs);
 }
 
 /* ---------- دانلود یک فایل ZIP در مرورگر ---------- */

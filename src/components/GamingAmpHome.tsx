@@ -69,8 +69,8 @@ export default function GamingAmpHome({
       
       {/* 1. HERO SLIDER */}
       <section className="relative w-full aspect-[21/9] min-h-[600px] flex items-center justify-center border-b-2 border-[#00d8ff]/30" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 95%, 0% 100%)' }}>
-        <img loading="lazy" 
-          src={heroGame?.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80"} 
+        <img loading="eager" fetchpriority="high" 
+          src={heroGame?.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80"} 
           alt="Hero" 
           className="absolute inset-0 w-full h-full object-cover opacity-100" 
         />

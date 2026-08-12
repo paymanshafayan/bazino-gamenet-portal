@@ -8,33 +8,8 @@
     <!-- Unsplash contains the selected hero artwork, so retaining this connection improves its LCP. -->
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
     <link rel="icon" type="image/webp" href="/src/assets/images/bazino_logo_user.webp" />
-    <script>
-      // Fonts used to be a render-blocking Google stylesheet which in turn started five
-      // font downloads (including fonts used only by optional themes). Load the two
-      // site-wide families after the load event instead: system fallbacks render the first
-      // view immediately, while display=optional prevents a late layout shift.
-      (function () {
-        function loadOptionalFonts() {
-          var link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = 'https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&family=Orbitron:wght@500;700;900&display=optional';
-          link.media = 'print';
-          link.onload = function () { link.media = 'all'; };
-          document.head.appendChild(link);
-        }
-
-        function scheduleFontLoad() {
-          if ('requestIdleCallback' in window) {
-            window.requestIdleCallback(loadOptionalFonts, { timeout: 4000 });
-          } else {
-            window.setTimeout(loadOptionalFonts, 2500);
-          }
-        }
-
-        if (document.readyState === 'complete') scheduleFontLoad();
-        else window.addEventListener('load', scheduleFontLoad, { once: true });
-      })();
-    </script>
+    <!-- Typography deliberately uses the local/system stack declared in index.css.
+         A late webfont swap was moving the brand header and the hero below it. -->
     <title>Bazino Pro | بازینو پرو — گیم‌نت و کلوپ گیمینگ</title>
   </head>
   <body>

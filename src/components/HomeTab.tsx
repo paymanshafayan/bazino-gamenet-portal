@@ -57,7 +57,9 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   const [appSliders, setAppSliders] = useState<any[]>([]);
   const themeComponentHostRef = useRef<HTMLDivElement | null>(null);
   const [themeComponentVersion, setThemeComponentVersion] = useState(0);
-  // بارگذاری theme.js قالب (فقط وقتی قالب کامپوننت دارد)
+  // بارگذاری theme.js قالب — برای قالب‌های نصب‌شده (server themes) اجباری است:
+  // صفحه اصلی قالب بدون کامپوننتش معنی ندارد، پس اگر بارگذاری/ثبت نشد، یک پیام
+  // خطای واضح در کنسول و یک placeholder با پیام خطا نمایش می‌دهیم (به‌جای سکوت).
   useEffect(() => {
     if (!themeComponent) return;
     let cancelled = false;
@@ -65,10 +67,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     script.src = themeComponent.cssUrl.replace(/\/theme\.css$/, '/theme.js');
     script.async = true;
     script.onload = () => {
-      if (!cancelled) setThemeComponentVersion(v => v + 1);
+      if (cancelled) return;
+      // ثبت نشدن کامپوننت یعنی theme.js اجرا شد ولی SDK.registerComponent صدا زده نشد
+      if (!hasComponent('home')) {
+        console.error('[ThemeSDK] theme.js loaded but did not register a home component:', script.src);
+      }
+      setThemeComponentVersion(v => v + 1);
     };
     script.onerror = () => {
-      console.warn('[ThemeSDK] theme.js failed to load:', script.src);
+      console.error('[ThemeSDK] Failed to load theme.js (اجباری برای این قالب):', script.src);
+      setThemeComponentVersion(v => v + 1); // برای نمایش حالت خطا
     };
     document.body.appendChild(script);
     return () => {
@@ -647,10 +655,24 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   // قالب‌های دارای کامپوننت اختصاصی (theme.js نصب‌شده با ZIP):
   // کامپوننت قالب در یک هاست رندر می‌شود تا چیدمان کاملاً اختصاصی
   // داشته باشد — دقیقاً مثل قالب‌های سیستمی Geco/GamingAmp.
-  if (themeComponent && hasComponent('home')) {
+  // برای قالب‌های نصب‌شده، theme.js اجباری است؛ اگر بارگذاری شد ولی
+  // کامپوننت ثبت نشد (یا load خطا داد) به‌جای سقوط بی‌صدا به پیش‌فرض،
+  // یک پیام خطا نمایش می‌دهیم تا مشکل فوراً دیده شود.
+  if (themeComponent) {
+    if (hasComponent('home')) {
+      return (
+        <div className="w-full animate-fade-in" dir={dir}>
+          <div ref={themeComponentHostRef} className="w-full" />
+        </div>
+      );
+    }
     return (
       <div className="w-full animate-fade-in" dir={dir}>
-        <div ref={themeComponentHostRef} className="w-full" />
+        <div className="min-h-[300px] flex items-center justify-center p-8 bg-red-950/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
+          {language === 'fa'
+            ? '⚠️ کامپوننت صفحه اصلی این قالب (theme.js) بارگذاری نشد یا خطا داد. لطفاً قالب را دوباره نصب کنید.'
+            : '⚠️ This theme\'s home component (theme.js) failed to load or did not register. Please re-install the theme.'}
+        </div>
       </div>
     );
   }

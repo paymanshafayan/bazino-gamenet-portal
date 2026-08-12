@@ -4,13 +4,13 @@
  *  (بدون وابستگی به Vite/مرورگر — قابل استفاده در کلاینت و سرور)
  * ═══════════════════════════════════════════════════════════════════
  *
- *  فرمت استاندارد پکیج قالب (فایل .zip):
+ *  فرمت استاندارد پکیج قالب (فایل .zip) — همه فایل‌های اصلی اجباری‌اند:
  *  ─────────────────────────────────────
  *    theme.zip
- *    ├── theme.json        ← متادیتای قالب (اختیاری)
- *    ├── theme.css         ← استایل کامل قالب (اجباری)
- *    ├── theme.js          ← کامپوننت صفحه اصلی قالب (اختیاری، با SDK)
- *    └── assets/           ← فایل‌های مورد نیاز قالب (اختیاری)
+ *    ├── theme.json        ← اجباری — متادیتای قالب (نام، id، نسخه، ...)
+ *    ├── theme.css         ← اجباری — استایل کامل قالب
+ *    ├── theme.js          ← اجباری — کامپوننت صفحه اصلی قالب (با SDK)
+ *    └── assets/           ← اختیاری — فایل‌های مورد نیاز قالب
  *        ├── logo.png          تصویر، ویدئو، فونت، آیکون و ...
  *        ├── banner.jpg
  *        └── ...
@@ -51,15 +51,15 @@ export interface ParsedZipTheme {
   css: string;
   /** فایل‌های داخل پوشه assets (مسیر نسبی ← بایت) */
   assets: Record<string, Uint8Array>;
-  /** کامپوننت قالب (theme.js) — اختیاری، با SDK ثبت می‌شود */
-  componentJs?: string;
+  /** کامپوننت قالب (theme.js) — اجباری، با SDK ثبت می‌شود */
+  componentJs: string;
   /** سایر فایل‌های نادیده‌گرفته‌شده (خارج از assets و خارج از theme.json/css/js) */
   ignoredFiles: string[];
 }
 
 export interface ZipParseError {
   error: string;
-  code: 'invalid-zip' | 'no-css' | 'empty-css' | 'wrong-format' | 'unsafe-path';
+  code: 'invalid-zip' | 'no-css' | 'empty-css' | 'wrong-format' | 'no-js' | 'empty-js' | 'unsafe-path';
 }
 
 export const isZipParseError = (r: ParsedZipTheme | ZipParseError): r is ZipParseError => 'error' in r;
@@ -199,13 +199,17 @@ export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZi
   const ignoredFiles: string[] = [];
   const jsKey = findEntry(entries, ['theme.js']);
   let componentJs: string | undefined;
-  if (jsKey) {
-    try {
-      const js = strFromU8(files[jsKey]);
-      if (js.trim().length > 0) componentJs = js;
-    } catch (e) {
-      console.warn('[ThemeZip] theme.js unreadable — ignoring:', e);
+  if (!jsKey) {
+    return { error: 'فایل کامپوننت قالب (theme.js) داخل ZIP پیدا نشد — این فایل اجباری است و صفحه اصلی قالب را می‌سازد', code: 'no-js' };
+  }
+  try {
+    const js = strFromU8(files[jsKey]);
+    if (js.trim().length === 0) {
+      return { error: 'فایل theme.js خالی است — باید کامپوننت صفحه اصلی را با SDK ثبت کند', code: 'empty-js' };
     }
+    componentJs = js;
+  } catch (e) {
+    return { error: 'فایل theme.js قابل خواندن نیست', code: 'no-js' };
   }
   const knownKeys = new Set([jsonKey, cssKey, jsKey, 'theme.json', 'theme.css', 'theme.js'].filter(Boolean));
   for (const raw of Object.keys(files)) {
@@ -260,15 +264,14 @@ export function buildThemeZip(
   css: string,
   meta: ZipThemeMeta,
   assets: Record<string, Uint8Array> = {},
-  componentJs?: string
+  componentJs: string
 ): Uint8Array {
   const zippable: Zippable = {
     'theme.json': strToU8(JSON.stringify(meta, null, 2)),
     'theme.css': strToU8(css),
+    // theme.js اجباری است — بدون آن پکیج معتبر نیست (طبق فرمت واحد قالب)
+    'theme.js': strToU8(componentJs),
   };
-  if (componentJs && componentJs.trim().length > 0) {
-    zippable['theme.js'] = strToU8(componentJs);
-  }
   for (const [rel, bytes] of Object.entries(assets)) {
     if (!rel || rel.includes('..')) continue;
     zippable[`assets/${rel}`] = bytes;

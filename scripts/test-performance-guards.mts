@@ -40,6 +40,11 @@ assert.ok((consoleGrid.match(/srcSet=\{getResponsiveSrcSet/g) ?? []).length >= 2
 assert.ok((consoleGrid.match(/width="400" height="240"/g) ?? []).length >= 2);
 assert.match(consoleHub, /srcSet=\{`\$\{panel\.bg\} 400w, \$\{panel\.bgLarge\} 800w`\}/);
 assert.match(consoleHub, /width=\{panel\.width\}[\s\S]{0,40}height=\{panel\.height\}/);
+// The initial Unsplash hero must select a compact responsive candidate rather than the
+// prior 1200px/q80 source, while keeping its eager LCP priority.
+assert.match(home, /getResponsiveSrcSet\(activeGame\.imageUrl, \[480, 720, 960\]\)/);
+assert.match(home, /sizes="\(min-width: 1024px\) 960px, 100vw"/);
+assert.match(guards, /url\.searchParams\.set\('q', '70'\)/);
 assert.match(html, /type="image\/webp" href="\/src\/assets\/images\/bazino_logo_user\.webp"/);
 
 // GTmetrix: next-gen format and payload guards for local backgrounds/panel images.

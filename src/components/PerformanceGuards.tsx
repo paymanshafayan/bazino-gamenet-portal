@@ -39,12 +39,15 @@ export function DeferredSection({ minHeight, render, onVisible }: DeferredSectio
   return <div ref={placeholderRef} style={{ minHeight }} aria-hidden="true" />;
 }
 
-/** فقط URLهای Unsplash را به srcset واکنش‌گرا تبدیل می‌کند؛ URL سفارشی ادمین دست‌نخورده می‌ماند. */
+/** فقط URLهای Unsplash را به srcset واکنش‌گرا تبدیل می‌کند؛ URL سفارشی ادمین دست‌نخورده می‌ماند.
+ * کیفیت 70 برای عکس‌های پس‌زمینه/کارت از نظر بصری کافی است و نسبت به q=80،
+ * مخصوصاً در Hero، حجم دانلود اولیه را به‌طور محسوسی کم می‌کند. */
 export function getResponsiveSrcSet(src: string, widths: number[]) {
   if (typeof src !== 'string' || !src.includes('images.unsplash.com')) return undefined;
   return widths.map(width => {
     const url = new URL(src);
     url.searchParams.set('w', String(width));
+    url.searchParams.set('q', '70');
     return `${url.toString()} ${width}w`;
   }).join(', ');
 }

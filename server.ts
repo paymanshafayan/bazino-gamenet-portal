@@ -59,6 +59,7 @@ import jwt from "jsonwebtoken";
 const DATA_SOURCE_SETTING = "data_source";
 const MOBILE_APP_STORE_LINKS_SETTING = "mobile_app_store_links";
 const MOBILE_APP_APK_META_SETTING = "mobile_app_apk_meta";
+const JARVIS_AI_PROVIDERS_SETTING = "jarvis_ai_providers";
 const MOBILE_APP_APK_FILE_NAME = "bazino-app.apk";
 export type DataSourceMode = "sample" | "database";
 
@@ -837,6 +838,56 @@ async function startServer() {
     }
   });
 
+  type JarvisAiProviderConfig = {
+    id: string;
+    provider: "gemini" | "groq" | "openrouter" | "ollama" | "custom";
+    label?: string;
+    model: string;
+    apiKey?: string;
+    baseUrl?: string;
+    enabled: boolean;
+  };
+
+  const defaultModelForProvider = (provider: string) => {
+    if (provider === "groq") return "llama-3.1-8b-instant";
+    if (provider === "openrouter") return "meta-llama/llama-3.1-8b-instruct:free";
+    if (provider === "ollama") return "qwen2.5:3b";
+    return "gemini-3.6-flash";
+  };
+
+  async function getJarvisAiProviders(includeEnvFallback = true): Promise<JarvisAiProviderConfig[]> {
+    let providers: JarvisAiProviderConfig[] = [];
+    try {
+      const raw = await getActiveDataProvider().getSetting(JARVIS_AI_PROVIDERS_SETTING);
+      if (raw) providers = JSON.parse(raw);
+    } catch {
+      providers = [];
+    }
+    providers = providers
+      .filter((p: any) => p && p.provider && p.model)
+      .map((p: any, index: number) => ({
+        id: String(p.id || `provider-${index + 1}`),
+        provider: p.provider,
+        label: p.label || p.provider,
+        model: p.model || defaultModelForProvider(p.provider),
+        apiKey: p.apiKey || "",
+        baseUrl: p.baseUrl || "",
+        enabled: p.enabled !== false,
+      }));
+
+    if (includeEnvFallback && providers.filter(p => p.enabled).length === 0) {
+      if (process.env.GROQ_API_KEY) providers.push({ id: "env-groq", provider: "groq", label: "Groq (env)", model: process.env.GROQ_MODEL || "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY, enabled: true });
+      if (process.env.OPENROUTER_API_KEY) providers.push({ id: "env-openrouter", provider: "openrouter", label: "OpenRouter (env)", model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free", apiKey: process.env.OPENROUTER_API_KEY, enabled: true });
+      if (process.env.OLLAMA_BASE_URL) providers.push({ id: "env-ollama", provider: "ollama", label: "Ollama (env)", model: process.env.OLLAMA_MODEL || "qwen2.5:3b", baseUrl: process.env.OLLAMA_BASE_URL, enabled: true });
+      if (process.env.GEMINI_API_KEY) providers.push({ id: "env-gemini", provider: "gemini", label: "Gemini (env)", model: process.env.GEMINI_MODEL || "gemini-3.6-flash", apiKey: process.env.GEMINI_API_KEY, enabled: true });
+    }
+    return includeEnvFallback ? providers.filter(p => p.enabled) : providers;
+  }
+
+  function maskJarvisProvider(p: JarvisAiProviderConfig) {
+    return { ...p, apiKey: p.apiKey ? "********" : "" };
+  }
+
   // =========================================================================
   // JARVIS SMART ASSISTANT — real backend brain.
   // The client (web or Flutter) only ever sends raw text. This endpoint
@@ -844,100 +895,15 @@ async function startServer() {
   // otherwise a keyword-based fallback) and then performs the REAL action
   // against the REAL database — never just a scripted reply.
   // =========================================================================
-  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any; language?: string }) {
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const client = getGeminiClient();
-        const tools = [{
-          functionDeclarations: [
-            {
-              name: "order_cafe_item",
-              description: "Order one food or drink item from the cafe/buffet menu for the user's current gaming system.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: { itemName: { type: Type.STRING, description: "Name or close description (Persian or English) of the menu item the user wants" } },
-                required: ["itemName"]
-              }
-            },
-            {
-              name: "extend_reservation",
-              description: "Extend the user's currently active gaming system reservation by a number of hours, deducting loyalty points (50 points per hour).",
-              parameters: {
-                type: Type.OBJECT,
-                properties: { hours: { type: Type.NUMBER, description: "Number of hours to extend, default 1, max 4" } },
-                required: []
-              }
-            },
-            {
-              name: "contact_admin",
-              description: "Send a real support/help request to the lounge staff on duty right now.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: { message: { type: Type.STRING, description: "Short summary in Persian of the issue or request" } },
-                required: ["message"]
-              }
-            },
-            {
-              name: "send_chat_message",
-              description: "Post a message to one of the community chat rooms on behalf of the user.",
-              parameters: {
-                type: Type.OBJECT,
-                properties: {
-                  room: { type: Type.STRING, description: "Which chat room/game the user means, e.g. CS2, Dota 2, general" },
-                  message: { type: Type.STRING, description: "The message content to post" }
-                },
-                required: ["message"]
-              }
-            },
-            { name: "reserve_system", description: "Reserve a free gaming system for the user.", parameters: { type: Type.OBJECT, properties: { systemType: { type: Type.STRING }, startTime: { type: Type.STRING }, hours: { type: Type.NUMBER } }, required: [] } },
-            { name: "cancel_reservation", description: "Cancel the user's active reservation.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
-            { name: "show_wallet", description: "Show the user's loyalty points, coupons, and recent transactions.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
-            { name: "suggest_best_system", description: "Suggest the best currently available gaming system.", parameters: { type: Type.OBJECT, properties: { systemType: { type: Type.STRING } }, required: [] } },
-            { name: "list_tournaments", description: "List active/upcoming tournaments.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
-            { name: "register_tournament", description: "Register a team for a tournament.", parameters: { type: Type.OBJECT, properties: { tournamentName: { type: Type.STRING }, teamName: { type: Type.STRING }, leader: { type: Type.STRING }, members: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: [] } },
-            { name: "search_shop", description: "Search gaming accessories in the shop.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING } }, required: ["query"] } },
-            { name: "purchase_shop_item", description: "Purchase one accessory from the shop.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, couponCode: { type: Type.STRING } }, required: ["query"] } },
-            { name: "read_messages", description: "Read the user's latest app messages and notifications.", parameters: { type: Type.OBJECT, properties: {}, required: [] } },
-            { name: "change_language", description: "Change app language. Supported: fa, en, ru, tr.", parameters: { type: Type.OBJECT, properties: { language: { type: Type.STRING } }, required: ["language"] } },
-            { name: "open_app_section", description: "Open/navigate to a section in the mobile app.", parameters: { type: Type.OBJECT, properties: { section: { type: Type.STRING, description: "home, reserve, cafe, shop, tournaments, loyalty, messages, chat, blog" } }, required: ["section"] } }
-          ]
-        }];
-
-        const replyLanguage = context.language === "en" ? "English" : context.language === "ru" ? "Russian" : context.language === "tr" ? "Turkish" : "Persian";
-        const systemPrompt = `You are Jarvis, the in-app voice assistant for BAZINO, a gaming lounge. The current user is ${context.user.username === "Guest" ? "a guest who is not logged in" : context.user.username}. ${context.activeReservation ? `They are currently on ${context.activeReservation.systemName}.` : "They have no active reservation right now."}
-Reply in ${replyLanguage}. Decide whether one of the available functions matches what the user is asking for, and call it with the best-guess parameters. If nothing matches (small talk, unclear request, or something outside these actions), do not call any function — just reply naturally and conversationally like a real assistant, and briefly explain what you can do in the app.`;
-
-        const response = await client.models.generateContent({
-          model: "gemini-3.6-flash",
-          contents: command,
-          config: { systemInstruction: systemPrompt, tools }
-        });
-
-        const call = response.functionCalls && response.functionCalls[0];
-        if (call) {
-          return { action: call.name as string, params: (call.args || {}) as any, aiReply: response.text || "" };
-        }
-        return { action: "chitchat", params: {}, aiReply: response.text || "" };
-      } catch (err) {
-        console.error("[Jarvis] Gemini intent resolution failed, falling back to keyword matching:", err);
-      }
-    }
-
-    // Offline / no-API-key fallback — still triggers REAL actions, just with simpler intent detection
+  function heuristicJarvisIntent(command: string) {
     const cmd = command.toLowerCase();
     if (/(سفارش|کافه|بوفه|پیتزا|همبرگر|نوشیدنی|ردبول)/.test(cmd)) {
       const itemName = cmd.includes("همبرگر") ? "همبرگر" : (cmd.includes("ردبول") || cmd.includes("نوشیدنی")) ? "ردبول" : "پیتزا";
       return { action: "order_cafe_item", params: { itemName }, aiReply: "" };
     }
-    if (/(تمدید|شارژ|زمان)/.test(cmd)) {
-      return { action: "extend_reservation", params: { hours: 1 }, aiReply: "" };
-    }
-    if (/(ادمین|پشتیبان|خراب|کمک)/.test(cmd)) {
-      return { action: "contact_admin", params: { message: command }, aiReply: "" };
-    }
-    if (/(چت|ارسال پیام|پیام بفرست)/.test(cmd)) {
-      return { action: "send_chat_message", params: { room: "", message: command }, aiReply: "" };
-    }
+    if (/(تمدید|شارژ|زمان)/.test(cmd)) return { action: "extend_reservation", params: { hours: 1 }, aiReply: "" };
+    if (/(ادمین|پشتیبان|خراب|کمک)/.test(cmd)) return { action: "contact_admin", params: { message: command }, aiReply: "" };
+    if (/(چت|ارسال پیام|پیام بفرست)/.test(cmd)) return { action: "send_chat_message", params: { room: "", message: command }, aiReply: "" };
     if (/(رزرو کن|رزرو سیستم|سیستم بگیر|کامپیوتر بگیر)/.test(cmd)) return { action: "reserve_system", params: { hours: 1 }, aiReply: "" };
     if (/(لغو رزرو|کنسل رزرو|رزرو را لغو)/.test(cmd)) return { action: "cancel_reservation", params: {}, aiReply: "" };
     if (/(کیف پول|امتیاز|کوپن|کد تخفیف)/.test(cmd)) return { action: "show_wallet", params: {}, aiReply: "" };
@@ -949,7 +915,93 @@ Reply in ${replyLanguage}. Decide whether one of the available functions matches
     if (/(پیام‌ها|پیام ها|نوتیفیکیشن|اعلان)/.test(cmd)) return { action: "read_messages", params: {}, aiReply: "" };
     if (/(زبان|language)/.test(cmd)) return { action: "change_language", params: { language: cmd.includes('english') || cmd.includes('انگلیسی') ? 'en' : cmd.includes('روسی') ? 'ru' : cmd.includes('ترکی') ? 'tr' : 'fa' }, aiReply: "" };
     if (/(برو به|باز کن|نشان بده)/.test(cmd)) return { action: "open_app_section", params: { section: command }, aiReply: "" };
-    return { action: "chitchat", params: {}, aiReply: "" };
+    return null;
+  }
+
+  const jarvisActionNames = [
+    "chitchat", "order_cafe_item", "extend_reservation", "contact_admin", "send_chat_message",
+    "reserve_system", "cancel_reservation", "show_wallet", "suggest_best_system", "list_tournaments",
+    "register_tournament", "search_shop", "purchase_shop_item", "read_messages", "change_language", "open_app_section"
+  ];
+
+  function parseJarvisAiJson(text: string) {
+    const cleaned = String(text || "").replace(/```json|```/g, "").trim();
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("AI response did not contain JSON");
+    const parsed = JSON.parse(match[0]);
+    const action = jarvisActionNames.includes(parsed.action) ? parsed.action : "chitchat";
+    return { action, params: parsed.params || {}, aiReply: parsed.reply || parsed.aiReply || "" };
+  }
+
+  async function callOpenAiCompatibleJarvis(provider: JarvisAiProviderConfig, messages: any[]) {
+    const base = provider.provider === "groq"
+      ? "https://api.groq.com/openai/v1"
+      : provider.provider === "openrouter"
+        ? "https://openrouter.ai/api/v1"
+        : (provider.baseUrl || "").replace(/\/$/, "");
+    if (!base) throw new Error("Missing OpenAI-compatible base URL");
+    if (!provider.apiKey && provider.provider !== "ollama") throw new Error("Missing API key");
+    const response = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
+        ...(provider.provider === "openrouter" ? { "HTTP-Referer": "https://bazino.pro", "X-Title": "Bazino Jarvis" } : {})
+      },
+      body: JSON.stringify({ model: provider.model, messages, temperature: 0.2, response_format: { type: "json_object" } })
+    });
+    if (!response.ok) throw new Error(`${provider.provider} ${response.status}: ${await response.text()}`);
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "";
+  }
+
+  async function callOllamaJarvis(provider: JarvisAiProviderConfig, messages: any[]) {
+    const base = (provider.baseUrl || "http://127.0.0.1:11434").replace(/\/$/, "");
+    const response = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: provider.model, messages, stream: false, format: "json" })
+    });
+    if (!response.ok) throw new Error(`ollama ${response.status}: ${await response.text()}`);
+    const data = await response.json();
+    return data.message?.content || "";
+  }
+
+  async function callGeminiJarvis(provider: JarvisAiProviderConfig, prompt: string) {
+    if (!provider.apiKey) throw new Error("Missing Gemini API key");
+    const client = new GoogleGenAI({ apiKey: provider.apiKey });
+    const response = await client.models.generateContent({ model: provider.model || "gemini-3.6-flash", contents: prompt });
+    return response.text || "";
+  }
+
+  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any; language?: string }) {
+    // Cost saver + safety: clear app commands are routed deterministically without any LLM call.
+    const deterministic = heuristicJarvisIntent(command);
+    if (deterministic) return deterministic;
+
+    const replyLanguage = context.language === "en" ? "English" : context.language === "ru" ? "Russian" : context.language === "tr" ? "Turkish" : "Persian";
+    const systemPrompt = `You are Jarvis, the in-app assistant for BAZINO gaming lounge. Current user: ${context.user.username === "Guest" ? "guest" : context.user.username}. ${context.activeReservation ? `Active reservation: ${context.activeReservation.systemName}.` : "No active reservation."}
+Return ONLY valid JSON: {"action":"one_of_allowed_actions","params":{},"reply":"short natural reply in ${replyLanguage}"}.
+Allowed actions: ${jarvisActionNames.join(", ")}.
+Use chitchat for normal conversation or unclear requests. For app tasks, choose the closest action and fill params. Never invent prices or claim an action happened; server executes actions after you classify.`;
+    const userPrompt = `User said: ${command}`;
+    const messages = [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }];
+    const providers = await getJarvisAiProviders(true);
+
+    for (const provider of providers) {
+      try {
+        let text = "";
+        if (provider.provider === "gemini") text = await callGeminiJarvis(provider, `${systemPrompt}\n\n${userPrompt}`);
+        else if (provider.provider === "ollama") text = await callOllamaJarvis(provider, messages);
+        else text = await callOpenAiCompatibleJarvis(provider, messages);
+        const parsed = parseJarvisAiJson(text);
+        return { ...parsed, provider: provider.label || provider.provider };
+      } catch (err) {
+        console.error(`[Jarvis] Provider ${provider.label || provider.provider} failed, trying next:`, err);
+      }
+    }
+
+    return { action: "chitchat", params: {}, aiReply: "پیامت رو شنیدم. برای فرمان‌های دقیق مثل رزرو، خرید، پیام‌ها یا تغییر زبان آماده‌ام؛ اگر خواستی می‌تونی دستور را واضح‌تر بگی." };
   }
 
   async function executeAssistantIntent(intent: { action: string; params: any; aiReply: string }, ctx: { user: any; activeReservation?: any }) {
@@ -2560,6 +2612,9 @@ namespace GameNet.Infrastructure.Migrations
     try {
       const settings = await getActiveDataProvider().listSettings();
       const settingsObj = settings.reduce((acc, curr) => {
+        // AI provider API keys are managed via the admin-only Jarvis endpoint below;
+        // never leak them through the public /api/settings response.
+        if (curr.key === JARVIS_AI_PROVIDERS_SETTING) return acc;
         acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);
@@ -2585,11 +2640,51 @@ namespace GameNet.Infrastructure.Migrations
       if (!key) {
         return res.status(400).json({ error: "Key is required" });
       }
+      if (key === JARVIS_AI_PROVIDERS_SETTING) {
+        return res.status(403).json({ error: "Jarvis AI providers must be managed through /api/admin/jarvis-ai-providers" });
+      }
       await getActiveDataProvider().setSetting(key, value);
       res.json({ success: true });
     } catch (err) {
       console.error("Error saving setting:", err);
       res.status(500).json({ error: "Failed to save setting" });
+    }
+  });
+
+  app.get("/api/admin/jarvis-ai-providers", async (_req, res) => {
+    try {
+      const providers = await getJarvisAiProviders(false);
+      res.json({ providers: providers.map(maskJarvisProvider) });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load Jarvis AI providers" });
+    }
+  });
+
+  app.post("/api/admin/jarvis-ai-providers", async (req, res) => {
+    try {
+      const incoming = Array.isArray(req.body?.providers) ? req.body.providers.slice(0, 3) : [];
+      const existing = await getJarvisAiProviders(false);
+      const existingById = new Map(existing.map(p => [p.id, p]));
+      const clean = incoming.map((p: any, index: number) => {
+        const id = String(p.id || `provider-${index + 1}`);
+        const provider = ["gemini", "groq", "openrouter", "ollama", "custom"].includes(String(p.provider)) ? String(p.provider) as JarvisAiProviderConfig["provider"] : "groq";
+        const old = existingById.get(id);
+        const apiKey = p.apiKey && p.apiKey !== "********" ? String(p.apiKey) : (old?.apiKey || "");
+        return {
+          id,
+          provider,
+          label: String(p.label || provider),
+          model: String(p.model || defaultModelForProvider(provider)),
+          apiKey,
+          baseUrl: String(p.baseUrl || ""),
+          enabled: p.enabled !== false,
+        } as JarvisAiProviderConfig;
+      });
+      await getActiveDataProvider().setSetting(JARVIS_AI_PROVIDERS_SETTING, JSON.stringify(clean));
+      res.json({ success: true, providers: clean.map(maskJarvisProvider) });
+    } catch (err) {
+      console.error("Error saving Jarvis AI providers:", err);
+      res.status(500).json({ error: "Failed to save Jarvis AI providers" });
     }
   });
 

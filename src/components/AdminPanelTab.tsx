@@ -85,6 +85,8 @@ export default function AdminPanelTab({
   const [migrationsCode, setMigrationsCode] = useState<string>('');
   const [dbLogsList, setDbLogsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [jarvisAiProviders, setJarvisAiProviders] = useState<any[]>([]);
+  const [isSavingJarvisProviders, setIsSavingJarvisProviders] = useState(false);
 
   // Customization & Settings states
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
@@ -289,6 +291,47 @@ export default function AdminPanelTab({
       console.error('Failed to parse social_media_links:', e);
     }
   }, [siteSettings]);
+
+  const loadJarvisProviders = async () => {
+    try {
+      const data = await fetch('/api/admin/jarvis-ai-providers').then(r => r.json());
+      const list = Array.isArray(data.providers) ? data.providers : [];
+      setJarvisAiProviders(list.length ? list : [
+        { id: 'provider-1', provider: 'groq', label: 'Groq fast fallback', model: 'llama-3.1-8b-instant', apiKey: '', baseUrl: '', enabled: true },
+        { id: 'provider-2', provider: 'openrouter', label: 'OpenRouter free fallback', model: 'meta-llama/llama-3.1-8b-instruct:free', apiKey: '', baseUrl: '', enabled: false },
+        { id: 'provider-3', provider: 'gemini', label: 'Gemini fallback', model: 'gemini-3.6-flash', apiKey: '', baseUrl: '', enabled: false },
+      ]);
+    } catch (e) {
+      addNotification(language === 'fa' ? 'خطا در دریافت مدل‌های جارویس' : 'Failed to load Jarvis providers', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'apiKeys') void loadJarvisProviders();
+  }, [activeSubTab]);
+
+  const updateJarvisProvider = (index: number, patch: Record<string, any>) => {
+    setJarvisAiProviders(prev => prev.map((p, i) => i === index ? { ...p, ...patch } : p));
+  };
+
+  const saveJarvisProviders = async () => {
+    setIsSavingJarvisProviders(true);
+    try {
+      const res = await fetch('/api/admin/jarvis-ai-providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providers: jarvisAiProviders.slice(0, 3) })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'save failed');
+      setJarvisAiProviders(data.providers || jarvisAiProviders);
+      addNotification(language === 'fa' ? 'مدل‌های جایگزین جارویس ذخیره شد' : 'Jarvis AI providers saved', 'success');
+    } catch (e) {
+      addNotification(language === 'fa' ? 'خطا در ذخیره مدل‌های جارویس' : 'Failed to save Jarvis providers', 'error');
+    } finally {
+      setIsSavingJarvisProviders(false);
+    }
+  };
 
   const handleSaveSetting = async (key: string, value: string) => {
     try {
@@ -3848,76 +3891,98 @@ export default function AdminPanelTab({
           {activeSubTab === 'apiKeys' && (
             <div className="animate-fade-in space-y-6">
               <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
                   <div>
                     <h3 className="text-lg font-black text-white flex items-center gap-2 font-display uppercase tracking-wider">
                       <Key className="w-5 h-5 text-blue-500 animate-pulse" />
-                      <span>{language === 'fa' ? 'تنظیمات API Key ها' : 'API Keys Settings'}</span>
+                      <span>{language === 'fa' ? 'مدل‌های هوش مصنوعی جارویس' : 'Jarvis AI Model Failover'}</span>
                     </h3>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {language === 'fa' 
-                        ? 'مدیریت کلیدهای امنیتی برای ارتباط با سرویس‌های خارجی مانند هوش مصنوعی' 
-                        : 'Manage security keys for integrating with external services like AI.'}
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed max-w-3xl">
+                      {language === 'fa'
+                        ? 'تا ۳ مدل را همراه با API Key تعریف کنید. جارویس اول فرمان‌های واضح اپ را بدون هزینه و با Rule Router اجرا می‌کند؛ فقط مکالمه‌های مبهم/آزاد به این مدل‌ها می‌روند و در صورت خطای مدل اول، خودکار مدل بعدی امتحان می‌شود.'
+                        : 'Configure up to 3 models with API keys. Jarvis routes clear app commands for free via rules first; only ambiguous/free chat goes to these models, with automatic failover to the next enabled provider.'}
                     </p>
                   </div>
+                  <button
+                    onClick={saveJarvisProviders}
+                    disabled={isSavingJarvisProviders}
+                    className="px-4 py-2.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-50 text-black font-black text-xs rounded-xl flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isSavingJarvisProviders ? (language === 'fa' ? 'در حال ذخیره...' : 'Saving...') : (language === 'fa' ? 'ذخیره مدل‌ها' : 'Save providers')}</span>
+                  </button>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="bg-black/40 border border-blue-500/20 rounded-xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                      Gemini AI API Key
-                    </h4>
-                    <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-                      {language === 'fa' ? (
-                        <>
-                          برای فعال‌سازی قابلیت‌های هوش مصنوعی (مانند ربات Jarvis و ترجمه خودکار متن)، سیستم نیازمند <strong className="text-white">Gemini API Key</strong> است. این کلید به‌صورت خودکار در سرور از طریق متغیر محیطی تزریق می‌شود، اما باید آن را از سایت گوگل دریافت کرده و در پنل تنظیمات محیط میزبانی خود قرار دهید.
-                        </>
-                      ) : (
-                        <>
-                          To enable AI features (like the Jarvis assistant and auto-translations), the system requires a <strong className="text-white">Gemini API Key</strong>. This key is automatically injected on the server via an environment variable, but you need to obtain it from Google and configure it in your hosting platform's settings.
-                        </>
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                  {jarvisAiProviders.slice(0, 3).map((provider, index) => (
+                    <div key={provider.id || index} className="bg-black/40 border border-blue-500/20 rounded-2xl p-5 space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <h4 className="text-sm font-black text-white flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center text-[10px]">{index + 1}</span>
+                          {language === 'fa' ? 'مدل جایگزین' : 'Fallback model'}
+                        </h4>
+                        <label className="flex items-center gap-2 text-[11px] text-gray-300">
+                          <input type="checkbox" checked={provider.enabled !== false} onChange={(e) => updateJarvisProvider(index, { enabled: e.target.checked })} />
+                          {language === 'fa' ? 'فعال' : 'Enabled'}
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Provider</label>
+                        <select
+                          value={provider.provider || 'groq'}
+                          onChange={(e) => {
+                            const defaults: Record<string, string> = {
+                              groq: 'llama-3.1-8b-instant',
+                              openrouter: 'meta-llama/llama-3.1-8b-instruct:free',
+                              gemini: 'gemini-3.6-flash',
+                              ollama: 'qwen2.5:3b',
+                              custom: provider.model || ''
+                            };
+                            updateJarvisProvider(index, { provider: e.target.value, model: defaults[e.target.value] || provider.model });
+                          }}
+                          className="w-full bg-[#0d1224] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
+                        >
+                          <option value="groq">Groq</option>
+                          <option value="openrouter">OpenRouter</option>
+                          <option value="gemini">Gemini</option>
+                          <option value="ollama">Ollama</option>
+                          <option value="custom">OpenAI-compatible Custom</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Label</label>
+                        <input value={provider.label || ''} onChange={(e) => updateJarvisProvider(index, { label: e.target.value })} className="w-full bg-[#0d1224] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white" placeholder="Groq primary" />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Model</label>
+                        <input value={provider.model || ''} onChange={(e) => updateJarvisProvider(index, { model: e.target.value })} className="w-full bg-[#0d1224] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono" placeholder="llama-3.1-8b-instant" />
+                      </div>
+
+                      {(provider.provider === 'custom' || provider.provider === 'ollama') && (
+                        <div>
+                          <label className="block text-[11px] text-gray-400 mb-1">Base URL</label>
+                          <input value={provider.baseUrl || ''} onChange={(e) => updateJarvisProvider(index, { baseUrl: e.target.value })} className="w-full bg-[#0d1224] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono" placeholder={provider.provider === 'ollama' ? 'http://127.0.0.1:11434' : 'https://api.example.com/openai/v1'} />
+                        </div>
                       )}
-                    </p>
 
-                    <div className="bg-[#0a0e21] border border-white/5 p-4 rounded-lg">
-                      <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3">
-                        {language === 'fa' ? 'راهنمای دریافت و ثبت کلید' : 'How to get and set the key'}
-                      </h5>
-                      <ol className="list-decimal list-inside text-xs text-gray-300 space-y-2 leading-loose">
-                        {language === 'fa' ? (
-                          <>
-                            <li>به سایت <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a> مراجعه کنید.</li>
-                            <li>با اکانت گوگل خود وارد شوید و یک API Key جدید بسازید (Create API Key).</li>
-                            <li>کلید ساخته شده را کپی کنید (شبیه به <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>در پنل تنظیمات محیط میزبانی خود (بخش <strong>Settings/Secrets</strong>)، یک متغیر محیطی (Environment Variable) جدید بسازید.</li>
-                            <li>نام دقیق متغیر: <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code></li>
-                            <li>مقدار کلید کپی شده را در آن قرار داده و ذخیره کنید.</li>
-                            <li>ممکن است نیاز باشد یک بار کانتینر اپلیکیشن مجددا راه‌اندازی (Restart) شود.</li>
-                          </>
-                        ) : (
-                          <>
-                            <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-mono">console.cloud.google.com</a>.</li>
-                            <li>Log in with your Google account and click "Create API Key".</li>
-                            <li>Copy the generated key (looks like <code className="text-emerald-400 font-mono bg-black px-1 py-0.5 rounded">AIzaSy...</code>).</li>
-                            <li>In your hosting platform's settings (e.g. <strong>Settings/Secrets</strong>), create a new environment variable.</li>
-                            <li>Use the exact name <code className="text-amber-400 font-mono bg-black px-1 py-0.5 rounded">GEMINI_API_KEY</code>.</li>
-                            <li>Paste the copied key as its value and save.</li>
-                            <li>You might need to restart the application container for the changes to take effect.</li>
-                          </>
-                        )}
-                      </ol>
+                      {provider.provider !== 'ollama' && (
+                        <div>
+                          <label className="block text-[11px] text-gray-400 mb-1">API Key</label>
+                          <input type="password" value={provider.apiKey || ''} onChange={(e) => updateJarvisProvider(index, { apiKey: e.target.value })} className="w-full bg-[#0d1224] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono" placeholder="Paste API key or leave ******** unchanged" />
+                          {provider.apiKey === '********' && <p className="mt-1 text-[10px] text-emerald-400">{language === 'fa' ? 'کلید قبلی محفوظ است؛ فقط برای تغییر، مقدار جدید وارد کنید.' : 'Existing key is preserved; enter a new value only to replace it.'}</p>}
+                        </div>
+                      )}
                     </div>
+                  ))}
+                </div>
 
-                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-200 flex items-start gap-2">
-                      <FileText className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                      <p>
-                        {language === 'fa' 
-                          ? 'توجه: به دلایل امنیتی، هرگز نباید API Key را مستقیماً در کدهای کلاینت قرار دهید. ما از طریق متغیر محیطی (Environment Variable) در سمت سرور این کلید را فراخوانی می‌کنیم تا امنیت حفظ شود.'
-                          : 'Note: For security reasons, you should never put the API Key directly in client-side code. We access it securely via environment variables on the backend.'}
-                      </p>
-                    </div>
-                  </div>
+                <div className="mt-5 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-100 leading-relaxed">
+                  {language === 'fa'
+                    ? 'پیشنهاد: مدل اول Groq با llama-3.1-8b-instant برای سرعت و هزینه کم، مدل دوم OpenRouter free، مدل سوم Gemini یا Ollama محلی. API Key ها فقط در سمت سرور ذخیره و استفاده می‌شوند و از /api/settings عمومی حذف شده‌اند.'
+                    : 'Recommended order: Groq llama-3.1-8b-instant first for speed/cost, OpenRouter free second, Gemini or local Ollama third. Keys are stored and used server-side only and are excluded from public /api/settings.'}
                 </div>
               </div>
             </div>

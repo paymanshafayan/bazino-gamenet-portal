@@ -1840,7 +1840,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         name,
         category,
         price: Number(price),
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1513104890138-7c749659a591",
+        imageUrl: imageUrl || "/images/home/pizza-480.webp",
         inventory: Number(inventory),
         isAvailable: isAvailable !== false
       });
@@ -1923,7 +1923,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         name,
         description,
         price: Number(price),
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1618384887929-16ec33fab9ef",
+        imageUrl: imageUrl || "/images/home/gear-shop-480.webp",
         stock: Number(stock),
         category
       });
@@ -2061,7 +2061,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         title,
         content,
         category,
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e",
+        imageUrl: imageUrl || "/images/home/esports-480.webp",
         author: author || "سیستم مدیریت",
         date: date || "۱۴۰۵/۰۴/۱۴",
         comments: "[]",

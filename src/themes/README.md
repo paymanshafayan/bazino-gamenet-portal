@@ -302,3 +302,17 @@ document.body.setAttribute('data-theme', 'cyberpunk-cyan');
 - فایل `gaming-hub.css` مربوط به قالب قدیمی حذف‌شده است و فقط برای حفظ کد نگه داشته شده.
 - **پکیج ZIP بدون `theme.js` دیگر معتبر نیست** — از این پس همه قالب‌ها باید هر سه فایل
   (`theme.json` + `theme.css` + `theme.js`) را داشته باشند.
+
+## Performance gate for uploaded ZIP themes
+
+Every ZIP uploaded through `POST /api/admin/themes/install` is audited **before any file is written**. The server applies safe automatic fixes (removing Google Fonts imports, adding `font-display: optional` to local font faces, and compacting SVG comments/whitespace), reports external origins and recurring timers, and rejects packages with a single asset over 3 MB or total assets over 8 MB.
+
+The installation response includes a `performance` report; the Admin Panel shows counts for automatic fixes and warnings. To audit a ZIP in CI or before upload:
+
+```bash
+npm run audit:theme -- ./my-theme.zip
+npm run audit:theme -- ./my-theme.zip --fix ./my-theme.optimized.zip
+npm run test:theme-performance
+```
+
+The gate never executes an uploaded `theme.js`; JavaScript is checked statically only.

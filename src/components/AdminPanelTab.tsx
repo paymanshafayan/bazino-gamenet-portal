@@ -771,9 +771,20 @@ export default function AdminPanelTab({
       };
 
       setAvailableThemes(prev => [...prev, serverTheme]);
+      const fixedCount = Array.isArray(data.performance?.findings)
+        ? data.performance.findings.filter((finding: { severity?: string }) => finding.severity === 'fixed').length
+        : 0;
+      const warningCount = Array.isArray(data.performance?.findings)
+        ? data.performance.findings.filter((finding: { severity?: string }) => finding.severity === 'warning').length
+        : 0;
       addNotification(language === 'fa'
         ? `قالب «${serverTheme.name}» روی سرور نصب و فعال شد${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} فایل assets)` : ''}`
         : `Theme "${serverTheme.name}" installed on server & activated${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} assets)` : ''}`, 'success');
+      if (fixedCount || warningCount) {
+        addNotification(language === 'fa'
+          ? `بررسی عملکرد قالب: ${fixedCount} اصلاح خودکار و ${warningCount} مورد نیازمند بررسی دستی.`
+          : `Theme performance check: ${fixedCount} automatic fixes and ${warningCount} items needing review.`, 'info');
+      }
 
       // فعال‌سازی فوری
       if (setThemeId) setThemeId(serverTheme.id);

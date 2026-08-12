@@ -2050,10 +2050,10 @@ Decide whether one of the available functions matches what the user is asking fo
         const fallbackName = (req.query.name as string) || undefined;
         const result = installThemeZip(new Uint8Array(buffer), fallbackName);
         if ("error" in result) {
-          return res.status(400).json({ error: result.error });
+          return res.status(400).json({ error: result.error, performance: result.performance });
         }
         logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${result.theme.id}" installed (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
-        res.json({ success: true, theme: result.theme });
+        res.json({ success: true, theme: result.theme, performance: result.performance });
       } catch (e) {
         console.error("Theme install error:", e);
         res.status(500).json({ error: String(e) });

@@ -1,18 +1,35 @@
 # Plan: Localize sample-data images (cafe / shop / blog / sliders)
 
-> **Status: PAUSED.** `generate_image` hit its per-session quota (8 images were
-> used for the home-page work). Per user decision, we wait and generate these
-> clean AI images in a later session. `image_search` was rejected because it
-> returns watermarked stock-site previews (istock/adobe/freepik/dreamstime).
+> **Status: DONE.** Every image referenced by `server/sampleData.ts` (cafe,
+> shop, blog, sliders) is now a local, optimized WebP under
+> `public/images/home/` — `grep -rn unsplash server/sampleData.ts` returns
+> nothing and no `images.unsplash.com` request is made at runtime.
 >
-> The **home page is already done** (HomeTab/GamingAmp/GecoPurple/DarkGold all
-> use local `/images/home/*.webp`). This file is ONLY about the remaining
-> sample-data images in `server/sampleData.ts`.
+> The last remaining item, the AI-generated **`hardware-pc`** shot for blog
+> article `art-2`, has been generated and encoded to
+> `hardware-pc-400.webp` (400x225) and `hardware-pc-800.webp` (800x450);
+> `art-2` now points at them (`imageUrl` / `mobileImageUrl`) instead of the
+> temporary `pc-arena` stand-in.
+>
+> The **home page** is likewise done (HomeTab/GamingAmp/GecoPurple/DarkGold all
+> use local `/images/home/*.webp`).
 
-## What to generate (11 new images, AI)
+## How it was resolved
 
-All saved as source PNGs to a scratch dir, then resized/optimized to WebP with
-ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
+Instead of generating 11 separate food/accessory photos, the cafe, shop and
+slider entries were pointed at the existing local `cafe-*` / `gear-shop-*` /
+`esports-*` / `rpg-openworld-*` WebP sets, and only the missing hardware shot
+(`hardware-pc`) was generated with AI. Source PNGs are resized/optimized to
+WebP with ImageMagick into `public/images/home/`, naming convention
+`{name}-{width}.webp`.
+
+### Blog — generated (1) ✅
+| file stem | replaces unsplash | used by | variants |
+|---|---|---|---|
+| `hardware-pc` | photo-1587202372775-e229f172b9d7 | blog art-2 | 400 (400x225), 800 (800x450) |
+
+<details>
+<summary>Original plan (kept for reference — superseded by the mapping above)</summary>
 
 ### Food — cafe menu (5)
 | file stem | replaces unsplash | used by | variants |
@@ -37,6 +54,8 @@ ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
 |---|---|---|---|
 | `hardware-pc` | photo-1587202372775-e229f172b9d7 | blog art-2 | 400, 800 |
 
+</details>
+
 > `pizza` and `keyboard` need the larger set because they are also rendered in
 > the **home hero** via `SAMPLE_SLIDERS` (`HomeTab.tsx` calls
 > `getResponsiveSrcSet(activeGame.imageUrl, [480,800,960])`).
@@ -45,18 +64,32 @@ ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
 - `esports` → slider slide-1, blog art-1
 - `rpg-openworld` → slider slide-4, blog art-3
 
-> ✅ **Done since:** `slide-1` and `slide-4` in `server/sampleData.ts` were localized
-> to `/images/home/esports-960.webp` and `/images/home/rpg-openworld-960.webp` as part
-> of the LCP fix (the home hero swaps to slide-1 after the appSliders fetch). Only
-> `slide-2` (pizza) and `slide-3` (keyboard) still use Unsplash — they need the AI
-> images below.
+> ✅ **Done:** all four sliders in `server/sampleData.ts` are localized
+> (`esports-480`, `cafe-480`, `gear-shop-480`, `rpg-openworld-480`), which also
+> fixed the home-hero LCP (the hero swaps to slide-1 after the appSliders fetch).
 
 ## Why variants differ
 - Cafe/Shop/Blog tabs render images with plain `<img src>` (NO srcset), so card
   items only need a single small file (~400px).
 - Sliders are shown in the home hero WITH responsive srcset → need 480/800/960.
 
-## Edits to make in `server/sampleData.ts` (after images exist)
+## Final image mapping in `server/sampleData.ts` (applied ✅)
+
+```ts
+// SAMPLE_CAFE_ITEMS   c1..c5   -> '/images/home/cafe-480.webp'   (mobile: cafe-320)
+// SAMPLE_ACCESSORIES  a1..a5   -> '/images/home/gear-shop-480.webp' (mobile: gear-shop-320)
+// SAMPLE_SLIDERS      slide-1  -> '/images/home/esports-480.webp'
+//                     slide-2  -> '/images/home/cafe-480.webp'
+//                     slide-3  -> '/images/home/gear-shop-480.webp'
+//                     slide-4  -> '/images/home/rpg-openworld-480.webp'
+// SAMPLE_ARTICLES     art-1    -> '/images/home/esports-480.webp'
+//                     art-2    -> '/images/home/hardware-pc-800.webp'  (mobile: hardware-pc-400)
+//                     art-3    -> '/images/home/rpg-openworld-480.webp'
+//                     art-4    -> '/images/home/cafe-480.webp'
+```
+
+<details>
+<summary>Original target mapping (reference)</summary>
 
 ```ts
 // SAMPLE_CAFE_ITEMS imageUrl:
@@ -86,11 +119,14 @@ ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
 //   art-4 Cafe       -> '/images/home/pizza-800.webp'
 ```
 
+</details>
+
 Also update the two `imageUrl ||` fallbacks in `server.ts` (lines ~1659, ~1742,
 ~1880) if desired (they default new admin items to unsplash — optional).
 
-## Verification (same as home work)
-- `npx tsc --noEmit`
-- `npx vite build`
-- curl each new `/images/home/<name>-<w>.webp` → 200 image/webp
-- `grep unsplash server/sampleData.ts` → 0
+## Verification (all passing ✅)
+- `npx tsc --noEmit` → no errors
+- `npx vite build` → OK (still emits `dist/assets/index-*.css`)
+- `curl -I /images/home/hardware-pc-400.webp` → `200` `image/webp`
+- `curl -I /images/home/hardware-pc-800.webp` → `200` `image/webp`
+- `grep -rn unsplash server/sampleData.ts` → 0 matches

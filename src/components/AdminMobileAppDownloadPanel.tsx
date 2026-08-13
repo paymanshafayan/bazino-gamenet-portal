@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Download, Edit, ExternalLink, Github, PackageOpen, Play, Plus, QrCode, Save, Smartphone, Store, Trash2, Upload, X, Apple } from 'lucide-react';
+import { AlertTriangle, Apple, Check, Copy, Download, Edit, ExternalLink, Github, PackageOpen, Play, Plus, QrCode, Save, Smartphone, Store, Trash2, Upload, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import type { MobileAppDownloadConfig, MobileAppStoreKind, MobileAppStoreLink } from '../types/mobileApp';
 import { getAuthToken } from '../services/authToken';
@@ -41,6 +41,93 @@ const formatBytes = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const MAX_APK_BYTES = 160 * 1024 * 1024;
+const APK_CHUNK_BYTES = 8 * 1024 * 1024;
+const MAX_CHUNK_RETRIES = 3;
+const APK_CHUNK_TIMEOUT_MS = 3 * 60 * 1000;
+
+type ApkUploadFailureReason = 'http' | 'network' | 'timeout' | 'aborted';
+
+interface ApkUploadErrorDetails {
+  httpStatus: number;
+  responseBody: string;
+  lastProgress: number;
+  reason: ApkUploadFailureReason;
+  chunkIndex: number;
+  totalChunks: number;
+  attempts: number;
+}
+
+class ApkChunkRequestError extends Error {
+  details: ApkUploadErrorDetails;
+
+  constructor(details: ApkUploadErrorDetails) {
+    super(`APK chunk upload failed (${details.reason}, HTTP ${details.httpStatus || 0})`);
+    this.name = 'ApkChunkRequestError';
+    this.details = details;
+  }
+}
+
+const responseTextOr = (xhr: XMLHttpRequest, fallback: string) => {
+  try {
+    return xhr.responseText || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const sendApkChunk = (
+  url: string,
+  chunk: Blob,
+  authToken: string | null,
+  chunkIndex: number,
+  totalChunks: number,
+  lastProgress: number,
+) => new Promise<string>((resolve, reject) => {
+  const xhr = new XMLHttpRequest();
+  let settled = false;
+
+  const fail = (reason: ApkUploadFailureReason, fallbackBody: string) => {
+    if (settled) return;
+    settled = true;
+    reject(new ApkChunkRequestError({
+      httpStatus: xhr.status || 0,
+      responseBody: responseTextOr(xhr, fallbackBody),
+      lastProgress,
+      reason,
+      chunkIndex,
+      totalChunks,
+      attempts: 1,
+    }));
+  };
+
+  xhr.open('POST', url);
+  xhr.timeout = APK_CHUNK_TIMEOUT_MS;
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+  // Raw XHR does not pass through the global fetch interceptor.
+  if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+  xhr.onload = () => {
+    if (settled) return;
+    if (xhr.status >= 200 && xhr.status < 300) {
+      settled = true;
+      resolve(responseTextOr(xhr, ''));
+      return;
+    }
+    fail('http', '(empty response body)');
+  };
+  xhr.onerror = () => fail('network', 'Network error: no response body was received');
+  xhr.ontimeout = () => fail('timeout', `Upload request timed out after ${APK_CHUNK_TIMEOUT_MS / 1000} seconds`);
+  xhr.onabort = () => fail('aborted', 'Upload request was aborted before the server responded');
+
+  try {
+    xhr.send(chunk);
+  } catch (error) {
+    fail('network', String(error));
+  }
+});
+
+const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
 export default function AdminMobileAppDownloadPanel({ addNotification }: Props) {
   const { language, dir } = useLanguage();
   const isFa = language === 'fa';
@@ -51,6 +138,7 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
   const [isSavingLinks, setIsSavingLinks] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<ApkUploadErrorDetails | null>(null);
 
   const selectedOption = useMemo(() => STORE_OPTIONS.find((x) => x.kind === form.kind) || STORE_OPTIONS[0], [form.kind]);
 
@@ -120,54 +208,132 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
     await persistLinks(links.map((x) => x.id === id ? { ...x, isActive: !x.isActive } : x));
   };
 
-  // Maximum APK size accepted by the server (see /api/admin/mobile-app/upload-apk).
-  const MAX_APK_BYTES = 160 * 1024 * 1024;
-
-  const uploadApk = (file: File) => {
+  const uploadApk = async (file: File) => {
     if (!file.name.toLowerCase().endsWith('.apk')) {
       addNotification(isFa ? 'فقط فایل APK قابل آپلود است' : 'Only APK files are allowed', 'error');
+      return;
+    }
+    if (file.size < 1) {
+      addNotification(isFa ? 'فایل APK خالی است' : 'The APK file is empty', 'error');
       return;
     }
     if (file.size > MAX_APK_BYTES) {
       addNotification(isFa ? 'حجم فایل APK بیشتر از ۱۶۰ مگابایت است' : 'APK file is larger than 160 MB', 'error');
       return;
     }
+
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadError(null);
 
-    // Raw binary upload (no base64/JSON): the request body stays as small as the
-    // file itself, the server parses it with express.raw, and upload progress
-    // tracks the actual bytes being sent.
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `/api/admin/mobile-app/upload-apk?fileName=${encodeURIComponent(file.name)}`);
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-    // XHR bypasses the global fetch interceptor, so the admin token has to be
-    // attached by hand or /api/admin/* answers 401.
+    const totalChunks = Math.ceil(file.size / APK_CHUNK_BYTES);
+    const uploadId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     const authToken = getAuthToken();
-    if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) setUploadProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    xhr.onload = () => {
-      setIsUploading(false);
-      if (xhr.status >= 200 && xhr.status < 300) {
-        setUploadProgress(100);
-        addNotification(isFa ? 'فایل APK با موفقیت آپلود شد' : 'APK uploaded successfully', 'success');
-        void loadConfig();
-      } else if (xhr.status === 413) {
-        setUploadProgress(0);
-        addNotification(isFa ? 'حجم فایل APK از حد مجاز بیشتر است' : 'APK file is too large', 'error');
-      } else {
-        setUploadProgress(0);
-        addNotification(isFa ? 'آپلود APK ناموفق بود' : 'APK upload failed', 'error');
+    let lastProgress = 0;
+
+    try {
+      for (let index = 0; index < totalChunks; index += 1) {
+        const start = index * APK_CHUNK_BYTES;
+        const chunk = file.slice(start, Math.min(start + APK_CHUNK_BYTES, file.size));
+        const query = new URLSearchParams({
+          uploadId,
+          index: String(index),
+          total: String(totalChunks),
+          fileName: file.name,
+          fileSize: String(file.size),
+        });
+        const url = `/api/admin/mobile-app/upload-apk/chunk?${query.toString()}`;
+        let lastError: ApkChunkRequestError | null = null;
+
+        // One initial attempt plus up to three retries for transient proxy/server errors.
+        for (let attempt = 0; attempt <= MAX_CHUNK_RETRIES; attempt += 1) {
+          try {
+            await sendApkChunk(url, chunk, authToken, index, totalChunks, lastProgress);
+            lastError = null;
+            break;
+          } catch (error) {
+            const requestError = error instanceof ApkChunkRequestError
+              ? error
+              : new ApkChunkRequestError({
+                  httpStatus: 0,
+                  responseBody: String(error),
+                  lastProgress,
+                  reason: 'network',
+                  chunkIndex: index,
+                  totalChunks,
+                  attempts: attempt + 1,
+                });
+            requestError.details.attempts = attempt + 1;
+            lastError = requestError;
+            const retryable = requestError.details.httpStatus === 0 ||
+              requestError.details.httpStatus === 408 ||
+              requestError.details.httpStatus === 429 ||
+              requestError.details.httpStatus >= 500;
+            if (!retryable || attempt === MAX_CHUNK_RETRIES) break;
+            await wait(500 * (2 ** attempt));
+          }
+        }
+
+        if (lastError) throw lastError;
+        lastProgress = Math.round(((index + 1) / totalChunks) * 100);
+        setUploadProgress(lastProgress);
       }
-    };
-    xhr.onerror = () => {
+
+      setUploadProgress(100);
+      setUploadError(null);
+      addNotification(isFa ? 'فایل APK با موفقیت آپلود شد' : 'APK uploaded successfully', 'success');
+      void loadConfig().catch(() => addNotification(isFa ? 'آپلود انجام شد، اما دریافت متادیتای تازه ناموفق بود' : 'Upload succeeded, but refreshing metadata failed', 'error'));
+    } catch (error) {
+      const details = error instanceof ApkChunkRequestError
+        ? error.details
+        : {
+            httpStatus: 0,
+            responseBody: String(error),
+            lastProgress,
+            reason: 'network' as const,
+            chunkIndex: Math.min(Math.floor((lastProgress / 100) * totalChunks), totalChunks - 1),
+            totalChunks,
+            attempts: 1,
+          };
+      setUploadProgress(details.lastProgress);
+      setUploadError(details);
+      addNotification(isFa ? 'آپلود APK ناموفق بود؛ جزئیات خطا در پنل نمایش داده شد' : 'APK upload failed; diagnostics are shown in the panel', 'error');
+    } finally {
       setIsUploading(false);
-      setUploadProgress(0);
-      addNotification(isFa ? 'خطا در ارتباط هنگام آپلود' : 'Network error while uploading', 'error');
-    };
-    xhr.send(file);
+    }
+  };
+
+  const copyUploadError = async () => {
+    if (!uploadError) return;
+    const diagnostic = [
+      `HTTP status: ${uploadError.httpStatus || 0}`,
+      `Reason: ${uploadError.reason}`,
+      `Chunk: ${uploadError.chunkIndex + 1}/${uploadError.totalChunks}`,
+      `Attempts: ${uploadError.attempts}`,
+      `Last progress: ${uploadError.lastProgress}%`,
+      'Response body:',
+      uploadError.responseBody,
+    ].join('\n');
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(diagnostic);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = diagnostic;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      }
+      addNotification(isFa ? 'جزئیات خطا کپی شد' : 'Error details copied', 'success');
+    } catch {
+      addNotification(isFa ? 'کپی جزئیات خطا ناموفق بود' : 'Failed to copy error details', 'error');
+    }
   };
 
   return (
@@ -208,7 +374,17 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
             {isFa ? 'آپلود فایل APK' : 'Upload APK file'}
           </h3>
           <label className="block rounded-2xl border border-dashed border-cyan-300/25 bg-cyan-300/[0.04] p-6 text-center cursor-pointer hover:bg-cyan-300/[0.08] transition-colors">
-            <input type="file" accept=".apk,application/vnd.android.package-archive" className="hidden" disabled={isUploading} onChange={(e) => e.target.files?.[0] && uploadApk(e.target.files[0])} />
+            <input
+              type="file"
+              accept=".apk,application/vnd.android.package-archive"
+              className="hidden"
+              disabled={isUploading}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = '';
+                if (file) void uploadApk(file);
+              }}
+            />
             <Upload className="w-8 h-8 text-cyan-200 mx-auto mb-3" />
             <div className="text-sm font-black text-white">{isFa ? 'انتخاب و آپلود APK' : 'Choose and upload APK'}</div>
             <p className="text-[11px] text-gray-400 mt-2">{isFa ? 'فایل با نام ثابت روی سرور ذخیره می‌شود و دکمه دانلود مستقیم را فعال می‌کند.' : 'The file is saved on the server and enables the direct download button.'}</p>
@@ -223,6 +399,38 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
               <div className="h-3 rounded-full bg-black/40 border border-white/10 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all" style={{ width: `${uploadProgress}%` }} />
               </div>
+            </div>
+          )}
+
+          {uploadError && (
+            <div className="mt-4 rounded-2xl border border-red-400/35 bg-red-500/10 p-4 text-xs text-red-50" role="alert">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-300 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-black text-red-200">{isFa ? 'جزئیات خطای آپلود APK' : 'APK upload error details'}</div>
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-[11px]">
+                      <span>{isFa ? 'وضعیت HTTP:' : 'HTTP status:'} <b dir="ltr">{uploadError.httpStatus || 0}</b></span>
+                      <span>{isFa ? 'نوع خطا:' : 'Failure type:'} <b dir="ltr">{uploadError.reason}</b></span>
+                      <span>{isFa ? 'تکه:' : 'Chunk:'} <b dir="ltr">{uploadError.chunkIndex + 1}/{uploadError.totalChunks}</b></span>
+                      <span>{isFa ? 'تعداد تلاش‌ها:' : 'Attempts:'} <b dir="ltr">{uploadError.attempts}</b></span>
+                      <span className="sm:col-span-2">{isFa ? 'آخرین درصد پیشرفت:' : 'Last progress:'} <b dir="ltr">{uploadError.lastProgress}%</b></span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void copyUploadError()}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-200 text-red-950 px-3 py-2 text-[11px] font-black shrink-0"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {isFa ? 'کپی جزئیات' : 'Copy details'}
+                </button>
+              </div>
+              <div className="mt-3 text-[10px] font-bold text-red-200">{isFa ? 'بدنهٔ پاسخ سرور' : 'Server response body'}</div>
+              <pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-xl border border-red-300/15 bg-black/35 p-3 text-[10px] leading-5 text-red-100" dir="ltr">
+                {uploadError.responseBody || '(empty response body)'}
+              </pre>
             </div>
           )}
 

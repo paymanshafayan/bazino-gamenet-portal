@@ -8,6 +8,8 @@ import compression from "compression";
 import path from "path";
 import fs from "fs";
 import { createHash } from "crypto";
+import { Transform } from "stream";
+import { pipeline as streamPipeline } from "stream/promises";
 import { createServer as createViteServer } from "vite";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -463,13 +465,49 @@ async function startServer() {
     });
   });
 
-  // Middleware for parsing JSON requests. APK uploads from the admin panel are sent as
-  // base64 JSON so the upload progress can be tracked in-browser without adding a new
-  // multipart dependency.
+  // Parse ordinary JSON requests globally. Binary upload routes must keep the incoming
+  // stream untouched: the legacy APK route owns its raw parser and the chunk route pipes
+  // each request straight to disk.
   const jsonParser = express.json({ limit: "260mb" });
   app.use((req, res, next) => {
-    if (req.path === "/api/admin/mobile-app/upload-apk" || req.path === "/api/admin/themes/install") return next();
+    if (
+      req.path === "/api/admin/mobile-app/upload-apk" ||
+      req.path === "/api/admin/mobile-app/upload-apk/chunk" ||
+      req.path === "/api/admin/themes/install"
+    ) return next();
     return jsonParser(req, res, next);
+  });
+
+  // body-parser errors otherwise fall through Express' default HTML error page, which
+  // hides the useful status/body from API clients. Always return a small JSON diagnostic.
+  app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const isBodyParserError = Boolean(
+      error && (
+        error.type === "entity.too.large" ||
+        error.type === "entity.parse.failed" ||
+        error.type === "request.aborted" ||
+        error.status === 400 ||
+        error.status === 413
+      )
+    );
+    if (!isBodyParserError) return next(error);
+
+    const status = error.type === "entity.too.large" || error.status === 413 ? 413 : 400;
+    if (req.path.includes("upload-apk")) {
+      console.error("[APK Upload] Request body parser rejected the upload", {
+        path: req.path,
+        status,
+        type: error.type,
+        message: error.message,
+        contentLength: req.headers["content-length"] || "unknown",
+      });
+    }
+    return res.status(status).json({
+      error: status === 413 ? "Request body is too large" : "Request body could not be parsed",
+      code: error.type || "BODY_PARSE_ERROR",
+      status,
+      details: error.message || String(error),
+    });
   });
 
   // CORS: needed for the Management App desktop build, which runs its OWN local server +
@@ -2858,6 +2896,32 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // =========================================================================
   const getMobileAppDownloadDir = () => path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "downloads");
   const getMobileAppApkPath = () => path.join(getMobileAppDownloadDir(), MOBILE_APP_APK_FILE_NAME);
+  const getMobileAppUploadRoot = () => path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), ".apk-uploads");
+  const MAX_APK_BYTES = 160 * 1024 * 1024;
+  // The browser emits 8 MiB chunks. Keep a little headroom while still staying well
+  // below the common reverse-proxy request limits that broke whole-file uploads.
+  const MAX_APK_CHUNK_BYTES = 10 * 1024 * 1024;
+  const MAX_APK_CHUNKS = 100;
+
+  const streamApkChunkToFile = async (req: express.Request, targetPath: string) => {
+    let bytes = 0;
+    let tooLarge = false;
+    const sizeLimiter = new Transform({
+      transform(chunk: Buffer, _encoding, callback) {
+        bytes += chunk.length;
+        if (bytes > MAX_APK_CHUNK_BYTES) {
+          // Keep consuming the request so the client can receive a proper JSON 413,
+          // but stop forwarding bytes to disk as soon as the cap is crossed.
+          tooLarge = true;
+          return callback();
+        }
+        callback(null, chunk);
+      }
+    });
+
+    await streamPipeline(req, sizeLimiter, fs.createWriteStream(targetPath, { flags: "w" }));
+    return { bytes, tooLarge };
+  };
 
   const getMobileAppConfig = async () => {
     const store = getActiveDataProvider();
@@ -2933,18 +2997,45 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
+  // Keep the whole-file endpoint for already-cached admin bundles. Its parser is
+  // wrapped so body-parser failures are logged and returned as JSON rather than an
+  // opaque Express HTML page.
+  const legacyApkRawParser = express.raw({
+    type: ["application/octet-stream", "application/vnd.android.package-archive", "application/x-apk", "application/zip", "application/json"],
+    limit: "260mb"
+  });
+  const parseLegacyApkBody = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.info("[APK Upload] Legacy whole-file request started", {
+      fileName: req.query.fileName || "unknown",
+      contentLength: req.headers["content-length"] || "unknown",
+      contentType: req.headers["content-type"] || "unknown",
+    });
+    legacyApkRawParser(req, res, (error?: any) => {
+      if (!error) return next();
+      const status = error.type === "entity.too.large" || error.status === 413 ? 413 : 400;
+      console.error("[APK Upload] Legacy request body rejected", {
+        status,
+        type: error.type,
+        message: error.message,
+        contentLength: req.headers["content-length"] || "unknown",
+      });
+      return res.status(status).json({
+        error: status === 413 ? "APK upload request is too large" : "APK upload body could not be read",
+        code: error.type || "APK_BODY_PARSE_ERROR",
+        status,
+        details: error.message || String(error),
+      });
+    });
+  };
+
   app.post(
     "/api/admin/mobile-app/upload-apk",
-    // Raw binary body (Content-Type: application/octet-stream from the admin panel).
-    // Keeps the request body the same size as the file itself (no base64 inflation)
-    // so uploads stay under reverse-proxy limits and track progress reliably.
-    // application/json is accepted too for backward compatibility with the old
-    // base64 client (cached bundles).
-    express.raw({ type: ["application/octet-stream", "application/vnd.android.package-archive", "application/x-apk", "application/zip", "application/json"], limit: "260mb" }),
+    parseLegacyApkBody,
     async (req, res) => {
       try {
         const raw = req.body as Buffer | undefined;
         if (!Buffer.isBuffer(raw) || raw.length === 0) {
+          console.warn("[APK Upload] Legacy request did not contain file data");
           return res.status(400).json({ error: "APK file data is missing" });
         }
 
@@ -2967,14 +3058,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           buffer = Buffer.from(base64, "base64");
         } else {
           buffer = raw;
-          const rawName = typeof req.query.fileName === "string" ? req.query.fileName.trim() : "";
-          fileName = rawName;
+          fileName = typeof req.query.fileName === "string" ? req.query.fileName.trim() : "";
         }
 
         if (buffer.length === 0) {
           return res.status(400).json({ error: "Empty APK file" });
         }
-        if (buffer.length > 160 * 1024 * 1024) {
+        if (buffer.length > MAX_APK_BYTES) {
           return res.status(413).json({ error: "APK file is too large" });
         }
         if (fileName && !fileName.toLowerCase().endsWith(".apk")) {
@@ -2985,13 +3075,171 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         fs.writeFileSync(getMobileAppApkPath(), buffer);
         const meta = { originalName: fileName || MOBILE_APP_APK_FILE_NAME, size: buffer.length, uploadedAt: new Date().toISOString() };
         await getActiveDataProvider().setSetting(MOBILE_APP_APK_META_SETTING, JSON.stringify(meta));
+        console.info("[APK Upload] Legacy whole-file upload completed", { fileName: meta.originalName, size: meta.size });
         res.json({ success: true, ...(await getMobileAppConfig()) });
       } catch (e) {
-        console.error("Mobile APK upload failed:", e);
+        console.error("[APK Upload] Legacy whole-file upload failed", e);
         res.status(500).json({ error: String(e) });
       }
     }
   );
+
+  // Proxy-safe upload: every request is about 8 MiB and is streamed directly to a
+  // temporary file. The last request joins the files in index order into a temporary
+  // APK, then atomically replaces the public download and stores the same metadata as
+  // the legacy route. No request or complete APK is buffered in Node's heap.
+  app.post("/api/admin/mobile-app/upload-apk/chunk", async (req, res) => {
+    const uploadId = typeof req.query.uploadId === "string" ? req.query.uploadId.trim() : "";
+    const rawIndex = typeof req.query.index === "string" ? req.query.index : "";
+    const rawTotal = typeof req.query.total === "string" ? req.query.total : "";
+    const index = /^\d+$/.test(rawIndex) ? Number(rawIndex) : Number.NaN;
+    const total = /^\d+$/.test(rawTotal) ? Number(rawTotal) : Number.NaN;
+    const fileName = typeof req.query.fileName === "string" ? req.query.fileName.trim() : "";
+    const rawFileSize = typeof req.query.fileSize === "string" ? req.query.fileSize : "";
+    const declaredFileSize = /^\d+$/.test(rawFileSize) ? Number(rawFileSize) : undefined;
+
+    const failValidation = (status: number, error: string) => {
+      console.warn("[APK Upload] Chunk request rejected", { uploadId, index: rawIndex, total: rawTotal, status, error });
+      return res.status(status).json({ error, status, uploadId, index: rawIndex, total: rawTotal });
+    };
+
+    if (!/^[A-Za-z0-9_-]{8,100}$/.test(uploadId)) {
+      return failValidation(400, "Invalid uploadId");
+    }
+    if (!Number.isSafeInteger(total) || total < 1 || total > MAX_APK_CHUNKS) {
+      return failValidation(400, `total must be between 1 and ${MAX_APK_CHUNKS}`);
+    }
+    if (!Number.isSafeInteger(index) || index < 0 || index >= total) {
+      return failValidation(400, "index is outside the upload range");
+    }
+    if (fileName && (fileName.length > 255 || !fileName.toLowerCase().endsWith(".apk"))) {
+      return failValidation(400, "Only .apk files are allowed");
+    }
+    if (declaredFileSize !== undefined && (declaredFileSize < 1 || declaredFileSize > MAX_APK_BYTES)) {
+      return failValidation(413, "APK file is too large");
+    }
+    const contentLength = Number(req.headers["content-length"] || 0);
+    if (Number.isFinite(contentLength) && contentLength > MAX_APK_CHUNK_BYTES) {
+      return failValidation(413, "APK chunk is too large");
+    }
+
+    const uploadDir = path.join(getMobileAppUploadRoot(), uploadId);
+    const chunkPath = path.join(uploadDir, `${index}.chunk`);
+    const tempChunkPath = path.join(uploadDir, `${index}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);
+    const completedPath = path.join(uploadDir, "completed.json");
+    let assembledPath = "";
+
+    console.info("[APK Upload] Receiving chunk", {
+      uploadId,
+      index,
+      total,
+      contentLength: req.headers["content-length"] || "unknown",
+    });
+
+    try {
+      await fs.promises.mkdir(uploadDir, { recursive: true });
+      const received = await streamApkChunkToFile(req, tempChunkPath);
+      if (received.tooLarge) {
+        await fs.promises.rm(tempChunkPath, { force: true });
+        return failValidation(413, "APK chunk is too large");
+      }
+      if (received.bytes === 0) {
+        await fs.promises.rm(tempChunkPath, { force: true });
+        return failValidation(400, "APK chunk is empty");
+      }
+
+      // A retry replaces this exact index; it never appends duplicate bytes.
+      await fs.promises.rm(chunkPath, { force: true });
+      await fs.promises.rename(tempChunkPath, chunkPath);
+
+      // If the final response was lost and the browser retries, the completion marker
+      // makes that retry idempotent even though the original chunk files were cleaned.
+      if (fs.existsSync(completedPath)) {
+        try {
+          const completed = JSON.parse(await fs.promises.readFile(completedPath, "utf8"));
+          const sameUpload = completed.total === total &&
+            (!fileName || completed.originalName === fileName) &&
+            (declaredFileSize === undefined || completed.size === declaredFileSize);
+          await fs.promises.rm(chunkPath, { force: true });
+          if (!sameUpload) return failValidation(409, "uploadId has already been used for another APK");
+          console.info("[APK Upload] Completed upload retry acknowledged", { uploadId, index, total });
+          return res.json({ success: true, complete: true, duplicate: true, ...(await getMobileAppConfig()) });
+        } catch (markerError) {
+          console.warn("[APK Upload] Ignoring an invalid completion marker", { uploadId, error: String(markerError) });
+          await fs.promises.rm(completedPath, { force: true });
+        }
+      }
+
+      console.info("[APK Upload] Chunk stored", { uploadId, index, total, bytes: received.bytes });
+      if (index !== total - 1) {
+        return res.json({ success: true, complete: false, uploadId, index, total, receivedBytes: received.bytes });
+      }
+
+      const chunkPaths = Array.from({ length: total }, (_, chunkIndex) => path.join(uploadDir, `${chunkIndex}.chunk`));
+      const missing = chunkPaths
+        .map((partPath, chunkIndex) => fs.existsSync(partPath) ? -1 : chunkIndex)
+        .filter((chunkIndex) => chunkIndex >= 0);
+      if (missing.length > 0) {
+        console.warn("[APK Upload] Final chunk arrived before all parts were available", { uploadId, missing });
+        return res.status(409).json({ error: "Some APK chunks are missing", status: 409, uploadId, missing });
+      }
+
+      const stats = await Promise.all(chunkPaths.map((partPath) => fs.promises.stat(partPath)));
+      const finalSize = stats.reduce((sum, stat) => sum + stat.size, 0);
+      if (finalSize < 1) return failValidation(400, "APK file is empty");
+      if (finalSize > MAX_APK_BYTES) return failValidation(413, "APK file is too large");
+      if (declaredFileSize !== undefined && finalSize !== declaredFileSize) {
+        return failValidation(400, `APK size mismatch: expected ${declaredFileSize}, received ${finalSize}`);
+      }
+
+      await fs.promises.mkdir(getMobileAppDownloadDir(), { recursive: true });
+      assembledPath = path.join(getMobileAppDownloadDir(), `.${MOBILE_APP_APK_FILE_NAME}.${uploadId}.tmp`);
+      await fs.promises.rm(assembledPath, { force: true });
+      for (let chunkIndex = 0; chunkIndex < chunkPaths.length; chunkIndex += 1) {
+        await streamPipeline(
+          fs.createReadStream(chunkPaths[chunkIndex]),
+          fs.createWriteStream(assembledPath, { flags: chunkIndex === 0 ? "w" : "a" })
+        );
+      }
+
+      const assembledStat = await fs.promises.stat(assembledPath);
+      if (assembledStat.size !== finalSize) {
+        throw new Error(`Reassembled APK size mismatch: expected ${finalSize}, wrote ${assembledStat.size}`);
+      }
+
+      // rename is atomic on the deployment filesystem, so downloaders never see a
+      // half-reassembled APK and the existing file remains available until this point.
+      await fs.promises.rename(assembledPath, getMobileAppApkPath());
+      assembledPath = "";
+      const meta = {
+        originalName: fileName || MOBILE_APP_APK_FILE_NAME,
+        size: finalSize,
+        uploadedAt: new Date().toISOString()
+      };
+      await getActiveDataProvider().setSetting(MOBILE_APP_APK_META_SETTING, JSON.stringify(meta));
+
+      let markerWritten = false;
+      try {
+        await fs.promises.writeFile(completedPath, JSON.stringify({ uploadId, total, ...meta }), "utf8");
+        markerWritten = true;
+      } catch (markerError) {
+        console.warn("[APK Upload] Could not write completion marker; retaining chunks for safe retry", { uploadId, error: String(markerError) });
+      }
+      if (markerWritten) {
+        await Promise.all(chunkPaths.map((partPath) => fs.promises.rm(partPath, { force: true }))).catch((cleanupError) => {
+          console.warn("[APK Upload] Could not clean one or more completed chunks", { uploadId, error: String(cleanupError) });
+        });
+      }
+
+      console.info("[APK Upload] Chunked APK upload completed", { uploadId, fileName: meta.originalName, size: meta.size, total });
+      return res.json({ success: true, complete: true, uploadId, index, total, ...(await getMobileAppConfig()) });
+    } catch (e) {
+      await fs.promises.rm(tempChunkPath, { force: true }).catch(() => undefined);
+      if (assembledPath) await fs.promises.rm(assembledPath, { force: true }).catch(() => undefined);
+      console.error("[APK Upload] Chunk upload failed", { uploadId, index, total, error: String(e) });
+      if (!res.headersSent) return res.status(500).json({ error: "Failed to store APK chunk", status: 500, details: String(e), uploadId, index, total });
+    }
+  });
 
   app.post("/api/admin/mobile-app/store-links", async (req, res) => {
     try {

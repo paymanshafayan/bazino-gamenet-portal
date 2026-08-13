@@ -7,7 +7,7 @@
  * routing, real JWT auth and the real data provider.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -850,6 +850,49 @@ test('an admin can upload a mobile apk', async () => {
   const body = await res.json();
   assert.equal(res.status, 200, JSON.stringify(body));
   assert.equal(body.success, true);
+});
+
+test('chunked APK upload reassembles ordered parts and publishes the final file', async () => {
+  const chunks = [
+    Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x42]),
+    Buffer.from('azino-chunk-two-'),
+    Buffer.from([0x00, 0x01, 0x02, 0xFE, 0xFF]),
+  ];
+  const expected = Buffer.concat(chunks);
+  const uploadId = `e2e-${Date.now().toString(36)}`;
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    const query = new URLSearchParams({
+      uploadId,
+      index: String(index),
+      total: String(chunks.length),
+      fileName: 'chunked-e2e.apk',
+      fileSize: String(expected.length),
+    });
+    const res = await fetch(`${BASE}/api/admin/mobile-app/upload-apk/chunk?${query}`, {
+      method: 'POST',
+      headers: {
+        ...adminAuth(),
+        'Content-Type': 'application/octet-stream',
+      },
+      body: chunks[index],
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200, `chunk ${index} failed: ${JSON.stringify(body)}`);
+    assert.equal(body.success, true);
+    assert.equal(body.complete, index === chunks.length - 1);
+  }
+
+  const apkPath = path.join(workDir, 'public', 'downloads', 'bazino-app.apk');
+  assert.ok(existsSync(apkPath), 'the final APK was not published at the stable download path');
+  assert.deepEqual(readFileSync(apkPath), expected, 'the final APK bytes were not reassembled in chunk order');
+
+  const meta = await getJson(`${BASE}/api/mobile-app`);
+  assert.equal(meta.apkFileName, 'chunked-e2e.apk');
+  assert.equal(meta.apkSize, expected.length);
+  const download = await fetch(`${BASE}/api/mobile-app/download`);
+  assert.equal(download.status, 200);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), expected, 'the download route did not serve the reassembled APK');
 });
 
 // NOTE: while the data source is in "sample" mode the public GETs deliberately

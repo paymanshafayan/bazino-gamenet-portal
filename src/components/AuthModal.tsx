@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { X, Mail, Lock, User, Phone, LogIn, UserPlus, Sparkles, AlertCircle } from 'lucide-react';
 import { UserState } from '../types/gamenet';
+import { setAuthToken } from '../services/authToken';
 
 interface Props {
   isOpen: boolean;
@@ -45,6 +46,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
       if (!response.ok) {
         throw new Error(data.error || 'خطایی رخ داد.');
       }
+
+      // Persist the JWT: privileged routes (/api/admin/*) require a real token
+      // rather than the legacy shared "activeUsername" server setting.
+      setAuthToken(data.token);
 
       onAuthSuccess(data.user);
       const msg = activeTab === 'login'

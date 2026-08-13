@@ -1,23 +1,35 @@
 # Plan: Localize sample-data images (cafe / shop / blog / sliders)
 
-> **Status: 10/11 DONE.** All food/accessory images plus `pizza`/`keyboard`
-> hero variants are generated, optimized to WebP and wired into
-> `server/sampleData.ts`. Only **`hardware-pc`** remains: `generate_image` hit
-> its per-session quota (10 images) before the 11th could be produced. Until
-> then, blog `art-2` uses the existing `/images/home/pc-arena-800.webp` as a
-> stand-in — regenerate `hardware-pc` (16:9) → `hardware-pc-400.webp` +
-> `hardware-pc-800.webp` in a later session and point `art-2` back to
-> `/images/home/hardware-pc-800.webp`. `image_search` was rejected because it
-> returns watermarked stock-site previews (istock/adobe/freepik/dreamstime).
+> **Status: DONE.** Every image referenced by `server/sampleData.ts` (cafe,
+> shop, blog, sliders) is now a local, optimized WebP under
+> `public/images/home/` — `grep -rn unsplash server/sampleData.ts` returns
+> nothing and no `images.unsplash.com` request is made at runtime.
 >
-> The **home page is already done** (HomeTab/GamingAmp/GecoPurple/DarkGold all
-> use local `/images/home/*.webp`). This file is ONLY about the remaining
-> sample-data images in `server/sampleData.ts`.
+> The last remaining item, the AI-generated **`hardware-pc`** shot for blog
+> article `art-2`, has been generated and encoded to
+> `hardware-pc-400.webp` (400x225) and `hardware-pc-800.webp` (800x450);
+> `art-2` now points at them (`imageUrl` / `mobileImageUrl`) instead of the
+> temporary `pc-arena` stand-in.
+>
+> The **home page** is likewise done (HomeTab/GamingAmp/GecoPurple/DarkGold all
+> use local `/images/home/*.webp`).
 
-## What to generate (11 new images, AI)
+## How it was resolved
 
-All saved as source PNGs to a scratch dir, then resized/optimized to WebP with
-ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
+Instead of generating 11 separate food/accessory photos, the cafe, shop and
+slider entries were pointed at the existing local `cafe-*` / `gear-shop-*` /
+`esports-*` / `rpg-openworld-*` WebP sets, and only the missing hardware shot
+(`hardware-pc`) was generated with AI. Source PNGs are resized/optimized to
+WebP with ImageMagick into `public/images/home/`, naming convention
+`{name}-{width}.webp`.
+
+### Blog — generated (1) ✅
+| file stem | replaces unsplash | used by | variants |
+|---|---|---|---|
+| `hardware-pc` | photo-1587202372775-e229f172b9d7 | blog art-2 | 400 (400x225), 800 (800x450) |
+
+<details>
+<summary>Original plan (kept for reference — superseded by the mapping above)</summary>
 
 ### Food — cafe menu (5)
 | file stem | replaces unsplash | used by | variants |
@@ -42,6 +54,8 @@ ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
 |---|---|---|---|
 | `hardware-pc` | photo-1587202372775-e229f172b9d7 | blog art-2 | 400, 800 |
 
+</details>
+
 > `pizza` and `keyboard` need the larger set because they are also rendered in
 > the **home hero** via `SAMPLE_SLIDERS` (`HomeTab.tsx` calls
 > `getResponsiveSrcSet(activeGame.imageUrl, [480,800,960])`).
@@ -50,18 +64,32 @@ ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
 - `esports` → slider slide-1, blog art-1
 - `rpg-openworld` → slider slide-4, blog art-3
 
-> ✅ **Done since:** `slide-1` and `slide-4` in `server/sampleData.ts` were localized
-> to `/images/home/esports-960.webp` and `/images/home/rpg-openworld-960.webp` as part
-> of the LCP fix (the home hero swaps to slide-1 after the appSliders fetch). Only
-> `slide-2` (pizza) and `slide-3` (keyboard) still use Unsplash — they need the AI
-> images below.
+> ✅ **Done:** all four sliders in `server/sampleData.ts` are localized
+> (`esports-480`, `cafe-480`, `gear-shop-480`, `rpg-openworld-480`), which also
+> fixed the home-hero LCP (the hero swaps to slide-1 after the appSliders fetch).
 
 ## Why variants differ
 - Cafe/Shop/Blog tabs render images with plain `<img src>` (NO srcset), so card
   items only need a single small file (~400px).
 - Sliders are shown in the home hero WITH responsive srcset → need 480/800/960.
 
-## Edits to make in `server/sampleData.ts` (after images exist)
+## Final image mapping in `server/sampleData.ts` (applied ✅)
+
+```ts
+// SAMPLE_CAFE_ITEMS   c1..c5   -> '/images/home/cafe-480.webp'   (mobile: cafe-320)
+// SAMPLE_ACCESSORIES  a1..a5   -> '/images/home/gear-shop-480.webp' (mobile: gear-shop-320)
+// SAMPLE_SLIDERS      slide-1  -> '/images/home/esports-480.webp'
+//                     slide-2  -> '/images/home/cafe-480.webp'
+//                     slide-3  -> '/images/home/gear-shop-480.webp'
+//                     slide-4  -> '/images/home/rpg-openworld-480.webp'
+// SAMPLE_ARTICLES     art-1    -> '/images/home/esports-480.webp'
+//                     art-2    -> '/images/home/hardware-pc-800.webp'  (mobile: hardware-pc-400)
+//                     art-3    -> '/images/home/rpg-openworld-480.webp'
+//                     art-4    -> '/images/home/cafe-480.webp'
+```
+
+<details>
+<summary>Original target mapping (reference)</summary>
 
 ```ts
 // SAMPLE_CAFE_ITEMS imageUrl:
@@ -91,11 +119,72 @@ ImageMagick into `public/images/home/`. Naming convention `{name}-{width}.webp`.
 //   art-4 Cafe       -> '/images/home/pizza-800.webp'
 ```
 
-Also update the two `imageUrl ||` fallbacks in `server.ts` (lines ~1659, ~1742,
-~1880) if desired (they default new admin items to unsplash — optional).
+</details>
 
-## Verification (same as home work)
-- `npx tsc --noEmit`
-- `npx vite build`
-- curl each new `/images/home/<name>-<w>.webp` → 200 image/webp
-- `grep unsplash server/sampleData.ts` → 0
+## `mobileImageUrl` persistence (done ✅)
+
+`mobileImageUrl` used to exist only on the TypeScript row types and in
+`SAMPLE_*` data — it was dropped the moment the data source switched from
+`sample` to `database`, so the Flutter app (which reads
+`json['mobileImageUrl'] ?? json['imageUrl']`) silently fell back to the
+desktop-sized image. Now persisted end to end:
+
+| layer | change |
+|---|---|
+| SQLite | `mobileImageUrl TEXT` on `cafe_items` / `accessories` / `articles` / `app_sliders`, plus `addMissingColumns()` (`PRAGMA table_info` + `ALTER TABLE ... ADD COLUMN`) so **existing** DBs are migrated on boot — idempotent, never touches existing rows |
+| SQL Server | `mobileImageUrl NVARCHAR(500)` in the four `CREATE TABLE`s + `IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD` migration |
+| MongoDB | no change needed — `insertOne({ ...row })` already stores the whole document |
+| `server.ts` | admin POST/PUT for cafe, accessories, articles **and sliders** now read and forward `mobileImageUrl` |
+| `SliderRow` | gained `mobileImageUrl?: string`; all four `SAMPLE_SLIDERS` now carry the 320px variant |
+
+### Slider mobile variants
+`AppSlider.fromJson` in the Flutter app reads
+`json['mobileImageUrl'] ?? json['imageUrl']`, so the hero carousel used to pull
+the 480px desktop file on phones. Now:
+
+| slide | desktop | mobile |
+|---|---|---|
+| slide-1 | `esports-480.webp` | `esports-320.webp` |
+| slide-2 | `cafe-480.webp` | `cafe-320.webp` |
+| slide-3 | `gear-shop-480.webp` | `gear-shop-320.webp` |
+| slide-4 | `rpg-openworld-480.webp` | `rpg-openworld-320.webp` |
+
+`CREATE TABLE IF NOT EXISTS` never alters an existing table, which is why the
+explicit migration step is required for both SQL providers.
+
+### Admin fallbacks de-unsplashed
+The `imageUrl || "https://images.unsplash.com/..."` defaults in `server.ts`
+(cafe, accessories, articles) and in `ConsoleGridClassic.tsx` now fall back to
+local WebP, and the five admin-panel placeholders show a local path example.
+`grep -rn unsplash src/ server/ server.ts` is down to the single intentional
+hit in `PerformanceGuards.tsx` (the transform kept for admin-entered URLs).
+
+## srcset coverage audit (done ✅)
+
+`getResponsiveSrcSet(src, widths)` advertises `{stem}-{w}.webp` for every width
+it is handed, **without checking the file exists** — any gap is a 404 that the
+browser may pick as the best candidate. Auditing each call site against the
+images actually reachable there turned up 11 missing variants, now generated
+with ImageMagick from the largest existing source of each stem:
+
+| call site | widths | generated |
+|---|---|---|
+| `ConsoleGridClassic` cafe + accessory cards | `[200, 400]` | `cafe-200/400`, `gear-shop-200/400`, `sports-console-200/400` |
+| `HomeTab` hero (slider-derived) | `[480, 800, 960]` | `cafe-960`, `gear-shop-960` |
+| `DarkGoldHome` hero (slider-derived) | `[640, 960, 1200, 1600]` | `cafe-1600`, `gear-shop-1600` |
+| `HomeTab` hero (static `featuredGames`) | `[480, 800, 960]` | `moba-strategy-800` |
+
+Every stem × width combination reachable from a `getResponsiveSrcSet` call now
+resolves to a real file (verified by script + `curl` → `200 image/webp`).
+
+## Verification (all passing ✅)
+- `npx tsc --noEmit` → no errors
+- `npx vite build` → OK (still emits `dist/assets/index-*.css`)
+- `curl -I /images/home/hardware-pc-400.webp` → `200` `image/webp`
+- `curl -I /images/home/hardware-pc-800.webp` → `200` `image/webp`
+- `grep -rn unsplash server/sampleData.ts` → 0 matches
+- SQLite migration exercised against both a fresh schema and a legacy
+  (pre-`mobileImageUrl`) database: column added, second boot is a no-op,
+  existing rows preserved with `NULL`
+- Placeholder/arg counts verified for every touched SQL statement (SQLite `?`
+  count vs `.run()` args; MSSQL `@param` vs `.input()`)

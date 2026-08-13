@@ -38,6 +38,11 @@ if (typeof window !== 'undefined') {
 import App from './App.tsx';
 import './index.css';
 import { LanguageProvider } from './context/LanguageContext';
+import { installAuthFetchInterceptor } from './services/authToken';
+
+// Attaches the stored JWT to same-origin /api/** requests. Must run before the
+// app mounts so the very first data fetches are authenticated too.
+installAuthFetchInterceptor();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

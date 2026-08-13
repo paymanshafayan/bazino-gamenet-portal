@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Download, Edit, ExternalLink, Github, PackageOpen, Play, Plus, QrCode, Save, Smartphone, Store, Trash2, Upload, X, Apple } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import type { MobileAppDownloadConfig, MobileAppStoreKind, MobileAppStoreLink } from '../types/mobileApp';
+import { getAuthToken } from '../services/authToken';
 
 interface Props {
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -140,6 +141,10 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `/api/admin/mobile-app/upload-apk?fileName=${encodeURIComponent(file.name)}`);
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    // XHR bypasses the global fetch interceptor, so the admin token has to be
+    // attached by hand or /api/admin/* answers 401.
+    const authToken = getAuthToken();
+    if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) setUploadProgress(Math.round((event.loaded / event.total) * 100));
     };

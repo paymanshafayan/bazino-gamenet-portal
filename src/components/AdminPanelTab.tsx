@@ -1511,7 +1511,7 @@ export default function AdminPanelTab({
                     <input 
                       type="text" 
                       required 
-                      placeholder="https://images.unsplash.com/photo-..."
+                      placeholder="/images/home/esports-480.webp"
                       value={newSlideUrl}
                       onChange={(e) => setNewSlideUrl(e.target.value)}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
@@ -2456,7 +2456,7 @@ export default function AdminPanelTab({
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">لینک آدرس تصویر (Unsplash CDN recommended)</label>
                     <input 
                       type="text"
-                      placeholder="https://images.unsplash.com/photo-..."
+                      placeholder="/images/home/esports-480.webp"
                       value={newCafe.imageUrl}
                       onChange={(e) => setNewCafe({ ...newCafe, imageUrl: e.target.value })}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
@@ -2583,7 +2583,7 @@ export default function AdminPanelTab({
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">لینک آدرس تصویر</label>
                     <input 
                       type="text"
-                      placeholder="https://images.unsplash.com/photo-..."
+                      placeholder="/images/home/esports-480.webp"
                       value={newAccessory.imageUrl}
                       onChange={(e) => setNewAccessory({ ...newAccessory, imageUrl: e.target.value })}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
@@ -2786,7 +2786,7 @@ export default function AdminPanelTab({
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">آدرس لینک تصویر کاور مقاله</label>
                     <input 
                       type="text" 
-                      placeholder="https://images.unsplash.com/photo-..."
+                      placeholder="/images/home/esports-480.webp"
                       value={newArticle.imageUrl}
                       onChange={(e) => setNewArticle({ ...newArticle, imageUrl: e.target.value })}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
@@ -3202,7 +3202,7 @@ export default function AdminPanelTab({
                     <input 
                       type="text" 
                       required 
-                      placeholder="https://images.unsplash.com/photo-..."
+                      placeholder="/images/home/esports-480.webp"
                       value={newSlideUrl}
                       onChange={(e) => setNewSlideUrl(e.target.value)}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary font-mono"

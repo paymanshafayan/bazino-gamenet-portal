@@ -60,7 +60,14 @@ const DATA_SOURCE_SETTING = "data_source";
 const MOBILE_APP_STORE_LINKS_SETTING = "mobile_app_store_links";
 const MOBILE_APP_APK_META_SETTING = "mobile_app_apk_meta";
 const JARVIS_AI_PROVIDERS_SETTING = "jarvis_ai_providers";
+const SYNC_API_KEY_SETTING = "gamenet_sync_api_key";
 const MOBILE_APP_APK_FILE_NAME = "bazino-app.apk";
+
+/** کلیدهای حساسِ جدول تنظیمات که هرگز نباید از مسیر عمومی /api/settings بیرون بروند. */
+const SECRET_SETTING_KEYS = new Set<string>([
+  JARVIS_AI_PROVIDERS_SETTING,
+  SYNC_API_KEY_SETTING,
+]);
 export type DataSourceMode = "sample" | "database";
 
 export async function getDataSourceMode(): Promise<DataSourceMode> {
@@ -100,6 +107,36 @@ export async function resolveSampleById<T extends Record<string, any>>(
   }
   const dbRow = await fetchDb();
   return dbRow ?? sampleRows.find(x => x[keyField] === key);
+}
+
+/**
+ * Makes a sample row writable.
+ *
+ * resolveSampleById() happily hands back a SAMPLE row that exists only in
+ * memory. Any follow-up `UPDATE ... WHERE id = ?` then matches zero rows and the
+ * change is silently lost while the endpoint still answers `success: true`
+ * (e.g. posting a comment on a sample article, or registering a team for a
+ * sample tournament).
+ *
+ * This inserts the sample row into the database first — but only when it isn't
+ * there yet — so the subsequent UPDATE has something to write to. Returns true
+ * when the row is now persisted.
+ */
+export async function ensurePersisted<T extends Record<string, any>>(
+  fetchDb: () => Promise<T | undefined>,
+  create: (row: T) => Promise<void>,
+  row: T | undefined
+): Promise<boolean> {
+  if (!row) return false;
+  const existing = await fetchDb();
+  if (existing) return true;
+  try {
+    await create(row);
+    return true;
+  } catch (err) {
+    console.error("[ensurePersisted] Could not materialise sample row:", err);
+    return false;
+  }
 }
 
 async function startServer() {
@@ -304,6 +341,36 @@ async function startServer() {
     }
     next();
   }
+
+  // Requires a REAL authenticated user whose role is "admin".
+  //
+  // This deliberately does NOT go through getCurrentUser(), because that helper
+  // falls back to the shared legacy "activeUsername" setting when no token is
+  // sent — and that setting is seeded to "admin" on a fresh install, which would
+  // make every anonymous visitor look like the administrator. Privileged routes
+  // therefore demand a real, signed JWT (req.authUsername) and re-check the role
+  // against the database on every request, so revoking a user's admin role takes
+  // effect immediately instead of living on inside an old token.
+  async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+    try {
+      const username = (req as any).authUsername;
+      if (!username) {
+        return res.status(401).json({ error: "برای دسترسی به این بخش باید با حساب مدیر وارد شوید." });
+      }
+      const row = await getActiveDataProvider().getUserByUsername(username);
+      if (!row || (row.role || "gamer") !== "admin") {
+        return res.status(403).json({ error: "این عملیات فقط برای مدیر سیستم مجاز است." });
+      }
+      next();
+    } catch (err) {
+      console.error("[Admin Auth] Error verifying admin privileges:", err);
+      res.status(500).json({ error: "Failed to verify admin privileges" });
+    }
+  }
+
+  // Single choke point: every current AND future /api/admin/* route is gated here,
+  // so a new admin endpoint can't accidentally ship unprotected.
+  app.use("/api/admin", requireAdmin);
 
   // =========================================================================
   // API ROUTE CONTROLLERS
@@ -731,6 +798,13 @@ async function startServer() {
       const store = getActiveDataProvider();
       const reservation = await resolveSampleById(() => store.getReservationLogById(id), SAMPLE_RESERVATION_LOGS, id);
       if (reservation) {
+        // A sample reservation must be materialised first, otherwise the
+        // check-in UPDATE matches no rows and the guest is never marked present.
+        await ensurePersisted(
+          () => store.getReservationLogById(id),
+          r => store.addReservationLog(r),
+          reservation
+        );
         await store.setReservationCheckedIn(id);
         const reservationLogs = await store.listReservationLogs();
         res.json({
@@ -1280,19 +1354,48 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Guards every /api/sync/* route. The expected key is read from the generic settings
   // store under `gamenet_sync_api_key` (set it via `POST /api/admin/settings` with
   // `{ key: "gamenet_sync_api_key", value: "..." }`, or from the site's admin settings UI
-  // once one exists for it). If no key has been configured yet, every request is allowed
-  // through — this keeps the existing co-located/same-origin behavior working exactly as
-  // before for anyone who hasn't set up remote desktop sync. Once a key IS configured,
-  // every /api/sync/* call must send a matching `Authorization: Bearer <key>` header.
+  // once one exists for it).
+  //
+  // Access rules:
+  //   • key configured  → a matching `Authorization: Bearer <key>` header is required.
+  //   • no key, request from the same machine (loopback) → allowed, so the zero-config
+  //     co-located desktop client keeps working exactly as before.
+  //   • no key, request from anywhere else → refused. Previously these were allowed,
+  //     which published station/reservation data on any internet-facing deployment.
+  /** Is this request coming from the machine the server itself runs on? */
+  function isLoopbackRequest(req: express.Request): boolean {
+    // req.ip honours trust proxy; fall back to the raw socket address.
+    const raw = (req.ip || req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+    if (raw !== "127.0.0.1" && raw !== "::1" && raw !== "localhost") return false;
+    // A reverse proxy on the same host would also look like loopback, so a
+    // forwarding header means the request really came from outside.
+    if (req.headers["x-forwarded-for"]) return false;
+    return true;
+  }
+
   async function requireSyncApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
-      const expectedKey = await getActiveDataProvider().getSetting("gamenet_sync_api_key");
-      if (!expectedKey) return next(); // not configured — backward-compatible, allow through
-      const header = req.headers.authorization;
-      if (header && header.startsWith("Bearer ") && header.slice(7) === expectedKey) {
-        return next();
+      const expectedKey = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
+
+      if (expectedKey) {
+        const header = req.headers.authorization;
+        if (header && header.startsWith("Bearer ") && header.slice(7) === expectedKey) {
+          return next();
+        }
+        return res.status(401).json({ success: false, error: "Invalid or missing sync API key" });
       }
-      res.status(401).json({ success: false, error: "Invalid or missing sync API key" });
+
+      // No key configured yet. The original behaviour was to allow EVERYONE
+      // through, which exposes desktop-sync data on any public deployment.
+      // Keep the zero-config path working for the co-located desktop client
+      // (same machine → loopback) but refuse anonymous remote callers and tell
+      // the operator how to enable remote sync properly.
+      if (isLoopbackRequest(req)) return next();
+
+      return res.status(401).json({
+        success: false,
+        error: "Sync API key is not configured. Set the 'gamenet_sync_api_key' setting in the admin panel to allow remote sync clients.",
+      });
     } catch (err) {
       console.error("[Sync Auth] Error checking API key:", err);
       res.status(500).json({ error: "Failed to verify sync API key" });
@@ -1631,6 +1734,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const tournament = await resolveSampleById(() => store.getTournamentById(tournamentId), SAMPLE_TOURNAMENTS, tournamentId);
 
       if (tournament) {
+        // Same as article comments: a sample tournament has to be materialised
+        // before registerTournamentTeam()'s UPDATE can persist the new team.
+        await ensurePersisted(
+          () => store.getTournamentById(tournamentId),
+          t => store.createTournament(t),
+          tournament
+        );
         const teams = JSON.parse(tournament.teams);
         teams.push(team);
         const registeredTeamsCount = tournament.registeredTeamsCount + 1;
@@ -1675,6 +1785,9 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const article = await resolveSampleById(() => store.getArticleById(id), SAMPLE_ARTICLES, id);
 
       if (article) {
+        // The article may only exist as sample data; persist it first, otherwise
+        // the UPDATE below silently writes to nothing and the comment is lost.
+        await ensurePersisted(() => store.getArticleById(id), a => store.createArticle(a), article);
         const comments = JSON.parse(article.comments);
         const newComment = {
           id: Math.random().toString(36).substring(2, 9),
@@ -1831,7 +1944,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Cafe Items CRUD
   app.post("/api/admin/cafe", async (req, res) => {
     try {
-      const { name, category, price, imageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const nextId = "c" + ((await store.countCafeItems()) + 1);
 
@@ -1841,6 +1954,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         category,
         price: Number(price),
         imageUrl: imageUrl || "/images/home/pizza-480.webp",
+        mobileImageUrl: mobileImageUrl || "/images/home/pizza-400.webp",
         inventory: Number(inventory),
         isAvailable: isAvailable !== false
       });
@@ -1855,7 +1969,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/cafe/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, category, price, imageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const item = await store.getCafeItemById(id);
 
@@ -1865,6 +1979,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           category: category !== undefined ? category : item.category,
           price: price !== undefined ? Number(price) : item.price,
           imageUrl: imageUrl !== undefined ? imageUrl : item.imageUrl,
+          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : item.mobileImageUrl,
           inventory: inventory !== undefined ? Number(inventory) : item.inventory,
           isAvailable: isAvailable !== undefined ? !!isAvailable : item.isAvailable,
         });
@@ -1914,7 +2029,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Accessory Shop CRUD
   app.post("/api/admin/accessories", async (req, res) => {
     try {
-      const { name, description, price, imageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countAccessories()) + 1);
 
@@ -1924,6 +2039,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         description,
         price: Number(price),
         imageUrl: imageUrl || "/images/home/gear-shop-480.webp",
+        mobileImageUrl: mobileImageUrl || "/images/home/gear-shop-320.webp",
         stock: Number(stock),
         category
       });
@@ -1938,7 +2054,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/accessories/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, price, imageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
       const store = getActiveDataProvider();
       const acc = await store.getAccessoryById(id);
 
@@ -1948,6 +2064,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           description: description !== undefined ? description : acc.description,
           price: price !== undefined ? Number(price) : acc.price,
           imageUrl: imageUrl !== undefined ? imageUrl : acc.imageUrl,
+          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : acc.mobileImageUrl,
           stock: stock !== undefined ? Number(stock) : acc.stock,
           category: category !== undefined ? category : acc.category,
         });
@@ -2052,7 +2169,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Blog News Articles CRUD
   app.post("/api/admin/articles", async (req, res) => {
     try {
-      const { title, content, category, imageUrl, author, date } = req.body;
+      const { title, content, category, imageUrl, mobileImageUrl, author, date } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countArticles()) + 1);
 
@@ -2062,6 +2179,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         content,
         category,
         imageUrl: imageUrl || "/images/home/esports-480.webp",
+        mobileImageUrl: mobileImageUrl || "/images/home/esports-320.webp",
         author: author || "سیستم مدیریت",
         date: date || "۱۴۰۵/۰۴/۱۴",
         comments: "[]",
@@ -2377,7 +2495,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/admin/app-sliders", async (req, res) => {
     try {
-      const { imageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       if (!imageUrl || !target) {
         return res.status(400).json({ error: "آدرس تصویر و بخش هدف الزامی هستند." });
       }
@@ -2385,6 +2503,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const newSlide = {
         id: "slide-" + Math.random().toString(36).substring(2, 9),
         imageUrl,
+        mobileImageUrl: mobileImageUrl || undefined,
         target,
         titleFa: titleFa || "",
         titleEn: titleEn || "",
@@ -2404,13 +2523,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/app-sliders/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { imageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       const store = getActiveDataProvider();
       const slide = await store.getSliderById(id);
 
       if (slide) {
         await store.updateSlider(id, {
           imageUrl: imageUrl !== undefined ? imageUrl : slide.imageUrl,
+          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : slide.mobileImageUrl,
           target: target !== undefined ? target : slide.target,
           titleFa: titleFa !== undefined ? titleFa : slide.titleFa,
           titleEn: titleEn !== undefined ? titleEn : slide.titleEn,
@@ -2644,9 +2764,10 @@ namespace GameNet.Infrastructure.Migrations
     try {
       const settings = await getActiveDataProvider().listSettings();
       const settingsObj = settings.reduce((acc, curr) => {
-        // AI provider API keys are managed via the admin-only Jarvis endpoint below;
-        // never leak them through the public /api/settings response.
-        if (curr.key === JARVIS_AI_PROVIDERS_SETTING) return acc;
+        // Secrets (AI provider keys, the desktop-sync API key) are managed through
+        // their own admin-only endpoints; never leak them through the public
+        // /api/settings response, which any visitor can read.
+        if (SECRET_SETTING_KEYS.has(curr.key)) return acc;
         acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);
@@ -3010,7 +3131,15 @@ Example format:
       setActiveDataProvider(provider);
       logDbQuery(provider.name, 'SYSTEM', `Site successfully installed. Welcome back, ${adminUsername}!`);
 
-      res.json({ success: true, message: "نصب با موفقیت انجام شد." });
+      // Hand back a real token for the admin that was just created: /api/admin/*
+      // now requires a signed JWT, so without this the operator would land on a
+      // freshly installed site with an admin panel they can't call.
+      res.json({
+        success: true,
+        message: "نصب با موفقیت انجام شد.",
+        token: signAuthToken(adminUsername),
+        user: { username: adminUsername, email: adminEmail || "", phone: "", loyaltyPoints: 1000, role: "admin" }
+      });
     } catch (err: any) {
       console.error("Installation failure:", err);
       res.status(500).json({ error: `خطا در فرآیند نصب: ${err.message}` });

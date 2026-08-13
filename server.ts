@@ -7,6 +7,7 @@ import express from "express";
 import compression from "compression";
 import path from "path";
 import fs from "fs";
+import { createHash } from "crypto";
 import { createServer as createViteServer } from "vite";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -209,11 +210,51 @@ export async function ensurePersisted<T extends Record<string, any>>(
   }
 }
 
+// ==== مهر نسخه‌ی دارایی روی تصاویر public (رفع گزارش Lighthouse: «A long cache
+// lifetime / efficient cache policy») ====
+// فایل‌های /images/* در public/ قرار دارند و برخلاف باندل‌های Vite هش محتوایی نمی‌گیرند،
+// برای همین قبلاً فقط ۷ روز کش می‌شدند. راه‌حلِ امنِ کش طولانی: به هر URL «?v=<نسخه>»
+// می‌چسبانیم و نسخه را با هر دپلویِ محتوامتفاوت عوض می‌کنیم؛ آنگاه می‌توان به این
+// URLها کشِ immutable یک‌ساله داد و کاربر بعد از هر دپلو دقیقاً فایل جدید را می‌گیرد —
+// بدون بازگشتِ مشکل دیدن تصویر قدیمی. در حالت توسعه نسخه خالی می‌ماند و URLها
+// دست‌نخورده‌اند (رفتار قبلی).
+let ASSET_VERSION = "";
+
+function stampImageAssetUrl(url: string): string {
+  if (!ASSET_VERSION || !url.startsWith("/images/") || url.includes("v=")) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(ASSET_VERSION)}`;
+}
+
+// پاسخ‌های JSON را بدون تغییر ساختاری پیمایش می‌کند (رشته/آرایه/آبجکت ساده تا عمق ۸)
+// و به رشته‌های «/images/…» مهر نسخه می‌زند. آبجکت‌های غیرساده (Buffer، Date، …) دست‌نخورده می‌مانند.
+function stampImageAssetUrls(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") return stampImageAssetUrl(value);
+  if (depth > 8 || value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => stampImageAssetUrls(item, depth + 1));
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = stampImageAssetUrls(entry, depth + 1);
+  }
+  return out;
+}
+
 async function startServer() {
   const app = express();
   const PORT = process.env.NODE_ENV === "production" ? (Number(process.env.PORT) || 3000) : 3000;
 
   app.use(compression());
+
+  // مهر نسخه‌ی دارایی روی URLهای تصاویر در پاسخ‌های API — تا اپ موبایل و کلاینت وب
+  // همان URL نسخه‌دار را دریافت کنند و بتوانند با کش immutable یک‌ساله سرو شوند.
+  // مقدار ASSET_VERSION هنگام درخواست خوانده می‌شود و در production قبل از listen
+  // محاسبه شده است؛ در dev خالی است و این میدل‌ویر عملاً بی‌اثر است.
+  app.use((_req, res, next) => {
+    const sendJson = res.json.bind(res);
+    res.json = ((body: unknown) => sendJson(stampImageAssetUrls(body))) as typeof res.json;
+    next();
+  });
 
   // Cloudflare Web Analytics injects beacon.min.js at the edge when enabled. Its CDN TTL
   // is controlled by Cloudflare (not this origin), so an origin cache header cannot make
@@ -3385,9 +3426,32 @@ Example format:
   } else {
     // Serve static files in production
     const distPath = path.join(staticRoot, "dist");
+    // محاسبه‌ی نسخه‌ی دارایی‌ها برای مهر «?v=»: اولویت با متغیرهای محیطی دپلو است؛
+    // در نبودشان اثر انگشت محتوای پوشه‌ی تصاویر + نام باندل‌های هش‌دارِ اصلی ساخته
+    // می‌شود (با تعویض هر تصویر یا بازسازی JS تغییر می‌کند)؛ fallback آخر زمان بوت است.
+    try {
+      const envVersion = process.env.ASSET_VERSION || process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RAILWAY_DEPLOYMENT_ID || "";
+      if (envVersion) {
+        ASSET_VERSION = envVersion;
+      } else {
+        const parts: string[] = [];
+        const homeDir = path.join(distPath, "images", "home");
+        for (const name of (await fs.promises.readdir(homeDir)).sort()) {
+          const st = await fs.promises.stat(path.join(homeDir, name));
+          if (st.isFile()) parts.push(`${name}:${st.size}`);
+        }
+        const builtAssets = await fs.promises.readdir(path.join(distPath, "assets")).catch(() => [] as string[]);
+        parts.push("#", builtAssets.filter((n) => /^index-.*\.(js|css)$/.test(n)).sort().join(","));
+        ASSET_VERSION = createHash("sha256").update(parts.join("|")).digest("hex").slice(0, 12);
+      }
+    } catch {
+      ASSET_VERSION = String(Date.now());
+    }
     // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML باید بدون کش باشد تا هر دپلو
     // فوراً دیده شود — پس index: false می‌گذاریم تا index.html به‌جای static، از
     // هندلر پایین (با تزریق بوت‌استرپ و Cache-Control: no-cache) سرو شود.
+    // تصاویرِ نسخه‌دار (?v= هم‌ارز ASSET_VERSION) کش immutable یک‌ساله می‌گیرند؛
+    // URL بدون نسخه (dev یا کلاینت قدیمی) همان کش ۷روزه‌ی پیش‌فرض را نگه می‌دارد.
     app.use(express.static(distPath, {
       index: false,
       maxAge: "7d",
@@ -3395,6 +3459,13 @@ Example format:
       setHeaders: (res, filePath) => {
         if (/\/assets\//.test(filePath)) {
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          return;
+        }
+        if (/\/images\//.test(filePath)) {
+          const reqQueryV = ((res as unknown as { req?: { query?: { v?: unknown } } }).req?.query?.v);
+          if (ASSET_VERSION && reqQueryV === ASSET_VERSION) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          }
         }
       }
     }));
@@ -3411,10 +3482,23 @@ Example format:
     app.get("*", async (req, res) => {
       try {
         if (!indexHtmlTemplate) {
-          indexHtmlTemplate = await fs.promises.readFile(path.join(distPath, "index.html"), "utf8");
+          let template = await fs.promises.readFile(path.join(distPath, "index.html"), "utf8");
+          // مهر نسخه روی URLهای images/* داخل HTML (مثل imagesrcset پیش‌بارگذاری
+          // تصویر قهرمان) تا آن‌ها هم بتوانند با کش immutable یک‌ساله سرو شوند.
+          // نکته: Vite با base:'./' مسیرهای public را در HTML بیلدشده «نسبی» می‌نویسد
+          // (images/home/… بدون اسلش اول)، پس الگو اسلش ابتدایی را اختیاری گرفته است.
+          // الگو بعد از «?»/«v=» موجود متوقف می‌شود، پس مهر دوباره زده نمی‌شود.
+          if (ASSET_VERSION) {
+            template = template.replace(/(\/?images\/[^\s"'<>?()]+)/g, (match, url: string, offset: number, whole: string) => {
+              const nextChar = whole.charAt(offset + match.length);
+              return nextChar === "?" ? match : `${url}?v=${encodeURIComponent(ASSET_VERSION)}`;
+            });
+          }
+          indexHtmlTemplate = template;
         }
         const bootstrap = {
           tournaments: await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+          assetVersion: ASSET_VERSION,
         };
         // جلوگیری از شکستن HTML توسط دنباله‌هایی مثل "</script>" داخل JSON
         const json = JSON.stringify(bootstrap).replace(/</g, "\\u003c");

@@ -10,7 +10,7 @@ import {
 } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
 import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
-import { 
+import {
   Gamepad2, 
   Tv, 
   Utensils, 
@@ -34,6 +34,7 @@ import {
   Heart,
   Grid
 } from 'lucide-react';
+import { vimg } from '../utils/assetVersion';
 
 interface Props {
   themeId?: string;
@@ -664,7 +665,7 @@ export default function ConsoleGridClassic({
           <div className="grid grid-cols-2 gap-3 max-h-[320px] overflow-y-auto scrollbar-thin pr-1">
             {cafeItems.map((item) => {
               const qty = cafeCart[item.id] || 0;
-              const imageUrl = item.imageUrl || '/images/home/cafe-480.webp';
+              const imageUrl = item.imageUrl || vimg('/images/home/cafe-480.webp');
               return (
                 <div key={item.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
                   <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [320, 480])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={item.name} className="h-20 w-full object-cover rounded-lg" />
@@ -764,7 +765,7 @@ export default function ConsoleGridClassic({
           <div className="grid grid-cols-2 gap-3 max-h-[320px] overflow-y-auto scrollbar-thin pr-1">
             {accessories.map((acc) => {
               const qty = shopCart[acc.id] || 0;
-              const imageUrl = acc.imageUrl || '/images/home/gear-shop-480.webp';
+              const imageUrl = acc.imageUrl || vimg('/images/home/gear-shop-480.webp');
               return (
                 <div key={acc.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
                   <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [320, 480])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={acc.name} className="h-20 w-full object-cover rounded-lg" />

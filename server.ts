@@ -138,11 +138,19 @@ async function repairLegacyCatalogImages(): Promise<void> {
       "/images/home/sports-console-320.webp", // جایگذار عمومیِ مشترک کنسول/دسته
     ];
     const staticRoots = [path.join(process.cwd(), "dist"), path.join(process.cwd(), "public")];
-    const isLegacyUrl = (url?: string): boolean => {
+    const isLegacyUrl = (url: string | undefined, field: "imageUrl" | "mobileImageUrl"): boolean => {
       if (!url) return false;
       if (LEGACY_HINTS.some((h) => url.includes(h))) return true;
-      // مسیر محلی که فایلش دیگر روی دیسک نیست = لینک خراب/قدیمی
-      if (url.startsWith("/")) return !staticRoots.some((root) => fs.existsSync(path.join(root, url)));
+      // مهاجرت پوشه‌ی موبایل: نسخه‌ی موبایلِ آیتم‌های داخلی باید از پوشه‌ی بهینه‌ی
+      // /images/mobile بیاید (تصاویر عمودیِ اسلایدر و بازفشرده‌شده‌ی آیتم‌ها).
+      // پس هر مقدار کهنه‌ی /images/home برای این فیلد مهاجرت‌داده می‌شود.
+      // (imageUrlِ وب عمداً همان /images/home می‌ماند و build-in نیست.)
+      if (field === "mobileImageUrl" && url.startsWith("/images/home/")) return true;
+      // مسیر محلی که فایلش دیگر روی دیسک نیست = لینک خراب/قدیمی.
+      // کوئریِ احتمالیِ «?v=» (اگر نسخه‌ی مهرخورده ناخواسته ذخیره شده باشد) پیش از
+      // چکِ وجود فایل برداشته می‌شود تا به‌اشتباه «خراب» تلقی نشود.
+      const bare = url.split("?")[0];
+      if (bare.startsWith("/")) return !staticRoots.some((root) => fs.existsSync(path.join(root, bare)));
       return false;
     };
 
@@ -157,8 +165,8 @@ async function repairLegacyCatalogImages(): Promise<void> {
         const row = rows.find((r) => r.id === s.id);
         if (!row) continue;
         const patch: Partial<T> = {};
-        if (s.imageUrl && isLegacyUrl(row.imageUrl)) (patch as Record<string, string>).imageUrl = s.imageUrl;
-        if (s.mobileImageUrl && isLegacyUrl(row.mobileImageUrl)) (patch as Record<string, string>).mobileImageUrl = s.mobileImageUrl;
+        if (s.imageUrl && isLegacyUrl(row.imageUrl, "imageUrl")) (patch as Record<string, string>).imageUrl = s.imageUrl;
+        if (s.mobileImageUrl && isLegacyUrl(row.mobileImageUrl, "mobileImageUrl")) (patch as Record<string, string>).mobileImageUrl = s.mobileImageUrl;
         if (Object.keys(patch).length) {
           await update(row.id, patch);
           n++;
@@ -221,8 +229,16 @@ export async function ensurePersisted<T extends Record<string, any>>(
 let ASSET_VERSION = "";
 
 function stampImageAssetUrl(url: string): string {
-  if (!ASSET_VERSION || !url.startsWith("/images/") || url.includes("v=")) return url;
-  return `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(ASSET_VERSION)}`;
+  if (!ASSET_VERSION || !url.startsWith("/images/")) return url;
+  // اگر URL از قبل مهرِ «?v=» داشته باشد (مثلاً نسخه‌ی کهنه‌ای که ناخواسته در
+  // دیتابیس ذخیره شده)، مهر را با نسخه‌ی جاری بازنویسی می‌کنیم تا همیشه با
+  // کش immutable یک‌ساله سرو شود.
+  const q = url.indexOf("?");
+  const bare = q === -1 ? url : url.slice(0, q);
+  const rest = q === -1 ? "" : url.slice(q + 1);
+  const params = rest ? rest.split("&").filter((p) => p && !p.startsWith("v=")) : [];
+  params.push(`v=${encodeURIComponent(ASSET_VERSION)}`);
+  return `${bare}?${params.join("&")}`;
 }
 
 // پاسخ‌های JSON را بدون تغییر ساختاری پیمایش می‌کند (رشته/آرایه/آبجکت ساده تا عمق ۸)

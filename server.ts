@@ -1831,7 +1831,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Cafe Items CRUD
   app.post("/api/admin/cafe", async (req, res) => {
     try {
-      const { name, category, price, imageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const nextId = "c" + ((await store.countCafeItems()) + 1);
 
@@ -1840,7 +1840,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         name,
         category,
         price: Number(price),
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1513104890138-7c749659a591",
+        imageUrl: imageUrl || "/images/home/cafe-480.webp",
+        mobileImageUrl: mobileImageUrl || "/images/home/cafe-320.webp",
         inventory: Number(inventory),
         isAvailable: isAvailable !== false
       });
@@ -1855,7 +1856,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/cafe/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, category, price, imageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const item = await store.getCafeItemById(id);
 
@@ -1865,6 +1866,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           category: category !== undefined ? category : item.category,
           price: price !== undefined ? Number(price) : item.price,
           imageUrl: imageUrl !== undefined ? imageUrl : item.imageUrl,
+          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : item.mobileImageUrl,
           inventory: inventory !== undefined ? Number(inventory) : item.inventory,
           isAvailable: isAvailable !== undefined ? !!isAvailable : item.isAvailable,
         });
@@ -1914,7 +1916,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Accessory Shop CRUD
   app.post("/api/admin/accessories", async (req, res) => {
     try {
-      const { name, description, price, imageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countAccessories()) + 1);
 
@@ -1923,7 +1925,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         name,
         description,
         price: Number(price),
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1618384887929-16ec33fab9ef",
+        imageUrl: imageUrl || "/images/home/gear-shop-480.webp",
+        mobileImageUrl: mobileImageUrl || "/images/home/gear-shop-320.webp",
         stock: Number(stock),
         category
       });
@@ -1938,7 +1941,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/accessories/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, price, imageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
       const store = getActiveDataProvider();
       const acc = await store.getAccessoryById(id);
 
@@ -1948,6 +1951,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           description: description !== undefined ? description : acc.description,
           price: price !== undefined ? Number(price) : acc.price,
           imageUrl: imageUrl !== undefined ? imageUrl : acc.imageUrl,
+          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : acc.mobileImageUrl,
           stock: stock !== undefined ? Number(stock) : acc.stock,
           category: category !== undefined ? category : acc.category,
         });
@@ -2052,7 +2056,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Blog News Articles CRUD
   app.post("/api/admin/articles", async (req, res) => {
     try {
-      const { title, content, category, imageUrl, author, date } = req.body;
+      const { title, content, category, imageUrl, mobileImageUrl, author, date } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countArticles()) + 1);
 
@@ -2061,7 +2065,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         title,
         content,
         category,
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e",
+        imageUrl: imageUrl || "/images/home/esports-480.webp",
+        mobileImageUrl: mobileImageUrl || "/images/home/esports-320.webp",
         author: author || "سیستم مدیریت",
         date: date || "۱۴۰۵/۰۴/۱۴",
         comments: "[]",

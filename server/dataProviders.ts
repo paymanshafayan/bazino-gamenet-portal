@@ -279,18 +279,41 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS active_coupons (code TEXT PRIMARY KEY, type TEXT, value REAL, minOrder REAL, expiry TEXT, expiryDate TEXT, maxUsageCount INTEGER DEFAULT 1, usageCount INTEGER DEFAULT 0, isActive INTEGER DEFAULT 1);
       CREATE TABLE IF NOT EXISTS systems (id TEXT PRIMARY KEY, name TEXT, type TEXT, hourlyRate REAL, isActive INTEGER DEFAULT 1, isReserved INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS reservation_logs (id TEXT PRIMARY KEY, systemId TEXT, username TEXT, systemName TEXT, startTime TEXT, endTime TEXT, totalPrice REAL, date TEXT, checkedIn INTEGER DEFAULT 0, timestamp TEXT);
-      CREATE TABLE IF NOT EXISTS cafe_items (id TEXT PRIMARY KEY, name TEXT, category TEXT, price REAL, imageUrl TEXT, inventory INTEGER, isAvailable INTEGER DEFAULT 1);
+      CREATE TABLE IF NOT EXISTS cafe_items (id TEXT PRIMARY KEY, name TEXT, category TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, inventory INTEGER, isAvailable INTEGER DEFAULT 1);
       CREATE TABLE IF NOT EXISTS cafe_orders (id TEXT PRIMARY KEY, items TEXT, totalPrice REAL, discountApplied REAL, finalAmount REAL, couponCode TEXT, tableNumber TEXT, date TEXT, status TEXT);
-      CREATE TABLE IF NOT EXISTS accessories (id TEXT PRIMARY KEY, name TEXT, description TEXT, price REAL, imageUrl TEXT, stock INTEGER, category TEXT);
+      CREATE TABLE IF NOT EXISTS accessories (id TEXT PRIMARY KEY, name TEXT, description TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, stock INTEGER, category TEXT);
       CREATE TABLE IF NOT EXISTS shop_orders (id TEXT PRIMARY KEY, cart TEXT, totalPrice REAL, discountApplied REAL, finalAmount REAL, couponCode TEXT, date TEXT, status TEXT);
       CREATE TABLE IF NOT EXISTS tournaments (id TEXT PRIMARY KEY, title TEXT, game TEXT, registrationFee REAL, startDate TEXT, maxTeams INTEGER, status TEXT, registeredTeamsCount INTEGER, teams TEXT, bracket TEXT);
-      CREATE TABLE IF NOT EXISTS articles (id TEXT PRIMARY KEY, title TEXT, content TEXT, category TEXT, imageUrl TEXT, author TEXT, date TEXT, comments TEXT);
+      CREATE TABLE IF NOT EXISTS articles (id TEXT PRIMARY KEY, title TEXT, content TEXT, category TEXT, imageUrl TEXT, mobileImageUrl TEXT, author TEXT, date TEXT, comments TEXT);
       CREATE TABLE IF NOT EXISTS user_messages (id TEXT PRIMARY KEY, sender TEXT, recipient TEXT, title TEXT, body TEXT, date TEXT, isRead INTEGER DEFAULT 0, type TEXT);
       CREATE TABLE IF NOT EXISTS themes (id TEXT PRIMARY KEY, name TEXT, nameEn TEXT, primaryColor TEXT, primaryHover TEXT, darkBg TEXT, darkCard TEXT, accentRed TEXT);
       CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT);
     `);
     logDbQuery(this.name, 'SQL', 'CREATE TABLE IF NOT EXISTS ... (17 tables verified)');
+    this.addMissingColumns();
     return { success: true, message: 'SQLite schema verified/created.' };
+  }
+
+  /** Adds columns introduced after the initial schema to databases that already
+   *  exist (CREATE TABLE IF NOT EXISTS never alters an existing table).
+   *  Safe to run on every boot: each column is only added when missing. */
+  private addMissingColumns(): void {
+    const wanted: Array<{ table: string; column: string; type: string }> = [
+      { table: 'cafe_items', column: 'mobileImageUrl', type: 'TEXT' },
+      { table: 'accessories', column: 'mobileImageUrl', type: 'TEXT' },
+      { table: 'articles', column: 'mobileImageUrl', type: 'TEXT' },
+    ];
+    for (const { table, column, type } of wanted) {
+      try {
+        const cols = this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+        if (cols.length > 0 && !cols.some(c => c.name === column)) {
+          this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type};`);
+          logDbQuery(this.name, 'SQL', `ALTER TABLE ${table} ADD COLUMN ${column}`);
+        }
+      } catch (e) {
+        console.warn(`[SQLite] Could not add ${table}.${column}:`, e);
+      }
+    }
   }
 
   // ---- Users ----
@@ -419,15 +442,15 @@ export class SqliteStore implements IDataStore {
     return row ? { ...row, isAvailable: !!row.isAvailable } : undefined;
   }
   async createCafeItem(i: CafeItemRow) {
-    this.db.prepare(`INSERT INTO cafe_items (id, name, category, price, imageUrl, inventory, isAvailable) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(i.id, i.name, i.category, i.price, i.imageUrl, i.inventory, i.isAvailable ? 1 : 0);
+    this.db.prepare(`INSERT INTO cafe_items (id, name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(i.id, i.name, i.category, i.price, i.imageUrl, i.mobileImageUrl ?? null, i.inventory, i.isAvailable ? 1 : 0);
   }
   async updateCafeItem(id: string, f: Partial<CafeItemRow>) {
     const current = await this.getCafeItemById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    this.db.prepare(`UPDATE cafe_items SET name=?, category=?, price=?, imageUrl=?, inventory=?, isAvailable=? WHERE id=?`)
-      .run(m.name, m.category, m.price, m.imageUrl, m.inventory, m.isAvailable ? 1 : 0, id);
+    this.db.prepare(`UPDATE cafe_items SET name=?, category=?, price=?, imageUrl=?, mobileImageUrl=?, inventory=?, isAvailable=? WHERE id=?`)
+      .run(m.name, m.category, m.price, m.imageUrl, m.mobileImageUrl ?? null, m.inventory, m.isAvailable ? 1 : 0, id);
   }
   async decrementCafeInventory(id: string, qty: number) {
     this.db.prepare(`UPDATE cafe_items SET inventory = MAX(0, inventory - ?) WHERE id = ?`).run(qty, id);
@@ -447,15 +470,15 @@ export class SqliteStore implements IDataStore {
   async listAccessories() { return this.db.prepare(`SELECT * FROM accessories`).all() as AccessoryRow[]; }
   async getAccessoryById(id: string) { return this.db.prepare(`SELECT * FROM accessories WHERE id = ?`).get(id) as AccessoryRow | undefined; }
   async createAccessory(a: AccessoryRow) {
-    this.db.prepare(`INSERT INTO accessories (id, name, description, price, imageUrl, stock, category) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(a.id, a.name, a.description, a.price, a.imageUrl, a.stock, a.category);
+    this.db.prepare(`INSERT INTO accessories (id, name, description, price, imageUrl, mobileImageUrl, stock, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(a.id, a.name, a.description, a.price, a.imageUrl, a.mobileImageUrl ?? null, a.stock, a.category);
   }
   async updateAccessory(id: string, f: Partial<AccessoryRow>) {
     const current = await this.getAccessoryById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    this.db.prepare(`UPDATE accessories SET name=?, description=?, price=?, imageUrl=?, stock=?, category=? WHERE id=?`)
-      .run(m.name, m.description, m.price, m.imageUrl, m.stock, m.category, id);
+    this.db.prepare(`UPDATE accessories SET name=?, description=?, price=?, imageUrl=?, mobileImageUrl=?, stock=?, category=? WHERE id=?`)
+      .run(m.name, m.description, m.price, m.imageUrl, m.mobileImageUrl ?? null, m.stock, m.category, id);
   }
   async decrementAccessoryStock(id: string, qty: number) {
     this.db.prepare(`UPDATE accessories SET stock = MAX(0, stock - ?) WHERE id = ?`).run(qty, id);
@@ -488,8 +511,8 @@ export class SqliteStore implements IDataStore {
   async listArticles() { return this.db.prepare(`SELECT * FROM articles`).all() as ArticleRow[]; }
   async getArticleById(id: string) { return this.db.prepare(`SELECT * FROM articles WHERE id = ?`).get(id) as ArticleRow | undefined; }
   async createArticle(a: ArticleRow) {
-    this.db.prepare(`INSERT INTO articles (id, title, content, category, imageUrl, author, date, comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(a.id, a.title, a.content, a.category, a.imageUrl, a.author, a.date, a.comments);
+    this.db.prepare(`INSERT INTO articles (id, title, content, category, imageUrl, mobileImageUrl, author, date, comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(a.id, a.title, a.content, a.category, a.imageUrl, a.mobileImageUrl ?? null, a.author, a.date, a.comments);
   }
   async setArticleComments(id: string, commentsJson: string) { this.db.prepare(`UPDATE articles SET comments = ? WHERE id = ?`).run(commentsJson, id); }
   async deleteArticle(id: string) { this.db.prepare(`DELETE FROM articles WHERE id = ?`).run(id); }
@@ -626,17 +649,26 @@ export class SqlServerStore implements IDataStore {
       IF OBJECT_ID('dbo.active_coupons','U') IS NULL CREATE TABLE dbo.active_coupons (code NVARCHAR(50) PRIMARY KEY, type NVARCHAR(20), value FLOAT, minOrder FLOAT, expiry NVARCHAR(50), expiryDate NVARCHAR(50), maxUsageCount INT DEFAULT 1, usageCount INT DEFAULT 0, isActive BIT DEFAULT 1);
       IF OBJECT_ID('dbo.systems','U') IS NULL CREATE TABLE dbo.systems (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), type NVARCHAR(50), hourlyRate FLOAT, isActive BIT DEFAULT 1, isReserved BIT DEFAULT 0);
       IF OBJECT_ID('dbo.reservation_logs','U') IS NULL CREATE TABLE dbo.reservation_logs (id NVARCHAR(50) PRIMARY KEY, systemId NVARCHAR(50), username NVARCHAR(100), systemName NVARCHAR(200), startTime NVARCHAR(20), endTime NVARCHAR(20), totalPrice FLOAT, date NVARCHAR(50), checkedIn BIT DEFAULT 0, timestamp NVARCHAR(50));
-      IF OBJECT_ID('dbo.cafe_items','U') IS NULL CREATE TABLE dbo.cafe_items (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), category NVARCHAR(50), price FLOAT, imageUrl NVARCHAR(500), inventory INT, isAvailable BIT DEFAULT 1);
+      IF OBJECT_ID('dbo.cafe_items','U') IS NULL CREATE TABLE dbo.cafe_items (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), category NVARCHAR(50), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), inventory INT, isAvailable BIT DEFAULT 1);
       IF OBJECT_ID('dbo.cafe_orders','U') IS NULL CREATE TABLE dbo.cafe_orders (id NVARCHAR(50) PRIMARY KEY, items NVARCHAR(MAX), totalPrice FLOAT, discountApplied FLOAT, finalAmount FLOAT, couponCode NVARCHAR(50), tableNumber NVARCHAR(50), date NVARCHAR(50), status NVARCHAR(50));
-      IF OBJECT_ID('dbo.accessories','U') IS NULL CREATE TABLE dbo.accessories (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), description NVARCHAR(MAX), price FLOAT, imageUrl NVARCHAR(500), stock INT, category NVARCHAR(50));
+      IF OBJECT_ID('dbo.accessories','U') IS NULL CREATE TABLE dbo.accessories (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), description NVARCHAR(MAX), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), stock INT, category NVARCHAR(50));
       IF OBJECT_ID('dbo.shop_orders','U') IS NULL CREATE TABLE dbo.shop_orders (id NVARCHAR(50) PRIMARY KEY, cart NVARCHAR(MAX), totalPrice FLOAT, discountApplied FLOAT, finalAmount FLOAT, couponCode NVARCHAR(50), date NVARCHAR(50), status NVARCHAR(50));
       IF OBJECT_ID('dbo.tournaments','U') IS NULL CREATE TABLE dbo.tournaments (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(200), game NVARCHAR(100), registrationFee FLOAT, startDate NVARCHAR(50), maxTeams INT, status NVARCHAR(50), registeredTeamsCount INT, teams NVARCHAR(MAX), bracket NVARCHAR(MAX));
-      IF OBJECT_ID('dbo.articles','U') IS NULL CREATE TABLE dbo.articles (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(300), content NVARCHAR(MAX), category NVARCHAR(50), imageUrl NVARCHAR(500), author NVARCHAR(100), date NVARCHAR(50), comments NVARCHAR(MAX));
+      IF OBJECT_ID('dbo.articles','U') IS NULL CREATE TABLE dbo.articles (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(300), content NVARCHAR(MAX), category NVARCHAR(50), imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), author NVARCHAR(100), date NVARCHAR(50), comments NVARCHAR(MAX));
       IF OBJECT_ID('dbo.user_messages','U') IS NULL CREATE TABLE dbo.user_messages (id NVARCHAR(50) PRIMARY KEY, sender NVARCHAR(100), recipient NVARCHAR(100), title NVARCHAR(200), body NVARCHAR(MAX), date NVARCHAR(50), isRead BIT DEFAULT 0, type NVARCHAR(50));
       IF OBJECT_ID('dbo.themes','U') IS NULL CREATE TABLE dbo.themes (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), nameEn NVARCHAR(100), primaryColor NVARCHAR(20), primaryHover NVARCHAR(20), darkBg NVARCHAR(20), darkCard NVARCHAR(20), accentRed NVARCHAR(20));
       IF OBJECT_ID('dbo.app_sliders','U') IS NULL CREATE TABLE dbo.app_sliders (id NVARCHAR(50) PRIMARY KEY, imageUrl NVARCHAR(500), target NVARCHAR(50), titleFa NVARCHAR(300), titleEn NVARCHAR(300), titleRu NVARCHAR(300), titleTr NVARCHAR(300));
     `);
     logDbQuery(this.name, 'SQL', `Schema verified on database [${dbName}] (17 tables).`);
+
+    // Columns introduced after the initial schema — added to pre-existing tables.
+    await this.r().query(`
+      IF COL_LENGTH('dbo.cafe_items','mobileImageUrl') IS NULL ALTER TABLE dbo.cafe_items ADD mobileImageUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.accessories','mobileImageUrl') IS NULL ALTER TABLE dbo.accessories ADD mobileImageUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.articles','mobileImageUrl') IS NULL ALTER TABLE dbo.articles ADD mobileImageUrl NVARCHAR(500) NULL;
+    `);
+    logDbQuery(this.name, 'SQL', 'Verified mobileImageUrl columns (cafe_items, accessories, articles).');
+
     return { success: true, message: `SQL Server database [${dbName}] and schema verified/created.` };
   }
 
@@ -796,16 +828,16 @@ export class SqlServerStore implements IDataStore {
   }
   async createCafeItem(i: CafeItemRow) {
     await this.r().input('id', this.sql.NVarChar, i.id).input('n', this.sql.NVarChar, i.name).input('c', this.sql.NVarChar, i.category)
-      .input('p', this.sql.Float, i.price).input('img', this.sql.NVarChar, i.imageUrl).input('inv', this.sql.Int, i.inventory).input('a', this.sql.Bit, i.isAvailable)
-      .query(`INSERT INTO dbo.cafe_items (id, name, category, price, imageUrl, inventory, isAvailable) VALUES (@id, @n, @c, @p, @img, @inv, @a)`);
+      .input('p', this.sql.Float, i.price).input('img', this.sql.NVarChar, i.imageUrl).input('mimg', this.sql.NVarChar, i.mobileImageUrl ?? null).input('inv', this.sql.Int, i.inventory).input('a', this.sql.Bit, i.isAvailable)
+      .query(`INSERT INTO dbo.cafe_items (id, name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable) VALUES (@id, @n, @c, @p, @img, @mimg, @inv, @a)`);
   }
   async updateCafeItem(id: string, f: Partial<CafeItemRow>) {
     const current = await this.getCafeItemById(id);
     if (!current) return;
     const m = { ...current, ...f };
     await this.r().input('id', this.sql.NVarChar, id).input('n', this.sql.NVarChar, m.name).input('c', this.sql.NVarChar, m.category)
-      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('inv', this.sql.Int, m.inventory).input('a', this.sql.Bit, m.isAvailable)
-      .query(`UPDATE dbo.cafe_items SET name=@n, category=@c, price=@p, imageUrl=@img, inventory=@inv, isAvailable=@a WHERE id=@id`);
+      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('inv', this.sql.Int, m.inventory).input('a', this.sql.Bit, m.isAvailable)
+      .query(`UPDATE dbo.cafe_items SET name=@n, category=@c, price=@p, imageUrl=@img, mobileImageUrl=@mimg, inventory=@inv, isAvailable=@a WHERE id=@id`);
   }
   async decrementCafeInventory(id: string, qty: number) {
     await this.r().input('q', this.sql.Int, qty).input('id', this.sql.NVarChar, id)
@@ -831,16 +863,16 @@ export class SqlServerStore implements IDataStore {
   async getAccessoryById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.accessories WHERE id = @id`)).recordset[0]; }
   async createAccessory(a: AccessoryRow) {
     await this.r().input('id', this.sql.NVarChar, a.id).input('n', this.sql.NVarChar, a.name).input('desc', this.sql.NVarChar, a.description)
-      .input('p', this.sql.Float, a.price).input('img', this.sql.NVarChar, a.imageUrl).input('s', this.sql.Int, a.stock).input('c', this.sql.NVarChar, a.category)
-      .query(`INSERT INTO dbo.accessories (id, name, description, price, imageUrl, stock, category) VALUES (@id, @n, @desc, @p, @img, @s, @c)`);
+      .input('p', this.sql.Float, a.price).input('img', this.sql.NVarChar, a.imageUrl).input('mimg', this.sql.NVarChar, a.mobileImageUrl ?? null).input('s', this.sql.Int, a.stock).input('c', this.sql.NVarChar, a.category)
+      .query(`INSERT INTO dbo.accessories (id, name, description, price, imageUrl, mobileImageUrl, stock, category) VALUES (@id, @n, @desc, @p, @img, @mimg, @s, @c)`);
   }
   async updateAccessory(id: string, f: Partial<AccessoryRow>) {
     const current = await this.getAccessoryById(id);
     if (!current) return;
     const m = { ...current, ...f };
     await this.r().input('id', this.sql.NVarChar, id).input('n', this.sql.NVarChar, m.name).input('desc', this.sql.NVarChar, m.description)
-      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('s', this.sql.Int, m.stock).input('c', this.sql.NVarChar, m.category)
-      .query(`UPDATE dbo.accessories SET name=@n, description=@desc, price=@p, imageUrl=@img, stock=@s, category=@c WHERE id=@id`);
+      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('s', this.sql.Int, m.stock).input('c', this.sql.NVarChar, m.category)
+      .query(`UPDATE dbo.accessories SET name=@n, description=@desc, price=@p, imageUrl=@img, mobileImageUrl=@mimg, stock=@s, category=@c WHERE id=@id`);
   }
   async decrementAccessoryStock(id: string, qty: number) {
     await this.r().input('q', this.sql.Int, qty).input('id', this.sql.NVarChar, id)
@@ -882,9 +914,9 @@ export class SqlServerStore implements IDataStore {
   async getArticleById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.articles WHERE id = @id`)).recordset[0]; }
   async createArticle(a: ArticleRow) {
     await this.r().input('id', this.sql.NVarChar, a.id).input('ti', this.sql.NVarChar, a.title).input('co', this.sql.NVarChar, a.content)
-      .input('ca', this.sql.NVarChar, a.category).input('img', this.sql.NVarChar, a.imageUrl).input('au', this.sql.NVarChar, a.author)
+      .input('ca', this.sql.NVarChar, a.category).input('img', this.sql.NVarChar, a.imageUrl).input('mimg', this.sql.NVarChar, a.mobileImageUrl ?? null).input('au', this.sql.NVarChar, a.author)
       .input('d', this.sql.NVarChar, a.date).input('cm', this.sql.NVarChar, a.comments)
-      .query(`INSERT INTO dbo.articles (id, title, content, category, imageUrl, author, date, comments) VALUES (@id, @ti, @co, @ca, @img, @au, @d, @cm)`);
+      .query(`INSERT INTO dbo.articles (id, title, content, category, imageUrl, mobileImageUrl, author, date, comments) VALUES (@id, @ti, @co, @ca, @img, @mimg, @au, @d, @cm)`);
   }
   async setArticleComments(id: string, commentsJson: string) {
     await this.r().input('cm', this.sql.NVarChar, commentsJson).input('id', this.sql.NVarChar, id).query(`UPDATE dbo.articles SET comments = @cm WHERE id = @id`);

@@ -121,8 +121,30 @@ WebP with ImageMagick into `public/images/home/`, naming convention
 
 </details>
 
-Also update the two `imageUrl ||` fallbacks in `server.ts` (lines ~1659, ~1742,
-~1880) if desired (they default new admin items to unsplash — optional).
+## `mobileImageUrl` persistence (done ✅)
+
+`mobileImageUrl` used to exist only on the TypeScript row types and in
+`SAMPLE_*` data — it was dropped the moment the data source switched from
+`sample` to `database`, so the Flutter app (which reads
+`json['mobileImageUrl'] ?? json['imageUrl']`) silently fell back to the
+desktop-sized image. Now persisted end to end:
+
+| layer | change |
+|---|---|
+| SQLite | `mobileImageUrl TEXT` on `cafe_items` / `accessories` / `articles`, plus `addMissingColumns()` (`PRAGMA table_info` + `ALTER TABLE ... ADD COLUMN`) so **existing** DBs are migrated on boot — idempotent, never touches existing rows |
+| SQL Server | `mobileImageUrl NVARCHAR(500)` in the three `CREATE TABLE`s + `IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD` migration |
+| MongoDB | no change needed — `insertOne({ ...row })` already stores the whole document |
+| `server.ts` | admin POST/PUT for cafe, accessories and articles now read and forward `mobileImageUrl` |
+
+`CREATE TABLE IF NOT EXISTS` never alters an existing table, which is why the
+explicit migration step is required for both SQL providers.
+
+### Admin fallbacks de-unsplashed
+The `imageUrl || "https://images.unsplash.com/..."` defaults in `server.ts`
+(cafe, accessories, articles) and in `ConsoleGridClassic.tsx` now fall back to
+local WebP, and the five admin-panel placeholders show a local path example.
+`grep -rn unsplash src/ server/ server.ts` is down to the single intentional
+hit in `PerformanceGuards.tsx` (the transform kept for admin-entered URLs).
 
 ## Verification (all passing ✅)
 - `npx tsc --noEmit` → no errors
@@ -130,3 +152,8 @@ Also update the two `imageUrl ||` fallbacks in `server.ts` (lines ~1659, ~1742,
 - `curl -I /images/home/hardware-pc-400.webp` → `200` `image/webp`
 - `curl -I /images/home/hardware-pc-800.webp` → `200` `image/webp`
 - `grep -rn unsplash server/sampleData.ts` → 0 matches
+- SQLite migration exercised against both a fresh schema and a legacy
+  (pre-`mobileImageUrl`) database: column added, second boot is a no-op,
+  existing rows preserved with `NULL`
+- Placeholder/arg counts verified for every touched SQL statement (SQLite `?`
+  count vs `.run()` args; MSSQL `@param` vs `.input()`)

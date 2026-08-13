@@ -2382,7 +2382,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/admin/app-sliders", async (req, res) => {
     try {
-      const { imageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       if (!imageUrl || !target) {
         return res.status(400).json({ error: "آدرس تصویر و بخش هدف الزامی هستند." });
       }
@@ -2390,6 +2390,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const newSlide = {
         id: "slide-" + Math.random().toString(36).substring(2, 9),
         imageUrl,
+        mobileImageUrl: mobileImageUrl || undefined,
         target,
         titleFa: titleFa || "",
         titleEn: titleEn || "",
@@ -2409,13 +2410,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/app-sliders/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { imageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       const store = getActiveDataProvider();
       const slide = await store.getSliderById(id);
 
       if (slide) {
         await store.updateSlider(id, {
           imageUrl: imageUrl !== undefined ? imageUrl : slide.imageUrl,
+          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : slide.mobileImageUrl,
           target: target !== undefined ? target : slide.target,
           titleFa: titleFa !== undefined ? titleFa : slide.titleFa,
           titleEn: titleEn !== undefined ? titleEn : slide.titleEn,

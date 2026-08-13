@@ -79,7 +79,7 @@ export interface TournamentRow { id: string; title: string; titleFa?: string; ti
 export interface ArticleRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; content: string; contentFa?: string; contentEn?: string; contentRu?: string; contentTr?: string; category: string; imageUrl: string; mobileImageUrl?: string; author: string; authorFa?: string; authorEn?: string; authorRu?: string; authorTr?: string; date: string; comments: string; }
 export interface UserMessageRow { id: string; sender: string; recipient: string; title: string; body: string; date: string; isRead: boolean; type: string; }
 export interface ThemeRow { id: string; name: string; nameEn: string; primaryColor: string; primaryHover: string; darkBg: string; darkCard: string; accentRed: string; }
-export interface SliderRow { id: string; imageUrl: string; target: string; titleFa: string; titleEn: string; titleRu: string; titleTr: string; }
+export interface SliderRow { id: string; imageUrl: string; mobileImageUrl?: string; target: string; titleFa: string; titleEn: string; titleRu: string; titleTr: string; }
 export interface SettingRow { key: string; value: string; }
 
 export interface AdminSeedInput { username: string; password: string; email: string; phone: string; }
@@ -287,7 +287,7 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS articles (id TEXT PRIMARY KEY, title TEXT, content TEXT, category TEXT, imageUrl TEXT, mobileImageUrl TEXT, author TEXT, date TEXT, comments TEXT);
       CREATE TABLE IF NOT EXISTS user_messages (id TEXT PRIMARY KEY, sender TEXT, recipient TEXT, title TEXT, body TEXT, date TEXT, isRead INTEGER DEFAULT 0, type TEXT);
       CREATE TABLE IF NOT EXISTS themes (id TEXT PRIMARY KEY, name TEXT, nameEn TEXT, primaryColor TEXT, primaryHover TEXT, darkBg TEXT, darkCard TEXT, accentRed TEXT);
-      CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT);
+      CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, mobileImageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT);
     `);
     logDbQuery(this.name, 'SQL', 'CREATE TABLE IF NOT EXISTS ... (17 tables verified)');
     this.addMissingColumns();
@@ -302,6 +302,7 @@ export class SqliteStore implements IDataStore {
       { table: 'cafe_items', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'accessories', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'articles', column: 'mobileImageUrl', type: 'TEXT' },
+      { table: 'app_sliders', column: 'mobileImageUrl', type: 'TEXT' },
     ];
     for (const { table, column, type } of wanted) {
       try {
@@ -547,15 +548,15 @@ export class SqliteStore implements IDataStore {
   async listSliders() { return this.db.prepare(`SELECT * FROM app_sliders`).all() as SliderRow[]; }
   async getSliderById(id: string) { return this.db.prepare(`SELECT * FROM app_sliders WHERE id = ?`).get(id) as SliderRow | undefined; }
   async createSlider(s: SliderRow) {
-    this.db.prepare(`INSERT INTO app_sliders (id, imageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(s.id, s.imageUrl, s.target, s.titleFa, s.titleEn, s.titleRu, s.titleTr);
+    this.db.prepare(`INSERT INTO app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(s.id, s.imageUrl, s.mobileImageUrl ?? null, s.target, s.titleFa, s.titleEn, s.titleRu, s.titleTr);
   }
   async updateSlider(id: string, f: Partial<SliderRow>) {
     const current = await this.getSliderById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    this.db.prepare(`UPDATE app_sliders SET imageUrl=?, target=?, titleFa=?, titleEn=?, titleRu=?, titleTr=? WHERE id=?`)
-      .run(m.imageUrl, m.target, m.titleFa, m.titleEn, m.titleRu, m.titleTr, id);
+    this.db.prepare(`UPDATE app_sliders SET imageUrl=?, mobileImageUrl=?, target=?, titleFa=?, titleEn=?, titleRu=?, titleTr=? WHERE id=?`)
+      .run(m.imageUrl, m.mobileImageUrl ?? null, m.target, m.titleFa, m.titleEn, m.titleRu, m.titleTr, id);
   }
   async deleteSlider(id: string) { this.db.prepare(`DELETE FROM app_sliders WHERE id = ?`).run(id); }
 
@@ -657,7 +658,7 @@ export class SqlServerStore implements IDataStore {
       IF OBJECT_ID('dbo.articles','U') IS NULL CREATE TABLE dbo.articles (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(300), content NVARCHAR(MAX), category NVARCHAR(50), imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), author NVARCHAR(100), date NVARCHAR(50), comments NVARCHAR(MAX));
       IF OBJECT_ID('dbo.user_messages','U') IS NULL CREATE TABLE dbo.user_messages (id NVARCHAR(50) PRIMARY KEY, sender NVARCHAR(100), recipient NVARCHAR(100), title NVARCHAR(200), body NVARCHAR(MAX), date NVARCHAR(50), isRead BIT DEFAULT 0, type NVARCHAR(50));
       IF OBJECT_ID('dbo.themes','U') IS NULL CREATE TABLE dbo.themes (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), nameEn NVARCHAR(100), primaryColor NVARCHAR(20), primaryHover NVARCHAR(20), darkBg NVARCHAR(20), darkCard NVARCHAR(20), accentRed NVARCHAR(20));
-      IF OBJECT_ID('dbo.app_sliders','U') IS NULL CREATE TABLE dbo.app_sliders (id NVARCHAR(50) PRIMARY KEY, imageUrl NVARCHAR(500), target NVARCHAR(50), titleFa NVARCHAR(300), titleEn NVARCHAR(300), titleRu NVARCHAR(300), titleTr NVARCHAR(300));
+      IF OBJECT_ID('dbo.app_sliders','U') IS NULL CREATE TABLE dbo.app_sliders (id NVARCHAR(50) PRIMARY KEY, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), target NVARCHAR(50), titleFa NVARCHAR(300), titleEn NVARCHAR(300), titleRu NVARCHAR(300), titleTr NVARCHAR(300));
     `);
     logDbQuery(this.name, 'SQL', `Schema verified on database [${dbName}] (17 tables).`);
 
@@ -666,8 +667,9 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.cafe_items','mobileImageUrl') IS NULL ALTER TABLE dbo.cafe_items ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.accessories','mobileImageUrl') IS NULL ALTER TABLE dbo.accessories ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.articles','mobileImageUrl') IS NULL ALTER TABLE dbo.articles ADD mobileImageUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.app_sliders','mobileImageUrl') IS NULL ALTER TABLE dbo.app_sliders ADD mobileImageUrl NVARCHAR(500) NULL;
     `);
-    logDbQuery(this.name, 'SQL', 'Verified mobileImageUrl columns (cafe_items, accessories, articles).');
+    logDbQuery(this.name, 'SQL', 'Verified mobileImageUrl columns (cafe_items, accessories, articles, app_sliders).');
 
     return { success: true, message: `SQL Server database [${dbName}] and schema verified/created.` };
   }
@@ -956,17 +958,17 @@ export class SqlServerStore implements IDataStore {
   async listSliders() { return (await this.r().query(`SELECT * FROM dbo.app_sliders`)).recordset as SliderRow[]; }
   async getSliderById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.app_sliders WHERE id = @id`)).recordset[0]; }
   async createSlider(s: SliderRow) {
-    await this.r().input('id', this.sql.NVarChar, s.id).input('img', this.sql.NVarChar, s.imageUrl).input('t', this.sql.NVarChar, s.target)
+    await this.r().input('id', this.sql.NVarChar, s.id).input('img', this.sql.NVarChar, s.imageUrl).input('mimg', this.sql.NVarChar, s.mobileImageUrl ?? null).input('t', this.sql.NVarChar, s.target)
       .input('fa', this.sql.NVarChar, s.titleFa).input('en', this.sql.NVarChar, s.titleEn).input('ru', this.sql.NVarChar, s.titleRu).input('tr', this.sql.NVarChar, s.titleTr)
-      .query(`INSERT INTO dbo.app_sliders (id, imageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (@id, @img, @t, @fa, @en, @ru, @tr)`);
+      .query(`INSERT INTO dbo.app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (@id, @img, @mimg, @t, @fa, @en, @ru, @tr)`);
   }
   async updateSlider(id: string, f: Partial<SliderRow>) {
     const current = await this.getSliderById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    await this.r().input('id', this.sql.NVarChar, id).input('img', this.sql.NVarChar, m.imageUrl).input('t', this.sql.NVarChar, m.target)
+    await this.r().input('id', this.sql.NVarChar, id).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('t', this.sql.NVarChar, m.target)
       .input('fa', this.sql.NVarChar, m.titleFa).input('en', this.sql.NVarChar, m.titleEn).input('ru', this.sql.NVarChar, m.titleRu).input('tr', this.sql.NVarChar, m.titleTr)
-      .query(`UPDATE dbo.app_sliders SET imageUrl=@img, target=@t, titleFa=@fa, titleEn=@en, titleRu=@ru, titleTr=@tr WHERE id=@id`);
+      .query(`UPDATE dbo.app_sliders SET imageUrl=@img, mobileImageUrl=@mimg, target=@t, titleFa=@fa, titleEn=@en, titleRu=@ru, titleTr=@tr WHERE id=@id`);
   }
   async deleteSlider(id: string) { await this.r().input('id', this.sql.NVarChar, id).query(`DELETE FROM dbo.app_sliders WHERE id = @id`); }
 

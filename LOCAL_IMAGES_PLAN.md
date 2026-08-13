@@ -131,10 +131,23 @@ desktop-sized image. Now persisted end to end:
 
 | layer | change |
 |---|---|
-| SQLite | `mobileImageUrl TEXT` on `cafe_items` / `accessories` / `articles`, plus `addMissingColumns()` (`PRAGMA table_info` + `ALTER TABLE ... ADD COLUMN`) so **existing** DBs are migrated on boot — idempotent, never touches existing rows |
-| SQL Server | `mobileImageUrl NVARCHAR(500)` in the three `CREATE TABLE`s + `IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD` migration |
+| SQLite | `mobileImageUrl TEXT` on `cafe_items` / `accessories` / `articles` / `app_sliders`, plus `addMissingColumns()` (`PRAGMA table_info` + `ALTER TABLE ... ADD COLUMN`) so **existing** DBs are migrated on boot — idempotent, never touches existing rows |
+| SQL Server | `mobileImageUrl NVARCHAR(500)` in the four `CREATE TABLE`s + `IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD` migration |
 | MongoDB | no change needed — `insertOne({ ...row })` already stores the whole document |
-| `server.ts` | admin POST/PUT for cafe, accessories and articles now read and forward `mobileImageUrl` |
+| `server.ts` | admin POST/PUT for cafe, accessories, articles **and sliders** now read and forward `mobileImageUrl` |
+| `SliderRow` | gained `mobileImageUrl?: string`; all four `SAMPLE_SLIDERS` now carry the 320px variant |
+
+### Slider mobile variants
+`AppSlider.fromJson` in the Flutter app reads
+`json['mobileImageUrl'] ?? json['imageUrl']`, so the hero carousel used to pull
+the 480px desktop file on phones. Now:
+
+| slide | desktop | mobile |
+|---|---|---|
+| slide-1 | `esports-480.webp` | `esports-320.webp` |
+| slide-2 | `cafe-480.webp` | `cafe-320.webp` |
+| slide-3 | `gear-shop-480.webp` | `gear-shop-320.webp` |
+| slide-4 | `rpg-openworld-480.webp` | `rpg-openworld-320.webp` |
 
 `CREATE TABLE IF NOT EXISTS` never alters an existing table, which is why the
 explicit migration step is required for both SQL providers.
@@ -145,6 +158,24 @@ The `imageUrl || "https://images.unsplash.com/..."` defaults in `server.ts`
 local WebP, and the five admin-panel placeholders show a local path example.
 `grep -rn unsplash src/ server/ server.ts` is down to the single intentional
 hit in `PerformanceGuards.tsx` (the transform kept for admin-entered URLs).
+
+## srcset coverage audit (done ✅)
+
+`getResponsiveSrcSet(src, widths)` advertises `{stem}-{w}.webp` for every width
+it is handed, **without checking the file exists** — any gap is a 404 that the
+browser may pick as the best candidate. Auditing each call site against the
+images actually reachable there turned up 11 missing variants, now generated
+with ImageMagick from the largest existing source of each stem:
+
+| call site | widths | generated |
+|---|---|---|
+| `ConsoleGridClassic` cafe + accessory cards | `[200, 400]` | `cafe-200/400`, `gear-shop-200/400`, `sports-console-200/400` |
+| `HomeTab` hero (slider-derived) | `[480, 800, 960]` | `cafe-960`, `gear-shop-960` |
+| `DarkGoldHome` hero (slider-derived) | `[640, 960, 1200, 1600]` | `cafe-1600`, `gear-shop-1600` |
+| `HomeTab` hero (static `featuredGames`) | `[480, 800, 960]` | `moba-strategy-800` |
+
+Every stem × width combination reachable from a `getResponsiveSrcSet` call now
+resolves to a real file (verified by script + `curl` → `200 image/webp`).
 
 ## Verification (all passing ✅)
 - `npx tsc --noEmit` → no errors

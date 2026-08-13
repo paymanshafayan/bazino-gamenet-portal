@@ -3385,8 +3385,11 @@ Example format:
   } else {
     // Serve static files in production
     const distPath = path.join(staticRoot, "dist");
-    // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML بدون کش (برای به‌روزرسانی فوری)
+    // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML باید بدون کش باشد تا هر دپلو
+    // فوراً دیده شود — پس index: false می‌گذاریم تا index.html به‌جای static، از
+    // هندلر پایین (با تزریق بوت‌استرپ و Cache-Control: no-cache) سرو شود.
     app.use(express.static(distPath, {
+      index: false,
       maxAge: "7d",
       etag: true,
       setHeaders: (res, filePath) => {
@@ -3395,8 +3398,32 @@ Example format:
         }
       }
     }));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    // Inline bootstrap: داده‌های لازم برای اولین رندر (مسابقات صفحه‌ی اصلی)
+    // داخل خودِ HTML تزریق می‌شود. قبلاً کلاینت بعد از دانلود و اجرای باندل JS
+    // یک رفت‌وبرگشت اضافه به /api/tournaments می‌زد و Lighthouse آن را به‌عنوان
+    // بخشی از زنجیره‌ی بحرانی LCP (HTML → JS → API) گزارش می‌کرد؛ با این تزریق،
+    // داده همزمان با HTML می‌رسد و آن لینک از زنجیره حذف می‌شود.
+    // قالب HTML فقط یک‌بار از دیسک خوانده می‌شود (dist در هر دپلو عوض می‌شود و
+    // فرایند ری‌استارت می‌شود، پس کهنگی قالب ممکن نیست). خودِ HTML کش نمی‌شود،
+    // پس داده‌ی تزریق‌شده هم همیشه تازه است؛ کلاینت هم بعداً با refreshAll
+    // به‌روزرسانی را انجام می‌دهد.
+    let indexHtmlTemplate: string | null = null;
+    app.get("*", async (req, res) => {
+      try {
+        if (!indexHtmlTemplate) {
+          indexHtmlTemplate = await fs.promises.readFile(path.join(distPath, "index.html"), "utf8");
+        }
+        const bootstrap = {
+          tournaments: await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+        };
+        // جلوگیری از شکستن HTML توسط دنباله‌هایی مثل "</script>" داخل JSON
+        const json = JSON.stringify(bootstrap).replace(/</g, "\\u003c");
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache");
+        res.send(indexHtmlTemplate.replace("</head>", `<script>window.__BAZINO_BOOTSTRAP__=${json};</script></head>`));
+      } catch {
+        res.sendFile(path.join(distPath, "index.html"));
+      }
     });
   }
 

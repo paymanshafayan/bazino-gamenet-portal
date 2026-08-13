@@ -411,14 +411,21 @@ export default function TournamentsTab({
             </div>
 
             {/* Render brackets: Round 1, Semis, Finals */}
-            <div className="flex gap-8 justify-between items-center min-w-[600px]">
-              
-              {/* Round 1 Column (Quarter Finals) */}
-              <div className="flex-1 flex flex-col gap-6 justify-around h-full">
-                <div className="text-center text-xs text-primary font-black tracking-wider uppercase mb-2 font-display">
-                  {language === 'fa' ? 'یک‌چهارم نهایی' : 'Quarterfinals'}
-                </div>
-                {selectedTournament.bracket.round1.map((match) => (
+            {!selectedTournament.bracket?.round1?.length ? (
+              <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
+                <Trophy className="w-12 h-12 text-primary/30" />
+                <span className="text-sm font-bold text-gray-400 font-display">
+                  {language === 'fa' ? 'جدول حذفی هنوز مشخص نشده است' : 'Bracket not drawn yet'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex gap-8 justify-between items-center min-w-[600px]">
+                {/* Round 1 Column (Quarter Finals) */}
+                <div className="flex-1 flex flex-col gap-6 justify-around h-full">
+                  <div className="text-center text-xs text-primary font-black tracking-wider uppercase mb-2 font-display">
+                    {language === 'fa' ? 'یک‌چهارم نهایی' : 'Quarterfinals'}
+                  </div>
+                  {selectedTournament.bracket.round1.map((match) => (
                   <div key={match.id} className="bg-[#0d122b] rounded-lg border border-white/10 p-3.5 flex flex-col gap-2 relative">
                     <div className="flex justify-between items-center text-xs font-bold">
                       <span className={`font-bold font-display ${match.winner === match.teamA ? 'text-primary' : 'text-gray-300'}`}>{match.teamA}</span>
@@ -479,8 +486,8 @@ export default function TournamentsTab({
                   </div>
                 ))}
               </div>
-
             </div>
+            )}
           </div>
         )}
 
@@ -898,11 +905,11 @@ export default function TournamentsTab({
             <div className="mt-6 border-t border-white/10 pt-4">
               <h4 className="text-xs font-bold text-white mb-2.5 flex items-center gap-1.5 font-display uppercase tracking-wide">
                 <Users className="w-4 h-4 text-primary" />
-                <span>{language === 'fa' ? `تیم‌های ثبت‌نام شده (${selectedTournament.teams.length})` : `Registered Teams (${selectedTournament.teams.length})`}</span>
+                <span>{language === 'fa' ? `تیم‌های ثبت‌نام شده (${selectedTournament.teams?.length ?? 0})` : `Registered Teams (${selectedTournament.teams?.length ?? 0})`}</span>
               </h4>
 
               <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
-                {selectedTournament.teams.map((t, idx) => (
+                {(selectedTournament.teams ?? []).map((t, idx) => (
                   <div key={idx} className="bg-[#0d122b] p-3 rounded-lg border border-white/5 flex flex-col gap-1.5 text-xs">
                     <div className="flex justify-between font-bold text-gray-200">
                       <span className="font-display text-primary">{t.name}</span>

@@ -49,6 +49,8 @@ import {
   type ParsedZipTheme
 } from '../themes/zip';
 
+const PresentationTab = React.lazy(() => import('./PresentationTab'));
+
 interface Props {
   themeId?: string;
   setThemeId?: (id: string) => void;
@@ -69,7 +71,7 @@ export default function AdminPanelTab({
   setLayoutMode
 }: Props) {
   const { language, dir } = useLanguage();
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'systems' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'chat' | 'migrations' | 'messages' | 'themes' | 'appSlider' | 'mobileAppDownload' | 'customization' | 'dbLogs' | 'apiKeys'>('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'systems' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'chat' | 'migrations' | 'messages' | 'themes' | 'appSlider' | 'mobileAppDownload' | 'customization' | 'dbLogs' | 'apiKeys' | 'presentation'>('dashboard');
   const [isLocalHelpOpen, setIsLocalHelpOpen] = useState(false);
   const themeUploadPanelRef = useRef<HTMLDivElement | null>(null);
   
@@ -1447,6 +1449,18 @@ export default function AdminPanelTab({
           >
             <Key className="w-4 h-4" />
             <span>{language === 'fa' ? 'تنظیمات API Key و اتصالات' : 'API Keys & Connections'}</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveSubTab('presentation')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'presentation'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+                : 'text-primary hover:text-white hover:bg-primary/5'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{language === 'fa' ? 'پرزنتیشن' : 'Presentation'}</span>
           </button>
         </div>
 
@@ -4014,6 +4028,12 @@ export default function AdminPanelTab({
                 </div>
               </div>
             </div>
+          )}
+
+          {activeSubTab === 'presentation' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Presentation...</div>}>
+              <PresentationTab addNotification={addNotification} />
+            </React.Suspense>
           )}
 
         </div>

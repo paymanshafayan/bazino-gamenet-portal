@@ -14,6 +14,8 @@ import {
 // HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
 import LandingHero from './components/LandingHero';
 import { clearAuthToken } from './services/authToken';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ScrollToTop } from './components/ScrollToTop';
 const HomeTab = lazy(() => import('./components/HomeTab'));
 const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
@@ -24,7 +26,7 @@ const BlogTab = lazy(() => import('./components/BlogTab'));
 const CsharpCodeViewer = lazy(() => import('./components/CsharpCodeViewer'));
 const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
 const FlutterCodeViewer = lazy(() => import('./components/FlutterCodeViewer'));
-const PresentationTab = lazy(() => import('./components/PresentationTab'));
+
 const AuthModal = lazy(() => import('./components/AuthModal'));
 const InstallPage = lazy(() => import('./components/InstallPage'));
 const ChatTab = lazy(() => import('./components/ChatTab'));
@@ -460,7 +462,7 @@ export default function App() {
       )}
       {activeTab === 'csharp' && <CsharpCodeViewer addNotification={addNotification} />}
       {activeTab === 'flutter' && <FlutterCodeViewer addNotification={addNotification} />}
-      {activeTab === 'presentation' && <PresentationTab addNotification={addNotification} />}
+
       {activeTab === 'chat' && <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} />}
     </div>
     </Suspense>
@@ -590,8 +592,7 @@ export default function App() {
                 { id: 'cafe', label: language === 'fa' ? 'کافه' : (language === 'ru' ? 'КАФЕ' : (language === 'tr' ? 'KAFE' : 'Cafe')), icon: Coffee },
                 { id: 'shop', label: language === 'fa' ? 'فروشگاه' : (language === 'ru' ? 'МАГАЗИН' : (language === 'tr' ? 'MAĞAZA' : 'Shop')), icon: ShoppingBag },
                 { id: 'tournaments', label: language === 'fa' ? 'مسابقات' : (language === 'ru' ? 'АРЕНА' : (language === 'tr' ? 'ARENA' : 'Arena')), icon: Trophy },
-                { id: 'loyalty', label: language === 'fa' ? 'باشگاه' : (language === 'ru' ? 'КЛУБ' : (language === 'tr' ? 'KULÜP' : 'Club')), icon: Award },
-                { id: 'presentation', label: language === 'fa' ? 'پرزنتیشن' : 'Slides', icon: Sparkles }
+                { id: 'loyalty', label: language === 'fa' ? 'باشگاه' : (language === 'ru' ? 'КЛУБ' : (language === 'tr' ? 'KULÜP' : 'Club')), icon: Award }
               ].map(t => (
                 <button 
                   key={t.id} 
@@ -604,9 +605,6 @@ export default function App() {
             </nav>
 
             <div className="flex items-center gap-4">
-               {user?.role === 'admin' && (
-                  <button onClick={() => setActiveTab('admin')} className="text-xs font-bold text-purple-400 border border-purple-500/30 px-3 py-1.5 rounded-lg hover:bg-purple-500/20">Admin</button>
-               )}
                {!user ? (
                  <button onClick={() => setIsAuthModalOpen(true)} className="text-xs font-bold bg-primary text-black px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                    <LogIn className="w-4 h-4"/> {language === 'fa' ? 'ورود' : 'Login'}
@@ -665,7 +663,9 @@ export default function App() {
       )}
 
           <main className="flex-grow z-10 w-full relative">
-            {renderTabContent()}
+            <ErrorBoundary>
+              {renderTabContent()}
+            </ErrorBoundary>
           </main>
 
       {/* Modals — lazy: چانک هر مودال فقط هنگام «اولین باز شدن» دانلود و اجرا می‌شود.
@@ -758,6 +758,11 @@ export default function App() {
           </div>
         </div>
       )}
+      
+      <ScrollToTop 
+        hidden={activeTab === 'admin' || activeTab === 'hub' || activeTab === 'console_grid'} 
+        isRTL={dir === 'rtl'} 
+      />
     </div>
   );
 }

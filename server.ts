@@ -217,7 +217,11 @@ async function startServer() {
   // Middleware for parsing JSON requests. APK uploads from the admin panel are sent as
   // base64 JSON so the upload progress can be tracked in-browser without adding a new
   // multipart dependency.
-  app.use(express.json({ limit: "260mb" }));
+  const jsonParser = express.json({ limit: "260mb" });
+  app.use((req, res, next) => {
+    if (req.path === "/api/admin/mobile-app/upload-apk" || req.path === "/api/admin/themes/install") return next();
+    return jsonParser(req, res, next);
+  });
 
   // CORS: needed for the Management App desktop build, which runs its OWN local server +
   // database and calls this server's /api/sync/* endpoints from a different origin over
@@ -2647,7 +2651,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     // so uploads stay under reverse-proxy limits and track progress reliably.
     // application/json is accepted too for backward compatibility with the old
     // base64 client (cached bundles).
-    express.raw({ type: ["application/octet-stream", "application/vnd.android.package-archive", "application/x-apk", "application/zip", "application/json"], limit: "170mb" }),
+    express.raw({ type: ["application/octet-stream", "application/vnd.android.package-archive", "application/x-apk", "application/zip", "application/json"], limit: "260mb" }),
     async (req, res) => {
       try {
         const raw = req.body as Buffer | undefined;

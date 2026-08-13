@@ -415,5 +415,66 @@ test('every <img> rendered by LandingHero has width, height and alt', async () =
   await el.unmount();
 });
 
+suite('35. UI — TournamentsTab');
+
+test('does not crash when mounting a tournament with an empty bracket', async () => {
+  const { default: TournamentsTab } = await loadModule('/src/components/TournamentsTab.tsx');
+  
+  stubFetch(async (url) => {
+    if (url.includes('/api/tournaments')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tournaments: [{
+            id: 'test-tournament',
+            title: 'Empty Bracket Tournament',
+            game: 'Test Game',
+            registrationFee: 0,
+            startDate: '2026-08-13',
+            maxTeams: 16,
+            status: 'Active',
+            registeredTeamsCount: 0,
+            teams: [],
+            bracket: {}
+          }]
+        })
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+
+  const Wrapper = () => withLanguage(React.createElement(TournamentsTab, { 
+    tournaments: [{
+      id: 'test-tournament',
+      title: 'Empty Bracket Tournament',
+      game: 'Test Game',
+      registrationFee: 0,
+      startDate: '2026-08-13',
+      maxTeams: 16,
+      status: 'Active',
+      registeredTeamsCount: 0,
+      teams: [],
+      bracket: {}
+    }],
+    onAddLoyaltyPoints: () => {},
+    onRegisterTeam: () => {},
+    addNotification: () => {}
+  }));
+  const el = await mount(Wrapper, {});
+  
+  // Wait for fetch and effect
+  await act(async () => {
+    await new Promise(r => setTimeout(r, 100));
+  });
+
+  const html = el.html();
+  // It shouldn't crash, meaning we should find evidence it rendered
+  assert.ok(html.includes('Empty Bracket Tournament') || html.includes('جدول حذفی هنوز مشخص نشده است') || html.includes('Bracket not drawn yet'), 'Did not find expected text indicating successful render');
+
+  await el.unmount();
+  restoreFetch();
+});
+
 await run({ title: 'Bazino — UI component tests', jsonOut: 'tests/reports/ui.json' });
 await teardownDom();

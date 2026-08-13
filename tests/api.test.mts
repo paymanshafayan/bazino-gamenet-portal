@@ -658,8 +658,6 @@ test('the sync API key is never exposed through GET /api/settings', async () => 
   }
 });
 
-}
-
 /* ═══════════════════════════════════════════════════════════════════════
    27. Privileged-route access control
    ═══════════════════════════════════════════════════════════════════════ */
@@ -838,6 +836,21 @@ test('POST /api/support/request files a ticket', async () => {
    ═══════════════════════════════════════════════════════════════════════ */
 suite('29. API — admin catalog CRUD');
 
+test('an admin can upload a mobile apk', async () => {
+  const binaryContent = new Uint8Array([0x50, 0x4B, 0x03, 0x04]); // dummy zip/apk header
+  const res = await fetch(`${BASE}/api/admin/mobile-app/upload-apk?fileName=test.apk`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${adminToken}`,
+      'Content-Type': 'application/octet-stream'
+    },
+    body: binaryContent
+  });
+  const body = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.success, true);
+});
+
 // NOTE: while the data source is in "sample" mode the public GETs deliberately
 // serve SAMPLE_* rather than the database, so these tests verify against the
 // authoritative list each write endpoint returns.
@@ -1011,6 +1024,8 @@ test('the SPA shell is returned for an unknown non-API path', async () => {
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type') ?? '', /text\/html/);
 });
+
+}
 
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

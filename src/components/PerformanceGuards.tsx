@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { vimg } from '../utils/assetVersion';
 
 interface DeferredSectionProps {
   minHeight: number;
@@ -57,10 +58,17 @@ export function getResponsiveSrcSet(src: string, widths: number[]) {
   if (typeof src !== 'string' || widths.length === 0) return undefined;
 
   // Local first-party images — same origin, no cross-origin download.
-  if (src.startsWith('/images/') && src.endsWith('.webp')) {
-    const withWidth = src.match(/^(.*?)-\d+\.webp$/);
-    const stem = withWidth ? withWidth[1] : src.replace(/\.webp$/, '');
-    return widths.map(w => `${stem}-${w}.webp ${w}w`).join(', ');
+  // ورودی ممکن است از قبل مهر نسخه‌ی سرور (?v=…) را داشته باشد (پاسخ‌های API)؛
+  // پس کوئری را جدا می‌کنیم تا تشخیص الگو نشکند و همان مهر به همه‌ی عرض‌ها برسد.
+  const queryAt = src.indexOf('?');
+  const bareSrc = queryAt === -1 ? src : src.slice(0, queryAt);
+  if (bareSrc.startsWith('/images/') && bareSrc.endsWith('.webp')) {
+    const withWidth = bareSrc.match(/^(.*?)-\d+\.webp$/);
+    const stem = withWidth ? withWidth[1] : bareSrc.replace(/\.webp$/, '');
+    const suffix = queryAt === -1 ? null : src.slice(queryAt);
+    // نسخه‌دار بودن → سرور به این URL کش immutable یک‌ساله می‌دهد.
+    const withVersion = (u: string) => (suffix ? u + suffix : vimg(u));
+    return widths.map(w => `${withVersion(`${stem}-${w}.webp`)} ${w}w`).join(', ');
   }
 
   // Unsplash responsive transform (kept for admin-uploaded custom image URLs).

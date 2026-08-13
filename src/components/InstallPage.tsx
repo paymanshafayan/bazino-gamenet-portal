@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Database, Server, Shield, Sparkles, Layout, Globe, Check, AlertCircle, ChevronRight, Terminal, User
 } from 'lucide-react';
-import bazinoLogo from '../assets/images/bazino_logo_user.webp';
+import bazinoLogo from '../assets/images/bazino_logo_user-128.webp'; // نمایش ۶۴px × DPR2 = واریانت ۱۲۸px
 import { setAuthToken } from '../services/authToken';
 
 interface InstallPageProps {

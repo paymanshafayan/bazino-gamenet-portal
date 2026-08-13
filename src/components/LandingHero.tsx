@@ -1,3 +1,5 @@
+import { vimg, vsrcset } from '../utils/assetVersion';
+
 interface LandingHeroProps {
   onNavigate: () => void;
 }
@@ -14,7 +16,7 @@ interface LandingHeroProps {
  * document instead of a cross-origin Unsplash fetch discovered only after JS runs.
  */
 export default function LandingHero({ onNavigate }: LandingHeroProps) {
-  const image = '/images/home/esports-960.webp';
+  const image = vimg('/images/home/esports-960.webp');
 
   return (
     <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#050608] shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
@@ -22,7 +24,7 @@ export default function LandingHero({ onNavigate }: LandingHeroProps) {
         loading="eager"
         fetchPriority="high"
         src={image}
-        srcSet="/images/home/esports-480.webp 480w, /images/home/esports-800.webp 800w, /images/home/esports-960.webp 960w"
+        srcSet={vsrcset("/images/home/esports-480.webp 480w, /images/home/esports-800.webp 800w, /images/home/esports-960.webp 960w")}
         sizes="(min-width: 1024px) 960px, 100vw"
         width="1200"
         height="514"

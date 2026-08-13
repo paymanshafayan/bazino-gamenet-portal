@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
-import bazinoLogo from './assets/images/bazino_logo_user.webp';
+import bazinoLogo from './assets/images/bazino_logo_user-80.webp'; // 48 CSS px × DPR2 ≈ 80px واقعی
 import {
   BUILT_IN_THEMES,
   getStoredThemeId,
@@ -69,6 +69,22 @@ const TAB_DATASETS: Record<string, string[]> = {
   blog: ['articles'],
   loyalty: ['transactions', 'coupons', 'user'],
 };
+
+// ── داده‌ی اولیه‌ی تزریق‌شده در HTML توسط سرور ────────────────────────────
+// سرور در production، لیست مسابقات را به‌صورت window.__BAZINO_BOOTSTRAP__
+// داخل خودِ HTML می‌گذارد تا اولین رندر منتظر یک رفت‌وبرگشت اضافه‌ی /api
+// نماند — یعنی /api/tournaments از زنجیره‌ی بحرانی LCP (HTML → JS → API) که
+// Lighthouse گزارش کرده بود حذف می‌شود. در dev (Vite) این متغیر وجود ندارد
+// و کد همان مسیر fetch قبلی را می‌رود.
+type BgRequestInit = RequestInit & { priority?: 'high' | 'low' | 'auto' };
+const BOOTSTRAP = (typeof window !== 'undefined'
+  ? (window as unknown as { __BAZINO_BOOTSTRAP__?: { tournaments?: Tournament[] } }).__BAZINO_BOOTSTRAP__
+  : undefined);
+const BOOTSTRAP_TOURNAMENTS: Tournament[] | null = Array.isArray(BOOTSTRAP?.tournaments) ? (BOOTSTRAP!.tournaments as Tournament[]) : null;
+
+// fetchهای پس‌زمینه با اولویت «low» — با منابع LCP رقابت نمی‌کنند و در
+// درخت وابستگی شبکه‌ی Chrome بخشی از مسیر بحرانی حساب نمی‌شوند.
+const BG_FETCH: BgRequestInit = { priority: 'low' };
 
 export default function App() {
   const { language, setLanguage, t, dir } = useLanguage();
@@ -184,7 +200,8 @@ export default function App() {
   const [systems, setSystems] = useState<GameSystem[]>([]);
   const [cafeItems, setCafeItems] = useState<CafeItem[]>([]);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  // اگر سرور داده‌ی اولیه را داخل HTML تزریق کرده باشد، رندر اول همان را دارد
+  const [tournaments, setTournaments] = useState<Tournament[]>(() => BOOTSTRAP_TOURNAMENTS ?? []);
   const [articles, setArticles] = useState<Article[]>([]);
   const [transactions, setTransactions] = useState<LoyaltyTx[]>([]);
   const [activeCoupons, setActiveCoupons] = useState<DiscountCode[]>([]);
@@ -220,17 +237,19 @@ export default function App() {
   // داده‌های غیرضروری برای صفحه‌ی اصلی، فقط هنگام باز شدن تبِ مربوطه
   // (useEffect روی activeTab) دریافت می‌شوند تا تعداد درخواست‌های /api در
   // زنجیره‌ی بحرانیِ اولیه کم شود.
-  const loadedRef = useRef<Set<string>>(new Set());
+  // اگر بوت‌استرپ HTML لیست مسابقات را داده باشد، آن دیتاست «بارگذاری‌شده»
+  // حساب می‌شود و هنگام بوت دوباره fetch نمی‌شود (حذف از زنجیره‌ی بحرانی).
+  const loadedRef = useRef<Set<string>>(new Set(BOOTSTRAP_TOURNAMENTS ? ['tournaments'] : []));
 
   const fetchDataset: Record<string, () => Promise<void>> = {
-    systems:      async () => { const r = await fetch('/api/systems').then(res => res.json()).catch(() => []);      startTransition(() => { if (Array.isArray(r)) setSystems(r); }); },
-    cafe:         async () => { const r = await fetch('/api/cafe').then(res => res.json()).catch(() => []);         startTransition(() => { if (Array.isArray(r)) setCafeItems(r); }); },
-    accessories:  async () => { const r = await fetch('/api/accessories').then(res => res.json()).catch(() => []);  startTransition(() => { if (Array.isArray(r)) setAccessories(r); }); },
-    tournaments:  async () => { const r = await fetch('/api/tournaments').then(res => res.json()).catch(() => []);  startTransition(() => { if (Array.isArray(r)) setTournaments(r); }); },
-    articles:     async () => { const r = await fetch('/api/articles').then(res => res.json()).catch(() => []);     startTransition(() => { if (Array.isArray(r)) setArticles(r); }); },
-    transactions: async () => { const r = await fetch('/api/transactions').then(res => res.json()).catch(() => []); startTransition(() => { if (Array.isArray(r)) setTransactions(r); }); },
-    coupons:      async () => { const r = await fetch('/api/coupons').then(res => res.json()).catch(() => []);      startTransition(() => { if (Array.isArray(r)) setActiveCoupons(r); }); },
-    user:         async () => { const r = await fetch('/api/user').then(res => res.json()).catch(() => null);        startTransition(() => { if (r && r.username && r.username !== 'Guest') setUser(r); else setUser(null); }); },
+    systems:      async () => { const r = await fetch('/api/systems', BG_FETCH).then(res => res.json()).catch(() => []);      startTransition(() => { if (Array.isArray(r)) setSystems(r); }); },
+    cafe:         async () => { const r = await fetch('/api/cafe', BG_FETCH).then(res => res.json()).catch(() => []);         startTransition(() => { if (Array.isArray(r)) setCafeItems(r); }); },
+    accessories:  async () => { const r = await fetch('/api/accessories', BG_FETCH).then(res => res.json()).catch(() => []);  startTransition(() => { if (Array.isArray(r)) setAccessories(r); }); },
+    tournaments:  async () => { const r = await fetch('/api/tournaments', BG_FETCH).then(res => res.json()).catch(() => []);  startTransition(() => { if (Array.isArray(r)) setTournaments(r); }); },
+    articles:     async () => { const r = await fetch('/api/articles', BG_FETCH).then(res => res.json()).catch(() => []);     startTransition(() => { if (Array.isArray(r)) setArticles(r); }); },
+    transactions: async () => { const r = await fetch('/api/transactions', BG_FETCH).then(res => res.json()).catch(() => []); startTransition(() => { if (Array.isArray(r)) setTransactions(r); }); },
+    coupons:      async () => { const r = await fetch('/api/coupons', BG_FETCH).then(res => res.json()).catch(() => []);      startTransition(() => { if (Array.isArray(r)) setActiveCoupons(r); }); },
+    user:         async () => { const r = await fetch('/api/user', BG_FETCH).then(res => res.json()).catch(() => null);        startTransition(() => { if (r && r.username && r.username !== 'Guest') setUser(r); else setUser(null); }); },
   };
 
   const ensureLoaded = (keys: string[]) => {
@@ -260,8 +279,23 @@ export default function App() {
   // با تغییر قالب/نما هم دوباره اجرا می‌شود.
   useEffect(() => {
     const comprehensive = themeId === 'console-grid' || layoutMode === 'hub';
-    scheduleIdle(() => ensureLoaded(comprehensive ? Object.keys(fetchDataset) : ['tournaments', 'user']));
+    // مسابقات از بوت‌استرپ HTML می‌آید؛ اگر تزریق نشده بود (dev/static) همان
+    // fetch قبلی انجام می‌شود. «user» دیگر اینجا نیست — پایین‌تر با تأخیر بیشتر.
+    const keys = comprehensive ? Object.keys(fetchDataset) : (BOOTSTRAP_TOURNAMENTS ? [] : ['tournaments']);
+    if (keys.length > 0) scheduleIdle(() => ensureLoaded(keys));
   }, [themeId, layoutMode]);
+
+  // وضعیت ورود کاربر هیچ نقشی در رندر/LCP اولیه ندارد؛ فقط بعد از load کامل
+  // صفحه و در زمان idle (با اولویت شبکه‌ی low) دریافت می‌شود تا /api/user از
+  // زنجیره‌ی بحرانی Lighthouse حذف شود.
+  useEffect(() => {
+    const loadUserWhenIdle = () => scheduleIdle(() => ensureLoaded(['user']));
+    if (document.readyState === 'complete') loadUserWhenIdle();
+    else {
+      window.addEventListener('load', loadUserWhenIdle, { once: true });
+      return () => window.removeEventListener('load', loadUserWhenIdle);
+    }
+  }, []);
 
   // بارگذاریِ داده‌های هر تب فقط هنگام باز شدن آن تب (در idle)، تا درخواست‌های
   // /api از زنجیره‌ی بحرانیِ اولیه حذف شوند.

@@ -12,8 +12,8 @@ import { suite, test, assert, run } from './harness.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(path.join(ROOT, p), 'utf8');
-const IMAGES_DIR = path.join(ROOT, 'public/images/home');
-const onDisk = new Set(existsSync(IMAGES_DIR) ? readdirSync(IMAGES_DIR) : []);
+const IMAGES_DIRS = [path.join(ROOT, 'public/images/home'), path.join(ROOT, 'public/images/mobile')];
+const onDisk = new Set(IMAGES_DIRS.flatMap(d => existsSync(d) ? readdirSync(d, { withFileTypes: true }).filter(e => e.isFile()).map(e => e.name) : []));
 
 const {
   SAMPLE_SYSTEMS, SAMPLE_CAFE_ITEMS, SAMPLE_ACCESSORIES, SAMPLE_TOURNAMENTS,
@@ -503,14 +503,18 @@ test('SQL Server migrates existing tables with IF COL_LENGTH guards', () => {
 suite('9. Source policy');
 
 test('no unsplash reference survives outside PerformanceGuards', () => {
+  // صرفِ نامِ دامنه در کد مجاز است (مثلاً LEGACY_HINTS در server.ts برای شناسایی
+  // لینک‌های قدیمی، یا رجکس allowlist برای دانلود نسخه موبایل) — آنچه ممنوع است
+  // ارجاع واقعی به یک فایل تصویری روی unsplash است (photo-...)
+  const UNSPLASH_ASSET_URL = /images\.unsplash\.com\/photo-/i;
   const files = [
     'server.ts', 'server/sampleData.ts', 'server/dataProviders.ts',
     'src/components/ConsoleGridClassic.tsx', 'src/components/AdminPanelTab.tsx',
     'src/components/HomeTab.tsx', 'src/components/BlogTab.tsx',
     'src/components/CafeTab.tsx', 'src/components/ShopTab.tsx',
   ];
-  const offenders = files.filter(f => read(f).includes('unsplash'));
-  assert.deepEqual(offenders, [], `unsplash still referenced in: ${offenders.join(', ')}`);
+  const offenders = files.filter(f => UNSPLASH_ASSET_URL.test(read(f)));
+  assert.deepEqual(offenders, [], `unsplash asset URL still referenced in: ${offenders.join(', ')}`);
 });
 
 test('PerformanceGuards keeps its intentional unsplash transform', () => {

@@ -7,6 +7,7 @@ import express from "express";
 import compression from "compression";
 import path from "path";
 import fs from "fs";
+import { createHash } from "crypto";
 import { createServer as createViteServer } from "vite";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -110,6 +111,122 @@ export async function resolveSampleById<T extends Record<string, any>>(
 }
 
 /**
+ * BACKWARD-COMPAT IMAGE REPAIR — «یک بار برای همیشه»
+ *
+ * نسخه‌های قدیمی، کاتالوگ را با لینک تصویر راه‌دور (unsplash) یا جایگذار
+ * عمومیِ مشترک (مثل `/images/home/cafe-320.webp` برای همه‌ی آیتم‌های کافه)
+ * seed می‌کردند. اپ موبایل `mobileImageUrl` را ترجیح می‌دهد، پس آن ردیف‌ها
+ * برای همیشه تصویر قدیمی نشان می‌دهند — حتی بعد از پاکسازی CDN، چون خودِ
+ * پیلود API قدیمی است.
+ *
+ * در هر بوت، فقط وقتی منبع داده «database» است: ردیف‌هایی که id آن‌ها با
+ * داده‌ی نمونه یکی است و لینک ذخیره‌شده‌شان «قدیمی/خراب» به نظر می‌رسد
+ * (لینک unsplash، یکی از جایگذارهای مشترک، یا مسیر محلی که فایلش روی دیسک
+ * نیست) به مسیر WebP فعلیِ sampleData بازنویسی می‌شوند. به ردیف‌های
+ * ساخته‌شده توسط ادمین یا لینک‌های دست‌نظافت‌دستی هرگز دست نمی‌زند و
+ * کاملاً idempotent است.
+ *
+ * جدا از این، در هر دو حالت، مقدار mobileImageUrlهایی که به
+ * /images/mobile/generated/* اشاره می‌کنند اما فایل‌شان دیگر روی دیسک نیست
+ * null می‌شود (مثلاً بعد از ری‌استارت روی هاست با دیسک موقتی) تا کلاینت
+ * به‌جای تصویر شکسته به imageUrl اصلی برگردد.
+ */
+async function repairLegacyCatalogImages(): Promise<void> {
+  try {
+    const store = getActiveDataProvider();
+    const serveSampleMode = (await getDataSourceMode()) !== "database";
+
+    const LEGACY_HINTS = [
+      "unsplash.com", // لینک‌های راه‌دور نسخه‌های قدیمی
+      "/images/home/cafe-320.webp", // جایگذار عمومیِ مشترک آیتم‌های کافه
+      "/images/home/gear-shop-320.webp", // جایگذار عمومیِ مشترک فروشگاه
+      "/images/home/sports-console-320.webp", // جایگذار عمومیِ مشترک کنسول/دسته
+    ];
+    const staticRoots = [path.join(process.cwd(), "dist"), path.join(process.cwd(), "public")];
+    const isLegacyUrl = (url: string | undefined, field: "imageUrl" | "mobileImageUrl"): boolean => {
+      if (!url) return false;
+      if (LEGACY_HINTS.some((h) => url.includes(h))) return true;
+      // مهاجرت پوشه‌ی موبایل: نسخه‌ی موبایلِ آیتم‌های داخلی باید از پوشه‌ی بهینه‌ی
+      // /images/mobile بیاید (تصاویر عمودیِ اسلایدر و بازفشرده‌شده‌ی آیتم‌ها).
+      // پس هر مقدار کهنه‌ی /images/home برای این فیلد مهاجرت‌داده می‌شود.
+      // (imageUrlِ وب عمداً همان /images/home می‌ماند و build-in نیست.)
+      if (field === "mobileImageUrl" && url.startsWith("/images/home/")) return true;
+      // مسیر محلی که فایلش دیگر روی دیسک نیست = لینک خراب/قدیمی.
+      // کوئریِ احتمالیِ «?v=» (اگر نسخه‌ی مهرخورده ناخواسته ذخیره شده باشد) پیش از
+      // چکِ وجود فایل برداشته می‌شود تا به‌اشتباه «خراب» تلقی نشود.
+      const bare = url.split("?")[0];
+      if (bare.startsWith("/")) return !staticRoots.some((root) => fs.existsSync(path.join(root, bare)));
+      return false;
+    };
+
+    type ImageBearingRow = { id: string; imageUrl?: string; mobileImageUrl?: string };
+    const repair = async <T extends ImageBearingRow>(
+      rows: T[],
+      samples: T[],
+      update: (id: string, fields: Partial<T>) => Promise<void>
+    ): Promise<number> => {
+      let n = 0;
+      for (const s of samples) {
+        const row = rows.find((r) => r.id === s.id);
+        if (!row) continue;
+        const patch: Partial<T> = {};
+        if (s.imageUrl && isLegacyUrl(row.imageUrl, "imageUrl")) (patch as Record<string, string>).imageUrl = s.imageUrl;
+        if (s.mobileImageUrl && isLegacyUrl(row.mobileImageUrl, "mobileImageUrl")) (patch as Record<string, string>).mobileImageUrl = s.mobileImageUrl;
+        if (Object.keys(patch).length) {
+          await update(row.id, patch);
+          n++;
+        }
+      }
+      return n;
+    };
+
+    // بازنویسی ردیف‌های قدیمی نسبت به داده‌ی نمونه فقط وقتی معنا دارد که
+    // منبع داده «database» است؛ در حالت sample هرگز اجرا نمی‌شود تا رفتار
+    // قبلی دقیقاً حفظ شود.
+    if (!serveSampleMode) {
+      const repaired =
+        (await repair(await store.listCafeItems(), SAMPLE_CAFE_ITEMS, (id, f) => store.updateCafeItem(id, f))) +
+        (await repair(await store.listAccessories(), SAMPLE_ACCESSORIES, (id, f) => store.updateAccessory(id, f))) +
+        (await repair(await store.listSliders(), SAMPLE_SLIDERS, (id, f) => store.updateSlider(id, f)));
+      if (repaired > 0) {
+        console.log(`[Image Repair] ${repaired} legacy catalog image URL(s) updated to current local WebP paths.`);
+      }
+    }
+
+    // فایل‌های تولیدشده‌ی runtime در public/images/mobile/generated روی هاست‌های
+    // با دیسک موقتی (مثل Railway بدون volume) بعد از هر بازنشانی پاک می‌شوند در
+    // حالی‌که DB به‌شان اشاره می‌کند؛ در آن حالت مقدار را null می‌کنیم تا اپ به
+    // جای نمایش تصویر شکسته، به imageUrl اصلیِ ردیف برگردد.
+    // این پاک‌سازی به حالت منبع داده بستگی ندارد (همیشه با دیسک و DB کار می‌کند،
+    // نه با داده‌ی نمونه) و هرگز به ردیف‌های سروشده از نمونه دست نمی‌زند.
+    const cleanDanglingGenerated = async <T extends ImageBearingRow>(
+      rows: T[],
+      update: (id: string, fields: Partial<T>) => Promise<void>
+    ): Promise<number> => {
+      let n = 0;
+      for (const row of rows) {
+        const url = typeof row.mobileImageUrl === "string" ? row.mobileImageUrl.split("?")[0] : "";
+        if (!url.startsWith("/images/mobile/generated/")) continue;
+        if (staticRoots.some((root) => fs.existsSync(path.join(root, url)))) continue;
+        await update(row.id, { mobileImageUrl: null } as unknown as Partial<T>);
+        n++;
+      }
+      return n;
+    };
+    const cleaned =
+      (await cleanDanglingGenerated(await store.listCafeItems(), (id, f) => store.updateCafeItem(id, f))) +
+      (await cleanDanglingGenerated(await store.listAccessories(), (id, f) => store.updateAccessory(id, f))) +
+      (await cleanDanglingGenerated(await store.listSliders(), (id, f) => store.updateSlider(id, f)));
+    if (cleaned > 0) {
+      console.log(`[Image Repair] ${cleaned} dangling generated mobile image reference(s) cleared (file missing on disk).`);
+    }
+  } catch (e) {
+    // این بهینه‌سازی هرگز نباید بوت سرور را متوقف کند
+    console.error("[Image Repair] skipped due to error:", e);
+  }
+}
+
+/**
  * Makes a sample row writable.
  *
  * resolveSampleById() happily hands back a SAMPLE row that exists only in
@@ -139,11 +256,143 @@ export async function ensurePersisted<T extends Record<string, any>>(
   }
 }
 
+// ==== مهر نسخه‌ی دارایی روی تصاویر public (رفع گزارش Lighthouse: «A long cache
+// lifetime / efficient cache policy») ====
+// فایل‌های /images/* در public/ قرار دارند و برخلاف باندل‌های Vite هش محتوایی نمی‌گیرند،
+// برای همین قبلاً فقط ۷ روز کش می‌شدند. راه‌حلِ امنِ کش طولانی: به هر URL «?v=<نسخه>»
+// می‌چسبانیم و نسخه را با هر دپلویِ محتوامتفاوت عوض می‌کنیم؛ آنگاه می‌توان به این
+// URLها کشِ immutable یک‌ساله داد و کاربر بعد از هر دپلو دقیقاً فایل جدید را می‌گیرد —
+// بدون بازگشتِ مشکل دیدن تصویر قدیمی. در حالت توسعه نسخه خالی می‌ماند و URLها
+// دست‌نخورده‌اند (رفتار قبلی).
+let ASSET_VERSION = "";
+
+function stampImageAssetUrl(url: string): string {
+  if (!ASSET_VERSION || !url.startsWith("/images/")) return url;
+  // اگر URL از قبل مهرِ «?v=» داشته باشد (مثلاً نسخه‌ی کهنه‌ای که ناخواسته در
+  // دیتابیس ذخیره شده)، مهر را با نسخه‌ی جاری بازنویسی می‌کنیم تا همیشه با
+  // کش immutable یک‌ساله سرو شود.
+  const q = url.indexOf("?");
+  const bare = q === -1 ? url : url.slice(0, q);
+  const rest = q === -1 ? "" : url.slice(q + 1);
+  const params = rest ? rest.split("&").filter((p) => p && !p.startsWith("v=")) : [];
+  params.push(`v=${encodeURIComponent(ASSET_VERSION)}`);
+  return `${bare}?${params.join("&")}`;
+}
+
+// پاسخ‌های JSON را بدون تغییر ساختاری پیمایش می‌کند (رشته/آرایه/آبجکت ساده تا عمق ۸)
+// و به رشته‌های «/images/…» مهر نسخه می‌زند. آبجکت‌های غیرساده (Buffer، Date، …) دست‌نخورده می‌مانند.
+function stampImageAssetUrls(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") return stampImageAssetUrl(value);
+  if (depth > 8 || value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => stampImageAssetUrls(item, depth + 1));
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = stampImageAssetUrls(entry, depth + 1);
+  }
+  return out;
+}
+
+// ==== ساخت خودکار نسخه‌ی موبایل از تصویر اصلی (پنل مدیریت) ====
+// وقتی ادمین تصویری ثبت می‌کند و «ساخت خودکار» فعال است، با sharp از روی تصویر
+// اصلی یک واریانت سبک با ابعاد متناسبِ اپ می‌سازیم و در public/images/mobile/generated
+// ذخیره می‌کنیم. نام فایل = هشِ محتوای منبع + نوع کاربرد؛ یعنی:
+//   الف) درخواست تکراری همان فایل را بازاستفاده می‌کند،
+//   ب) هر تغییر محتوا نامِ جدید می‌سازد، پس کش immutable بدون نیاز به مهر «?v=» امن است.
+// شکست در تولید هرگز ثبت آیتم را نمی‌شکند: با undefined برمی‌گردیم و اپ به
+// imageUrl اصلی برمی‌گردد (رفتار قبلی).
+const MOBILE_IMAGE_PRESETS = {
+  item: { width: 400, height: 400, quality: 78 },    // کارت آیتم کافه/فروشگاه — مربع
+  slide: { width: 640, height: 854, quality: 80 },   // اسلایدر اپ — عمودی ۳:۴ (کادر Expanded/تمام‌قد)
+  article: { width: 640, height: 360, quality: 80 }, // کارت مقاله — ۱۶:۹
+} as const;
+type MobileImageKind = keyof typeof MOBILE_IMAGE_PRESETS;
+
+const generatedMobileDir = () => path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "images", "mobile", "generated");
+
+async function generateMobileImageVariant(imageUrl: string | undefined, kind: MobileImageKind): Promise<string | undefined> {
+  if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.trim()) return undefined;
+  const preset = MOBILE_IMAGE_PRESETS[kind];
+  try {
+    const bareUrl = imageUrl.trim().split("?")[0];
+    let srcBuffer: Buffer | null = null;
+    if (bareUrl.startsWith("/")) {
+      // منبع لوکال: اول public (منبعِ بیلد)، بعد dist (خروجی production)
+      const staticRoot = process.env.BAZINO_STATIC_ROOT || process.cwd();
+      for (const root of [path.join(staticRoot, "public"), path.join(staticRoot, "dist")]) {
+        try { srcBuffer = await fs.promises.readFile(path.join(root, bareUrl)); break; } catch { /* ریشه‌ی بعدی */ }
+      }
+    } else if (/^https:\/\/images\.unsplash\.com\//.test(bareUrl)) {
+      // دانلود منبع خارجی فقط به Unsplash (هاستِ توصیه‌شده در فرم‌های ادمین) محدود شده
+      // تا سطح SSRF کوچک بماند؛ سقف ۸ مگابایت و تایم‌اوت ۶ ثانیه.
+      const resp = await fetch(bareUrl, { signal: AbortSignal.timeout(6000) });
+      if (resp.ok) {
+        const len = Number(resp.headers.get("content-length") || 0);
+        if (len <= 8 * 1024 * 1024) {
+          srcBuffer = Buffer.from(await resp.arrayBuffer());
+          if (srcBuffer.length > 8 * 1024 * 1024) srcBuffer = null;
+        }
+      }
+    }
+    if (!srcBuffer) {
+      // بدون این لاگ، مسیر رایج «نام فایل اشتباه/فایل ناموجود یا لینک غیرمجاز»
+      // کاملاً بی‌صداز هم بود undefined برمی‌گردد و دیباگِ ادمین غیرممکن می‌شود.
+      console.warn(
+        `[Mobile Image] auto-generation skipped: source unreadable or not allowed (url=${imageUrl}, kind=${kind}). ` +
+        `Local files must exist under public/ or dist/; remote sources are limited to https://images.unsplash.com/* (8MB max).`
+      );
+      return undefined;
+    }
+    const hash = createHash("sha256").update(srcBuffer).update(String(kind)).digest("hex").slice(0, 10);
+    const outName = `gen-${kind}-${hash}.webp`;
+    const outDir = generatedMobileDir();
+    const outPath = path.join(outDir, outName);
+    if (!fs.existsSync(outPath)) {
+      // import تنبل: اگر sharp روی محیطی نصب/قابل‌استفاده نبود، فقط تولید نسخه رد می‌شود نه بوت سرور
+      const sharp = (await import("sharp")).default;
+      await fs.promises.mkdir(outDir, { recursive: true });
+      await sharp(srcBuffer)
+        .rotate()
+        .resize(preset.width, preset.height, { fit: "cover", position: "attention" })
+        .webp({ quality: preset.quality, effort: 5 })
+        .toFile(outPath);
+    }
+    return `/images/mobile/generated/${outName}`;
+  } catch (err) {
+    console.error("[Mobile Image] auto-generation failed:", err);
+    return undefined;
+  }
+}
+
+// اولویت: مقدار دستیِ ادمین → ساخت خودکار → undefined (اپ خودش به imageUrl برمی‌گردد)
+async function resolveAdminMobileImageUrl(
+  manualValue: unknown,
+  autoGenerate: unknown,
+  imageUrl: string | undefined,
+  kind: MobileImageKind
+): Promise<string | undefined> {
+  const manual = typeof manualValue === "string" && manualValue.trim() ? manualValue.trim() : undefined;
+  if (manual) return manual;
+  if (autoGenerate === false) return undefined;
+  return generateMobileImageVariant(imageUrl, kind);
+}
+
 async function startServer() {
   const app = express();
   const PORT = process.env.NODE_ENV === "production" ? (Number(process.env.PORT) || 3000) : 3000;
 
   app.use(compression());
+
+  // مهر نسخه‌ی دارایی روی URLهای تصاویر در پاسخ‌های API — تا اپ موبایل و کلاینت وب
+  // همان URL نسخه‌دار را دریافت کنند و بتوانند با کش immutable یک‌ساله سرو شوند.
+  // مقدار ASSET_VERSION هنگام درخواست خوانده می‌شود و در production قبل از listen
+  // محاسبه شده است؛ در dev خالی است و این میدل‌ویر عملاً بی‌اثر است.
+  app.use((_req, res, next) => {
+    const sendJson = res.json.bind(res);
+    res.json = ((body: unknown) => sendJson(stampImageAssetUrls(body))) as typeof res.json;
+    next();
+  });
 
   // Cloudflare Web Analytics injects beacon.min.js at the edge when enabled. Its CDN TTL
   // is controlled by Cloudflare (not this origin), so an origin cache header cannot make
@@ -289,6 +538,12 @@ async function startServer() {
   // =========================================================================
   await initializeActiveProvider();
   const bootStore = getActiveDataProvider();
+
+  // ردیف‌های قدیمی کاتالوگ (لینک unsplash یا جایگذار عمومی cafe-320) را در
+  // حالت database به تصاویر محلی فعلی برمی‌گرداند؛ در حالت sample بی‌اثر است.
+  // همچنین رفرنس‌های mobileImageUrl که به فایل پاکشده در images/mobile/generated
+  // اشاره می‌کنند (دیسک موقتیِ هاست) را در هر دو حالت null می‌کند.
+  await repairLegacyCatalogImages();
 
   // Safety net only: if for some reason no admin account exists at all
   // (e.g. local dev before /install was ever completed), create a minimal
@@ -1948,17 +2203,23 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Cafe Items CRUD
   app.post("/api/admin/cafe", async (req, res) => {
     try {
-      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const nextId = "c" + ((await store.countCafeItems()) + 1);
+
+      const finalImageUrl = imageUrl || "/images/home/pizza-480.webp";
+      // اولویت: مقدار دستی ادمین ← ساخت خودکار با sharp (پیش‌فرض روشن) ← undefined که
+      // در آن صورت اپ خودش به imageUrl اصلی برمی‌گردد (رفتار قبلیِ fallback حذف شده؛
+      // دیگر پلیس‌هولدر عمومیِ pizza-400 به همه آیتم‌ها نمی‌چسبانیم)
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "item");
 
       await store.createCafeItem({
         id: nextId,
         name,
         category,
         price: Number(price),
-        imageUrl: imageUrl || "/images/home/pizza-480.webp",
-        mobileImageUrl: mobileImageUrl || "/images/home/pizza-400.webp",
+        imageUrl: finalImageUrl,
+        mobileImageUrl: finalMobileUrl,
         inventory: Number(inventory),
         isAvailable: isAvailable !== false
       });
@@ -1973,17 +2234,25 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/cafe/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const item = await store.getCafeItemById(id);
 
       if (item) {
+        const finalImageUrl = imageUrl !== undefined ? imageUrl : item.imageUrl;
+        // در ویرایش: مقدار دستی جدید ← در غیر این صورت اگر «ساخت خودکار» فرستاده شده
+        // دوباره از روی تصویر نهایی می‌سازیم ← وگرنه مقدار قبلی حفظ می‌شود
+        const wantsAuto = autoGenerateMobile === true || (typeof mobileImageUrl === "string" && !mobileImageUrl.trim() && autoGenerateMobile !== false);
+        const finalMobileUrl = typeof mobileImageUrl === "string" && mobileImageUrl.trim()
+          ? mobileImageUrl.trim()
+          : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "item") : undefined) ?? item.mobileImageUrl;
+
         await store.updateCafeItem(id, {
           name: name !== undefined ? name : item.name,
           category: category !== undefined ? category : item.category,
           price: price !== undefined ? Number(price) : item.price,
-          imageUrl: imageUrl !== undefined ? imageUrl : item.imageUrl,
-          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : item.mobileImageUrl,
+          imageUrl: finalImageUrl,
+          mobileImageUrl: finalMobileUrl,
           inventory: inventory !== undefined ? Number(inventory) : item.inventory,
           isAvailable: isAvailable !== undefined ? !!isAvailable : item.isAvailable,
         });
@@ -2033,17 +2302,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Accessory Shop CRUD
   app.post("/api/admin/accessories", async (req, res) => {
     try {
-      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countAccessories()) + 1);
+
+      const finalImageUrl = imageUrl || "/images/home/gear-shop-480.webp";
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "item");
 
       await store.createAccessory({
         id: nextId,
         name,
         description,
         price: Number(price),
-        imageUrl: imageUrl || "/images/home/gear-shop-480.webp",
-        mobileImageUrl: mobileImageUrl || "/images/home/gear-shop-320.webp",
+        imageUrl: finalImageUrl,
+        mobileImageUrl: finalMobileUrl,
         stock: Number(stock),
         category
       });
@@ -2058,17 +2330,23 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/accessories/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
       const store = getActiveDataProvider();
       const acc = await store.getAccessoryById(id);
 
       if (acc) {
+        const finalImageUrl = imageUrl !== undefined ? imageUrl : acc.imageUrl;
+        const wantsAuto = autoGenerateMobile === true || (typeof mobileImageUrl === "string" && !mobileImageUrl.trim() && autoGenerateMobile !== false);
+        const finalMobileUrl = typeof mobileImageUrl === "string" && mobileImageUrl.trim()
+          ? mobileImageUrl.trim()
+          : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "item") : undefined) ?? acc.mobileImageUrl;
+
         await store.updateAccessory(id, {
           name: name !== undefined ? name : acc.name,
           description: description !== undefined ? description : acc.description,
           price: price !== undefined ? Number(price) : acc.price,
-          imageUrl: imageUrl !== undefined ? imageUrl : acc.imageUrl,
-          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : acc.mobileImageUrl,
+          imageUrl: finalImageUrl,
+          mobileImageUrl: finalMobileUrl,
           stock: stock !== undefined ? Number(stock) : acc.stock,
           category: category !== undefined ? category : acc.category,
         });
@@ -2173,17 +2451,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Blog News Articles CRUD
   app.post("/api/admin/articles", async (req, res) => {
     try {
-      const { title, content, category, imageUrl, mobileImageUrl, author, date } = req.body;
+      const { title, content, category, imageUrl, mobileImageUrl, autoGenerateMobile, author, date } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countArticles()) + 1);
+
+      const finalImageUrl = imageUrl || "/images/home/esports-480.webp";
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "article");
 
       const newArt = {
         id: nextId,
         title,
         content,
         category,
-        imageUrl: imageUrl || "/images/home/esports-480.webp",
-        mobileImageUrl: mobileImageUrl || "/images/home/esports-320.webp",
+        imageUrl: finalImageUrl,
+        mobileImageUrl: finalMobileUrl,
         author: author || "سیستم مدیریت",
         date: date || "۱۴۰۵/۰۴/۱۴",
         comments: "[]",
@@ -2499,15 +2780,17 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/admin/app-sliders", async (req, res) => {
     try {
-      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       if (!imageUrl || !target) {
         return res.status(400).json({ error: "آدرس تصویر و بخش هدف الزامی هستند." });
       }
       const store = getActiveDataProvider();
+      // اسلایدر اپ عمودی است (کادر Expanded + BoxFit.cover)؛ واریانت موبایل ۳:۴ ساخته می‌شود
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, imageUrl, "slide");
       const newSlide = {
         id: "slide-" + Math.random().toString(36).substring(2, 9),
         imageUrl,
-        mobileImageUrl: mobileImageUrl || undefined,
+        mobileImageUrl: finalMobileUrl,
         target,
         titleFa: titleFa || "",
         titleEn: titleEn || "",
@@ -2527,14 +2810,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/app-sliders/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       const store = getActiveDataProvider();
       const slide = await store.getSliderById(id);
 
       if (slide) {
+        const finalImageUrl = imageUrl !== undefined ? imageUrl : slide.imageUrl;
+        const wantsAuto = autoGenerateMobile === true || (typeof mobileImageUrl === "string" && !mobileImageUrl.trim() && autoGenerateMobile !== false);
+        const finalMobileUrl = typeof mobileImageUrl === "string" && mobileImageUrl.trim()
+          ? mobileImageUrl.trim()
+          : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "slide") : undefined) ?? slide.mobileImageUrl;
+
         await store.updateSlider(id, {
-          imageUrl: imageUrl !== undefined ? imageUrl : slide.imageUrl,
-          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : slide.mobileImageUrl,
+          imageUrl: finalImageUrl,
+          mobileImageUrl: finalMobileUrl,
           target: target !== undefined ? target : slide.target,
           titleFa: titleFa !== undefined ? titleFa : slide.titleFa,
           titleEn: titleEn !== undefined ? titleEn : slide.titleEn,
@@ -3296,6 +3585,23 @@ Example format:
     res.sendFile(path.join(managementAppDist, "index.html"));
   });
 
+  // فایل‌های بهینه‌شده‌ی موبایل که پنل مدیریت در لحظه (runtime) می‌سازد. در production
+  // فقط dist سرو می‌شود و این فایل‌ها در public نوشته می‌شوند، پس بدون این mount
+  // موقتی ۴۰۴ می‌شدند. نام فایل هشِ محتواست پس کش immutable همیشه امن است.
+  const generatedImagesDir = generatedMobileDir();
+  try {
+    fs.mkdirSync(generatedImagesDir, { recursive: true });
+    app.use("/images/mobile/generated", express.static(generatedImagesDir, {
+      index: false,
+      fallthrough: true,
+      setHeaders: (res) => {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    }));
+  } catch (e) {
+    console.error("[Static] Failed to mount generated mobile images dir:", e);
+  }
+
   if (process.env.NODE_ENV !== "production") {
     // Mount Vite dev server in middleware mode
     const vite = await createViteServer({
@@ -3311,18 +3617,88 @@ Example format:
   } else {
     // Serve static files in production
     const distPath = path.join(staticRoot, "dist");
-    // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML بدون کش (برای به‌روزرسانی فوری)
+    // محاسبه‌ی نسخه‌ی دارایی‌ها برای مهر «?v=»: اولویت با متغیرهای محیطی دپلو است؛
+    // در نبودشان اثر انگشت محتوای پوشه‌ی تصاویر + نام باندل‌های هش‌دارِ اصلی ساخته
+    // می‌شود (با تعویض هر تصویر یا بازسازی JS تغییر می‌کند)؛ fallback آخر زمان بوت است.
+    try {
+      const envVersion = process.env.ASSET_VERSION || process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RAILWAY_DEPLOYMENT_ID || "";
+      if (envVersion) {
+        ASSET_VERSION = envVersion;
+      } else {
+        const parts: string[] = [];
+        const homeDir = path.join(distPath, "images", "home");
+        for (const name of (await fs.promises.readdir(homeDir)).sort()) {
+          const st = await fs.promises.stat(path.join(homeDir, name));
+          if (st.isFile()) parts.push(`${name}:${st.size}`);
+        }
+        const builtAssets = await fs.promises.readdir(path.join(distPath, "assets")).catch(() => [] as string[]);
+        parts.push("#", builtAssets.filter((n) => /^index-.*\.(js|css)$/.test(n)).sort().join(","));
+        ASSET_VERSION = createHash("sha256").update(parts.join("|")).digest("hex").slice(0, 12);
+      }
+    } catch {
+      ASSET_VERSION = String(Date.now());
+    }
+    // فایل‌های هش‌شده (assets) کش طولانی‌مدت؛ HTML باید بدون کش باشد تا هر دپلو
+    // فوراً دیده شود — پس index: false می‌گذاریم تا index.html به‌جای static، از
+    // هندلر پایین (با تزریق بوت‌استرپ و Cache-Control: no-cache) سرو شود.
+    // تصاویرِ نسخه‌دار (?v= هم‌ارز ASSET_VERSION) کش immutable یک‌ساله می‌گیرند؛
+    // URL بدون نسخه (dev یا کلاینت قدیمی) همان کش ۷روزه‌ی پیش‌فرض را نگه می‌دارد.
     app.use(express.static(distPath, {
+      index: false,
       maxAge: "7d",
       etag: true,
       setHeaders: (res, filePath) => {
         if (/\/assets\//.test(filePath)) {
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          return;
+        }
+        if (/\/images\//.test(filePath)) {
+          const reqQueryV = ((res as unknown as { req?: { query?: { v?: unknown } } }).req?.query?.v);
+          if (ASSET_VERSION && reqQueryV === ASSET_VERSION) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          }
         }
       }
     }));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    // Inline bootstrap: داده‌های لازم برای اولین رندر (مسابقات صفحه‌ی اصلی)
+    // داخل خودِ HTML تزریق می‌شود. قبلاً کلاینت بعد از دانلود و اجرای باندل JS
+    // یک رفت‌وبرگشت اضافه به /api/tournaments می‌زد و Lighthouse آن را به‌عنوان
+    // بخشی از زنجیره‌ی بحرانی LCP (HTML → JS → API) گزارش می‌کرد؛ با این تزریق،
+    // داده همزمان با HTML می‌رسد و آن لینک از زنجیره حذف می‌شود.
+    // قالب HTML فقط یک‌بار از دیسک خوانده می‌شود (dist در هر دپلو عوض می‌شود و
+    // فرایند ری‌استارت می‌شود، پس کهنگی قالب ممکن نیست). خودِ HTML کش نمی‌شود،
+    // پس داده‌ی تزریق‌شده هم همیشه تازه است؛ کلاینت هم بعداً با refreshAll
+    // به‌روزرسانی را انجام می‌دهد.
+    let indexHtmlTemplate: string | null = null;
+    app.get("*", async (req, res) => {
+      try {
+        if (!indexHtmlTemplate) {
+          let template = await fs.promises.readFile(path.join(distPath, "index.html"), "utf8");
+          // مهر نسخه روی URLهای images/* داخل HTML (مثل imagesrcset پیش‌بارگذاری
+          // تصویر قهرمان) تا آن‌ها هم بتوانند با کش immutable یک‌ساله سرو شوند.
+          // نکته: Vite با base:'./' مسیرهای public را در HTML بیلدشده «نسبی» می‌نویسد
+          // (images/home/… بدون اسلش اول)، پس الگو اسلش ابتدایی را اختیاری گرفته است.
+          // الگو بعد از «?»/«v=» موجود متوقف می‌شود، پس مهر دوباره زده نمی‌شود.
+          if (ASSET_VERSION) {
+            template = template.replace(/(\/?images\/[^\s"'<>?()]+)/g, (match, url: string, offset: number, whole: string) => {
+              const nextChar = whole.charAt(offset + match.length);
+              return nextChar === "?" ? match : `${url}?v=${encodeURIComponent(ASSET_VERSION)}`;
+            });
+          }
+          indexHtmlTemplate = template;
+        }
+        const bootstrap = {
+          tournaments: await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+          assetVersion: ASSET_VERSION,
+        };
+        // جلوگیری از شکستن HTML توسط دنباله‌هایی مثل "</script>" داخل JSON
+        const json = JSON.stringify(bootstrap).replace(/</g, "\\u003c");
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache");
+        res.send(indexHtmlTemplate.replace("</head>", `<script>window.__BAZINO_BOOTSTRAP__=${json};</script></head>`));
+      } catch {
+        res.sendFile(path.join(distPath, "index.html"));
+      }
     });
   }
 

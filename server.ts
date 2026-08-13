@@ -110,6 +110,76 @@ export async function resolveSampleById<T extends Record<string, any>>(
 }
 
 /**
+ * BACKWARD-COMPAT IMAGE REPAIR — «یک بار برای همیشه»
+ *
+ * نسخه‌های قدیمی، کاتالوگ را با لینک تصویر راه‌دور (unsplash) یا جایگذار
+ * عمومیِ مشترک (مثل `/images/home/cafe-320.webp` برای همه‌ی آیتم‌های کافه)
+ * seed می‌کردند. اپ موبایل `mobileImageUrl` را ترجیح می‌دهد، پس آن ردیف‌ها
+ * برای همیشه تصویر قدیمی نشان می‌دهند — حتی بعد از پاکسازی CDN، چون خودِ
+ * پیلود API قدیمی است.
+ *
+ * در هر بوت، فقط وقتی منبع داده «database» است: ردیف‌هایی که id آن‌ها با
+ * داده‌ی نمونه یکی است و لینک ذخیره‌شده‌شان «قدیمی/خراب» به نظر می‌رسد
+ * (لینک unsplash، یکی از جایگذارهای مشترک، یا مسیر محلی که فایلش روی دیسک
+ * نیست) به مسیر WebP فعلیِ sampleData بازنویسی می‌شوند. به ردیف‌های
+ * ساخته‌شده توسط ادمین یا لینک‌های دست‌نظافت‌دستی هرگز دست نمی‌زند و
+ * کاملاً idempotent است.
+ */
+async function repairLegacyCatalogImages(): Promise<void> {
+  try {
+    if ((await getDataSourceMode()) !== "database") return;
+    const store = getActiveDataProvider();
+
+    const LEGACY_HINTS = [
+      "unsplash.com", // لینک‌های راه‌دور نسخه‌های قدیمی
+      "/images/home/cafe-320.webp", // جایگذار عمومیِ مشترک آیتم‌های کافه
+      "/images/home/gear-shop-320.webp", // جایگذار عمومیِ مشترک فروشگاه
+      "/images/home/sports-console-320.webp", // جایگذار عمومیِ مشترک کنسول/دسته
+    ];
+    const staticRoots = [path.join(process.cwd(), "dist"), path.join(process.cwd(), "public")];
+    const isLegacyUrl = (url?: string): boolean => {
+      if (!url) return false;
+      if (LEGACY_HINTS.some((h) => url.includes(h))) return true;
+      // مسیر محلی که فایلش دیگر روی دیسک نیست = لینک خراب/قدیمی
+      if (url.startsWith("/")) return !staticRoots.some((root) => fs.existsSync(path.join(root, url)));
+      return false;
+    };
+
+    type ImageBearingRow = { id: string; imageUrl?: string; mobileImageUrl?: string };
+    const repair = async <T extends ImageBearingRow>(
+      rows: T[],
+      samples: T[],
+      update: (id: string, fields: Partial<T>) => Promise<void>
+    ): Promise<number> => {
+      let n = 0;
+      for (const s of samples) {
+        const row = rows.find((r) => r.id === s.id);
+        if (!row) continue;
+        const patch: Partial<T> = {};
+        if (s.imageUrl && isLegacyUrl(row.imageUrl)) (patch as Record<string, string>).imageUrl = s.imageUrl;
+        if (s.mobileImageUrl && isLegacyUrl(row.mobileImageUrl)) (patch as Record<string, string>).mobileImageUrl = s.mobileImageUrl;
+        if (Object.keys(patch).length) {
+          await update(row.id, patch);
+          n++;
+        }
+      }
+      return n;
+    };
+
+    const repaired =
+      (await repair(await store.listCafeItems(), SAMPLE_CAFE_ITEMS, (id, f) => store.updateCafeItem(id, f))) +
+      (await repair(await store.listAccessories(), SAMPLE_ACCESSORIES, (id, f) => store.updateAccessory(id, f))) +
+      (await repair(await store.listSliders(), SAMPLE_SLIDERS, (id, f) => store.updateSlider(id, f)));
+    if (repaired > 0) {
+      console.log(`[Image Repair] ${repaired} legacy catalog image URL(s) updated to current local WebP paths.`);
+    }
+  } catch (e) {
+    // این بهینه‌سازی هرگز نباید بوت سرور را متوقف کند
+    console.error("[Image Repair] skipped due to error:", e);
+  }
+}
+
+/**
  * Makes a sample row writable.
  *
  * resolveSampleById() happily hands back a SAMPLE row that exists only in
@@ -289,6 +359,10 @@ async function startServer() {
   // =========================================================================
   await initializeActiveProvider();
   const bootStore = getActiveDataProvider();
+
+  // ردیف‌های قدیمی کاتالوگ (لینک unsplash یا جایگذار عمومی cafe-320) را در
+  // حالت database به تصاویر محلی فعلی برمی‌گرداند؛ در حالت sample بی‌اثر است.
+  await repairLegacyCatalogImages();
 
   // Safety net only: if for some reason no admin account exists at all
   // (e.g. local dev before /install was ever completed), create a minimal

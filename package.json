@@ -11,7 +11,11 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "audit:theme": "tsx scripts/audit-theme-package.mts",
-    "test:theme-performance": "tsx scripts/test-theme-performance.mts"
+    "test:theme-performance": "tsx scripts/test-theme-performance.mts",
+    "test": "tsx tests/run-all.mts",
+    "test:unit": "tsx tests/unit.test.mts",
+    "test:db": "tsx tests/database.test.mts",
+    "test:api": "tsx tests/api.test.mts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

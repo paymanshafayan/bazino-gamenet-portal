@@ -60,7 +60,14 @@ const DATA_SOURCE_SETTING = "data_source";
 const MOBILE_APP_STORE_LINKS_SETTING = "mobile_app_store_links";
 const MOBILE_APP_APK_META_SETTING = "mobile_app_apk_meta";
 const JARVIS_AI_PROVIDERS_SETTING = "jarvis_ai_providers";
+const SYNC_API_KEY_SETTING = "gamenet_sync_api_key";
 const MOBILE_APP_APK_FILE_NAME = "bazino-app.apk";
+
+/** کلیدهای حساسِ جدول تنظیمات که هرگز نباید از مسیر عمومی /api/settings بیرون بروند. */
+const SECRET_SETTING_KEYS = new Set<string>([
+  JARVIS_AI_PROVIDERS_SETTING,
+  SYNC_API_KEY_SETTING,
+]);
 export type DataSourceMode = "sample" | "database";
 
 export async function getDataSourceMode(): Promise<DataSourceMode> {
@@ -1286,7 +1293,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // every /api/sync/* call must send a matching `Authorization: Bearer <key>` header.
   async function requireSyncApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
-      const expectedKey = await getActiveDataProvider().getSetting("gamenet_sync_api_key");
+      const expectedKey = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
       if (!expectedKey) return next(); // not configured — backward-compatible, allow through
       const header = req.headers.authorization;
       if (header && header.startsWith("Bearer ") && header.slice(7) === expectedKey) {
@@ -2619,9 +2626,10 @@ namespace GameNet.Infrastructure.Migrations
     try {
       const settings = await getActiveDataProvider().listSettings();
       const settingsObj = settings.reduce((acc, curr) => {
-        // AI provider API keys are managed via the admin-only Jarvis endpoint below;
-        // never leak them through the public /api/settings response.
-        if (curr.key === JARVIS_AI_PROVIDERS_SETTING) return acc;
+        // Secrets (AI provider keys, the desktop-sync API key) are managed through
+        // their own admin-only endpoints; never leak them through the public
+        // /api/settings response, which any visitor can read.
+        if (SECRET_SETTING_KEYS.has(curr.key)) return acc;
         acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);

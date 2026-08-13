@@ -667,7 +667,7 @@ export default function ConsoleGridClassic({
               const imageUrl = item.imageUrl || '/images/home/cafe-480.webp';
               return (
                 <div key={item.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
-                  <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [200, 400])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={item.name} className="h-20 w-full object-cover rounded-lg" />
+                  <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [320, 480])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={item.name} className="h-20 w-full object-cover rounded-lg" />
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{item.name}</h3>
@@ -767,7 +767,7 @@ export default function ConsoleGridClassic({
               const imageUrl = acc.imageUrl || '/images/home/gear-shop-480.webp';
               return (
                 <div key={acc.id} className="p-2.5 border border-white/5 bg-black/20 rounded-xl flex flex-col gap-2 relative">
-                  <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [200, 400])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={acc.name} className="h-20 w-full object-cover rounded-lg" />
+                  <img loading="lazy" src={imageUrl} srcSet={getResponsiveSrcSet(imageUrl, [320, 480])} sizes="(min-width: 1024px) 25vw, 50vw" width="400" height="240" alt={acc.name} className="h-20 w-full object-cover rounded-lg" />
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{acc.name}</h3>

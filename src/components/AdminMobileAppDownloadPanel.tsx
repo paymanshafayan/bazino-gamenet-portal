@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Download, Edit, ExternalLink, Github, PackageOpen, Play, Plus, QrCode, Save, Smartphone, Store, Trash2, Upload, X, Apple } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import type { MobileAppDownloadConfig, MobileAppStoreKind, MobileAppStoreLink } from '../types/mobileApp';
+import { getAuthToken } from '../services/authToken';
 
 interface Props {
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -119,46 +120,54 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
     await persistLinks(links.map((x) => x.id === id ? { ...x, isActive: !x.isActive } : x));
   };
 
+  // Maximum APK size accepted by the server (see /api/admin/mobile-app/upload-apk).
+  const MAX_APK_BYTES = 160 * 1024 * 1024;
+
   const uploadApk = (file: File) => {
     if (!file.name.toLowerCase().endsWith('.apk')) {
       addNotification(isFa ? 'فقط فایل APK قابل آپلود است' : 'Only APK files are allowed', 'error');
       return;
     }
+    if (file.size > MAX_APK_BYTES) {
+      addNotification(isFa ? 'حجم فایل APK بیشتر از ۱۶۰ مگابایت است' : 'APK file is larger than 160 MB', 'error');
+      return;
+    }
     setIsUploading(true);
     setUploadProgress(0);
 
-    const reader = new FileReader();
-    reader.onerror = () => {
+    // Raw binary upload (no base64/JSON): the request body stays as small as the
+    // file itself, the server parses it with express.raw, and upload progress
+    // tracks the actual bytes being sent.
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/admin/mobile-app/upload-apk?fileName=${encodeURIComponent(file.name)}`);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    // XHR bypasses the global fetch interceptor, so the admin token has to be
+    // attached by hand or /api/admin/* answers 401.
+    const authToken = getAuthToken();
+    if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) setUploadProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    xhr.onload = () => {
       setIsUploading(false);
-      addNotification(isFa ? 'خطا در خواندن فایل' : 'Failed to read file', 'error');
+      if (xhr.status >= 200 && xhr.status < 300) {
+        setUploadProgress(100);
+        addNotification(isFa ? 'فایل APK با موفقیت آپلود شد' : 'APK uploaded successfully', 'success');
+        void loadConfig();
+      } else if (xhr.status === 413) {
+        setUploadProgress(0);
+        addNotification(isFa ? 'حجم فایل APK از حد مجاز بیشتر است' : 'APK file is too large', 'error');
+      } else {
+        setUploadProgress(0);
+        addNotification(isFa ? 'آپلود APK ناموفق بود' : 'APK upload failed', 'error');
+      }
     };
-    reader.onprogress = (event) => {
-      if (event.lengthComputable) setUploadProgress(Math.round((event.loaded / event.total) * 45));
+    xhr.onerror = () => {
+      setIsUploading(false);
+      setUploadProgress(0);
+      addNotification(isFa ? 'خطا در ارتباط هنگام آپلود' : 'Network error while uploading', 'error');
     };
-    reader.onload = () => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/admin/mobile-app/upload-apk');
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) setUploadProgress(45 + Math.round((event.loaded / event.total) * 55));
-      };
-      xhr.onload = () => {
-        setIsUploading(false);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setUploadProgress(100);
-          addNotification(isFa ? 'فایل APK با موفقیت آپلود شد' : 'APK uploaded successfully', 'success');
-          void loadConfig();
-        } else {
-          addNotification(isFa ? 'آپلود APK ناموفق بود' : 'APK upload failed', 'error');
-        }
-      };
-      xhr.onerror = () => {
-        setIsUploading(false);
-        addNotification(isFa ? 'خطا در ارتباط هنگام آپلود' : 'Network error while uploading', 'error');
-      };
-      xhr.send(JSON.stringify({ fileName: file.name, mimeType: file.type || 'application/vnd.android.package-archive', dataBase64: String(reader.result) }));
-    };
-    reader.readAsDataURL(file);
+    xhr.send(file);
   };
 
   return (

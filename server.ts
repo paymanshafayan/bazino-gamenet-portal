@@ -1953,8 +1953,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         name,
         category,
         price: Number(price),
-        imageUrl: imageUrl || "/images/home/cafe-480.webp",
-        mobileImageUrl: mobileImageUrl || "/images/home/cafe-320.webp",
+        imageUrl: imageUrl || "/images/home/pizza-480.webp",
+        mobileImageUrl: mobileImageUrl || "/images/home/pizza-400.webp",
         inventory: Number(inventory),
         isAvailable: isAvailable !== false
       });
@@ -2640,33 +2640,65 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
-  app.post("/api/admin/mobile-app/upload-apk", async (req, res) => {
-    try {
-      const { fileName, dataBase64 } = req.body || {};
-      if (!fileName || !String(fileName).toLowerCase().endsWith(".apk")) {
-        return res.status(400).json({ error: "Only .apk files are allowed" });
+  app.post(
+    "/api/admin/mobile-app/upload-apk",
+    // Raw binary body (Content-Type: application/octet-stream from the admin panel).
+    // Keeps the request body the same size as the file itself (no base64 inflation)
+    // so uploads stay under reverse-proxy limits and track progress reliably.
+    // application/json is accepted too for backward compatibility with the old
+    // base64 client (cached bundles).
+    express.raw({ type: ["application/octet-stream", "application/vnd.android.package-archive", "application/x-apk", "application/zip", "application/json"], limit: "170mb" }),
+    async (req, res) => {
+      try {
+        const raw = req.body as Buffer | undefined;
+        if (!Buffer.isBuffer(raw) || raw.length === 0) {
+          return res.status(400).json({ error: "APK file data is missing" });
+        }
+
+        let buffer: Buffer;
+        let fileName = "";
+        const contentType = String(req.headers["content-type"] || "");
+
+        if (contentType.includes("application/json")) {
+          // Legacy base64 JSON upload from older cached clients.
+          let parsed: any;
+          try {
+            parsed = JSON.parse(raw.toString("utf8"));
+          } catch {
+            return res.status(400).json({ error: "Invalid APK upload payload" });
+          }
+          fileName = String(parsed?.fileName || "");
+          const dataBase64 = String(parsed?.dataBase64 || "");
+          if (!dataBase64) return res.status(400).json({ error: "Missing APK file data" });
+          const base64 = dataBase64.includes(",") ? dataBase64.split(",").pop()! : dataBase64;
+          buffer = Buffer.from(base64, "base64");
+        } else {
+          buffer = raw;
+          const rawName = typeof req.query.fileName === "string" ? req.query.fileName.trim() : "";
+          fileName = rawName;
+        }
+
+        if (buffer.length === 0) {
+          return res.status(400).json({ error: "Empty APK file" });
+        }
+        if (buffer.length > 160 * 1024 * 1024) {
+          return res.status(413).json({ error: "APK file is too large" });
+        }
+        if (fileName && !fileName.toLowerCase().endsWith(".apk")) {
+          return res.status(400).json({ error: "Only .apk files are allowed" });
+        }
+
+        fs.mkdirSync(getMobileAppDownloadDir(), { recursive: true });
+        fs.writeFileSync(getMobileAppApkPath(), buffer);
+        const meta = { originalName: fileName || MOBILE_APP_APK_FILE_NAME, size: buffer.length, uploadedAt: new Date().toISOString() };
+        await getActiveDataProvider().setSetting(MOBILE_APP_APK_META_SETTING, JSON.stringify(meta));
+        res.json({ success: true, ...(await getMobileAppConfig()) });
+      } catch (e) {
+        console.error("Mobile APK upload failed:", e);
+        res.status(500).json({ error: String(e) });
       }
-      if (!dataBase64 || typeof dataBase64 !== "string") {
-        return res.status(400).json({ error: "Missing APK file data" });
-      }
-      const base64 = dataBase64.includes(",") ? dataBase64.split(",").pop()! : dataBase64;
-      const buffer = Buffer.from(base64, "base64");
-      if (buffer.length === 0) {
-        return res.status(400).json({ error: "Empty APK file" });
-      }
-      if (buffer.length > 160 * 1024 * 1024) {
-        return res.status(413).json({ error: "APK file is too large" });
-      }
-      fs.mkdirSync(getMobileAppDownloadDir(), { recursive: true });
-      fs.writeFileSync(getMobileAppApkPath(), buffer);
-      const meta = { originalName: fileName, size: buffer.length, uploadedAt: new Date().toISOString() };
-      await getActiveDataProvider().setSetting(MOBILE_APP_APK_META_SETTING, JSON.stringify(meta));
-      res.json({ success: true, ...(await getMobileAppConfig()) });
-    } catch (e) {
-      console.error("Mobile APK upload failed:", e);
-      res.status(500).json({ error: String(e) });
     }
-  });
+  );
 
   app.post("/api/admin/mobile-app/store-links", async (req, res) => {
     try {

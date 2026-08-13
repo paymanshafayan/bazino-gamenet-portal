@@ -1,8 +1,13 @@
 # Plan: Localize sample-data images (cafe / shop / blog / sliders)
 
-> **Status: PAUSED.** `generate_image` hit its per-session quota (8 images were
-> used for the home-page work). Per user decision, we wait and generate these
-> clean AI images in a later session. `image_search` was rejected because it
+> **Status: 10/11 DONE.** All food/accessory images plus `pizza`/`keyboard`
+> hero variants are generated, optimized to WebP and wired into
+> `server/sampleData.ts`. Only **`hardware-pc`** remains: `generate_image` hit
+> its per-session quota (10 images) before the 11th could be produced. Until
+> then, blog `art-2` uses the existing `/images/home/pc-arena-800.webp` as a
+> stand-in — regenerate `hardware-pc` (16:9) → `hardware-pc-400.webp` +
+> `hardware-pc-800.webp` in a later session and point `art-2` back to
+> `/images/home/hardware-pc-800.webp`. `image_search` was rejected because it
 > returns watermarked stock-site previews (istock/adobe/freepik/dreamstime).
 >
 > The **home page is already done** (HomeTab/GamingAmp/GecoPurple/DarkGold all

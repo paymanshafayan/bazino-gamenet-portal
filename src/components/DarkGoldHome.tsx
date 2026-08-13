@@ -353,7 +353,7 @@ export default function DarkGoldHome({
                 <img loading="lazy"
                   src={genre.imageUrl}
                   srcSet={getResponsiveSrcSet(genre.imageUrl, [320, 480, 640])}
-                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                  sizes="(min-width: 1280px) 302px, (min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                   width="800"
                   height="960"
                   alt={getLocText(genre.title)}
@@ -429,7 +429,7 @@ export default function DarkGoldHome({
                 <img loading="lazy"
                   src={sect.imageUrl}
                   srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 480, 640])}
-                  sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw"
+                  sizes="(min-width: 1280px) 302px, (min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw"
                   width="800"
                   height="500"
                   alt={getLocText(sect.title)}

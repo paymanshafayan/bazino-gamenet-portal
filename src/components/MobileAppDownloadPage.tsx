@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import type { MobileAppDownloadConfig, MobileAppStoreKind, MobileAppStoreLink } from '../types/mobileApp';
-import bazinoLogo from '../assets/images/bazino_logo_user.webp';
+import bazinoLogo from '../assets/images/bazino_logo_user-80.webp'; // نمایش ۴۰px → واریانت ۸۰px
 
 interface Props {
   onBackHome: () => void;

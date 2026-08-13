@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
-import bazinoLogo from './assets/images/bazino_logo_user.webp';
+import bazinoLogo from './assets/images/bazino_logo_user-80.webp'; // 48 CSS px × DPR2 ≈ 80px واقعی
 import {
   BUILT_IN_THEMES,
   getStoredThemeId,

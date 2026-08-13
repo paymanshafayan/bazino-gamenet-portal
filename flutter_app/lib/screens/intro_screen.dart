@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+/// ارتفاع هدر صفحهٔ اینترو.
+///
+/// هم خودِ هدر و هم فاصلهٔ بالای ناحیهٔ ویدیو از این مقدار استفاده می‌کنند،
+/// بنابراین با تغییر آن، ویدیو هرگز زیر هدر نمی‌افتد.
+const double kIntroHeaderHeight = 74;
+
+/// رنگ سرمه‌ای تیرهٔ هدر اینترو (navy).
+const Color kIntroHeaderColor = Color(0xFF0B1B3A);
+
 class BazinoIntroScreen extends StatefulWidget {
   const BazinoIntroScreen({super.key, required this.onFinish});
 
@@ -67,7 +76,7 @@ class _BazinoIntroScreenState extends State<BazinoIntroScreen> {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-            top: 64,
+            top: kIntroHeaderHeight,
             child: _buildVideoArea(),
           ),
           Positioned(
@@ -77,10 +86,10 @@ class _BazinoIntroScreenState extends State<BazinoIntroScreen> {
             child: SafeArea(
               bottom: false,
               child: Container(
-                height: 64,
+                height: kIntroHeaderHeight,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF111827),
+                  color: kIntroHeaderColor,
                   boxShadow: [
                     BoxShadow(color: Color(0x99000000), blurRadius: 18, offset: Offset(0, 8)),
                   ],

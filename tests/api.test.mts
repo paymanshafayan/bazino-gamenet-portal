@@ -434,7 +434,8 @@ test('an admin-created cafe item keeps its mobileImageUrl', async () => {
   assert.equal(status, 200, JSON.stringify(body));
   const created = body.cafeItems.find((i: any) => i.name === 'E2E Item');
   assert.ok(created, 'created item not returned');
-  assert.equal(created.mobileImageUrl, '/images/home/cafe-320.webp', 'mobileImageUrl was dropped by the API');
+  // پاسخ‌ها با مهر «?v=» (ASSET_VERSION) سرو می‌شوند — مسیر bare مقایسه می‌شود
+  assert.equal((created.mobileImageUrl ?? '').split('?')[0], '/images/home/cafe-320.webp', 'mobileImageUrl was dropped by the API');
 });
 
 test('a new cafe item falls back to a LOCAL image, never unsplash', async () => {
@@ -456,7 +457,7 @@ test('an admin-created slider keeps its mobileImageUrl', async () => {
   assert.equal(status, 200, JSON.stringify(body));
   const created = body.appSliders.find((s: any) => s.titleEn === 'Test');
   assert.ok(created, 'slider not created');
-  assert.equal(created.mobileImageUrl, '/images/home/esports-320.webp', 'slider mobileImageUrl dropped by the API');
+  assert.equal((created.mobileImageUrl ?? '').split('?')[0], '/images/home/esports-320.webp', 'slider mobileImageUrl dropped by the API');
 });
 
 test('a slider without an image or target is rejected', async () => {
@@ -475,7 +476,7 @@ test('an admin-created article keeps its mobileImageUrl', async () => {
   // "sample" mode, so verify against the list the write endpoint returns.
   const created = body.articles.find((a: any) => a.title === 'E2E Article');
   assert.ok(created, 'article not created');
-  assert.equal(created.mobileImageUrl, '/images/home/hardware-pc-400.webp');
+  assert.equal((created.mobileImageUrl ?? '').split('?')[0], '/images/home/hardware-pc-400.webp');
   assert.deepEqual(created.comments, [], 'comments should be parsed into an array');
 });
 

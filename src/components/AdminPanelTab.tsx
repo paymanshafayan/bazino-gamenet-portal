@@ -126,13 +126,15 @@ export default function AdminPanelTab({
 
   // Form states for adding items
   const [newSystem, setNewSystem] = useState({ name: '', type: 'PC', hourlyRate: 25000, isActive: true });
-  const [newCafe, setNewCafe] = useState({ name: '', category: 'Foods', price: 50000, imageUrl: '', inventory: 20, isAvailable: true });
-  const [newAccessory, setNewAccessory] = useState({ name: '', description: '', price: 1000000, imageUrl: '', stock: 5, category: 'Keyboard' });
+  const [newCafe, setNewCafe] = useState({ name: '', category: 'Foods', price: 50000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, inventory: 20, isAvailable: true });
+  const [newAccessory, setNewAccessory] = useState({ name: '', description: '', price: 1000000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
   const [newTournament, setNewTournament] = useState({ title: '', game: '', registrationFee: 100000, startDate: '۱۴۰۵/۰۵/۰۱', maxTeams: 8 });
-  const [newArticle, setNewArticle] = useState({ title: '', content: '', category: 'News', imageUrl: '' });
+  const [newArticle, setNewArticle] = useState({ title: '', content: '', category: 'News', imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true });
 
   // Slider form states
   const [newSlideUrl, setNewSlideUrl] = useState('');
+  const [newSlideMobileUrl, setNewSlideMobileUrl] = useState('');
+  const [newSlideAutoMobile, setNewSlideAutoMobile] = useState(true);
   const [newSlideTarget, setNewSlideTarget] = useState('reserve');
   const [newSlideTitleFa, setNewSlideTitleFa] = useState('');
   const [newSlideTitleEn, setNewSlideTitleEn] = useState('');
@@ -593,6 +595,8 @@ export default function AdminPanelTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageUrl: newSlideUrl,
+          mobileImageUrl: newSlideMobileUrl,
+          autoGenerateMobile: newSlideAutoMobile,
           target: newSlideTarget,
           titleFa: newSlideTitleFa,
           titleEn: newSlideTitleEn,
@@ -604,6 +608,9 @@ export default function AdminPanelTab({
       if (res.success) {
         setAppSliders(res.appSliders);
         addNotification(language === 'fa' ? 'اسلاید جدید با موفقیت اضافه شد' : 'New slide added successfully', 'success');
+        setNewSlideUrl('');
+        setNewSlideMobileUrl('');
+        setNewSlideAutoMobile(true);
         setNewSlideUrl('');
         setNewSlideTitleFa('');
         setNewSlideTitleEn('');
@@ -651,6 +658,8 @@ export default function AdminPanelTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageUrl: newSlideUrl,
+          mobileImageUrl: newSlideMobileUrl,
+          autoGenerateMobile: newSlideAutoMobile,
           target: newSlideTarget,
           titleFa: newSlideTitleFa,
           titleEn: newSlideTitleEn,
@@ -664,6 +673,8 @@ export default function AdminPanelTab({
         addNotification(language === 'fa' ? 'اسلاید با موفقیت ویرایش شد' : 'Slide updated successfully', 'success');
         setEditingSlideId(null);
         setNewSlideUrl('');
+        setNewSlideMobileUrl('');
+        setNewSlideAutoMobile(true);
         setNewSlideTitleFa('');
         setNewSlideTitleEn('');
         setNewSlideTitleRu('');
@@ -681,6 +692,8 @@ export default function AdminPanelTab({
   const startEditSlide = (slide: any) => {
     setEditingSlideId(slide.id);
     setNewSlideUrl(slide.imageUrl);
+    setNewSlideMobileUrl(slide.mobileImageUrl || '');
+    setNewSlideAutoMobile(!slide.mobileImageUrl);
     setNewSlideTarget(slide.target);
     setNewSlideTitleFa(slide.titleFa || '');
     setNewSlideTitleEn(slide.titleEn || '');
@@ -692,6 +705,8 @@ export default function AdminPanelTab({
   const cancelEditSlide = () => {
     setEditingSlideId(null);
     setNewSlideUrl('');
+    setNewSlideMobileUrl('');
+    setNewSlideAutoMobile(true);
     setNewSlideTitleFa('');
     setNewSlideTitleEn('');
     setNewSlideTitleRu('');
@@ -1179,7 +1194,7 @@ export default function AdminPanelTab({
       });
       if (res.ok) {
         addNotification('آیتم بوفه جدید با موفقیت در دیتابیس ثبت شد', 'success');
-        setNewCafe({ name: '', category: 'Foods', price: 50000, imageUrl: '', inventory: 20, isAvailable: true });
+        setNewCafe({ name: '', category: 'Foods', price: 50000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, inventory: 20, isAvailable: true });
         fetchData();
       }
     } catch (e) {
@@ -1198,7 +1213,7 @@ export default function AdminPanelTab({
       });
       if (res.ok) {
         addNotification('تجهیزات گیمینگ جدید در انبار دیتابیس ذخیره شد', 'success');
-        setNewAccessory({ name: '', description: '', price: 1000000, imageUrl: '', stock: 5, category: 'Keyboard' });
+        setNewAccessory({ name: '', description: '', price: 1000000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
         fetchData();
       }
     } catch (e) {
@@ -1236,7 +1251,7 @@ export default function AdminPanelTab({
       });
       if (res.ok) {
         addNotification('مقاله جدید در بخش اخبار بلاگ منتشر شد', 'success');
-        setNewArticle({ title: '', content: '', category: 'News', imageUrl: '' });
+        setNewArticle({ title: '', content: '', category: 'News', imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true });
         fetchData();
       }
     } catch (e) {
@@ -1530,6 +1545,25 @@ export default function AdminPanelTab({
                       onChange={(e) => setNewSlideUrl(e.target.value)}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs text-gray-400 block mb-1 font-bold">{language === 'fa' ? 'تصویر عمودی نسخه موبایل (اختیاری)' : 'Vertical mobile version image (optional)'}</label>
+                    <input 
+                      type="text"
+                      placeholder="/images/mobile/generated/..."
+                      value={newSlideMobileUrl}
+                      onChange={(e) => setNewSlideMobileUrl(e.target.value)}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
+                    />
+                    <label className="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newSlideAutoMobile}
+                        onChange={(e) => setNewSlideAutoMobile(e.target.checked)}
+                        className="accent-primary w-3.5 h-3.5"
+                      />
+                      <span>{language === 'fa' ? 'اگر فیلد بالا خالی بود، ساخت خودکار نسخه عمودی موبایل از روی تصویر اصلی' : 'If empty, auto-generate a vertical mobile version from the main image'}</span>
+                    </label>
                   </div>
                   
                   <div>
@@ -2476,6 +2510,25 @@ export default function AdminPanelTab({
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
                   </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs text-gray-400 block mb-1 font-bold">{language === 'fa' ? 'تصویر نسخه موبایل (اختیاری)' : 'Mobile version image (optional)'}</label>
+                    <input 
+                      type="text"
+                      placeholder="/images/mobile/generated/..."
+                      value={newCafe.mobileImageUrl}
+                      onChange={(e) => setNewCafe({ ...newCafe, mobileImageUrl: e.target.value })}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
+                    />
+                    <label className="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newCafe.autoGenerateMobile}
+                        onChange={(e) => setNewCafe({ ...newCafe, autoGenerateMobile: e.target.checked })}
+                        className="accent-primary w-3.5 h-3.5"
+                      />
+                      <span>{language === 'fa' ? 'اگر فیلد بالا خالی بود، ساخت خودکار نسخه بهینه موبایل از روی تصویر اصلی' : 'If empty, auto-generate an optimized mobile version from the main image'}</span>
+                    </label>
+                  </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">موجودی اولیه انبار</label>
                     <input 
@@ -2602,6 +2655,25 @@ export default function AdminPanelTab({
                       onChange={(e) => setNewAccessory({ ...newAccessory, imageUrl: e.target.value })}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
+                  </div>
+                  <div className="md:col-span-3 space-y-2">
+                    <label className="text-xs text-gray-400 block mb-1 font-bold">{language === 'fa' ? 'تصویر نسخه موبایل (اختیاری)' : 'Mobile version image (optional)'}</label>
+                    <input 
+                      type="text"
+                      placeholder="/images/mobile/generated/..."
+                      value={newAccessory.mobileImageUrl}
+                      onChange={(e) => setNewAccessory({ ...newAccessory, mobileImageUrl: e.target.value })}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
+                    />
+                    <label className="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newAccessory.autoGenerateMobile}
+                        onChange={(e) => setNewAccessory({ ...newAccessory, autoGenerateMobile: e.target.checked })}
+                        className="accent-primary w-3.5 h-3.5"
+                      />
+                      <span>{language === 'fa' ? 'اگر فیلد بالا خالی بود، ساخت خودکار نسخه بهینه موبایل از روی تصویر اصلی' : 'If empty, auto-generate an optimized mobile version from the main image'}</span>
+                    </label>
                   </div>
                   <div className="md:col-span-3 flex justify-end">
                     <button 
@@ -2805,6 +2877,25 @@ export default function AdminPanelTab({
                       onChange={(e) => setNewArticle({ ...newArticle, imageUrl: e.target.value })}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400 block mb-1 font-bold">{language === 'fa' ? 'تصویر نسخه موبایل (اختیاری)' : 'Mobile version image (optional)'}</label>
+                    <input 
+                      type="text"
+                      placeholder="/images/mobile/generated/..."
+                      value={newArticle.mobileImageUrl}
+                      onChange={(e) => setNewArticle({ ...newArticle, mobileImageUrl: e.target.value })}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
+                    />
+                    <label className="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newArticle.autoGenerateMobile}
+                        onChange={(e) => setNewArticle({ ...newArticle, autoGenerateMobile: e.target.checked })}
+                        className="accent-primary w-3.5 h-3.5"
+                      />
+                      <span>{language === 'fa' ? 'اگر فیلد بالا خالی بود، ساخت خودکار نسخه بهینه موبایل از روی تصویر اصلی' : 'If empty, auto-generate an optimized mobile version from the main image'}</span>
+                    </label>
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">متن کامل مقاله</label>
@@ -3221,6 +3312,25 @@ export default function AdminPanelTab({
                       onChange={(e) => setNewSlideUrl(e.target.value)}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs text-gray-400 block mb-1 font-bold">{language === 'fa' ? 'تصویر عمودی نسخه موبایل (اختیاری)' : 'Vertical mobile version image (optional)'}</label>
+                    <input 
+                      type="text"
+                      placeholder="/images/mobile/generated/..."
+                      value={newSlideMobileUrl}
+                      onChange={(e) => setNewSlideMobileUrl(e.target.value)}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary font-mono"
+                    />
+                    <label className="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newSlideAutoMobile}
+                        onChange={(e) => setNewSlideAutoMobile(e.target.checked)}
+                        className="accent-primary w-3.5 h-3.5"
+                      />
+                      <span>{language === 'fa' ? 'اگر فیلد بالا خالی بود، ساخت خودکار نسخه عمودی موبایل از روی تصویر اصلی' : 'If empty, auto-generate a vertical mobile version from the main image'}</span>
+                    </label>
                   </div>
                   
                   <div className="md:col-span-2 bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">

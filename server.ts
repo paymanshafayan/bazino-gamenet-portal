@@ -125,11 +125,16 @@ export async function resolveSampleById<T extends Record<string, any>>(
  * نیست) به مسیر WebP فعلیِ sampleData بازنویسی می‌شوند. به ردیف‌های
  * ساخته‌شده توسط ادمین یا لینک‌های دست‌نظافت‌دستی هرگز دست نمی‌زند و
  * کاملاً idempotent است.
+ *
+ * جدا از این، در هر دو حالت، مقدار mobileImageUrlهایی که به
+ * /images/mobile/generated/* اشاره می‌کنند اما فایل‌شان دیگر روی دیسک نیست
+ * null می‌شود (مثلاً بعد از ری‌استارت روی هاست با دیسک موقتی) تا کلاینت
+ * به‌جای تصویر شکسته به imageUrl اصلی برگردد.
  */
 async function repairLegacyCatalogImages(): Promise<void> {
   try {
-    if ((await getDataSourceMode()) !== "database") return;
     const store = getActiveDataProvider();
+    const serveSampleMode = (await getDataSourceMode()) !== "database";
 
     const LEGACY_HINTS = [
       "unsplash.com", // لینک‌های راه‌دور نسخه‌های قدیمی
@@ -175,12 +180,45 @@ async function repairLegacyCatalogImages(): Promise<void> {
       return n;
     };
 
-    const repaired =
-      (await repair(await store.listCafeItems(), SAMPLE_CAFE_ITEMS, (id, f) => store.updateCafeItem(id, f))) +
-      (await repair(await store.listAccessories(), SAMPLE_ACCESSORIES, (id, f) => store.updateAccessory(id, f))) +
-      (await repair(await store.listSliders(), SAMPLE_SLIDERS, (id, f) => store.updateSlider(id, f)));
-    if (repaired > 0) {
-      console.log(`[Image Repair] ${repaired} legacy catalog image URL(s) updated to current local WebP paths.`);
+    // بازنویسی ردیف‌های قدیمی نسبت به داده‌ی نمونه فقط وقتی معنا دارد که
+    // منبع داده «database» است؛ در حالت sample هرگز اجرا نمی‌شود تا رفتار
+    // قبلی دقیقاً حفظ شود.
+    if (!serveSampleMode) {
+      const repaired =
+        (await repair(await store.listCafeItems(), SAMPLE_CAFE_ITEMS, (id, f) => store.updateCafeItem(id, f))) +
+        (await repair(await store.listAccessories(), SAMPLE_ACCESSORIES, (id, f) => store.updateAccessory(id, f))) +
+        (await repair(await store.listSliders(), SAMPLE_SLIDERS, (id, f) => store.updateSlider(id, f)));
+      if (repaired > 0) {
+        console.log(`[Image Repair] ${repaired} legacy catalog image URL(s) updated to current local WebP paths.`);
+      }
+    }
+
+    // فایل‌های تولیدشده‌ی runtime در public/images/mobile/generated روی هاست‌های
+    // با دیسک موقتی (مثل Railway بدون volume) بعد از هر بازنشانی پاک می‌شوند در
+    // حالی‌که DB به‌شان اشاره می‌کند؛ در آن حالت مقدار را null می‌کنیم تا اپ به
+    // جای نمایش تصویر شکسته، به imageUrl اصلیِ ردیف برگردد.
+    // این پاک‌سازی به حالت منبع داده بستگی ندارد (همیشه با دیسک و DB کار می‌کند،
+    // نه با داده‌ی نمونه) و هرگز به ردیف‌های سروشده از نمونه دست نمی‌زند.
+    const cleanDanglingGenerated = async <T extends ImageBearingRow>(
+      rows: T[],
+      update: (id: string, fields: Partial<T>) => Promise<void>
+    ): Promise<number> => {
+      let n = 0;
+      for (const row of rows) {
+        const url = typeof row.mobileImageUrl === "string" ? row.mobileImageUrl.split("?")[0] : "";
+        if (!url.startsWith("/images/mobile/generated/")) continue;
+        if (staticRoots.some((root) => fs.existsSync(path.join(root, url)))) continue;
+        await update(row.id, { mobileImageUrl: null } as unknown as Partial<T>);
+        n++;
+      }
+      return n;
+    };
+    const cleaned =
+      (await cleanDanglingGenerated(await store.listCafeItems(), (id, f) => store.updateCafeItem(id, f))) +
+      (await cleanDanglingGenerated(await store.listAccessories(), (id, f) => store.updateAccessory(id, f))) +
+      (await cleanDanglingGenerated(await store.listSliders(), (id, f) => store.updateSlider(id, f)));
+    if (cleaned > 0) {
+      console.log(`[Image Repair] ${cleaned} dangling generated mobile image reference(s) cleared (file missing on disk).`);
     }
   } catch (e) {
     // این بهینه‌سازی هرگز نباید بوت سرور را متوقف کند
@@ -254,6 +292,90 @@ function stampImageAssetUrls(value: unknown, depth = 0): unknown {
     out[key] = stampImageAssetUrls(entry, depth + 1);
   }
   return out;
+}
+
+// ==== ساخت خودکار نسخه‌ی موبایل از تصویر اصلی (پنل مدیریت) ====
+// وقتی ادمین تصویری ثبت می‌کند و «ساخت خودکار» فعال است، با sharp از روی تصویر
+// اصلی یک واریانت سبک با ابعاد متناسبِ اپ می‌سازیم و در public/images/mobile/generated
+// ذخیره می‌کنیم. نام فایل = هشِ محتوای منبع + نوع کاربرد؛ یعنی:
+//   الف) درخواست تکراری همان فایل را بازاستفاده می‌کند،
+//   ب) هر تغییر محتوا نامِ جدید می‌سازد، پس کش immutable بدون نیاز به مهر «?v=» امن است.
+// شکست در تولید هرگز ثبت آیتم را نمی‌شکند: با undefined برمی‌گردیم و اپ به
+// imageUrl اصلی برمی‌گردد (رفتار قبلی).
+const MOBILE_IMAGE_PRESETS = {
+  item: { width: 400, height: 400, quality: 78 },    // کارت آیتم کافه/فروشگاه — مربع
+  slide: { width: 640, height: 854, quality: 80 },   // اسلایدر اپ — عمودی ۳:۴ (کادر Expanded/تمام‌قد)
+  article: { width: 640, height: 360, quality: 80 }, // کارت مقاله — ۱۶:۹
+} as const;
+type MobileImageKind = keyof typeof MOBILE_IMAGE_PRESETS;
+
+const generatedMobileDir = () => path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "images", "mobile", "generated");
+
+async function generateMobileImageVariant(imageUrl: string | undefined, kind: MobileImageKind): Promise<string | undefined> {
+  if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.trim()) return undefined;
+  const preset = MOBILE_IMAGE_PRESETS[kind];
+  try {
+    const bareUrl = imageUrl.trim().split("?")[0];
+    let srcBuffer: Buffer | null = null;
+    if (bareUrl.startsWith("/")) {
+      // منبع لوکال: اول public (منبعِ بیلد)، بعد dist (خروجی production)
+      const staticRoot = process.env.BAZINO_STATIC_ROOT || process.cwd();
+      for (const root of [path.join(staticRoot, "public"), path.join(staticRoot, "dist")]) {
+        try { srcBuffer = await fs.promises.readFile(path.join(root, bareUrl)); break; } catch { /* ریشه‌ی بعدی */ }
+      }
+    } else if (/^https:\/\/images\.unsplash\.com\//.test(bareUrl)) {
+      // دانلود منبع خارجی فقط به Unsplash (هاستِ توصیه‌شده در فرم‌های ادمین) محدود شده
+      // تا سطح SSRF کوچک بماند؛ سقف ۸ مگابایت و تایم‌اوت ۶ ثانیه.
+      const resp = await fetch(bareUrl, { signal: AbortSignal.timeout(6000) });
+      if (resp.ok) {
+        const len = Number(resp.headers.get("content-length") || 0);
+        if (len <= 8 * 1024 * 1024) {
+          srcBuffer = Buffer.from(await resp.arrayBuffer());
+          if (srcBuffer.length > 8 * 1024 * 1024) srcBuffer = null;
+        }
+      }
+    }
+    if (!srcBuffer) {
+      // بدون این لاگ، مسیر رایج «نام فایل اشتباه/فایل ناموجود یا لینک غیرمجاز»
+      // کاملاً بی‌صداز هم بود undefined برمی‌گردد و دیباگِ ادمین غیرممکن می‌شود.
+      console.warn(
+        `[Mobile Image] auto-generation skipped: source unreadable or not allowed (url=${imageUrl}, kind=${kind}). ` +
+        `Local files must exist under public/ or dist/; remote sources are limited to https://images.unsplash.com/* (8MB max).`
+      );
+      return undefined;
+    }
+    const hash = createHash("sha256").update(srcBuffer).update(String(kind)).digest("hex").slice(0, 10);
+    const outName = `gen-${kind}-${hash}.webp`;
+    const outDir = generatedMobileDir();
+    const outPath = path.join(outDir, outName);
+    if (!fs.existsSync(outPath)) {
+      // import تنبل: اگر sharp روی محیطی نصب/قابل‌استفاده نبود، فقط تولید نسخه رد می‌شود نه بوت سرور
+      const sharp = (await import("sharp")).default;
+      await fs.promises.mkdir(outDir, { recursive: true });
+      await sharp(srcBuffer)
+        .rotate()
+        .resize(preset.width, preset.height, { fit: "cover", position: "attention" })
+        .webp({ quality: preset.quality, effort: 5 })
+        .toFile(outPath);
+    }
+    return `/images/mobile/generated/${outName}`;
+  } catch (err) {
+    console.error("[Mobile Image] auto-generation failed:", err);
+    return undefined;
+  }
+}
+
+// اولویت: مقدار دستیِ ادمین → ساخت خودکار → undefined (اپ خودش به imageUrl برمی‌گردد)
+async function resolveAdminMobileImageUrl(
+  manualValue: unknown,
+  autoGenerate: unknown,
+  imageUrl: string | undefined,
+  kind: MobileImageKind
+): Promise<string | undefined> {
+  const manual = typeof manualValue === "string" && manualValue.trim() ? manualValue.trim() : undefined;
+  if (manual) return manual;
+  if (autoGenerate === false) return undefined;
+  return generateMobileImageVariant(imageUrl, kind);
 }
 
 async function startServer() {
@@ -419,6 +541,8 @@ async function startServer() {
 
   // ردیف‌های قدیمی کاتالوگ (لینک unsplash یا جایگذار عمومی cafe-320) را در
   // حالت database به تصاویر محلی فعلی برمی‌گرداند؛ در حالت sample بی‌اثر است.
+  // همچنین رفرنس‌های mobileImageUrl که به فایل پاکشده در images/mobile/generated
+  // اشاره می‌کنند (دیسک موقتیِ هاست) را در هر دو حالت null می‌کند.
   await repairLegacyCatalogImages();
 
   // Safety net only: if for some reason no admin account exists at all
@@ -2079,17 +2203,23 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Cafe Items CRUD
   app.post("/api/admin/cafe", async (req, res) => {
     try {
-      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const nextId = "c" + ((await store.countCafeItems()) + 1);
+
+      const finalImageUrl = imageUrl || "/images/home/pizza-480.webp";
+      // اولویت: مقدار دستی ادمین ← ساخت خودکار با sharp (پیش‌فرض روشن) ← undefined که
+      // در آن صورت اپ خودش به imageUrl اصلی برمی‌گردد (رفتار قبلیِ fallback حذف شده؛
+      // دیگر پلیس‌هولدر عمومیِ pizza-400 به همه آیتم‌ها نمی‌چسبانیم)
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "item");
 
       await store.createCafeItem({
         id: nextId,
         name,
         category,
         price: Number(price),
-        imageUrl: imageUrl || "/images/home/pizza-480.webp",
-        mobileImageUrl: mobileImageUrl || "/images/home/pizza-400.webp",
+        imageUrl: finalImageUrl,
+        mobileImageUrl: finalMobileUrl,
         inventory: Number(inventory),
         isAvailable: isAvailable !== false
       });
@@ -2104,17 +2234,25 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/cafe/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
       const item = await store.getCafeItemById(id);
 
       if (item) {
+        const finalImageUrl = imageUrl !== undefined ? imageUrl : item.imageUrl;
+        // در ویرایش: مقدار دستی جدید ← در غیر این صورت اگر «ساخت خودکار» فرستاده شده
+        // دوباره از روی تصویر نهایی می‌سازیم ← وگرنه مقدار قبلی حفظ می‌شود
+        const wantsAuto = autoGenerateMobile === true || (typeof mobileImageUrl === "string" && !mobileImageUrl.trim() && autoGenerateMobile !== false);
+        const finalMobileUrl = typeof mobileImageUrl === "string" && mobileImageUrl.trim()
+          ? mobileImageUrl.trim()
+          : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "item") : undefined) ?? item.mobileImageUrl;
+
         await store.updateCafeItem(id, {
           name: name !== undefined ? name : item.name,
           category: category !== undefined ? category : item.category,
           price: price !== undefined ? Number(price) : item.price,
-          imageUrl: imageUrl !== undefined ? imageUrl : item.imageUrl,
-          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : item.mobileImageUrl,
+          imageUrl: finalImageUrl,
+          mobileImageUrl: finalMobileUrl,
           inventory: inventory !== undefined ? Number(inventory) : item.inventory,
           isAvailable: isAvailable !== undefined ? !!isAvailable : item.isAvailable,
         });
@@ -2164,17 +2302,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Accessory Shop CRUD
   app.post("/api/admin/accessories", async (req, res) => {
     try {
-      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countAccessories()) + 1);
+
+      const finalImageUrl = imageUrl || "/images/home/gear-shop-480.webp";
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "item");
 
       await store.createAccessory({
         id: nextId,
         name,
         description,
         price: Number(price),
-        imageUrl: imageUrl || "/images/home/gear-shop-480.webp",
-        mobileImageUrl: mobileImageUrl || "/images/home/gear-shop-320.webp",
+        imageUrl: finalImageUrl,
+        mobileImageUrl: finalMobileUrl,
         stock: Number(stock),
         category
       });
@@ -2189,17 +2330,23 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/accessories/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, price, imageUrl, mobileImageUrl, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
       const store = getActiveDataProvider();
       const acc = await store.getAccessoryById(id);
 
       if (acc) {
+        const finalImageUrl = imageUrl !== undefined ? imageUrl : acc.imageUrl;
+        const wantsAuto = autoGenerateMobile === true || (typeof mobileImageUrl === "string" && !mobileImageUrl.trim() && autoGenerateMobile !== false);
+        const finalMobileUrl = typeof mobileImageUrl === "string" && mobileImageUrl.trim()
+          ? mobileImageUrl.trim()
+          : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "item") : undefined) ?? acc.mobileImageUrl;
+
         await store.updateAccessory(id, {
           name: name !== undefined ? name : acc.name,
           description: description !== undefined ? description : acc.description,
           price: price !== undefined ? Number(price) : acc.price,
-          imageUrl: imageUrl !== undefined ? imageUrl : acc.imageUrl,
-          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : acc.mobileImageUrl,
+          imageUrl: finalImageUrl,
+          mobileImageUrl: finalMobileUrl,
           stock: stock !== undefined ? Number(stock) : acc.stock,
           category: category !== undefined ? category : acc.category,
         });
@@ -2304,17 +2451,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Blog News Articles CRUD
   app.post("/api/admin/articles", async (req, res) => {
     try {
-      const { title, content, category, imageUrl, mobileImageUrl, author, date } = req.body;
+      const { title, content, category, imageUrl, mobileImageUrl, autoGenerateMobile, author, date } = req.body;
       const store = getActiveDataProvider();
       const nextId = "a" + ((await store.countArticles()) + 1);
+
+      const finalImageUrl = imageUrl || "/images/home/esports-480.webp";
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "article");
 
       const newArt = {
         id: nextId,
         title,
         content,
         category,
-        imageUrl: imageUrl || "/images/home/esports-480.webp",
-        mobileImageUrl: mobileImageUrl || "/images/home/esports-320.webp",
+        imageUrl: finalImageUrl,
+        mobileImageUrl: finalMobileUrl,
         author: author || "سیستم مدیریت",
         date: date || "۱۴۰۵/۰۴/۱۴",
         comments: "[]",
@@ -2630,15 +2780,17 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/admin/app-sliders", async (req, res) => {
     try {
-      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       if (!imageUrl || !target) {
         return res.status(400).json({ error: "آدرس تصویر و بخش هدف الزامی هستند." });
       }
       const store = getActiveDataProvider();
+      // اسلایدر اپ عمودی است (کادر Expanded + BoxFit.cover)؛ واریانت موبایل ۳:۴ ساخته می‌شود
+      const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, imageUrl, "slide");
       const newSlide = {
         id: "slide-" + Math.random().toString(36).substring(2, 9),
         imageUrl,
-        mobileImageUrl: mobileImageUrl || undefined,
+        mobileImageUrl: finalMobileUrl,
         target,
         titleFa: titleFa || "",
         titleEn: titleEn || "",
@@ -2658,14 +2810,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/app-sliders/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       const store = getActiveDataProvider();
       const slide = await store.getSliderById(id);
 
       if (slide) {
+        const finalImageUrl = imageUrl !== undefined ? imageUrl : slide.imageUrl;
+        const wantsAuto = autoGenerateMobile === true || (typeof mobileImageUrl === "string" && !mobileImageUrl.trim() && autoGenerateMobile !== false);
+        const finalMobileUrl = typeof mobileImageUrl === "string" && mobileImageUrl.trim()
+          ? mobileImageUrl.trim()
+          : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "slide") : undefined) ?? slide.mobileImageUrl;
+
         await store.updateSlider(id, {
-          imageUrl: imageUrl !== undefined ? imageUrl : slide.imageUrl,
-          mobileImageUrl: mobileImageUrl !== undefined ? mobileImageUrl : slide.mobileImageUrl,
+          imageUrl: finalImageUrl,
+          mobileImageUrl: finalMobileUrl,
           target: target !== undefined ? target : slide.target,
           titleFa: titleFa !== undefined ? titleFa : slide.titleFa,
           titleEn: titleEn !== undefined ? titleEn : slide.titleEn,
@@ -3426,6 +3584,23 @@ Example format:
   app.get("/management-app/*", (req, res) => {
     res.sendFile(path.join(managementAppDist, "index.html"));
   });
+
+  // فایل‌های بهینه‌شده‌ی موبایل که پنل مدیریت در لحظه (runtime) می‌سازد. در production
+  // فقط dist سرو می‌شود و این فایل‌ها در public نوشته می‌شوند، پس بدون این mount
+  // موقتی ۴۰۴ می‌شدند. نام فایل هشِ محتواست پس کش immutable همیشه امن است.
+  const generatedImagesDir = generatedMobileDir();
+  try {
+    fs.mkdirSync(generatedImagesDir, { recursive: true });
+    app.use("/images/mobile/generated", express.static(generatedImagesDir, {
+      index: false,
+      fallthrough: true,
+      setHeaders: (res) => {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    }));
+  } catch (e) {
+    console.error("[Static] Failed to mount generated mobile images dir:", e);
+  }
 
   if (process.env.NODE_ENV !== "production") {
     // Mount Vite dev server in middleware mode

@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { suite, test, skip, assert, run, waitFor, getJson, postJson } from './harness.mts';
+import { suite, test, skip, assert, run, waitFor, getJson, postJson, putJson } from './harness.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.TEST_PORT ?? 3457);
@@ -76,6 +76,7 @@ process.on('exit', shutdown);
 
 // Shared across suites; declared at module scope so the trailing security suite
 // (which lives outside the boot-guard block) can see them too.
+const uniqueUser = `e2e_${Date.now().toString(36)}`;
 let authToken = '';
 // The fallback admin the server seeds on first boot when the users table is empty.
 let adminToken = '';
@@ -231,7 +232,6 @@ test('the seeded admin can log in and receives a token', async () => {
   adminToken = body.token;
 });
 
-const uniqueUser = `e2e_${Date.now().toString(36)}`;
 
 test('register creates a user and returns a JWT', async () => {
   const { status, body } = await postJson(`${BASE}/api/auth/register`, {
@@ -601,12 +601,23 @@ test('an unknown API route does not return the SPA shell as 200 JSON', async () 
   }
 });
 
-// requireSyncApiKey is deliberately backward-compatible: with no key configured
-// every /api/sync/* call is allowed (co-located desktop client). The moment a key
-// IS set, the header becomes mandatory. Both halves are asserted here.
-test('/api/sync/* is open while no API key is configured', async () => {
+// With no key configured, /api/sync/* stays reachable from the SAME machine (the
+// zero-config co-located desktop client) but is refused for anyone else. The
+// test client connects over loopback, so it represents the co-located case.
+test('/api/sync/* stays open for the co-located client when no key is set', async () => {
   const res = await fetch(`${BASE}/api/sync/reservations`);
-  assert.equal(res.status, 200, 'sync should stay open for the legacy same-origin client');
+  assert.equal(res.status, 200, 'the same-machine desktop client must keep working');
+});
+
+test('/api/sync/* refuses an unconfigured remote caller', async () => {
+  // An X-Forwarded-For header means the request was proxied from outside, which
+  // is exactly the internet-facing case that used to be wide open.
+  const res = await fetch(`${BASE}/api/sync/reservations`, {
+    headers: { 'X-Forwarded-For': '203.0.113.7' },
+  });
+  assert.equal(res.status, 401, 'a remote caller was served sync data without any key');
+  const body = await res.json();
+  assert.match(String(body.error), /not configured|key/i, 'the error should explain how to fix it');
 });
 
 test('/api/sync/* rejects a wrong or missing key once one is configured', async () => {
@@ -726,6 +737,279 @@ test('install setup hands back a token so the new admin is not locked out', asyn
   assert.ok(body.token, 'no token to bootstrap the admin panel with');
   const res = await fetch(`${BASE}/api/admin/stats`, { headers: { Authorization: `Bearer ${body.token}` } });
   assert.equal(res.status, 200, 'a freshly issued admin token cannot reach the admin panel');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   28. Loyalty, orders and tournaments (previously untested routes)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('28. API — loyalty, shop & tournaments');
+
+test('GET /api/user returns the current user', async () => {
+  const user = await getJson(`${BASE}/api/user`, 200, { Authorization: `Bearer ${authToken}` });
+  assert.equal(user.username, uniqueUser);
+  assert.equal(typeof user.loyaltyPoints, 'number');
+});
+
+test('POST /api/user/points credits the signed-in user', async () => {
+  const before = await getJson(`${BASE}/api/user`, 200, { Authorization: `Bearer ${authToken}` });
+  const { status, body } = await postJson(`${BASE}/api/user/points`,
+    { points: 25, description: 'e2e credit' }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+  const after = await getJson(`${BASE}/api/user`, 200, { Authorization: `Bearer ${authToken}` });
+  assert.equal(after.loyaltyPoints, before.loyaltyPoints + 25, 'points were not credited');
+});
+
+test('POST /api/loyalty/redeem rejects redeeming more points than owned', async () => {
+  const { body } = await postJson(`${BASE}/api/loyalty/redeem`,
+    { points: 10_000_000, couponValue: 50, code: 'TOOMUCH' }, { Authorization: `Bearer ${authToken}` });
+  assert.ok(body.error || body.success === false,
+    'redeeming more points than the user owns should not succeed');
+});
+
+test('POST /api/loyalty/redeem debits the points it spends', async () => {
+  await postJson(`${BASE}/api/user/points`, { points: 500, description: 'top-up' },
+    { Authorization: `Bearer ${authToken}` });
+  const before = await getJson(`${BASE}/api/user`, 200, { Authorization: `Bearer ${authToken}` });
+
+  const { status } = await postJson(`${BASE}/api/loyalty/redeem`,
+    { points: 100, couponValue: 10, code: 'E2EREDEEM' }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200);
+
+  const after = await getJson(`${BASE}/api/user`, 200, { Authorization: `Bearer ${authToken}` });
+  assert.equal(after.loyaltyPoints, before.loyaltyPoints - 100, 'points were not debited');
+});
+
+test('POST /api/accessories/order prices the cart from the catalog', async () => {
+  const accessories = await getJson(`${BASE}/api/accessories`);
+  const item = accessories[0];
+  const { status, body } = await postJson(`${BASE}/api/accessories/order`, {
+    // deliberately lie about the price — the server must ignore it
+    cart: [{ item: { ...item, price: 1 }, quantity: 2 }],
+  }, { Authorization: `Bearer ${authToken}` });
+
+  assert.equal(status, 200, JSON.stringify(body));
+  const charged = body.order?.totalPrice ?? body.totalPrice;
+  assert.equal(charged, item.price * 2, `client-supplied price was trusted (charged ${charged})`);
+});
+
+test('POST /api/accessories/order rejects an empty cart', async () => {
+  const { status } = await postJson(`${BASE}/api/accessories/order`, { cart: [] },
+    { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 400);
+});
+
+test('POST /api/tournaments/register adds the team', async () => {
+  const tournaments = await getJson(`${BASE}/api/tournaments`);
+  const t = tournaments[0];
+  const before = t.registeredTeamsCount;
+  const { status, body } = await postJson(`${BASE}/api/tournaments/register`, {
+    tournamentId: t.id, team: { name: 'E2E Squad', members: ['a', 'b'] },
+  }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+
+  // Regression: registering for a SAMPLE tournament used to be silently dropped.
+  assert.ok(Array.isArray(body.tournaments), 'expected the updated tournament list');
+  assert.ok(JSON.stringify(body.tournaments).includes('E2E Squad'),
+    'the registered team was not recorded');
+  const updated = body.tournaments.find((x: any) => x.id === t.id);
+  assert.ok(updated, 'the tournament is missing from the response');
+  assert.equal(updated.registeredTeamsCount, before + 1, 'team count did not increase');
+});
+
+test('GET /api/reservations lists reservation logs', async () => {
+  const logs = await getJson(`${BASE}/api/reservations`);
+  assert.ok(Array.isArray(logs), 'reservations should be an array');
+});
+
+test('POST /api/support/request rejects an empty message', async () => {
+  const { status } = await postJson(`${BASE}/api/support/request`, { message: '   ' },
+    { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 400);
+});
+
+test('POST /api/support/request files a ticket', async () => {
+  const { status, body } = await postJson(`${BASE}/api/support/request`,
+    { message: 'کیبورد سیستم ۳ کار نمی‌کند' }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   29. Admin CRUD — the rest of the catalog
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('29. API — admin catalog CRUD');
+
+// NOTE: while the data source is in "sample" mode the public GETs deliberately
+// serve SAMPLE_* rather than the database, so these tests verify against the
+// authoritative list each write endpoint returns.
+test('a system can be created, updated and deleted', async () => {
+  const created = await postJson(`${BASE}/api/admin/systems`,
+    { name: 'E2E Rig', type: 'PC', hourlyRate: 80000, isActive: true }, adminAuth());
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const mine = created.body.systems.find((s: any) => s.name === 'E2E Rig');
+  assert.ok(mine, 'system was not created');
+  assert.equal(mine.hourlyRate, 80000);
+
+  const updated = await putJson(`${BASE}/api/admin/systems/${mine.id}`,
+    { name: 'E2E Rig v2', hourlyRate: 95000 }, adminAuth());
+  assert.equal(updated.status, 200, `update failed: ${JSON.stringify(updated.body)}`);
+  const renamed = updated.body.systems.find((s: any) => s.id === mine.id);
+  assert.equal(renamed.name, 'E2E Rig v2', 'rename did not persist');
+  assert.equal(renamed.hourlyRate, 95000, 'hourlyRate did not persist');
+
+  const del = await fetch(`${BASE}/api/admin/systems/${mine.id}`, { method: 'DELETE', headers: adminAuth() });
+  assert.equal(del.status, 200, 'delete failed');
+  const after = await del.json();
+  assert.ok(!after.systems.some((s: any) => s.id === mine.id), 'system still present after delete');
+});
+
+test('a tournament can be created and deleted', async () => {
+  const created = await postJson(`${BASE}/api/admin/tournaments`, {
+    title: 'E2E Cup', game: 'CS2', registrationFee: 50000,
+    startDate: '۱۴۰۵/۰۵/۰۱', maxTeams: 8, status: 'Open',
+  }, adminAuth());
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+
+  const mine = created.body.tournaments.find((t: any) => t.title === 'E2E Cup');
+  assert.ok(mine, 'tournament was not created');
+
+  const del = await fetch(`${BASE}/api/admin/tournaments/${mine.id}`, { method: 'DELETE', headers: adminAuth() });
+  assert.equal(del.status, 200, 'tournament delete failed');
+});
+
+test('an accessory can be created and deleted', async () => {
+  const created = await postJson(`${BASE}/api/admin/accessories`, {
+    name: 'E2E Mouse', price: 999000, stock: 3, category: 'Mouse',
+    imageUrl: '/images/home/gear-shop-480.webp',
+  }, adminAuth());
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+
+  const mine = created.body.accessories.find((a: any) => a.name === 'E2E Mouse');
+  assert.ok(mine, 'accessory was not created');
+
+  const del = await fetch(`${BASE}/api/admin/accessories/${mine.id}`, { method: 'DELETE', headers: adminAuth() });
+  assert.equal(del.status, 200);
+});
+
+test('an admin message reaches the user inbox', async () => {
+  const { status, body } = await postJson(`${BASE}/api/admin/messages`, {
+    recipient: uniqueUser, title: 'E2E Notice', body: 'سلام', sendAsNotification: false,
+  }, adminAuth());
+  assert.equal(status, 200, JSON.stringify(body));
+
+  const messages = await getJson(`${BASE}/api/messages`, 200, { Authorization: `Bearer ${authToken}` });
+  const mine = messages.find((m: any) => m.title === 'E2E Notice');
+  assert.ok(mine, 'the message never reached the recipient');
+
+  const read = await postJson(`${BASE}/api/messages/${mine.id}/read`, {},
+    { Authorization: `Bearer ${authToken}` });
+  assert.equal(read.status, 200, 'marking the message read failed');
+  assert.equal(read.body.message.isRead, true);
+});
+
+test('an incomplete admin message is rejected', async () => {
+  const { status } = await postJson(`${BASE}/api/admin/messages`, { recipient: uniqueUser }, adminAuth());
+  assert.equal(status, 400);
+});
+
+test('marking an unknown message read 404s', async () => {
+  const { status } = await postJson(`${BASE}/api/messages/does-not-exist/read`, {},
+    { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 404);
+});
+
+test('the data-source mode can be switched and rejects junk', async () => {
+  const bad = await postJson(`${BASE}/api/admin/data-source`, { mode: 'nonsense' }, adminAuth());
+  assert.equal(bad.status, 400, 'an invalid data-source mode was accepted');
+
+  const ok = await postJson(`${BASE}/api/admin/data-source`, { mode: 'database' }, adminAuth());
+  assert.equal(ok.status, 200);
+  assert.equal((await getJson(`${BASE}/api/data-source`)).mode, 'database');
+
+  // restore, otherwise later suites see a different data source
+  await postJson(`${BASE}/api/admin/data-source`, { mode: 'sample' }, adminAuth());
+  assert.equal((await getJson(`${BASE}/api/data-source`)).mode, 'sample');
+});
+
+test('POST /api/admin/translate validates its input', async () => {
+  const { status } = await postJson(`${BASE}/api/admin/translate`, { text: '' }, adminAuth());
+  assert.equal(status, 400);
+});
+
+// There is no create-room endpoint: rooms come from sample data / chat activity.
+test('an admin can delete a chat room', async () => {
+  const rooms = await getJson(`${BASE}/api/chat/rooms`);
+  const name = (Array.isArray(rooms) ? rooms : rooms.rooms ?? [])
+    .map((r: any) => (typeof r === 'string' ? r : r.name)).filter(Boolean).pop();
+  assert.ok(name, 'no chat room to delete');
+
+  const del = await fetch(`${BASE}/api/admin/chat-rooms/${encodeURIComponent(name)}`,
+    { method: 'DELETE', headers: adminAuth() });
+  assert.equal(del.status, 200, `delete failed with ${del.status}`);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   30. Misc endpoints & static delivery
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('30. API — misc endpoints');
+
+test('GET /api/chat/messages/:room returns an array', async () => {
+  const msgs = await getJson(`${BASE}/api/chat/messages/general`);
+  assert.ok(Array.isArray(msgs));
+});
+
+test('GET /api/desktop/availability reports per-platform flags', async () => {
+  const body = await getJson(`${BASE}/api/desktop/availability`);
+  assert.ok(body.availability && typeof body.availability === 'object');
+  for (const [platform, flag] of Object.entries(body.availability)) {
+    assert.equal(typeof flag, 'boolean', `${platform} availability is not a boolean`);
+  }
+});
+
+test('GET /api/csharp/migrations returns C# source', async () => {
+  const res = await fetch(`${BASE}/api/csharp/migrations`);
+  assert.equal(res.status, 200);
+  const text = await res.text();
+  assert.match(text, /Migration|migrationBuilder/, 'does not look like migration code');
+});
+
+test('an article comment round-trips', async () => {
+  const articles = await getJson(`${BASE}/api/articles`);
+  const target = articles[0];
+  const { status, body } = await postJson(`${BASE}/api/articles/${target.id}/comment`, {
+    gamerTag: 'e2e_commenter', content: 'تست نظر',
+  }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+  // Regression: posting a comment on a SAMPLE article used to update zero rows
+  // and lose the comment while still answering success:true.
+  assert.ok(Array.isArray(body.articles), 'expected the updated article list');
+  assert.ok(JSON.stringify(body.articles).includes('e2e_commenter'),
+    'the comment was not persisted');
+
+  // GET /api/articles still serves the pristine SAMPLE_ARTICLES while the data
+  // source is in "sample" mode, so the comment is only visible once the site is
+  // switched to the database — assert that, rather than a stale expectation.
+  await postJson(`${BASE}/api/admin/data-source`, { mode: 'database' }, adminAuth());
+  try {
+    const fromDb = await getJson(`${BASE}/api/articles`);
+    assert.ok(JSON.stringify(fromDb).includes('e2e_commenter'),
+      'the comment did not survive in the database');
+  } finally {
+    await postJson(`${BASE}/api/admin/data-source`, { mode: 'sample' }, adminAuth());
+  }
+});
+
+test('GET /api/themes/:id/theme.js is served for a built-in theme', async () => {
+  const themes = await getJson(`${BASE}/api/themes`);
+  const first = themes.serverThemes?.[0];
+  if (!first) return; // no server themes installed — nothing to assert
+  const res = await fetch(`${BASE}/api/themes/${first.id}/theme.js`);
+  assert.ok(res.status === 200 || res.status === 404, `unexpected status ${res.status}`);
+});
+
+test('the SPA shell is returned for an unknown non-API path', async () => {
+  const res = await fetch(`${BASE}/some/deep/client/route`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type') ?? '', /text\/html/);
 });
 
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });

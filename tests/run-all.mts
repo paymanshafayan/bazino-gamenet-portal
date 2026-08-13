@@ -38,6 +38,8 @@ type Layer = {
 const LAYERS: Layer[] = [
   { id: 'unit', file: 'unit.test.mts', report: 'unit.json', title: 'واحد — منطق خالص' },
   { id: 'database', file: 'database.test.mts', report: 'database.json', title: 'دیتابیس — SQLite واقعی' },
+  { id: 'providers', file: 'providers.test.mts', report: 'providers.json', title: 'پرووایدرها — SQLServer/Mongo' },
+  { id: 'ui', file: 'ui.test.mts', report: 'ui.json', title: 'رابط کاربری — کامپوننت‌ها (jsdom)' },
   { id: 'api', file: 'api.test.mts', report: 'api.json', title: 'API — سرور واقعی (end-to-end)', needsBuild: true },
 ];
 

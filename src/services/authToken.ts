@@ -66,12 +66,17 @@ let installed = false;
  * دیگری فرستاده نمی‌شود، و هدرِ صریحِ خودِ فراخوان بازنویسی نمی‌شود.
  */
 export function installAuthFetchInterceptor(): void {
-  if (installed || typeof window === 'undefined' || !window.fetch) return;
+  // Patch the fetch that callers actually reach. `globalThis` is the correct
+  // target: in a browser it IS `window`, and under a test DOM the two objects
+  // can differ, in which case patching only `window` would silently miss every
+  // call made through the bare `fetch(...)` binding.
+  const scope: any = typeof globalThis !== 'undefined' ? globalThis : undefined;
+  if (installed || !scope || typeof scope.fetch !== 'function') return;
   installed = true;
 
-  const originalFetch = window.fetch.bind(window);
+  const originalFetch = scope.fetch.bind(scope);
 
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const patched = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const token = getAuthToken();
     if (!token) return originalFetch(input as any, init);
 
@@ -89,4 +94,16 @@ export function installAuthFetchInterceptor(): void {
 
     return originalFetch(input as any, { ...init, headers });
   };
+
+  scope.fetch = patched;
+  // Keep window.fetch in sync when it is a distinct object (test DOMs), so code
+  // that explicitly calls `window.fetch(...)` is intercepted too.
+  if (typeof window !== 'undefined' && (window as any) !== scope) {
+    (window as any).fetch = patched;
+  }
+}
+
+/** فقط برای تست‌ها: اجازهٔ نصب دوبارهٔ interceptor روی یک fetch تازه. */
+export function __resetAuthFetchInterceptorForTests(): void {
+  installed = false;
 }

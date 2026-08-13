@@ -166,8 +166,17 @@ export async function getJson(url: string, expectedStatus = 200, headers?: Recor
 
 /** POST JSON and return { status, body } without throwing on error codes. */
 export async function postJson(url: string, payload: unknown, headers: Record<string, string> = {}): Promise<{ status: number; body: any }> {
+  return sendJson('POST', url, payload, headers);
+}
+
+/** Same as postJson, for endpoints that expect PUT. */
+export async function putJson(url: string, payload: unknown, headers: Record<string, string> = {}): Promise<{ status: number; body: any }> {
+  return sendJson('PUT', url, payload, headers);
+}
+
+async function sendJson(method: string, url: string, payload: unknown, headers: Record<string, string>): Promise<{ status: number; body: any }> {
   const res = await fetch(url, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(payload),
   });

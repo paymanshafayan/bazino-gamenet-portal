@@ -15,7 +15,9 @@
     "test": "tsx tests/run-all.mts",
     "test:unit": "tsx tests/unit.test.mts",
     "test:db": "tsx tests/database.test.mts",
-    "test:api": "tsx tests/api.test.mts"
+    "test:api": "tsx tests/api.test.mts",
+    "test:ui": "tsx tests/ui.test.mts",
+    "test:providers": "tsx tests/providers.test.mts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -50,6 +52,7 @@
     "@vitejs/plugin-legacy": "^6.1.1",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "jsdom": "^30.0.1",
     "postcss": "^8.4.49",
     "preact": "^10.29.8",
     "tailwindcss": "^4.1.14",

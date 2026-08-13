@@ -109,6 +109,36 @@ export async function resolveSampleById<T extends Record<string, any>>(
   return dbRow ?? sampleRows.find(x => x[keyField] === key);
 }
 
+/**
+ * Makes a sample row writable.
+ *
+ * resolveSampleById() happily hands back a SAMPLE row that exists only in
+ * memory. Any follow-up `UPDATE ... WHERE id = ?` then matches zero rows and the
+ * change is silently lost while the endpoint still answers `success: true`
+ * (e.g. posting a comment on a sample article, or registering a team for a
+ * sample tournament).
+ *
+ * This inserts the sample row into the database first — but only when it isn't
+ * there yet — so the subsequent UPDATE has something to write to. Returns true
+ * when the row is now persisted.
+ */
+export async function ensurePersisted<T extends Record<string, any>>(
+  fetchDb: () => Promise<T | undefined>,
+  create: (row: T) => Promise<void>,
+  row: T | undefined
+): Promise<boolean> {
+  if (!row) return false;
+  const existing = await fetchDb();
+  if (existing) return true;
+  try {
+    await create(row);
+    return true;
+  } catch (err) {
+    console.error("[ensurePersisted] Could not materialise sample row:", err);
+    return false;
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = process.env.NODE_ENV === "production" ? (Number(process.env.PORT) || 3000) : 3000;
@@ -768,6 +798,13 @@ async function startServer() {
       const store = getActiveDataProvider();
       const reservation = await resolveSampleById(() => store.getReservationLogById(id), SAMPLE_RESERVATION_LOGS, id);
       if (reservation) {
+        // A sample reservation must be materialised first, otherwise the
+        // check-in UPDATE matches no rows and the guest is never marked present.
+        await ensurePersisted(
+          () => store.getReservationLogById(id),
+          r => store.addReservationLog(r),
+          reservation
+        );
         await store.setReservationCheckedIn(id);
         const reservationLogs = await store.listReservationLogs();
         res.json({
@@ -1317,19 +1354,48 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Guards every /api/sync/* route. The expected key is read from the generic settings
   // store under `gamenet_sync_api_key` (set it via `POST /api/admin/settings` with
   // `{ key: "gamenet_sync_api_key", value: "..." }`, or from the site's admin settings UI
-  // once one exists for it). If no key has been configured yet, every request is allowed
-  // through — this keeps the existing co-located/same-origin behavior working exactly as
-  // before for anyone who hasn't set up remote desktop sync. Once a key IS configured,
-  // every /api/sync/* call must send a matching `Authorization: Bearer <key>` header.
+  // once one exists for it).
+  //
+  // Access rules:
+  //   • key configured  → a matching `Authorization: Bearer <key>` header is required.
+  //   • no key, request from the same machine (loopback) → allowed, so the zero-config
+  //     co-located desktop client keeps working exactly as before.
+  //   • no key, request from anywhere else → refused. Previously these were allowed,
+  //     which published station/reservation data on any internet-facing deployment.
+  /** Is this request coming from the machine the server itself runs on? */
+  function isLoopbackRequest(req: express.Request): boolean {
+    // req.ip honours trust proxy; fall back to the raw socket address.
+    const raw = (req.ip || req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+    if (raw !== "127.0.0.1" && raw !== "::1" && raw !== "localhost") return false;
+    // A reverse proxy on the same host would also look like loopback, so a
+    // forwarding header means the request really came from outside.
+    if (req.headers["x-forwarded-for"]) return false;
+    return true;
+  }
+
   async function requireSyncApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
       const expectedKey = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
-      if (!expectedKey) return next(); // not configured — backward-compatible, allow through
-      const header = req.headers.authorization;
-      if (header && header.startsWith("Bearer ") && header.slice(7) === expectedKey) {
-        return next();
+
+      if (expectedKey) {
+        const header = req.headers.authorization;
+        if (header && header.startsWith("Bearer ") && header.slice(7) === expectedKey) {
+          return next();
+        }
+        return res.status(401).json({ success: false, error: "Invalid or missing sync API key" });
       }
-      res.status(401).json({ success: false, error: "Invalid or missing sync API key" });
+
+      // No key configured yet. The original behaviour was to allow EVERYONE
+      // through, which exposes desktop-sync data on any public deployment.
+      // Keep the zero-config path working for the co-located desktop client
+      // (same machine → loopback) but refuse anonymous remote callers and tell
+      // the operator how to enable remote sync properly.
+      if (isLoopbackRequest(req)) return next();
+
+      return res.status(401).json({
+        success: false,
+        error: "Sync API key is not configured. Set the 'gamenet_sync_api_key' setting in the admin panel to allow remote sync clients.",
+      });
     } catch (err) {
       console.error("[Sync Auth] Error checking API key:", err);
       res.status(500).json({ error: "Failed to verify sync API key" });
@@ -1668,6 +1734,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const tournament = await resolveSampleById(() => store.getTournamentById(tournamentId), SAMPLE_TOURNAMENTS, tournamentId);
 
       if (tournament) {
+        // Same as article comments: a sample tournament has to be materialised
+        // before registerTournamentTeam()'s UPDATE can persist the new team.
+        await ensurePersisted(
+          () => store.getTournamentById(tournamentId),
+          t => store.createTournament(t),
+          tournament
+        );
         const teams = JSON.parse(tournament.teams);
         teams.push(team);
         const registeredTeamsCount = tournament.registeredTeamsCount + 1;
@@ -1712,6 +1785,9 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const article = await resolveSampleById(() => store.getArticleById(id), SAMPLE_ARTICLES, id);
 
       if (article) {
+        // The article may only exist as sample data; persist it first, otherwise
+        // the UPDATE below silently writes to nothing and the comment is lost.
+        await ensurePersisted(() => store.getArticleById(id), a => store.createArticle(a), article);
         const comments = JSON.parse(article.comments);
         const newComment = {
           id: Math.random().toString(36).substring(2, 9),

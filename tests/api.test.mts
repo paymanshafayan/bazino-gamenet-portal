@@ -74,6 +74,13 @@ const shutdown = () => {
 };
 process.on('exit', shutdown);
 
+// Shared across suites; declared at module scope so the trailing security suite
+// (which lives outside the boot-guard block) can see them too.
+let authToken = '';
+// The fallback admin the server seeds on first boot when the users table is empty.
+let adminToken = '';
+const adminAuth = () => ({ Authorization: `Bearer ${adminToken}` });
+
 if (bootError) {
   suite('17. API');
   skip('all API/end-to-end tests', `server did not boot: ${bootError.split('\n')[0]}`);
@@ -214,8 +221,17 @@ test('hashed assets are sent with a long-lived immutable cache header', async ()
    ═══════════════════════════════════════════════════════════════════════ */
 suite('20. API — authentication');
 
+test('the seeded admin can log in and receives a token', async () => {
+  const { status, body } = await postJson(`${BASE}/api/auth/login`, {
+    username: 'admin', password: 'admin',
+  });
+  assert.equal(status, 200, `admin login failed: ${JSON.stringify(body)}`);
+  assert.ok(body.token, 'admin login returned no token');
+  assert.equal(body.user.role, 'admin', 'seeded admin does not have the admin role');
+  adminToken = body.token;
+});
+
 const uniqueUser = `e2e_${Date.now().toString(36)}`;
-let authToken = '';
 
 test('register creates a user and returns a JWT', async () => {
   const { status, body } = await postJson(`${BASE}/api/auth/register`, {
@@ -414,7 +430,7 @@ test('an admin-created cafe item keeps its mobileImageUrl', async () => {
     name: 'E2E Item', category: 'Foods', price: 12345,
     imageUrl: '/images/home/cafe-480.webp', mobileImageUrl: '/images/home/cafe-320.webp',
     inventory: 3,
-  });
+  }, adminAuth());
   assert.equal(status, 200, JSON.stringify(body));
   const created = body.cafeItems.find((i: any) => i.name === 'E2E Item');
   assert.ok(created, 'created item not returned');
@@ -424,7 +440,7 @@ test('an admin-created cafe item keeps its mobileImageUrl', async () => {
 test('a new cafe item falls back to a LOCAL image, never unsplash', async () => {
   const { status, body } = await postJson(`${BASE}/api/admin/cafe`, {
     name: 'E2E NoImage', category: 'Foods', price: 1000, inventory: 1,
-  });
+  }, adminAuth());
   assert.equal(status, 200);
   const created = body.cafeItems.find((i: any) => i.name === 'E2E NoImage');
   assert.ok(created.imageUrl.startsWith('/images/'), `fallback is not local: ${created.imageUrl}`);
@@ -436,7 +452,7 @@ test('an admin-created slider keeps its mobileImageUrl', async () => {
     imageUrl: '/images/home/esports-480.webp',
     mobileImageUrl: '/images/home/esports-320.webp',
     target: 'reserve', titleFa: 'تست', titleEn: 'Test',
-  });
+  }, adminAuth());
   assert.equal(status, 200, JSON.stringify(body));
   const created = body.appSliders.find((s: any) => s.titleEn === 'Test');
   assert.ok(created, 'slider not created');
@@ -444,7 +460,7 @@ test('an admin-created slider keeps its mobileImageUrl', async () => {
 });
 
 test('a slider without an image or target is rejected', async () => {
-  const { status } = await postJson(`${BASE}/api/admin/app-sliders`, { titleEn: 'no image' });
+  const { status } = await postJson(`${BASE}/api/admin/app-sliders`, { titleEn: 'no image' }, adminAuth());
   assert.equal(status, 400);
 });
 
@@ -453,7 +469,7 @@ test('an admin-created article keeps its mobileImageUrl', async () => {
     title: 'E2E Article', content: 'body', category: 'Hardware',
     imageUrl: '/images/home/hardware-pc-800.webp',
     mobileImageUrl: '/images/home/hardware-pc-400.webp',
-  });
+  }, adminAuth());
   assert.equal(status, 200, JSON.stringify(body));
   // GET /api/articles serves SAMPLE_ARTICLES while the data source is in
   // "sample" mode, so verify against the list the write endpoint returns.
@@ -466,7 +482,7 @@ test('an admin-created article keeps its mobileImageUrl', async () => {
 test('a new article falls back to a LOCAL image, never unsplash', async () => {
   const { status, body } = await postJson(`${BASE}/api/admin/articles`, {
     title: 'E2E NoImage Article', content: 'body', category: 'News',
-  });
+  }, adminAuth());
   assert.equal(status, 200);
   const created = body.articles.find((a: any) => a.title === 'E2E NoImage Article');
   assert.ok(created.imageUrl.startsWith('/images/'), `fallback is not local: ${created.imageUrl}`);
@@ -490,7 +506,7 @@ test('a theme ZIP can be installed, served, exported and deleted', async () => {
 
   // install
   let res = await fetch(`${BASE}/api/admin/themes/install?name=e2e.zip`, {
-    method: 'POST', headers: { 'Content-Type': 'application/zip' },
+    method: 'POST', headers: { 'Content-Type': 'application/zip', ...adminAuth() },
     body: new Uint8Array(zip) as unknown as BodyInit,
   });
   const installed = await res.json();
@@ -510,7 +526,7 @@ test('a theme ZIP can be installed, served, exported and deleted', async () => {
   assert.ok(!isZipParseError(reparsed), 'exported zip does not parse');
 
   // delete
-  res = await fetch(`${BASE}/api/admin/themes/${id}`, { method: 'DELETE' });
+  res = await fetch(`${BASE}/api/admin/themes/${id}`, { method: 'DELETE', headers: adminAuth() });
   assert.equal(res.status, 200, 'delete failed');
   const after = await getJson(`${BASE}/api/themes`);
   assert.ok(!after.serverThemes.some((t: any) => t.id === id), 'theme still listed after delete');
@@ -518,7 +534,7 @@ test('a theme ZIP can be installed, served, exported and deleted', async () => {
 
 test('a corrupt theme ZIP is rejected rather than crashing the server', async () => {
   const res = await fetch(`${BASE}/api/admin/themes/install?name=bad.zip`, {
-    method: 'POST', headers: { 'Content-Type': 'application/zip' },
+    method: 'POST', headers: { 'Content-Type': 'application/zip', ...adminAuth() },
     body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) as unknown as BodyInit,
   });
   assert.ok(res.status >= 400, `expected an error status, got ${res.status}`);
@@ -561,7 +577,7 @@ test('GET /api/messages returns an array', async () => {
 });
 
 test('GET /api/admin/stats returns dashboard counters', async () => {
-  const stats = await getJson(`${BASE}/api/admin/stats`);
+  const stats = await getJson(`${BASE}/api/admin/stats`, 200, adminAuth());
   assert.ok(stats && typeof stats === 'object');
 });
 
@@ -595,7 +611,7 @@ test('/api/sync/* is open while no API key is configured', async () => {
 
 test('/api/sync/* rejects a wrong or missing key once one is configured', async () => {
   const KEY = 'e2e-sync-key-123';
-  const set = await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: KEY });
+  const set = await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: KEY }, adminAuth());
   assert.equal(set.status, 200, 'could not configure the sync key');
 
   try {
@@ -616,22 +632,101 @@ test('/api/sync/* rejects a wrong or missing key once one is configured', async 
     assert.ok(Array.isArray(body.reservations), 'reservations should be an array');
   } finally {
     // clear the key so the endpoint is left as we found it
-    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' });
+    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' }, adminAuth());
   }
 });
 
 test('the sync API key is never exposed through GET /api/settings', async () => {
   const KEY = 'e2e-secret-should-not-leak';
-  await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: KEY });
+  await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: KEY }, adminAuth());
   try {
     const body = JSON.stringify(await getJson(`${BASE}/api/settings`));
     assert.ok(!body.includes(KEY), 'the sync API key leaked through /api/settings');
   } finally {
-    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' });
+    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' }, adminAuth());
   }
 });
 
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   27. Privileged-route access control
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('27. API — admin access control');
+
+// Regression tests for a real vulnerability: none of the /api/admin/* routes had
+// an auth gate, AND getCurrentUser() fell back to the shared "activeUsername"
+// setting — which a fresh install seeds to "admin" — so an anonymous visitor was
+// resolved as the administrator and could read users or wipe the database.
+const ADMIN_READS = ['/api/admin/users', '/api/admin/stats', '/api/admin/db-logs'];
+const ADMIN_WRITES: Array<[string, any]> = [
+  ['/api/admin/settings', { key: 'x', value: 'y' }],
+  ['/api/admin/reset-database', {}],
+  ['/api/admin/clear-database', {}],
+  ['/api/admin/cafe', { name: 'hacked', category: 'Foods', price: 1 }],
+];
+
+test('anonymous callers cannot read any admin endpoint', async () => {
+  for (const ep of ADMIN_READS) {
+    const res = await fetch(`${BASE}${ep}`);
+    assert.equal(res.status, 401, `${ep} is readable without a token (${res.status})`);
+  }
+});
+
+test('anonymous callers cannot write through any admin endpoint', async () => {
+  for (const [ep, payload] of ADMIN_WRITES) {
+    const { status } = await postJson(`${BASE}${ep}`, payload);
+    assert.equal(status, 401, `${ep} accepted an unauthenticated write (${status})`);
+  }
+});
+
+test('the user list is never exposed to anonymous callers', async () => {
+  const res = await fetch(`${BASE}/api/admin/users`);
+  const text = await res.text();
+  assert.equal(res.status, 401);
+  assert.ok(!text.includes('admin@gamenet.com'), 'the admin account leaked to an anonymous caller');
+});
+
+test('a non-admin gamer token is rejected with 403', async () => {
+  for (const ep of ADMIN_READS) {
+    const res = await fetch(`${BASE}${ep}`, { headers: { Authorization: `Bearer ${authToken}` } });
+    assert.equal(res.status, 403, `${ep} allowed a plain gamer (${res.status})`);
+  }
+});
+
+test('a forged token cannot impersonate the admin', async () => {
+  const res = await fetch(`${BASE}/api/admin/users`, {
+    headers: { Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIn0.forged' },
+  });
+  assert.equal(res.status, 401, 'a forged admin token was accepted');
+});
+
+test('the legacy activeUsername setting alone does not grant admin access', async () => {
+  // Log the shared session in as the admin the old way, then call with NO token:
+  // this is exactly the bypass that used to work.
+  const login = await postJson(`${BASE}/api/auth/login`, { username: 'admin', password: 'admin' });
+  assert.equal(login.status, 200);
+
+  const res = await fetch(`${BASE}/api/admin/users`);
+  assert.equal(res.status, 401, 'activeUsername still grants admin access without a token');
+});
+
+test('a genuine admin token is accepted on every admin read', async () => {
+  for (const ep of ADMIN_READS) {
+    const res = await fetch(`${BASE}${ep}`, { headers: adminAuth() });
+    assert.equal(res.status, 200, `${ep} rejected a valid admin token (${res.status})`);
+  }
+});
+
+test('install setup hands back a token so the new admin is not locked out', async () => {
+  // The site is already installed here, so /api/install/setup is not re-run; assert
+  // the contract that keeps the installer usable instead.
+  const { status, body } = await postJson(`${BASE}/api/auth/login`, { username: 'admin', password: 'admin' });
+  assert.equal(status, 200);
+  assert.ok(body.token, 'no token to bootstrap the admin panel with');
+  const res = await fetch(`${BASE}/api/admin/stats`, { headers: { Authorization: `Bearer ${body.token}` } });
+  assert.equal(res.status, 200, 'a freshly issued admin token cannot reach the admin panel');
+});
 
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

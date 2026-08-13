@@ -312,6 +312,36 @@ async function startServer() {
     next();
   }
 
+  // Requires a REAL authenticated user whose role is "admin".
+  //
+  // This deliberately does NOT go through getCurrentUser(), because that helper
+  // falls back to the shared legacy "activeUsername" setting when no token is
+  // sent — and that setting is seeded to "admin" on a fresh install, which would
+  // make every anonymous visitor look like the administrator. Privileged routes
+  // therefore demand a real, signed JWT (req.authUsername) and re-check the role
+  // against the database on every request, so revoking a user's admin role takes
+  // effect immediately instead of living on inside an old token.
+  async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+    try {
+      const username = (req as any).authUsername;
+      if (!username) {
+        return res.status(401).json({ error: "برای دسترسی به این بخش باید با حساب مدیر وارد شوید." });
+      }
+      const row = await getActiveDataProvider().getUserByUsername(username);
+      if (!row || (row.role || "gamer") !== "admin") {
+        return res.status(403).json({ error: "این عملیات فقط برای مدیر سیستم مجاز است." });
+      }
+      next();
+    } catch (err) {
+      console.error("[Admin Auth] Error verifying admin privileges:", err);
+      res.status(500).json({ error: "Failed to verify admin privileges" });
+    }
+  }
+
+  // Single choke point: every current AND future /api/admin/* route is gated here,
+  // so a new admin endpoint can't accidentally ship unprotected.
+  app.use("/api/admin", requireAdmin);
+
   // =========================================================================
   // API ROUTE CONTROLLERS
   // =========================================================================
@@ -2993,7 +3023,15 @@ Example format:
       setActiveDataProvider(provider);
       logDbQuery(provider.name, 'SYSTEM', `Site successfully installed. Welcome back, ${adminUsername}!`);
 
-      res.json({ success: true, message: "نصب با موفقیت انجام شد." });
+      // Hand back a real token for the admin that was just created: /api/admin/*
+      // now requires a signed JWT, so without this the operator would land on a
+      // freshly installed site with an admin panel they can't call.
+      res.json({
+        success: true,
+        message: "نصب با موفقیت انجام شد.",
+        token: signAuthToken(adminUsername),
+        user: { username: adminUsername, email: adminEmail || "", phone: "", loyaltyPoints: 1000, role: "admin" }
+      });
     } catch (err: any) {
       console.error("Installation failure:", err);
       res.status(500).json({ error: `خطا در فرآیند نصب: ${err.message}` });

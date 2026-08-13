@@ -3,6 +3,7 @@ import {
   Database, Server, Shield, Sparkles, Layout, Globe, Check, AlertCircle, ChevronRight, Terminal, User
 } from 'lucide-react';
 import bazinoLogo from '../assets/images/bazino_logo_user.webp';
+import { setAuthToken } from '../services/authToken';
 
 interface InstallPageProps {
   onInstallationComplete: () => void;
@@ -179,6 +180,10 @@ export default function InstallPage({ onInstallationComplete }: InstallPageProps
         const errData = await res.json();
         throw new Error(errData.error || 'API installation error');
       }
+
+      // Keep the freshly created admin signed in: /api/admin/* requires a real JWT.
+      const setupData = await res.json().catch(() => null);
+      if (setupData?.token) setAuthToken(setupData.token);
 
       addLog(lang === 'fa' ? 'پیکربندی با موفقیت به پایان رسید!' : 'Installation finalized! Database locked.');
       setInstallSuccess(true);

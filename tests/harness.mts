@@ -153,8 +153,8 @@ export async function waitFor(check: () => boolean | Promise<boolean>, timeoutMs
 }
 
 /** fetch + parse JSON, asserting the HTTP status. */
-export async function getJson(url: string, expectedStatus = 200): Promise<any> {
-  const res = await fetch(url);
+export async function getJson(url: string, expectedStatus = 200, headers?: Record<string, string>): Promise<any> {
+  const res = await fetch(url, headers ? { headers } : undefined);
   const body = await res.text();
   assert.equal(res.status, expectedStatus, `GET ${url} → expected ${expectedStatus}, got ${res.status}. Body: ${body.slice(0, 300)}`);
   try {

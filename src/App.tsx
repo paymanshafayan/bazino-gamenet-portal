@@ -13,6 +13,7 @@ import {
 // بخش/دادهٔ پایین صفحه است؛ Hero سبکِ LandingHero بلافاصله paint می‌شود و خود
 // HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
 import LandingHero from './components/LandingHero';
+import { clearAuthToken } from './services/authToken';
 const HomeTab = lazy(() => import('./components/HomeTab'));
 const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
@@ -371,6 +372,7 @@ export default function App() {
 
   const confirmLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    clearAuthToken();
     setUser(null);
     setIsLogoutConfirmOpen(false);
     setActiveTab('home');

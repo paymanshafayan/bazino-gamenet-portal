@@ -2,17 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 /// ارتفاع هدر صفحهٔ اینترو.
-///
-/// هم خودِ هدر و هم فاصلهٔ بالای ناحیهٔ ویدیو از این مقدار استفاده می‌کنند،
-/// بنابراین با تغییر آن، چیدمان از هم نمی‌پاشد.
 const double kIntroHeaderHeight = 64;
-
-/// مقدار «فرو رفتن» بالای ویدیو زیر هدر (بر حسب پیکسل).
-///
-/// فریم ویدیو به بالا چسبانده می‌شود و همین مقدار بالاتر از لبهٔ پایینی هدر
-/// شروع می‌شود، تا نوار متنِ بالای فریم پشت هدر پنهان شود. چون هدر بعد از
-/// ویدیو در `Stack` رسم می‌شود، رویش را می‌پوشاند.
-const double kIntroVideoTuckUnderHeader = 10;
 
 /// رنگ سرمه‌ای تیرهٔ هدر اینترو (navy).
 const Color kIntroHeaderColor = Color(0xFF0B1B3A);
@@ -95,10 +85,11 @@ class _BazinoIntroScreenState extends State<BazinoIntroScreen> {
                 height: kIntroHeaderHeight,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 decoration: const BoxDecoration(
-                  color: kIntroHeaderColor,
-                  boxShadow: [
-                    BoxShadow(color: Color(0x99000000), blurRadius: 18, offset: Offset(0, 8)),
-                  ],
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [kIntroHeaderColor, Colors.transparent],
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -191,18 +182,12 @@ class _BazinoIntroScreenState extends State<BazinoIntroScreen> {
       );
     }
 
-    // فریم ویدیو به بالای صفحه چسبانده می‌شود و ۱۰ پیکسلِ بالایش پشت هدر
-    // می‌رود، تا متنِ روی آن نوار دیده نشود. هدر بعد از این در Stack رسم
-    // می‌شود، پس همیشه رویش قرار می‌گیرد.
-    final double topOffset =
-        MediaQuery.of(context).padding.top + kIntroHeaderHeight - kIntroVideoTuckUnderHeader;
-
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: EdgeInsets.only(top: topOffset),
-        child: AspectRatio(
-          aspectRatio: _controller.value.aspectRatio,
+    return SizedBox.expand(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: _controller.value.size.width,
+          height: _controller.value.size.height,
           child: VideoPlayer(_controller),
         ),
       ),

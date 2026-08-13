@@ -69,15 +69,15 @@ export interface Tournament {
   maxTeams: number;
   status: 'Upcoming' | 'Active' | 'Completed';
   registeredTeamsCount: number;
-  teams: Array<{
+  teams?: Array<{
     name: string;
     leader: string;
     members: string[];
   }>;
-  bracket: {
-    round1: Array<{ id: string; teamA: string; teamB: string; scoreA?: number; scoreB?: number; winner?: string }>;
-    semis: Array<{ id: string; teamA: string; teamB: string; scoreA?: number; scoreB?: number; winner?: string }>;
-    finals: Array<{ id: string; teamA: string; teamB: string; scoreA?: number; scoreB?: number; winner?: string }>;
+  bracket?: {
+    round1?: Array<{ id: string; teamA: string; teamB: string; scoreA?: number; scoreB?: number; winner?: string }>;
+    semis?: Array<{ id: string; teamA: string; teamB: string; scoreA?: number; scoreB?: number; winner?: string }>;
+    finals?: Array<{ id: string; teamA: string; teamB: string; scoreA?: number; scoreB?: number; winner?: string }>;
   };
 }
 

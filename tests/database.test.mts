@@ -20,7 +20,8 @@ let nativeOk = true;
 let nativeError = '';
 try {
   const require = (await import('node:module')).createRequire(import.meta.url);
-  require('better-sqlite3');
+  const Database = require('better-sqlite3');
+  new Database(':memory:');
 } catch (e: any) {
   nativeOk = false;
   nativeError = e?.message?.split('\n')[0] ?? String(e);

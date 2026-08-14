@@ -42,9 +42,7 @@ const formatBytes = (bytes?: number) => {
 };
 
 const MAX_APK_BYTES = 160 * 1024 * 1024;
-const APK_CHUNK_BYTES = 8 * 1024 * 1024;
-const MAX_CHUNK_RETRIES = 3;
-const APK_CHUNK_TIMEOUT_MS = 3 * 60 * 1000;
+const APK_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 type ApkUploadFailureReason = 'http' | 'network' | 'timeout' | 'aborted';
 
@@ -53,17 +51,14 @@ interface ApkUploadErrorDetails {
   responseBody: string;
   lastProgress: number;
   reason: ApkUploadFailureReason;
-  chunkIndex: number;
-  totalChunks: number;
-  attempts: number;
 }
 
-class ApkChunkRequestError extends Error {
+class ApkUploadRequestError extends Error {
   details: ApkUploadErrorDetails;
 
   constructor(details: ApkUploadErrorDetails) {
-    super(`APK chunk upload failed (${details.reason}, HTTP ${details.httpStatus || 0})`);
-    this.name = 'ApkChunkRequestError';
+    super(`APK upload failed (${details.reason}, HTTP ${details.httpStatus || 0})`);
+    this.name = 'ApkUploadRequestError';
     this.details = details;
   }
 }
@@ -76,57 +71,55 @@ const responseTextOr = (xhr: XMLHttpRequest, fallback: string) => {
   }
 };
 
-const sendApkChunk = (
-  url: string,
-  chunk: Blob,
+const sendApkForm = (
+  form: FormData,
   authToken: string | null,
-  chunkIndex: number,
-  totalChunks: number,
-  lastProgress: number,
-) => new Promise<string>((resolve, reject) => {
+  onProgress: (percent: number) => void,
+) => new Promise<void>((resolve, reject) => {
   const xhr = new XMLHttpRequest();
   let settled = false;
+  let lastProgress = 0;
 
   const fail = (reason: ApkUploadFailureReason, fallbackBody: string) => {
     if (settled) return;
     settled = true;
-    reject(new ApkChunkRequestError({
+    reject(new ApkUploadRequestError({
       httpStatus: xhr.status || 0,
       responseBody: responseTextOr(xhr, fallbackBody),
       lastProgress,
       reason,
-      chunkIndex,
-      totalChunks,
-      attempts: 1,
     }));
   };
 
-  xhr.open('POST', url);
-  xhr.timeout = APK_CHUNK_TIMEOUT_MS;
-  xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+  xhr.open('POST', '/api/admin/mobile-app/upload-apk');
+  xhr.timeout = APK_UPLOAD_TIMEOUT_MS;
+  // Do not set Content-Type: the browser must include FormData's multipart boundary.
   // Raw XHR does not pass through the global fetch interceptor.
   if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+  xhr.upload.onprogress = (event) => {
+    if (!event.lengthComputable) return;
+    lastProgress = Math.min(100, Math.max(0, Math.round((event.loaded / event.total) * 100)));
+    onProgress(lastProgress);
+  };
   xhr.onload = () => {
     if (settled) return;
     if (xhr.status >= 200 && xhr.status < 300) {
       settled = true;
-      resolve(responseTextOr(xhr, ''));
+      resolve();
       return;
     }
     fail('http', '(empty response body)');
   };
   xhr.onerror = () => fail('network', 'Network error: no response body was received');
-  xhr.ontimeout = () => fail('timeout', `Upload request timed out after ${APK_CHUNK_TIMEOUT_MS / 1000} seconds`);
+  xhr.ontimeout = () => fail('timeout', `Upload request timed out after ${APK_UPLOAD_TIMEOUT_MS / 1000} seconds`);
   xhr.onabort = () => fail('aborted', 'Upload request was aborted before the server responded');
 
   try {
-    xhr.send(chunk);
+    xhr.send(form);
   } catch (error) {
     fail('network', String(error));
   }
 });
-
-const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 export default function AdminMobileAppDownloadPanel({ addNotification }: Props) {
   const { language, dir } = useLanguage();
@@ -226,76 +219,27 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
     setUploadProgress(0);
     setUploadError(null);
 
-    const totalChunks = Math.ceil(file.size / APK_CHUNK_BYTES);
-    const uploadId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    const authToken = getAuthToken();
+    const form = new FormData();
+    form.append('file', file);
+
     let lastProgress = 0;
-
     try {
-      for (let index = 0; index < totalChunks; index += 1) {
-        const start = index * APK_CHUNK_BYTES;
-        const chunk = file.slice(start, Math.min(start + APK_CHUNK_BYTES, file.size));
-        const query = new URLSearchParams({
-          uploadId,
-          index: String(index),
-          total: String(totalChunks),
-          fileName: file.name,
-          fileSize: String(file.size),
-        });
-        const url = `/api/admin/mobile-app/upload-apk/chunk?${query.toString()}`;
-        let lastError: ApkChunkRequestError | null = null;
-
-        // One initial attempt plus up to three retries for transient proxy/server errors.
-        for (let attempt = 0; attempt <= MAX_CHUNK_RETRIES; attempt += 1) {
-          try {
-            await sendApkChunk(url, chunk, authToken, index, totalChunks, lastProgress);
-            lastError = null;
-            break;
-          } catch (error) {
-            const requestError = error instanceof ApkChunkRequestError
-              ? error
-              : new ApkChunkRequestError({
-                  httpStatus: 0,
-                  responseBody: String(error),
-                  lastProgress,
-                  reason: 'network',
-                  chunkIndex: index,
-                  totalChunks,
-                  attempts: attempt + 1,
-                });
-            requestError.details.attempts = attempt + 1;
-            lastError = requestError;
-            const retryable = requestError.details.httpStatus === 0 ||
-              requestError.details.httpStatus === 408 ||
-              requestError.details.httpStatus === 429 ||
-              requestError.details.httpStatus >= 500;
-            if (!retryable || attempt === MAX_CHUNK_RETRIES) break;
-            await wait(500 * (2 ** attempt));
-          }
-        }
-
-        if (lastError) throw lastError;
-        lastProgress = Math.round(((index + 1) / totalChunks) * 100);
-        setUploadProgress(lastProgress);
-      }
-
+      await sendApkForm(form, getAuthToken(), (percent) => {
+        lastProgress = percent;
+        setUploadProgress(percent);
+      });
       setUploadProgress(100);
       setUploadError(null);
       addNotification(isFa ? 'فایل APK با موفقیت آپلود شد' : 'APK uploaded successfully', 'success');
       void loadConfig().catch(() => addNotification(isFa ? 'آپلود انجام شد، اما دریافت متادیتای تازه ناموفق بود' : 'Upload succeeded, but refreshing metadata failed', 'error'));
     } catch (error) {
-      const details = error instanceof ApkChunkRequestError
+      const details = error instanceof ApkUploadRequestError
         ? error.details
         : {
             httpStatus: 0,
             responseBody: String(error),
             lastProgress,
             reason: 'network' as const,
-            chunkIndex: Math.min(Math.floor((lastProgress / 100) * totalChunks), totalChunks - 1),
-            totalChunks,
-            attempts: 1,
           };
       setUploadProgress(details.lastProgress);
       setUploadError(details);
@@ -310,8 +254,6 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
     const diagnostic = [
       `HTTP status: ${uploadError.httpStatus || 0}`,
       `Reason: ${uploadError.reason}`,
-      `Chunk: ${uploadError.chunkIndex + 1}/${uploadError.totalChunks}`,
-      `Attempts: ${uploadError.attempts}`,
       `Last progress: ${uploadError.lastProgress}%`,
       'Response body:',
       uploadError.responseBody,
@@ -412,8 +354,6 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
                     <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-[11px]">
                       <span>{isFa ? 'وضعیت HTTP:' : 'HTTP status:'} <b dir="ltr">{uploadError.httpStatus || 0}</b></span>
                       <span>{isFa ? 'نوع خطا:' : 'Failure type:'} <b dir="ltr">{uploadError.reason}</b></span>
-                      <span>{isFa ? 'تکه:' : 'Chunk:'} <b dir="ltr">{uploadError.chunkIndex + 1}/{uploadError.totalChunks}</b></span>
-                      <span>{isFa ? 'تعداد تلاش‌ها:' : 'Attempts:'} <b dir="ltr">{uploadError.attempts}</b></span>
                       <span className="sm:col-span-2">{isFa ? 'آخرین درصد پیشرفت:' : 'Last progress:'} <b dir="ltr">{uploadError.lastProgress}%</b></span>
                     </div>
                   </div>

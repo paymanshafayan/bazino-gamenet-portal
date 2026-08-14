@@ -7,7 +7,7 @@
  * routing, real JWT auth and the real data provider.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, existsSync, symlinkSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -882,6 +882,136 @@ test('multipart APK upload publishes a large file byte-for-byte', async () => {
   const download = await fetch(`${BASE}/api/mobile-app/download`);
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), expected, 'the download route did not serve the uploaded APK');
+});
+
+test('chunked APK upload survives a dropped chunk and publishes byte-for-byte', async () => {
+  // 17 MiB + a few bytes → three 8 MiB chunks; a payload this size would blow
+  // through Cloudflare's 100-second gateway window as a single request.
+  const chunkSize = 8 * 1024 * 1024;
+  const expectedBytes = new Uint8Array(17 * 1024 * 1024 + 123);
+  for (let index = 0; index < expectedBytes.length; index += 1) {
+    expectedBytes[index] = (index * 13 + 5) & 0xFF;
+  }
+  expectedBytes.set([0x50, 0x4B, 0x03, 0x04]); // dummy zip/apk header
+  const expected = Buffer.from(expectedBytes);
+  const totalChunks = Math.ceil(expected.length / chunkSize);
+  const sessionId = `chunked-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const chunkHeaders = { ...adminAuth(), 'Content-Type': 'application/octet-stream' };
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+    const start = chunkIndex * chunkSize;
+    const chunk = expected.subarray(start, Math.min(start + chunkSize, expected.length));
+    const url = `${BASE}/api/admin/mobile-app/upload-apk/chunk?sessionId=${sessionId}&index=${chunkIndex}&fileName=chunked-e2e.apk&totalSize=${expected.length}`;
+    const res = await fetch(url, { method: 'POST', headers: chunkHeaders, body: chunk });
+    const body = await res.json().catch(() => ({}));
+    assert.equal(res.status, 200, `chunk ${chunkIndex} failed: ${JSON.stringify(body)}`);
+    assert.equal(body.received, Math.min(expected.length, (chunkIndex + 1) * chunkSize), 'server byte count drifted');
+    assert.equal(body.expectedIndex, chunkIndex + 1, 'server did not advance the chunk index');
+  }
+
+  // Re-send the last chunk, as the client does after a dropped response: the
+  // server must treat it as an idempotent no-op, not append it twice.
+  const lastStart = (totalChunks - 1) * chunkSize;
+  const duplicateUrl = `${BASE}/api/admin/mobile-app/upload-apk/chunk?sessionId=${sessionId}&index=${totalChunks - 1}&fileName=chunked-e2e.apk&totalSize=${expected.length}`;
+  const dupRes = await fetch(duplicateUrl, { method: 'POST', headers: chunkHeaders, body: expected.subarray(lastStart) });
+  assert.equal(dupRes.status, 200, 'duplicate chunk was rejected');
+  const dupBody = await dupRes.json();
+  assert.equal(dupBody.received, expected.length, 'duplicate chunk was appended twice');
+
+  const finRes = await fetch(`${BASE}/api/admin/mobile-app/upload-apk/finalize`, {
+    method: 'POST',
+    headers: { ...adminAuth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, fileName: 'chunked-e2e.apk' }),
+  });
+  const finBody = await finRes.json();
+  assert.equal(finRes.status, 200, `finalize failed: ${JSON.stringify(finBody)}`);
+  assert.equal(finBody.success, true);
+
+  const apkPath = path.join(workDir, 'public', 'downloads', 'bazino-app.apk');
+  assert.ok(existsSync(apkPath), 'the final APK was not published at the stable download path');
+  assert.deepEqual(readFileSync(apkPath), expected, 'the chunked upload published a corrupt APK');
+
+  const meta = await getJson(`${BASE}/api/mobile-app`);
+  assert.equal(meta.apkFileName, 'chunked-e2e.apk');
+  assert.equal(meta.apkSize, expected.length);
+
+  const download = await fetch(`${BASE}/api/mobile-app/download`);
+  assert.equal(download.status, 200);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), expected, 'the download route did not serve the chunked APK');
+});
+
+test('chunked APK upload rejects out-of-order chunks, incomplete finalize, and cancels cleanly', async () => {
+  const sessionId = `cancel-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const chunkHeaders = { ...adminAuth(), 'Content-Type': 'application/octet-stream' };
+  const totalSize = 8;
+  const chunk = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
+  const chunkUrl = (index: number) =>
+    `${BASE}/api/admin/mobile-app/upload-apk/chunk?sessionId=${sessionId}&index=${index}&fileName=cancel-e2e.apk&totalSize=${totalSize}`;
+  const finalizeUrl = `${BASE}/api/admin/mobile-app/upload-apk/finalize`;
+
+  // Chunks must arrive in order.
+  let res = await fetch(chunkUrl(1), { method: 'POST', headers: chunkHeaders, body: chunk });
+  assert.equal(res.status, 409, 'out-of-order chunk was accepted');
+  const ooo = await res.json();
+  assert.equal(ooo.expectedIndex, 0, 'out-of-order response did not report the expected index');
+
+  // A chunked session is not published until every byte has arrived.
+  res = await fetch(chunkUrl(0), { method: 'POST', headers: chunkHeaders, body: chunk });
+  assert.equal(res.status, 200, 'first chunk was rejected');
+  let body = await res.json();
+  assert.equal(body.received, 4);
+
+  res = await fetch(finalizeUrl, {
+    method: 'POST',
+    headers: { ...adminAuth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, fileName: 'cancel-e2e.apk' }),
+  });
+  assert.equal(res.status, 409, 'incomplete upload was finalized');
+  body = await res.json();
+  assert.equal(body.code, 'APK_INCOMPLETE');
+  assert.equal(body.received, 4);
+  assert.equal(body.totalSize, 8);
+
+  // Duplicate retry is idempotent.
+  res = await fetch(chunkUrl(0), { method: 'POST', headers: chunkHeaders, body: chunk });
+  assert.equal(res.status, 200);
+  body = await res.json();
+  assert.equal(body.received, 4, 'duplicate chunk changed the byte count');
+
+  // Cancel removes the session and its partial file; finalize then 404s.
+  res = await fetch(`${BASE}/api/admin/mobile-app/upload-apk/session?sessionId=${sessionId}`, {
+    method: 'DELETE',
+    headers: adminAuth(),
+  });
+  assert.equal(res.status, 200, 'cancel failed');
+
+  res = await fetch(finalizeUrl, {
+    method: 'POST',
+    headers: { ...adminAuth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, fileName: 'cancel-e2e.apk' }),
+  });
+  assert.equal(res.status, 404, 'finalize did not reject a cancelled session');
+
+  const downloadsDir = path.join(workDir, 'public', 'downloads');
+  const leftovers = readdirSync(downloadsDir).filter((name) => name.endsWith('.part'));
+  assert.deepEqual(leftovers, [], 'cancelled session left a partial file behind');
+});
+
+test('chunked APK upload endpoints require an admin token', async () => {
+  const url = `${BASE}/api/admin/mobile-app/upload-apk/chunk?sessionId=anon-session-1234&index=0&fileName=anon.apk&totalSize=4`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: Buffer.from([0x50, 0x4B, 0x03, 0x04]),
+  });
+  assert.equal(res.status, 401, 'chunk upload without a token was not rejected');
+
+  const finRes = await fetch(`${BASE}/api/admin/mobile-app/upload-apk/finalize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'anon-session-1234' }),
+  });
+  assert.equal(finRes.status, 401, 'finalize without a token was not rejected');
 });
 
 // NOTE: while the data source is in "sample" mode the public GETs deliberately

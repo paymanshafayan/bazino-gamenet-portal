@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Apple, Check, Copy, Download, Edit, ExternalLink, Github, PackageOpen, Play, Plus, QrCode, Save, Smartphone, Store, Trash2, Upload, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import type { MobileAppDownloadConfig, MobileAppStoreKind, MobileAppStoreLink } from '../types/mobileApp';
@@ -42,7 +42,15 @@ const formatBytes = (bytes?: number) => {
 };
 
 const MAX_APK_BYTES = 160 * 1024 * 1024;
-const APK_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+// Chunked upload: sending a 160 MB APK as one HTTP request always trips the
+// reverse proxy's gateway timeout (Cloudflare HTTP 524), because the origin can
+// only answer after the whole body has been received. Small sequential chunks
+// keep every individual request far below any proxy timeout, and re-sending a
+// chunk after a dropped connection is cheap: the server treats repeated chunk
+// indices as idempotent no-ops.
+const APK_CHUNK_BYTES = 8 * 1024 * 1024;
+const APK_CHUNK_TIMEOUT_MS = 5 * 60 * 1000;
+const APK_CHUNK_MAX_RETRIES = 3;
 
 type ApkUploadFailureReason = 'http' | 'network' | 'timeout' | 'aborted';
 
@@ -71,14 +79,26 @@ const responseTextOr = (xhr: XMLHttpRequest, fallback: string) => {
   }
 };
 
-const sendApkForm = (
-  form: FormData,
+const makeApkSessionId = () => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {
+    /* fall through to the random fallback below */
+  }
+  return `apk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const uploadApkChunk = (
+  sessionId: string,
+  index: number,
+  blob: Blob,
+  fileName: string,
+  totalSize: number,
   authToken: string | null,
-  onProgress: (percent: number) => void,
+  onChunkProgress: (loaded: number, total: number) => void,
 ) => new Promise<void>((resolve, reject) => {
   const xhr = new XMLHttpRequest();
   let settled = false;
-  let lastProgress = 0;
 
   const fail = (reason: ApkUploadFailureReason, fallbackBody: string) => {
     if (settled) return;
@@ -86,20 +106,25 @@ const sendApkForm = (
     reject(new ApkUploadRequestError({
       httpStatus: xhr.status || 0,
       responseBody: responseTextOr(xhr, fallbackBody),
-      lastProgress,
+      lastProgress: 0,
       reason,
     }));
   };
 
-  xhr.open('POST', '/api/admin/mobile-app/upload-apk');
-  xhr.timeout = APK_UPLOAD_TIMEOUT_MS;
-  // Do not set Content-Type: the browser must include FormData's multipart boundary.
+  const query = new URLSearchParams({
+    sessionId,
+    index: String(index),
+    fileName,
+    totalSize: String(totalSize),
+  }).toString();
+  xhr.open('POST', `/api/admin/mobile-app/upload-apk/chunk?${query}`);
+  xhr.timeout = APK_CHUNK_TIMEOUT_MS;
   // Raw XHR does not pass through the global fetch interceptor.
   if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream');
   xhr.upload.onprogress = (event) => {
     if (!event.lengthComputable) return;
-    lastProgress = Math.min(100, Math.max(0, Math.round((event.loaded / event.total) * 100)));
-    onProgress(lastProgress);
+    onChunkProgress(event.loaded, event.total);
   };
   xhr.onload = () => {
     if (settled) return;
@@ -111,14 +136,119 @@ const sendApkForm = (
     fail('http', '(empty response body)');
   };
   xhr.onerror = () => fail('network', 'Network error: no response body was received');
-  xhr.ontimeout = () => fail('timeout', `Upload request timed out after ${APK_UPLOAD_TIMEOUT_MS / 1000} seconds`);
-  xhr.onabort = () => fail('aborted', 'Upload request was aborted before the server responded');
+  xhr.ontimeout = () => fail('timeout', `Chunk request timed out after ${APK_CHUNK_TIMEOUT_MS / 1000} seconds`);
+  xhr.onabort = () => fail('aborted', 'Chunk request was aborted before the server responded');
 
   try {
-    xhr.send(form);
+    xhr.send(blob);
   } catch (error) {
     fail('network', String(error));
   }
+});
+
+const finalizeApkUpload = async (sessionId: string, fileName: string, authToken: string | null) => {
+  const res = await fetch('/api/admin/mobile-app/upload-apk/finalize', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: JSON.stringify({ sessionId, fileName }),
+  });
+  if (!res.ok) {
+    let responseBody = '';
+    try {
+      responseBody = await res.text();
+    } catch {
+      /* keep the fallback */
+    }
+    throw new ApkUploadRequestError({ httpStatus: res.status, responseBody, lastProgress: 100, reason: 'http' });
+  }
+};
+
+const cancelApkUploadSession = async (sessionId: string, authToken: string | null) => {
+  try {
+    await fetch(`/api/admin/mobile-app/upload-apk/session?sessionId=${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    });
+  } catch {
+    // Best-effort cleanup only; the server also expires stale sessions on its own.
+  }
+};
+
+const sendApkForm = (
+  file: File,
+  authToken: string | null,
+  onProgress: (percent: number) => void,
+  onCancel: (cancel: () => void) => void,
+) => new Promise<void>((resolve, reject) => {
+  const sessionId = makeApkSessionId();
+  const totalSize = file.size;
+  const totalChunks = Math.max(1, Math.ceil(totalSize / APK_CHUNK_BYTES));
+  let cancelled = false;
+  let activeXhr: XMLHttpRequest | null = null;
+  let lastOverallProgress = 0;
+
+  const cancel = () => {
+    cancelled = true;
+    try {
+      activeXhr?.abort();
+    } catch {
+      /* ignore */
+    }
+  };
+  onCancel(cancel);
+
+  const reportProgress = (doneBytes: number) => {
+    lastOverallProgress = Math.min(100, Math.max(0, Math.round((doneBytes / totalSize) * 100)));
+    onProgress(lastOverallProgress);
+  };
+
+  const abortError = () => new ApkUploadRequestError({
+    httpStatus: 0,
+    responseBody: 'Upload cancelled by the user',
+    lastProgress: lastOverallProgress,
+    reason: 'aborted' as const,
+  });
+
+  const run = async () => {
+    try {
+      for (let index = 0; index < totalChunks; index += 1) {
+        if (cancelled) throw abortError();
+        const start = index * APK_CHUNK_BYTES;
+        const chunk = file.slice(start, Math.min(start + APK_CHUNK_BYTES, totalSize));
+
+        let attempt = 0;
+        for (;;) {
+          if (cancelled) throw abortError();
+          try {
+            await uploadApkChunk(
+              sessionId,
+              index,
+              chunk,
+              file.name,
+              totalSize,
+              authToken,
+              (loaded) => reportProgress(start + loaded),
+            );
+            break;
+          } catch (error) {
+            attempt += 1;
+            if (cancelled || attempt > APK_CHUNK_MAX_RETRIES) throw error;
+            await new Promise((resolveRetry) => setTimeout(resolveRetry, Math.min(1000 * attempt, 5000)));
+          }
+        }
+      }
+      await finalizeApkUpload(sessionId, file.name, authToken);
+      reportProgress(totalSize);
+      resolve();
+    } catch (error) {
+      void cancelApkUploadSession(sessionId, authToken);
+      reject(error);
+    }
+  };
+  void run();
 });
 
 export default function AdminMobileAppDownloadPanel({ addNotification }: Props) {
@@ -132,6 +262,7 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<ApkUploadErrorDetails | null>(null);
+  const cancelUploadRef = useRef<(() => void) | null>(null);
 
   const selectedOption = useMemo(() => STORE_OPTIONS.find((x) => x.kind === form.kind) || STORE_OPTIONS[0], [form.kind]);
 
@@ -219,15 +350,15 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
     setUploadProgress(0);
     setUploadError(null);
 
-    const form = new FormData();
-    form.append('file', file);
-
     let lastProgress = 0;
     try {
-      await sendApkForm(form, getAuthToken(), (percent) => {
+      await sendApkForm(file, getAuthToken(), (percent) => {
         lastProgress = percent;
         setUploadProgress(percent);
+      }, (cancel) => {
+        cancelUploadRef.current = cancel;
       });
+      cancelUploadRef.current = null;
       setUploadProgress(100);
       setUploadError(null);
       addNotification(isFa ? 'فایل APK با موفقیت آپلود شد' : 'APK uploaded successfully', 'success');
@@ -245,6 +376,7 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
       setUploadError(details);
       addNotification(isFa ? 'آپلود APK ناموفق بود؛ جزئیات خطا در پنل نمایش داده شد' : 'APK upload failed; diagnostics are shown in the panel', 'error');
     } finally {
+      cancelUploadRef.current = null;
       setIsUploading(false);
     }
   };
@@ -329,14 +461,25 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
             />
             <Upload className="w-8 h-8 text-cyan-200 mx-auto mb-3" />
             <div className="text-sm font-black text-white">{isFa ? 'انتخاب و آپلود APK' : 'Choose and upload APK'}</div>
-            <p className="text-[11px] text-gray-400 mt-2">{isFa ? 'فایل با نام ثابت روی سرور ذخیره می‌شود و دکمه دانلود مستقیم را فعال می‌کند.' : 'The file is saved on the server and enables the direct download button.'}</p>
+            <p className="text-[11px] text-gray-400 mt-2">{isFa ? 'فایل به‌صورت تکه‌تکه (۸ مگابایت) ارسال می‌شود تا از تایم‌اوت گیت‌وی (خطای ۵۲۴) جلوگیری کند؛ تکه‌های از دست‌رفته خودکار دوباره ارسال می‌شوند.' : 'The file is sent in 8 MB chunks to avoid gateway timeouts (HTTP 524); dropped chunks are retried automatically.'}</p>
           </label>
 
           {(isUploading || uploadProgress > 0) && (
             <div className="mt-4">
               <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
-                <span>{isFa ? 'پیشرفت آپلود' : 'Upload progress'}</span>
-                <span>{uploadProgress}%</span>
+                <span>{isFa ? 'پیشرفت آپلود (ارسال تکه‌تکه)' : 'Upload progress (chunked)'}</span>
+                <span className="flex items-center gap-2">
+                  {uploadProgress}%
+                  {isUploading && (
+                    <button
+                      type="button"
+                      onClick={() => cancelUploadRef.current?.()}
+                      className="rounded-lg bg-white/10 text-red-300 px-2 py-0.5 text-[10px] font-bold hover:bg-red-500/20"
+                    >
+                      {isFa ? 'انصراف' : 'Cancel'}
+                    </button>
+                  )}
+                </span>
               </div>
               <div className="h-3 rounded-full bg-black/40 border border-white/10 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all" style={{ width: `${uploadProgress}%` }} />

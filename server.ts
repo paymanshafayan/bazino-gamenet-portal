@@ -470,6 +470,7 @@ async function startServer() {
   app.use((req, res, next) => {
     if (
       req.path === "/api/admin/mobile-app/upload-apk" ||
+      req.path === "/api/admin/mobile-app/upload-apk/chunk" ||
       req.path === "/api/admin/themes/install"
     ) return next();
     return jsonParser(req, res, next);
@@ -3151,6 +3152,208 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       }
     }
   );
+
+  // =========================================================================
+  // CHUNKED APK UPLOAD — آپلود تکه‌تکه برای عبور از تایم‌اوت پروکسی/Cloudflare
+  //
+  // HTTP 524 یعنی گیت‌وی (Cloudflare) حدود ۱۰۰ ثانیه منتظر اوریجین ماند و
+  // جواب نگرفت. یک درخواست HTTP واحد با کل فایل APK (تا ۱۶۰MB) عملاً تضمینی
+  // است که در مسیر اینترنتِ واقعی از این پنجره رد شود — بدنه‌اش کامل فرستاده
+  // می‌شود ولی پاسخ هرگز نمی‌رسد. این API به‌جای آن، فایل را تکه‌تکه می‌گیرد:
+  // هر تکه یک درخواست کوتاهِ مستقل است که خیلی قبل از هر تایم‌اوتی تمام
+  // می‌شود؛ ایندکس تکه‌ها ترتیبی است و تکه تکراری (بعد از قطعی شبکه) به‌صورت
+  // idempotent نادیده گرفته می‌شود؛ و فایل نهایی فقط در finalize با یک rename
+  // اتمیک روی همان فایل‌سیستم منتشر می‌شود. اگر وسط کار قطع شود، هیچ فایل
+  // نیمه‌کاره‌ای به‌عنوان APK فعال دیده نمی‌شود.
+  // =========================================================================
+  const APK_CHUNK_MAX_BYTES = 16 * 1024 * 1024;
+  const APK_SESSION_TTL_MS = 6 * 60 * 60 * 1000;
+
+  interface ApkUploadSession {
+    sessionId: string;
+    fileName: string;
+    totalSize: number;
+    received: number;
+    expectedIndex: number;
+    partPath: string;
+    lastActivity: number;
+    /** زنجیرهٔ نوشتن روی دیسک: نوشتن تکه‌ها را ترتیبی می‌کند تا ارسال‌های
+     *  هم‌زمانِ یک تکه نتوانند به فایلِ part آسیب بزنند. */
+    writeChain: Promise<void>;
+    writeError?: any;
+  }
+  const apkUploadSessions = new Map<string, ApkUploadSession>();
+
+  const isValidApkSessionId = (sessionId: string) => /^[A-Za-z0-9._-]{8,128}$/.test(sessionId);
+
+  const cleanupApkSession = async (session: ApkUploadSession) => {
+    apkUploadSessions.delete(session.sessionId);
+    await fs.promises.rm(session.partPath, { force: true }).catch(() => undefined);
+  };
+
+  const sweepStaleApkSessions = async () => {
+    const now = Date.now();
+    for (const session of [...apkUploadSessions.values()]) {
+      if (now - session.lastActivity > APK_SESSION_TTL_MS) {
+        console.warn("[APK Upload] Dropping stale chunked session", {
+          sessionId: session.sessionId,
+          received: session.received,
+          totalSize: session.totalSize,
+        });
+        await cleanupApkSession(session);
+      }
+    }
+  };
+
+  // Chunk bodies are raw bytes (application/octet-stream), so this route must be
+  // skipped by the global JSON parser — it is, in the skip list above.
+  const apkChunkRawParser = express.raw({
+    type: () => true,
+    limit: String(APK_CHUNK_MAX_BYTES + 1024 * 1024),
+  });
+
+  app.post(
+    "/api/admin/mobile-app/upload-apk/chunk",
+    apkChunkRawParser,
+    async (req, res) => {
+      try {
+        const sessionId = String(req.query.sessionId || "").trim();
+        const fileName = String(req.query.fileName || "").trim();
+        const rawIndex = String(req.query.index ?? "").trim();
+        const rawTotalSize = String(req.query.totalSize ?? "").trim();
+
+        if (!isValidApkSessionId(sessionId)) {
+          return res.status(400).json({ error: "Invalid APK upload session id", code: "INVALID_APK_SESSION", status: 400 });
+        }
+        const index = Number(rawIndex);
+        const totalSize = Number(rawTotalSize);
+        if (
+          rawIndex === "" || rawTotalSize === "" ||
+          !Number.isInteger(index) || index < 0 ||
+          !Number.isInteger(totalSize) || totalSize <= 0 || totalSize > MAX_APK_BYTES
+        ) {
+          return res.status(400).json({ error: "Invalid APK chunk parameters", code: "INVALID_APK_CHUNK_PARAMS", status: 400 });
+        }
+        if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+          return res.status(400).json({ error: "APK chunk body is empty", code: "EMPTY_APK_CHUNK", status: 400 });
+        }
+        if (req.body.length > APK_CHUNK_MAX_BYTES) {
+          return res.status(413).json({ error: "APK chunk is too large", code: "APK_CHUNK_TOO_LARGE", status: 413 });
+        }
+        if (fileName && !fileName.toLowerCase().endsWith(".apk")) {
+          return res.status(400).json({ error: "Only .apk files are allowed", code: "INVALID_APK_FILE", status: 400 });
+        }
+
+        await sweepStaleApkSessions();
+
+        let session = apkUploadSessions.get(sessionId);
+        if (!session) {
+          await fs.promises.mkdir(getMobileAppDownloadDir(), { recursive: true });
+          session = {
+            sessionId,
+            fileName: fileName || MOBILE_APP_APK_FILE_NAME,
+            totalSize,
+            received: 0,
+            expectedIndex: 0,
+            partPath: path.join(getMobileAppDownloadDir(), `.${MOBILE_APP_APK_FILE_NAME}.${sessionId}.part`),
+            lastActivity: Date.now(),
+            writeChain: Promise.resolve(),
+          };
+          apkUploadSessions.set(sessionId, session);
+          console.info("[APK Upload] Chunked session started", { sessionId, fileName: session.fileName, totalSize });
+        }
+
+        if (session.totalSize !== totalSize) {
+          return res.status(409).json({ error: "APK upload session size mismatch", code: "APK_SESSION_CONFLICT", status: 409 });
+        }
+
+        // Chunks arrive strictly sequentially. A re-sent chunk (network retry after
+        // a lost response, or a proxy double-delivery) is an idempotent no-op — the
+        // bytes are already on disk, so we never write the same index twice.
+        if (index < session.expectedIndex) {
+          return res.json({ success: true, received: session.received, expectedIndex: session.expectedIndex, totalSize: session.totalSize });
+        }
+        if (index > session.expectedIndex) {
+          return res.status(409).json({ error: "APK chunk out of order", code: "APK_CHUNK_OUT_OF_ORDER", status: 409, expectedIndex: session.expectedIndex });
+        }
+
+        const chunk = req.body;
+        session.lastActivity = Date.now();
+        session.writeChain = session.writeChain
+          .then(() => fs.promises.appendFile(session!.partPath, chunk))
+          .catch((error: any) => { session!.writeError = error; });
+        await session.writeChain;
+        if (session.writeError) {
+          const writeError = session.writeError;
+          session.writeError = undefined;
+          throw writeError;
+        }
+
+        session.received += chunk.length;
+        session.expectedIndex += 1;
+        if (session.received > session.totalSize) {
+          await cleanupApkSession(session);
+          return res.status(400).json({ error: "APK chunk overflow", code: "APK_CHUNK_OVERFLOW", status: 400 });
+        }
+
+        return res.json({ success: true, received: session.received, expectedIndex: session.expectedIndex, totalSize: session.totalSize });
+      } catch (error: any) {
+        console.error("[APK Upload] Chunk append failed", { message: error?.message || String(error) });
+        if (!res.headersSent) {
+          return res.status(500).json({ error: "Failed to store APK chunk", code: "APK_CHUNK_WRITE_FAILED", status: 500, details: error?.message || String(error) });
+        }
+      }
+    }
+  );
+
+  app.post("/api/admin/mobile-app/upload-apk/finalize", async (req, res) => {
+    try {
+      const sessionId = String(req.body?.sessionId || "").trim();
+      if (!isValidApkSessionId(sessionId)) {
+        return res.status(400).json({ error: "Invalid APK upload session id", code: "INVALID_APK_SESSION", status: 400 });
+      }
+      const session = apkUploadSessions.get(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "APK upload session not found or expired — re-upload the file", code: "APK_SESSION_NOT_FOUND", status: 404 });
+      }
+
+      const stat = await fs.promises.stat(session.partPath).catch(() => null);
+      const onDisk = stat?.size || 0;
+      if (onDisk !== session.totalSize || onDisk === 0) {
+        return res.status(409).json({
+          error: "APK upload is incomplete — re-upload the remaining chunks",
+          code: "APK_INCOMPLETE",
+          status: 409,
+          received: onDisk,
+          totalSize: session.totalSize,
+        });
+      }
+
+      // Atomic publish on the same filesystem: the .part file is never visible as
+      // the live APK until every byte is on disk.
+      await fs.promises.rename(session.partPath, getMobileAppApkPath());
+      const meta = { originalName: session.fileName, size: onDisk, uploadedAt: new Date().toISOString() };
+      await getActiveDataProvider().setSetting(MOBILE_APP_APK_META_SETTING, JSON.stringify(meta));
+      apkUploadSessions.delete(sessionId);
+      console.info("[APK Upload] Chunked upload finalized", { fileName: meta.originalName, size: meta.size });
+      return res.json({ success: true, ...(await getMobileAppConfig()) });
+    } catch (error) {
+      console.error("[APK Upload] Finalize failed", error);
+      return res.status(500).json({ error: "Failed to finalize APK upload", status: 500, details: String(error) });
+    }
+  });
+
+  app.delete("/api/admin/mobile-app/upload-apk/session", async (req, res) => {
+    try {
+      const sessionId = String(req.query.sessionId || "").trim();
+      const session = apkUploadSessions.get(sessionId);
+      if (session) await cleanupApkSession(session);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("[APK Upload] Cancel failed", error);
+      return res.status(500).json({ error: "Failed to cancel APK upload", status: 500 });
+    }
+  });
 
   app.post("/api/admin/mobile-app/store-links", async (req, res) => {
     try {

@@ -1,0 +1,47 @@
+{
+  "base": "http://127.0.0.1:4173",
+  "captures": [
+    {
+      "name": "home",
+      "shot": "/home/user/bazino-gamenet-portal/visual-testing/bazino-home.png",
+      "info": {
+        "title": "Bazino Pro | بازینو پرو — گیم‌نت و کلوپ گیمینگ",
+        "lang": "fa",
+        "h1": [
+          "مسابقات بزرگ کانتر استرایک ۲"
+        ],
+        "rootChildren": 1,
+        "bodyScrollWidth": 1440,
+        "viewportWidth": 1440
+      },
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (File not found)",
+        "[Themes] Failed to fetch server themes: SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON",
+        "Failed to load resource: the server responded with a status of 404 (File not found)",
+        "Failed to load resource: the server responded with a status of 404 (File not found)",
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ]
+    },
+    {
+      "name": "home-mobile",
+      "shot": "/home/user/bazino-gamenet-portal/visual-testing/bazino-home-mobile.png",
+      "info": {
+        "title": "Bazino Pro | بازینو پرو — گیم‌نت و کلوپ گیمینگ",
+        "lang": "fa",
+        "h1": [
+          "مسابقات بزرگ کانتر استرایک ۲"
+        ],
+        "rootChildren": 1,
+        "bodyScrollWidth": 390,
+        "viewportWidth": 390
+      },
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (File not found)",
+        "[Themes] Failed to fetch server themes: SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON",
+        "Failed to load resource: the server responded with a status of 404 (File not found)",
+        "Failed to load resource: the server responded with a status of 404 (File not found)",
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ]
+    }
+  ]
+}

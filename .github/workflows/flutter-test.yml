@@ -58,10 +58,10 @@ jobs:
             else
               echo "**exit $code — FAILED**" >> "$R"
             fi
-            echo "$title=$code" >> /tmp/codes.txt
+            echo "$title=$code" >> "$GITHUB_WORKSPACE/codes.txt"
           }
 
-          : > /tmp/codes.txt
+          : > "$GITHUB_WORKSPACE/codes.txt"
           section "flutter --version" flutter --version
           section "flutter pub get"   flutter pub get
           section "flutter analyze"   flutter analyze
@@ -72,7 +72,7 @@ jobs:
             echo
             echo "## Summary"
             echo '```'
-            cat /tmp/codes.txt
+            cat "$GITHUB_WORKSPACE/codes.txt"
             echo '```'
             echo
             echo "build/web size: $(du -sh build/web 2>/dev/null | cut -f1 || echo 'not built')"
@@ -85,11 +85,28 @@ jobs:
           git config user.name  "flutter-ci"
           git config user.email "flutter-ci@users.noreply.github.com"
           git add FLUTTER_CI_REPORT.md
-          git diff --cached --quiet && { echo "report unchanged"; exit 0; }
-          git commit -m "ci(flutter): report for ${{ github.sha }} [skip ci]"
-          for i in 1 2 3; do
-            git pull --rebase --autostash origin "${{ github.ref_name }}" || true
-            git push origin "HEAD:${{ github.ref_name }}" && exit 0
-            sleep 5
-          done
-          echo "could not push the report"; exit 1
+          if git diff --cached --quiet; then
+            echo "report unchanged"
+          else
+            git commit -m "ci(flutter): report for ${{ github.sha }} [skip ci]"
+            pushed=no
+            for i in 1 2 3; do
+              git pull --rebase --autostash origin "${{ github.ref_name }}" || true
+              if git push origin "HEAD:${{ github.ref_name }}"; then pushed=yes; break; fi
+              sleep 5
+            done
+            [ "$pushed" = yes ] || echo "::warning::could not push the report"
+          fi
+
+      - name: Fail the job if analyze or test failed
+        run: |
+          if [ ! -f codes.txt ]; then
+            echo "::error::codes.txt is missing — the checks step did not run"
+            exit 1
+          fi
+          bad=$(grep -E '^(flutter pub get|flutter analyze|flutter test|flutter build web)=' codes.txt | grep -v '=0$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::$(echo "$bad" | tr '\n' ' ') — see FLUTTER_CI_REPORT.md"
+            exit 1
+          fi
+          echo "all checks passed"

@@ -1,0 +1,100 @@
+name: Desktop Installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'نسخه (بدون v) — مثلاً 1.0.0'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact: windows
+          - os: macos-latest
+            platform: mac
+            artifact: mac
+          - os: ubuntu-latest
+            platform: linux
+            artifact: linux
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build the site and the server bundle
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install desktop dependencies (Electron + electron-rebuild)
+        working-directory: desktop-app
+        run: npm install --no-audit --no-fund
+
+      - name: Prepare the server bundle
+        working-directory: desktop-app
+        run: npm run prepare-server-bundle
+
+      - name: Build the installer
+        working-directory: desktop-app
+        run: npx electron-builder --${{ matrix.platform }} --publish never
+
+      - name: Show what was produced
+        shell: bash
+        working-directory: desktop-app
+        run: ls -lh release/ || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.artifact }}
+          path: |
+            desktop-app/release/*.exe
+            desktop-app/release/*.dmg
+            desktop-app/release/*.AppImage
+            desktop-app/release/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+
+      - name: List everything collected
+        run: find installers -type f -exec ls -lh {} \;
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v${{ inputs.version }}
+          name: BAZINO PRO Desktop v${{ inputs.version }}
+          body: |
+            نصاب‌های نسخه‌ی دسکتاپ نرم‌افزار مدیریت گیم‌نت.
+
+            | سیستم‌عامل | فایل |
+            |---|---|
+            | ویندوز | `.exe` |
+            | مک | `.dmg` |
+            | لینوکس | `.AppImage` |
+
+            ⚠️ این نصاب‌ها **امضای دیجیتال ندارند**. ویندوز صفحه‌ی SmartScreen
+            («Windows protected your PC») نشان می‌دهد — «More info» سپس «Run anyway».
+            مک با Gatekeeper مسدود می‌کند — راست‌کلیک روی فایل، سپس Open.
+          files: installers/**/*
+          fail_on_unmatched_files: true

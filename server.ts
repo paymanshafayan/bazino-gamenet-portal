@@ -2293,6 +2293,47 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // ADMIN PANEL BACKEND CONTROLLERS
   // =========================================================================
 
+  /** شناسه‌ی یکتا برای یک رکورد تازه‌ی کاتالوگ.
+   *
+   *  قبلاً شناسه از روی **تعداد ردیف‌ها** ساخته می‌شد (`"s" + (count + 1)`). هر بار که
+   *  ادمین رکوردی را حذف می‌کرد، شمارش یکی کم می‌شد و شناسه‌ی بعدی با یک رکورد موجود
+   *  برخورد می‌کرد: ساخت سه ایستگاه، حذف دومی، و افزودن ایستگاه چهارم با
+   *  `UNIQUE constraint failed: systems.id` شکست می‌خورد و از آن به بعد ادمین دیگر
+   *  اصلاً نمی‌توانست ایستگاه اضافه کند.
+   *
+   *  ضمناً پیشوند `a` هم‌زمان برای لوازم جانبی و مقالات استفاده شده بود.
+   *  حالا هر موجودیت پیشوند مخصوص خودش را دارد و یکتایی پیش از درج بررسی می‌شود —
+   *  هم نسبت به دیتابیس و هم نسبت به داده‌ی نمونه (چون شناسه‌های نمونه مثل s1..s5 در
+   *  رزروها و سفارش‌های موجود ارجاع داده شده‌اند). */
+  /** پیام خطای قابل‌فهم برای ادمین به‌جای متن خام موتور دیتابیس.
+   *  ادمین نباید چیزی مثل «SqliteError: UNIQUE constraint failed: systems.id» ببیند. */
+  function adminErrorMessage(e: any): { status: number; message: string } {
+    if (e?.statusCode && e?.message) return { status: e.statusCode, message: e.message };
+    const raw = String(e?.message || e);
+    if (/UNIQUE constraint|duplicate key|E11000/i.test(raw)) {
+      return { status: 409, message: "رکوردی با همین شناسه از قبل وجود دارد. دوباره تلاش کنید." };
+    }
+    if (/NOT NULL constraint|cannot be null/i.test(raw)) {
+      return { status: 400, message: "یکی از فیلدهای الزامی خالی است." };
+    }
+    console.error("[Admin]", raw);
+    return { status: 500, message: "ثبت اطلاعات در پایگاه داده انجام نشد. جزئیات در لاگ سرور ثبت شد." };
+  }
+
+  async function nextEntityId(
+    prefix: string,
+    exists: (id: string) => Promise<boolean>
+  ): Promise<string> {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const id = `${prefix}-${randomBytes(3).toString("hex")}`;
+      if (!(await exists(id))) return id;
+    }
+    throw Object.assign(
+      new Error("ساخت شناسه‌ی یکتا برای این رکورد ممکن نشد. دوباره تلاش کنید."),
+      { statusCode: 500 }
+    );
+  }
+
   // Get general statistics for Admin dashboard
   app.get("/api/admin/stats", async (req, res) => {
     try {
@@ -2350,7 +2391,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, type, hourlyRate, isActive } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "s" + ((await store.countSystems()) + 1);
+      const nextId = await nextEntityId("sys", async (id) =>
+        Boolean(await store.getSystemById(id)) || SAMPLE_SYSTEMS.some(x => x.id === id));
 
       await store.createSystem({
         id: nextId,
@@ -2364,7 +2406,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listSystems();
       res.json({ success: true, systems: list });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2411,7 +2454,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "c" + ((await store.countCafeItems()) + 1);
+      const nextId = await nextEntityId("cafe", async (id) =>
+        Boolean(await store.getCafeItemById(id)) || SAMPLE_CAFE_ITEMS.some(x => x.id === id));
 
       const finalImageUrl = imageUrl || "/images/home/pizza-480.webp";
       // اولویت: مقدار دستی ادمین ← ساخت خودکار با sharp (پیش‌فرض روشن) ← undefined که
@@ -2433,7 +2477,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listCafeItems();
       res.json({ success: true, cafeItems: list });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2510,7 +2555,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "a" + ((await store.countAccessories()) + 1);
+      const nextId = await nextEntityId("acc", async (id) =>
+        Boolean(await store.getAccessoryById(id)) || SAMPLE_ACCESSORIES.some(x => x.id === id));
 
       const finalImageUrl = imageUrl || "/images/home/gear-shop-480.webp";
       const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "item");
@@ -2529,7 +2575,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listAccessories();
       res.json({ success: true, accessories: list });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2604,7 +2651,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { title, game, registrationFee, startDate, maxTeams, status } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "t" + ((await store.countTournaments()) + 1);
+      const nextId = await nextEntityId("trn", async (id) =>
+        Boolean(await store.getTournamentById(id)) || SAMPLE_TOURNAMENTS.some(x => x.id === id));
 
       const newTour = {
         id: nextId,
@@ -2635,7 +2683,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2659,7 +2708,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { title, content, category, imageUrl, mobileImageUrl, autoGenerateMobile, author, date } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "a" + ((await store.countArticles()) + 1);
+      const nextId = await nextEntityId("art", async (id) =>
+        Boolean(await store.getArticleById(id)) || SAMPLE_ARTICLES.some(x => x.id === id));
 
       const finalImageUrl = imageUrl || "/images/home/esports-480.webp";
       const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "article");
@@ -2705,7 +2755,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 

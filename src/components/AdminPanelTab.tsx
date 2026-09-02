@@ -1164,6 +1164,24 @@ export default function AdminPanelTab({
   };
 
   // Submit new items
+  // در حالت داده‌ی نمونه، رکورد تازه در دیتابیس ذخیره می‌شود ولی سایت و همین فهرست‌ها
+  // همچنان داده‌ی آماده را نشان می‌دهند. این رفتار عمدی است، اما توست موفقیت قبلاً چیزی
+  // درباره‌اش نمی‌گفت و ادمین فکر می‌کرد رکوردش گم شده است.
+  /** متن خطای واقعی سرور. این فرم‌ها تا امروز فقط شاخه‌ی res.ok را داشتند، پس اگر سرور
+   *  خطا برمی‌گرداند (مثلاً برخورد شناسه) هیچ چیزی به ادمین گفته نمی‌شد و دکمه بی‌صدا می‌ماند. */
+  const serverError = async (res: Response, fallback: string) => {
+    try {
+      const data = await res.json();
+      if (data && typeof data.error === 'string') return data.error;
+    } catch { /* پاسخ JSON نبود */ }
+    return fallback;
+  };
+
+  const savedNote = (msg: string) =>
+    dataSource === 'sample'
+      ? `${msg} — برای نمایش آن، «منبع داده» را در بخش سفارشی‌سازی کلوپ روی «دیتابیس» بگذارید.`
+      : msg;
+
   const handleAddSystem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSystem.name.trim()) return;
@@ -1174,9 +1192,11 @@ export default function AdminPanelTab({
         body: JSON.stringify(newSystem)
       });
       if (res.ok) {
-        addNotification('سیستم گیمینگ جدید با موفقیت به سرور افزوده شد', 'success');
+        addNotification(savedNote('سیستم گیمینگ جدید با موفقیت به سرور افزوده شد'), 'success');
         setNewSystem({ name: '', type: 'PC', hourlyRate: 25000, isActive: true });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت سیستم جدید'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت سیستم جدید', 'error');
@@ -1193,9 +1213,11 @@ export default function AdminPanelTab({
         body: JSON.stringify(newCafe)
       });
       if (res.ok) {
-        addNotification('آیتم بوفه جدید با موفقیت در دیتابیس ثبت شد', 'success');
+        addNotification(savedNote('آیتم بوفه جدید با موفقیت در دیتابیس ثبت شد'), 'success');
         setNewCafe({ name: '', category: 'Foods', price: 50000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, inventory: 20, isAvailable: true });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت آیتم بوفه'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت کالا', 'error');
@@ -1212,9 +1234,11 @@ export default function AdminPanelTab({
         body: JSON.stringify(newAccessory)
       });
       if (res.ok) {
-        addNotification('تجهیزات گیمینگ جدید در انبار دیتابیس ذخیره شد', 'success');
+        addNotification(savedNote('تجهیزات گیمینگ جدید در انبار دیتابیس ذخیره شد'), 'success');
         setNewAccessory({ name: '', description: '', price: 1000000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت سخت‌افزار جدید'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت سخت‌افزار جدید', 'error');
@@ -1234,6 +1258,8 @@ export default function AdminPanelTab({
         addNotification('تورنمنت گیمینگ جدید با موفقیت فعال گردید', 'success');
         setNewTournament({ title: '', game: '', registrationFee: 100000, startDate: '۱۴۰۵/۰۵/۰۱', maxTeams: 8 });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت تورنمنت'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت تورنمنت', 'error');
@@ -1253,6 +1279,8 @@ export default function AdminPanelTab({
         addNotification('مقاله جدید در بخش اخبار بلاگ منتشر شد', 'success');
         setNewArticle({ title: '', content: '', category: 'News', imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت مقاله خبررسانی'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت مقاله خبررسانی', 'error');
@@ -4011,30 +4039,39 @@ export default function AdminPanelTab({
                       {language === 'fa' ? 'هیچ لاگی در سیستم ثبت نشده است.' : 'No database queries logged yet.'}
                     </div>
                   ) : (
-                    dbLogsList.map((log: any, idx: number) => (
-                      <div key={idx} className="p-2.5 bg-white/5 border-l-2 border-emerald-500 rounded-r-lg space-y-1.5 hover:bg-white/10 transition-all">
+                    dbLogsList.map((log: any, idx: number) => {
+                      // سرور این لاگ‌ها را با فیلدهای { provider, type, command, timestamp }
+                      // می‌فرستد (server/dataProviders.ts → logDbQuery). این کامپوننت قبلاً
+                      // دنبال log.operation و log.query می‌گشت که هرگز وجود نداشتند، برای همین
+                      // ردیف‌ها بدون متن SQL و بدون برچسب نوع عملیات رندر می‌شدند.
+                      // هر دو شکل پشتیبانی می‌شود تا اگر جای دیگری نام قدیمی را بفرستد نشکند.
+                      const operation = log.type ?? log.operation ?? '—';
+                      const command = log.command ?? log.query ?? '';
+                      return (
+                      <div key={log.id ?? idx} className="p-2.5 bg-white/5 border-l-2 border-emerald-500 rounded-r-lg space-y-1.5 hover:bg-white/10 transition-all">
                         <div className="flex justify-between items-center text-[10px]">
                           <div className="flex items-center gap-2">
                             <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-400 rounded border border-emerald-900 font-bold">
                               {log.provider}
                             </span>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
-                              log.operation === 'INSERT' || log.operation === 'UPDATE' ? 'bg-amber-950 text-amber-400' :
-                              log.operation === 'SELECT' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400'
+                              operation === 'INSERT' || operation === 'UPDATE' || operation === 'SQL' ? 'bg-amber-950 text-amber-400' :
+                              operation === 'SELECT' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400'
                             }`}>
-                              {log.operation}
+                              {operation}
                             </span>
                           </div>
                           <span className="text-gray-500 font-mono">{log.timestamp}</span>
                         </div>
-                        <p className="text-gray-300 font-mono text-xs leading-relaxed break-words">{log.query}</p>
+                        <p className="text-gray-300 font-mono text-xs leading-relaxed break-words">{command}</p>
                         {log.params && log.params.length > 0 && (
                           <div className="text-[10px] text-gray-500 font-mono bg-black/40 p-1 rounded">
                             Parameters: <span className="text-gray-400">{JSON.stringify(log.params)}</span>
                           </div>
                         )}
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

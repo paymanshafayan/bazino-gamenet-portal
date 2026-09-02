@@ -1263,6 +1263,84 @@ test('promo codes without an owner stay usable by everyone', async () => {
   assert.equal(res.status, 200, 'public promo codes must keep working for anonymous carts');
 });
 
+suite('32. API — admin record ids survive deletion');
+
+test('creating, deleting and re-creating records keeps ids unique', async () => {
+  // The exact sequence that used to break: ids were derived from a row count, so
+  // deleting a record made the next insert collide with an existing one and the
+  // admin could never add another station.
+  await postJson(`${BASE}/api/admin/data-source`, { mode: 'database' }, adminAuth());
+  try {
+    const made: string[] = [];
+    for (const name of ['ایستگاه الف', 'ایستگاه ب', 'ایستگاه ج']) {
+      const { status, body } = await postJson(`${BASE}/api/admin/systems`,
+        { name, type: 'PC', hourlyRate: 30000 }, adminAuth());
+      assert.equal(status, 200, `create failed: ${JSON.stringify(body)}`);
+      const created = body.systems.find((x: any) => x.name === name);
+      assert.ok(created, `"${name}" is missing from the returned list`);
+      made.push(created.id);
+    }
+
+    const middle = made[1];
+    const del = await fetch(`${BASE}/api/admin/systems/${middle}`, { method: 'DELETE', headers: adminAuth() });
+    assert.equal(del.status, 200, 'delete failed');
+
+    const { status, body } = await postJson(`${BASE}/api/admin/systems`,
+      { name: 'ایستگاه پس از حذف', type: 'PC', hourlyRate: 99000 }, adminAuth());
+    assert.equal(status, 200, `re-create after delete failed: ${JSON.stringify(body)}`);
+
+    const ids = body.systems.map((x: any) => x.id);
+    assert.equal(new Set(ids).size, ids.length, `duplicate ids: ${JSON.stringify(ids)}`);
+    assert.ok(body.systems.some((x: any) => x.name === 'ایستگاه پس از حذف'),
+      'the new station was not stored');
+  } finally {
+    await postJson(`${BASE}/api/admin/data-source`, { mode: 'sample' }, adminAuth());
+  }
+});
+
+test('new ids never collide with the sample ids', async () => {
+  await postJson(`${BASE}/api/admin/data-source`, { mode: 'database' }, adminAuth());
+  try {
+    const sampleIds = new Set([
+      ...sample.SAMPLE_SYSTEMS.map((x: any) => x.id),
+      ...sample.SAMPLE_CAFE_ITEMS.map((x: any) => x.id),
+      ...sample.SAMPLE_ACCESSORIES.map((x: any) => x.id),
+      ...sample.SAMPLE_TOURNAMENTS.map((x: any) => x.id),
+      ...sample.SAMPLE_ARTICLES.map((x: any) => x.id),
+    ]);
+
+    const sys = await postJson(`${BASE}/api/admin/systems`, { name: 'idcheck', type: 'PC', hourlyRate: 1000 }, adminAuth());
+    const cafe = await postJson(`${BASE}/api/admin/cafe`, { name: 'idcheck', category: 'Foods', price: 1000, inventory: 1 }, adminAuth());
+    const acc = await postJson(`${BASE}/api/admin/accessories`, { name: 'idcheck', description: 'x', price: 1000, stock: 1, category: 'Mouse' }, adminAuth());
+
+    for (const [label, body, key] of [['systems', sys.body, 'systems'], ['cafe', cafe.body, 'cafeItems'], ['accessories', acc.body, 'accessories']] as const) {
+      const created = (body[key] || []).find((x: any) => x.name === 'idcheck');
+      assert.ok(created, `${label}: the created record is missing`);
+      assert.ok(!sampleIds.has(created.id), `${label}: id "${created.id}" collides with a sample id`);
+    }
+
+    // accessories and articles used to share the "a" prefix
+    const art = await postJson(`${BASE}/api/admin/articles`,
+      { title: 'idcheck-article', content: 'x', category: 'News', author: 'test' }, adminAuth());
+    const article = (art.body.articles || []).find((x: any) => x.title === 'idcheck-article');
+    const accessory = (acc.body.accessories || []).find((x: any) => x.name === 'idcheck');
+    assert.ok(article && accessory, 'could not create both an article and an accessory');
+    assert.notEqual(article.id, accessory.id, 'an article and an accessory share the same id');
+  } finally {
+    await postJson(`${BASE}/api/admin/data-source`, { mode: 'sample' }, adminAuth());
+  }
+});
+
+test('the database log feed carries the fields the panel renders', async () => {
+  const data = await getJson(`${BASE}/api/admin/db-logs`, 200, adminAuth());
+  assert.ok(Array.isArray(data.logs), 'db-logs did not return a list');
+  if (data.logs.length === 0) return;
+  const log = data.logs[0];
+  for (const field of ['provider', 'type', 'command', 'timestamp']) {
+    assert.ok(field in log, `the log entry is missing "${field}"`);
+  }
+});
+
 test('the SPA shell is returned for an unknown non-API path', async () => {
   const res = await fetch(`${BASE}/some/deep/client/route`);
   assert.equal(res.status, 200);

@@ -1,0 +1,327 @@
+{
+  "when": "2026-09-02T12:54:23.503Z",
+  "steps": [
+    {
+      "name": "open · داشبورد و آمار زنده",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «داشبورد» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه. راهنم",
+      "result": {
+        "chars": 1414
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "01-dashboard.png"
+    },
+    {
+      "name": "open · مدیریت کلاینت",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «مدیریت کلاینت‌ها» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبا",
+      "result": {
+        "chars": 667
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "02-systems.png"
+    },
+    {
+      "name": "open · بوفه کافه",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «بوفه کافه» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه. راه",
+      "result": {
+        "chars": 765
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "03-cafe.png"
+    },
+    {
+      "name": "open · انبار فروشگاه",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «فروشگاه جانبی» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه.",
+      "result": {
+        "chars": 797
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "04-shop.png"
+    },
+    {
+      "name": "open · برنامه‌ریزی تورنمنت",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «مسابقات» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه. راهنم",
+      "result": {
+        "chars": 993
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "05-tournaments.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "open · انتشار اخبار بلاگ",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «وبلاگ و اخبار» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه.",
+      "result": {
+        "chars": 738
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "06-blog.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "open · اتاق‌های گفتگوی زنده",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «اتاق‌های گفتگوی زنده» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این",
+      "result": {
+        "chars": 281
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "07-chat.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "open · ارسال پیام و نوتیفیکیشن",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «پیام‌ها و اعلان‌ها» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این ز",
+      "result": {
+        "chars": 724
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "08-messages.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "open · مهاجرت‌های EF Core",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «مهاجرت‌های دیتابیس» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این ز",
+      "result": {
+        "chars": 1959
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "09-migrations.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "open · مدیریت قالب‌ها",
+      "status": "ok",
+      "headingSample": "",
+      "result": {
+        "chars": 0
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "10-themes.png"
+    },
+    {
+      "name": "open · اسلایدر اپلیکیشن فلاتر",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «اسلایدر اپ» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه. را",
+      "result": {
+        "chars": 1014
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "11-slider.png"
+    },
+    {
+      "name": "open · دانلود اپلیکیشن",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «دانلود اپلیکیشن» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبان",
+      "result": {
+        "chars": 816
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "12-appdownload.png"
+    },
+    {
+      "name": "open · سفارشی‌سازی کلوپ",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «سفارشی‌سازی» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه. ر",
+      "result": {
+        "chars": 4290
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "13-customization.png"
+    },
+    {
+      "name": "open · لاگ‌های دیتابیس",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «لاگ‌های دیتابیس» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبان",
+      "result": {
+        "chars": 573
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "14-dblogs.png"
+    },
+    {
+      "name": "open · تنظیمات API Key",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «تنظیمات کلید‌ها» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبان",
+      "result": {
+        "chars": 936
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "15-apikeys.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "open · پرزنتیشن",
+      "status": "ok",
+      "headingSample": "آیا در کار با بخش «پرزنتیشن» نیاز به راهنمایی دارید؟ مشاهده راهنمای مصور تعاملی، چیدمان فیلدها و سناریوهای کاربردی این زبانه. راهن",
+      "result": {
+        "chars": 1108
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/default.min.css"
+      ],
+      "shot": "16-presentation.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "write · add a gaming station",
+      "status": "ok",
+      "toast": "سیستم گیمینگ جدید با موفقیت به سرور افزوده شد — برای نمایش آن، «منبع داده» را در بخش سفارشی‌سازی کلوپ روی «دیتابیس» بگذارید.",
+      "result": {
+        "created": false,
+        "name": "تست سیستم 31779"
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "17-write-system.png"
+    },
+    {
+      "name": "write · publish a blog article",
+      "status": "ok",
+      "toast": "مقاله جدید در بخش اخبار بلاگ منتشر شد",
+      "result": {
+        "published": true,
+        "title": "مقاله تست 31779"
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "18-write-article.png"
+    },
+    {
+      "name": "write · create a chat room",
+      "status": "ok",
+      "toast": "اتاق گفتگو ایجاد شد",
+      "result": {
+        "created": false,
+        "room": "Room31779"
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "19-write-chatroom.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "write · change a cafe order status",
+      "status": "ok",
+      "toast": "وضعیت سفارش CF-4609 با موفقیت بروزرسانی شد",
+      "result": {
+        "before": "Preparing",
+        "next": "Pending"
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "20-write-orderstatus.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "write · switch data source to database and back",
+      "status": "ok",
+      "result": {
+        "switchedTo": {
+          "mode": "sample",
+          "sample": {
+            "systems": 5,
+            "cafeItems": 5,
+            "accessories": 5,
+            "tournaments": 4,
+            "articles": 4,
+            "sliders": 4,
+            "coupons": 4,
+            "transactions": 4,
+            "chatRooms": 5,
+            "reservations": 3,
+            "settings": 4
+          },
+          "database": {
+            "systems": 1,
+            "cafeItems": 0,
+            "accessories": 0,
+            "tournaments": 1,
+            "articles": 3,
+            "sliders": 0,
+            "coupons": 3,
+            "transactions": 15,
+            "chatRooms": 1,
+            "reservations": 1
+          }
+        },
+        "restored": {
+          "mode": "sample",
+          "sample": {
+            "systems": 5,
+            "cafeItems": 5,
+            "accessories": 5,
+            "tournaments": 4,
+            "articles": 4,
+            "sliders": 4,
+            "coupons": 4,
+            "transactions": 4,
+            "chatRooms": 5,
+            "reservations": 3,
+            "settings": 4
+          },
+          "database": {
+            "systems": 1,
+            "cafeItems": 0,
+            "accessories": 0,
+            "tournaments": 1,
+            "articles": 3,
+            "sliders": 0,
+            "coupons": 3,
+            "transactions": 15,
+            "chatRooms": 1,
+            "reservations": 1
+          }
+        }
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "21-write-datasource.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - wa"
+    },
+    {
+      "name": "admin sees every reservation and transaction",
+      "status": "ok",
+      "note": "admin sees transactions from: [\"(legacy)\",\"alice_own\",\"bob_own\",\"Gamer_200319\"]",
+      "result": {
+        "reservations": 1,
+        "transactions": 15,
+        "coupons": 3,
+        "distinctOwners": 4
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: net::ERR_FAILED"
+  ],
+  "networkFailures": [
+    "FAILED https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/default.min.css"
+  ]
+}

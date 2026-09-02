@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `a99d5a2052d29d7a94247fd908d1c72d9a39da46`
+- commit: `5caf1e650e2bbe48cbb604909c9040d02e5bdbae`
 - branch: `arena/01a05e95-bazino-gamenet-portal`
-- run:    33650390088
-- date:   2026-09-02 15:43 UTC
+- run:    33652726149
+- date:   2026-09-02 16:05 UTC
 
 ## flutter --version
 ```
@@ -123,6 +123,17 @@ No issues found! (ran in 9.6s)
 ✅ BazinoApp — رندر اولین فریم قبل از خواندن SharedPreferences، لودر نشان می‌دهد
 ✅ BazinoApp — رندر کاربر تازه صفحه‌ی intro را می‌بیند
 ✅ BazinoApp — رندر کاربری که intro را دیده، دیگر آن را نمی‌بیند
+::endgroup::
+::group::❌ DELIBERATE FAILURE — proving the CI guard turns the job red (failed)
+Expected: <5>
+  Actual: <4>
+این تست عمداً خراب است و باید حذف شود
+
+package:matcher                                     expect
+package:flutter_test/src/widget_tester.dart 473:18  expect
+test/widget_test.dart 78:5                          main.<fn>
+::endgroup::
+::group::✅ Passing tests
 ✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
 ✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me
 ✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ ناقص نباید کرش کند
@@ -131,9 +142,9 @@ No issues found! (ran in 9.6s)
 ✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
 ::endgroup::
 
-🎉 10 tests passed.
+::error::10 tests passed, 1 failed.
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## flutter build web
 ```
@@ -151,7 +162,7 @@ file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14436 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             44.0s
+Compiling lib/main.dart for the Web...                             45.2s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -161,7 +172,7 @@ Compiling lib/main.dart for the Web...                             44.0s
 flutter --version=0
 flutter pub get=0
 flutter analyze=0
-flutter test=0
+flutter test=1
 flutter build web=0
 ```
 

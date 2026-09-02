@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Coffee, Plus, Check, Sparkles } from 'lucide-react';
 import { Station, BuffetItem, ServiceItem, CurrencyCode } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface AddBuffetServicesModalProps {
   station: Station;
@@ -18,6 +19,9 @@ export const AddBuffetServicesModal: React.FC<AddBuffetServicesModalProps> = ({
   onClose,
   onConfirmAddServices,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
   const [customServiceName, setCustomServiceName] = useState('');
   const [customServicePrice, setCustomServicePrice] = useState<number>(50);

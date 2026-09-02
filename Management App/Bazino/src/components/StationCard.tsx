@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Play, Pause, Square, Gamepad2, Gamepad, Monitor, Glasses, CircleDot, Clock, ArrowRightLeft, Coffee, DollarSign, Bell, AlertTriangle, ShieldAlert, Tag, User, Edit2 } from 'lucide-react';
 import { Station, TariffRate, CurrencyCode } from '../types';
 import { formatCurrency, formatTimerSeconds, calculateGameCost } from '../utils/formatters';
@@ -16,7 +16,14 @@ interface StationCardProps {
   onEditStation?: (station: Station) => void;
 }
 
-export const StationCard: React.FC<StationCardProps> = ({
+/**
+ * کارت یک ایستگاه.
+ *
+ * با `memo` پیچیده شده چون ثانیه‌شمار مرکزی هر ثانیه آرایه‌ی `stations` را به‌روز می‌کند و
+ * بدون آن، هر هشت کارت (و ~۹۰ آیکون SVG داخلشان) هر ثانیه دوباره رندر می‌شدند — حتی
+ * کارت‌هایی که هیچ سانس فعالی نداشتند و اصلاً عوض نشده بودند.
+ */
+const StationCardBase: React.FC<StationCardProps> = ({
   station,
   tariffs,
   currency,
@@ -332,3 +339,5 @@ export const StationCard: React.FC<StationCardProps> = ({
     </div>
   );
 };
+
+export const StationCard = memo(StationCardBase);

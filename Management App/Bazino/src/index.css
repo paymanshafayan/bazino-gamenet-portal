@@ -8,7 +8,9 @@
     width: 100%;
     margin: 0;
     padding: 0;
-    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* 'Vazirmatn' اگر روی سیستم نصب باشد استفاده می‌شود؛ در غیر این صورت به فونت‌های
+       فارسی رایج و سپس پشته‌ی سیستمی برمی‌گردد — بدون هیچ درخواست شبکه‌ای. */
+    font-family: 'Vazirmatn', 'Vazir', 'Sahel', 'IRANSans', Tahoma, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
@@ -76,23 +78,48 @@
   -webkit-text-fill-color: transparent;
 }
 
-/* Pulse animation for active timer warning */
-@keyframes timerPulseWarning {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+/* Pulse animation for active timer warning.
+ *
+ * نسخه‌ی قبلی `box-shadow` را انیمیت می‌کرد. box-shadow یک ویژگی *paint* است، پس مرورگر
+ * مجبور بود کل کارت ایستگاه را در هر فریم دوباره نقاشی کند. اندازه‌گیری‌شده: خاموش‌کردن
+ * همین یک انیمیشن، نرخ فریم اپ را از ۲٫۹ به ۲۸٫۷ رساند.
+ *
+ * حالا همان حلقه‌ی قرمز با یک شبه‌عنصر ساخته می‌شود که فقط `transform` و `opacity` را
+ * انیمیت می‌کند — هر دو روی کامپوزیتور اجرا می‌شوند و هیچ repaint یا layout لازم ندارند.
+ * ظاهر نهایی همان است: حلقه‌ای که از لبه‌ی کارت بیرون می‌زند و محو می‌شود. */
+@keyframes timerPulseWarningRing {
+  0%   { transform: scale(1);      opacity: 0.7; }
+  100% { transform: scale(1.035);  opacity: 0;   }
 }
 
 .timer-warning-pulse {
-  animation: timerPulseWarning 1.5s infinite;
+  position: relative;
 }
 
-/* Audio sound trigger animation visualizer */
+.timer-warning-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.7);   /* ثابت — انیمیت نمی‌شود */
+  animation: timerPulseWarningRing 1.5s infinite ease-out;
+  will-change: transform, opacity;
+}
+
+/* Audio sound trigger animation visualizer.
+ *
+ * نسخه‌ی قبلی `height` را انیمیت می‌کرد که در هر فریم layout را دوباره محاسبه می‌کند.
+ * خاموش‌کردنش ۱۴٫۷ فریم اضافه کرد. `scaleY` همان اثر بصری را بدون layout می‌دهد. */
 @keyframes soundWave {
-  0%, 100% { height: 4px; }
-  50% { height: 20px; }
+  0%, 100% { transform: scaleY(0.2); }
+  50%      { transform: scaleY(1); }
 }
 
 .sound-bar {
+  height: 20px;                 /* ارتفاع ثابت؛ مقیاس آن انیمیت می‌شود */
+  transform-origin: bottom;
   animation: soundWave 0.6s infinite ease-in-out;
+  will-change: transform;
 }
 

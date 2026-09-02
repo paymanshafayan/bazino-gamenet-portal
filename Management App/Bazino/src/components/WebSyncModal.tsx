@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { RefreshCw, Globe, CheckCircle2, ShieldCheck, X, Key, Server, ArrowUpRight, ArrowDownLeft, Terminal, Copy, Check, Settings, Activity, Calendar, Clock, User, CheckCircle, XCircle, AlertCircle, ListFilter, FileText, Download, Smartphone, Monitor } from 'lucide-react';
 import { WebSyncStatus } from '../types';
 import { buildSyncUrl, syncHeaders } from '../utils/syncClient';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface WebReservation {
   id: string;
@@ -38,6 +39,9 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
   onTriggerSync,
   onUpdateSyncSettings,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const [activeTab, setActiveTab] = useState<'status' | 'reservations' | 'config' | 'payload' | 'logs' | 'docs'>('status');
   // Draft fields for the config tab — only actually applied (and persisted) when the user
   // clicks "ذخیره تنظیمات". Seeded from the real, persisted settings (`status`), not fake

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Tag, Plus, Edit2, Trash2, Clock, Check } from 'lucide-react';
 import { TariffRate, CurrencyCode } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface ManageTariffsModalProps {
   tariffs: TariffRate[];
@@ -20,6 +21,9 @@ export const ManageTariffsModal: React.FC<ManageTariffsModalProps> = ({
   onUpdateTariff,
   onDeleteTariff,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const [editingTariff, setEditingTariff] = useState<TariffRate | null>(null);
   const [showForm, setShowForm] = useState(false);
 

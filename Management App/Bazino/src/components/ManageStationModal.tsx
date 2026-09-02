@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Gamepad2, Gamepad, Monitor, Glasses, CircleDot, Plus, Edit2, Tag, Trash2 } from 'lucide-react';
 import { Station, StationType, TariffRate, CurrencyCode } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface ManageStationModalProps {
   stationToEdit?: Station | null;
@@ -26,6 +27,9 @@ export const ManageStationModal: React.FC<ManageStationModalProps> = ({
   onSaveStation,
   onDeleteStation,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const [name, setName] = useState(stationToEdit?.name || '');
   const [type, setType] = useState<StationType>(stationToEdit?.type || 'PS5_VIP');
   const [icon, setIcon] = useState<string>(stationToEdit?.icon || 'Gamepad2');

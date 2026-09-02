@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Play, DollarSign, Clock, User, Tag, ShieldCheck, Sparkles } from 'lucide-react';
 import { Station, TariffRate, Customer, PaymentType, CurrencyCode } from '../types';
 import { formatCurrency, CURRENCY_SYMBOLS, getActiveHourlyRate } from '../utils/formatters';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface StationModalProps {
   station: Station;
@@ -29,6 +30,9 @@ export const StationModal: React.FC<StationModalProps> = ({
   onClose,
   onConfirmStart,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const [mode, setMode] = useState<'AMOUNT' | 'DURATION' | 'OPEN'>('AMOUNT');
   const [selectedTariffId, setSelectedTariffId] = useState<string>(station.currentTariffId || tariffs[0]?.id || 't1');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');

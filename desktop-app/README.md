@@ -58,7 +58,10 @@ npm run dist:linux   # روی لینوکس اجرا کنید
 یعنی:
 - برای نصاب **ویندوز واقعی**، باید `npm run prepare-server-bundle && npm run dist:win` رو **روی خود ویندوز** اجرا کنید (نه از لینوکس/مک با cross-compile).
 - همین‌طور برای مک و لینوکس.
-- اگه می‌خواید هر سه رو خودکار و هم‌زمان بسازید، از یک پایپ‌لاین CI با matrix سه‌تا runner (مثل GitHub Actions: `windows-latest`, `macos-latest`, `ubuntu-latest`) استفاده کنید — نمونه‌ی این workflow در این پروژه ساخته نشده، ولی الگوی استانداردیه (جستجو کنید: "electron-builder GitHub Actions matrix").
+- اگه می‌خواید هر سه رو خودکار و هم‌زمان بسازید، **همین کار الان انجام شده**:
+  `.github/workflows/desktop-installers.yml` با matrix سه‌تا runner (`windows-latest`,
+  `macos-latest`, `ubuntu-latest`) هر سه نصاب رو می‌سازه و به یک GitHub Release می‌چسبونه.
+  دو راه اجرا داره: دستی (Run workflow) و خودکار با هر push که چیزی زیر `desktop-app/` عوض کنه.
 
 ---
 
@@ -66,7 +69,17 @@ npm run dist:linux   # روی لینوکس اجرا کنید
 
 - `main.js`: پروسه‌ی اصلی Electron. `dataDir` رو (پوشه‌ی داده‌ی کاربر، مثلاً `%APPDATA%/BAZINO PRO` در ویندوز) به‌عنوان `process.cwd()` ست می‌کنه (اونجاست که `install-config.json` و فایل SQLite ذخیره می‌شن — این پوشه با آپدیت/حذف‌نصب اپ از بین نمی‌ره)، و متغیر `BAZINO_STATIC_ROOT` رو به مسیر واقعی فایل‌های build شده ست می‌کنه (چون این دو مسیر متفاوتن — `server.ts` این متغیر رو می‌خونه، پیش‌فرضش `process.cwd()`ه که برای deploy عادی هنوز درست کار می‌کنه).
 - یک `JWT_SECRET` تصادفی در اولین اجرا تولید و در `dataDir/.jwt-secret` ذخیره می‌شه (به‌جای مقدار پیش‌فرض ناامن کد).
-- `scripts/prepare-server-bundle.js`: خروجی build ریشه‌ی پروژه رو کپی می‌کنه و `node_modules` پروداکشن رو نصب می‌کنه — این پوشه (`server-bundle/`) توسط `.gitignore` نادیده گرفته می‌شه (تولیدشونده‌ست، نباید commit بشه).
+- `scripts/prepare-server-bundle.js`: خروجی build ریشه‌ی پروژه رو کپی می‌کنه. برای وابستگی‌ها
+  **اول `node_modules` ریشه رو کپی می‌کنه** (آفلاین و از قبل کامپایل‌شده) و فقط اگه ناقص بود
+  سراغ `npm install` می‌ره؛ در انتها هم واقعاً `better-sqlite3` رو از داخل bundle load می‌کنه
+  تا مطمئن بشه اپ موقع اجرا بالا میاد. این پوشه (`server-bundle/`) در `.gitignore` هست.
+- `scripts/run-headless-desktop.cjs`: همون مسیر راه‌اندازی `main.js` رو **بدون Electron** اجرا
+  می‌کنه (chdir به پوشه‌ی داده، `BAZINO_STATIC_ROOT`، تولید JWT، و require کردن `server.cjs`).
+  برای تست سریع بک‌اند دسکتاپ و گرفتن اسکرین‌شات از UI با یک مرورگر معمولی:
+
+  ```bash
+  node scripts/run-headless-desktop.cjs      # سپس http://localhost:3100/management-app
+  ```
 
 ## عیب‌یابی سریع
 

@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `a3906ff0cb632b1b6d32378ad27a78a19d932fca`
+- commit: `a99d5a2052d29d7a94247fd908d1c72d9a39da46`
 - branch: `arena/01a05e95-bazino-gamenet-portal`
-- run:    33648613450
-- date:   2026-09-02 15:27 UTC
+- run:    33650390088
+- date:   2026-09-02 15:43 UTC
 
 ## flutter --version
 ```
@@ -111,7 +111,7 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 10.1s)
+No issues found! (ran in 9.6s)
 ```
 **exit 0 — OK**
 
@@ -151,7 +151,7 @@ file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14436 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             47.4s
+Compiling lib/main.dart for the Web...                             44.0s
 ✓ Built build/web
 ```
 **exit 0 — OK**

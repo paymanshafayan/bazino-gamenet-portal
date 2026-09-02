@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, startTransition } from 'react';
 import { Tournament } from '../types/gamenet';
+import InitialAvatar from './InitialAvatar';
 import { useLanguage } from '../context/LanguageContext';
 import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
 import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
@@ -417,7 +418,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       name: { fa: 'سینا رضایی', en: 'Sina Razavi', ru: 'Сина Разави', tr: 'Sina Razavi' },
       gamerTag: 'Apex_C',
       role: { fa: 'سرمربی ارشد کانتر استرایک ۲', en: 'Head CS2 Coach', ru: 'Старший тренер CS2', tr: 'Baş CS2 Espor Koçu' },
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sina',
+      avatar: '',
       specialty: 'CS2, Valorant, Precision FPS'
     },
     {
@@ -425,7 +426,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       name: { fa: 'سورنا قاسمی', en: 'Sorena Ghasemi', ru: 'Сорена Гасеми', tr: 'Sorena Ghasemi' },
       gamerTag: 'Vortex_X',
       role: { fa: 'تحلیل‌گر ارشد بازی‌های تیمی', en: 'Senior MOBA Analyst', ru: 'Старший аналитик MOBA', tr: 'Kıdemli MOBA Analisti' },
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sorena',
+      avatar: '',
       specialty: 'Dota 2, League of Legends'
     },
     {
@@ -433,7 +434,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       name: { fa: 'آریا محمدی', en: 'Aria Mohammadi', ru: 'Ариа Мохаммади', tr: 'Aria Mohammadi' },
       gamerTag: 'Ghost_F',
       role: { fa: 'سوپروایزر سالن کنسول و فیفا', en: 'VIP Console Supervisor', ru: 'Супервайзер консольной зоны', tr: 'VIP Konsol Sorumlusu' },
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aria',
+      avatar: '',
       specialty: 'FIFA 26, Fighting Games'
     }
   ];
@@ -1331,13 +1332,17 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             >
               {/* Avatar Frame with custom gold borders */}
               <div className="relative w-24 h-24 rounded-full border-4 border-primary p-1 bg-black group-hover:scale-105 transition-transform duration-300">
-                <img loading="lazy"
-                  src={staff.avatar}
-                  width="96"
-                  height="96"
-                  alt={getLocText(staff.name)}
-                  className="rounded-full bg-dark-bg w-full h-full object-cover"
-                />
+                {staff.avatar ? (
+                  <img loading="lazy"
+                    src={staff.avatar}
+                    width="96"
+                    height="96"
+                    alt={getLocText(staff.name)}
+                    className="rounded-full bg-dark-bg w-full h-full object-cover"
+                  />
+                ) : (
+                  <InitialAvatar name={getLocText(staff.name)} size={88} className="w-full h-full" />
+                )}
                 <span className="absolute -bottom-1 -right-1 bg-primary text-black font-mono font-black text-[10px] px-2 py-0.5 notched-clip-sm shadow-md">
                   PRO
                 </span>

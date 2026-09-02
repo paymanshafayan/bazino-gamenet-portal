@@ -567,7 +567,6 @@ export class SqliteStore implements IDataStore {
     this.db.prepare(`INSERT OR REPLACE INTO users (username, passwordHash, email, phone, loyaltyPoints, role) VALUES (?, ?, ?, ?, 1000, 'admin')`)
       .run(adminUser.username || 'admin', passwordHash, adminUser.email || 'admin@gamenet.com', adminUser.phone || '09120000000');
     await this.setSetting('activeThemeId', 'dark-gold');
-    await this.setSetting('activeUsername', adminUser.username || 'admin');
     for (const theme of DEFAULT_THEMES) await this.createTheme(theme);
     logDbQuery(this.name, 'SYSTEM', 'Minimal database initialized with Admin user (password hashed with bcrypt).');
   }
@@ -983,7 +982,6 @@ export class SqlServerStore implements IDataStore {
         WHEN NOT MATCHED THEN INSERT (username, passwordHash, email, phone, loyaltyPoints, role) VALUES (@u, @p, @e, @ph, 1000, 'admin');
       `);
     await this.setSetting('activeThemeId', 'dark-gold');
-    await this.setSetting('activeUsername', adminUser.username || 'admin');
     for (const theme of DEFAULT_THEMES) {
       const exists = (await this.r().input('id', this.sql.NVarChar, theme.id).query(`SELECT COUNT(*) c FROM dbo.themes WHERE id=@id`)).recordset[0].c;
       if (!exists) await this.createTheme(theme);
@@ -1222,7 +1220,6 @@ export class MongoStore implements IDataStore {
       { upsert: true }
     );
     await this.setSetting('activeThemeId', 'dark-gold');
-    await this.setSetting('activeUsername', adminUser.username || 'admin');
     for (const theme of DEFAULT_THEMES) await this.createTheme(theme);
     logDbQuery(this.name, 'NoSQL', 'db.users.updateOne(..., {upsert:true}) — admin seeded with hashed password');
   }

@@ -10,7 +10,9 @@ export interface LoyaltyTx {
   id: string;
   points: number;
   description: string;
-  type: 'Earned' | 'Redeemed';
+  // 'Bonus' هم یک نوع واقعی است (هدیه‌ی خوش‌آمدگویی در server/sampleData.ts) اما
+  // در این تایپ نیامده بود، برای همین UI آن را به شاخه‌ی «خرج امتیاز» می‌فرستاد.
+  type: 'Earned' | 'Redeemed' | 'Bonus';
   date: string;
 }
 

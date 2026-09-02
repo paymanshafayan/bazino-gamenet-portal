@@ -1506,6 +1506,7 @@ export default function AdminPanelTab({
                         activeSubTab === 'mobileAppDownload' ? 'دانلود اپلیکیشن' :
                         activeSubTab === 'customization' ? 'سفارشی‌سازی' :
                         activeSubTab === 'dbLogs' ? 'لاگ‌های دیتابیس' :
+                        activeSubTab === 'presentation' ? 'پرزنتیشن' :
                         'تنظیمات کلید‌ها'
                       }» نیاز به راهنمایی دارید؟`
                     : `Need assistance with "${activeSubTab.toUpperCase()}" section?`}

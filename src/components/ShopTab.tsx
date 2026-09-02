@@ -2,19 +2,21 @@ import React, { useState } from 'react';
 import { Accessory, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Tag, CreditCard, ChevronRight, Check, X, Sparkles, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { postJson, errorMessage, toServerCart } from '../services/postJson';
 
 interface Props {
   themeId?: string;
   accessories: Accessory[];
   activeCoupons: DiscountCode[];
-  onAddLoyaltyPoints: (points: number, desc: string) => void;
+  /** پس از ثبت موفق خرید، وضعیت تازه‌ی سرور (کاربر، تراکنش‌ها، موجودی انبار) را بالا می‌فرستد. */
+  onServerState: (data: any) => void;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 export default function ShopTab({
   accessories,
   activeCoupons,
-  onAddLoyaltyPoints,
+  onServerState,
   addNotification,
 }: Props) {
   const { t, dir, language } = useLanguage();
@@ -140,40 +142,48 @@ export default function ShopTab({
     );
   };
 
-  const handleCheckout = () => {
-    if (cart.length === 0) return;
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const subtotal = getSubtotal();
-    const discount = getDiscountAmount();
-    const finalAmount = subtotal - discount;
+  // خرید واقعاً به بک‌اند فرستاده می‌شود (POST /api/accessories/order). شماره‌ی
+  // فاکتور، مبلغ نهایی، کسر موجودی و امتیاز همه از پاسخ سرور می‌آیند — قبلاً
+  // شماره‌ی فاکتور با Math.random ساخته می‌شد و هیچ سفارشی ثبت نمی‌شد.
+  const handleCheckout = async () => {
+    if (cart.length === 0 || isSubmitting) return;
 
-    const pointsEarned = Math.floor(finalAmount / 10000);
-    const invoiceNum = Math.floor(1000 + Math.random() * 9000);
+    setIsSubmitting(true);
+    try {
+      const data = await postJson('/api/accessories/order', {
+        cart: toServerCart(cart),
+        couponCode: appliedCoupon?.code || '',
+      });
 
-    const descMsg = language === 'fa'
-      ? `خرید لوازم جانبی گیمینگ (فاکتور #${invoiceNum})`
-      : language === 'en'
-      ? `Purchase of gaming accessories (Invoice #${invoiceNum})`
-      : language === 'ru'
-      ? `Покупка игровых аксессуаров (Счет #${invoiceNum})`
-      : `Oyuncu ekipmanları satın alımı (Fatura #${invoiceNum})`;
+      onServerState(data);
 
-    onAddLoyaltyPoints(pointsEarned, descMsg);
-    
-    const successMsg = language === 'fa'
-      ? `پرداخت با موفقیت انجام شد! ${pointsEarned} امتیاز وفاداری به حساب شما اضافه گردید.`
-      : language === 'en'
-      ? `Payment completed successfully! ${pointsEarned} loyalty points have been added to your account.`
-      : language === 'ru'
-      ? `Оплата прошла успешно! Вам начислено ${pointsEarned} баллов лояльности.`
-      : `Ödeme başarıyla tamamlandı! Hesabınıza ${pointsEarned} sadakat puanı eklendi.`;
+      const invoice = data?.order?.id ? ` (${data.order.id})` : '';
+      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10000);
+      const successMsg = language === 'fa'
+        ? `پرداخت با موفقیت انجام شد${invoice}! ${pointsEarned} امتیاز وفاداری به حساب شما اضافه گردید.`
+        : language === 'en'
+        ? `Payment completed successfully${invoice}! ${pointsEarned} loyalty points have been added to your account.`
+        : language === 'ru'
+        ? `Оплата прошла успешно${invoice}! Вам начислено ${pointsEarned} баллов лояльности.`
+        : `Ödeme başarıyla tamamlandı${invoice}! Hesabınıza ${pointsEarned} sadakat puanı eklendi.`;
 
-    addNotification(successMsg, 'success');
-    
-    // Clear cart and state
-    setCart([]);
-    setAppliedCoupon(null);
-    setCouponCode('');
+      addNotification(successMsg, 'success');
+
+      setCart([]);
+      setAppliedCoupon(null);
+      setCouponCode('');
+    } catch (e) {
+      addNotification(errorMessage(e,
+        language === 'fa' ? 'پرداخت انجام نشد. دوباره تلاش کنید.' :
+        language === 'en' ? 'Payment failed. Please try again.' :
+        language === 'ru' ? 'Оплата не прошла. Попробуйте снова.' :
+        'Ödeme başarısız. Lütfen tekrar deneyin.'
+      ), 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const subtotal = getSubtotal();
@@ -457,7 +467,8 @@ export default function ShopTab({
               {/* Purchase button */}
               <button
                 onClick={handleCheckout}
-                className="w-full mt-2 py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 cursor-pointer font-display text-xs"
+                disabled={isSubmitting}
+                className="w-full mt-2 py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 cursor-pointer font-display text-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <CreditCard className="w-4 h-4" />
                 <span>

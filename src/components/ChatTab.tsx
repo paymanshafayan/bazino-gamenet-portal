@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import InitialAvatar from './InitialAvatar';
 import { useLanguage } from '../context/LanguageContext';
 import { MessageSquare, Send, Plus, Users, Hash, Gamepad2, Smile, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { UserState } from '../types/gamenet';
@@ -437,11 +438,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
                 >
                   {/* User Avatar */}
                   <div className="w-8.5 h-8.5 rounded-full border-2 border-primary/30 p-0.5 shrink-0">
-                    <img loading="lazy" 
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.username}`} 
-                      className="rounded-full bg-dark-card w-full h-full" 
-                      alt="Avatar" 
-                    />
+                    <InitialAvatar name={msg.username} size={30} className="w-full h-full" />
                   </div>
 
                   {/* Message Bubble */}

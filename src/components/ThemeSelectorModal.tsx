@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Check, Palette, Sparkles } from 'lucide-react';
 import ThemeScreenshot from './ThemeScreenshot';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface ThemeColorConfig {
   primary: string;
@@ -33,6 +34,8 @@ export default function ThemeSelectorModal({
   setThemeId,
   language
 }: ThemeSelectorModalProps) {
+  useModalDismiss(isOpen, onClose);
+
   
   // Custom initial positions for the throwing/flying effect for each theme card
   const getThrowAnimation = (index: number) => {

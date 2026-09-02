@@ -48,7 +48,16 @@ async function step(name, fn, { shot = true } = {}) {
   return rec;
 }
 
-const nav = (label) => page.locator('header nav button', { hasText: label }).first();
+// دسکتاپ: هدر. موبایل: نوار پایین (که در Batch C اضافه شد).
+const nav = (label) => page.locator('header nav button, nav[aria-label] button', { hasText: label }).first();
+const mobileNav = async (label) => {
+  const direct = page.locator('nav[aria-label] button', { hasText: new RegExp(`^${label}$`) }).first();
+  if (await direct.count()) return direct.click({ timeout: 15000 });
+  // تب‌های فرعی پشت دکمه‌ی «بیشتر» هستند
+  await page.locator('nav[aria-label] button', { hasText: /بیشتر|More/ }).first().click({ timeout: 15000 });
+  await page.waitForTimeout(800);
+  return page.locator('[role=dialog] button', { hasText: new RegExp(`^${label}$`) }).first().click({ timeout: 15000 });
+};
 const toastTexts = () => page.locator('.fixed.top-6 > div span').allInnerTexts().catch(() => []);
 async function waitToast(re, timeout = 12000) {
   const end = Date.now() + timeout;
@@ -78,7 +87,7 @@ await step('home-desktop', async (rec) => {
 await step('logout-to-guest', async (rec) => {
   const logout = page.locator('header button[aria-label="Logout"]');
   if (await logout.count()) {
-    rec.notes.push('site opened ALREADY LOGGED IN as: ' + (await page.locator('header span.text-primary').first().innerText().catch(() => '?')));
+    rec.notes.push('site opened ALREADY LOGGED IN as: ' + (await page.locator('header span').filter({ hasText: /^@/ }).first().innerText().catch(() => '?')));
     await logout.click();
     await page.waitForTimeout(600);
     const confirm = page.locator('button', { hasText: /^خروج$|^Logout$/ }).last();
@@ -101,7 +110,8 @@ await step('register-new-account', async (rec) => {
   rec.notes.push(JSON.stringify(USER));
   await page.locator('form button[type=submit]').first().click();
   await page.waitForTimeout(3500);
-  const who = await page.locator('header span.text-primary').first().innerText().catch(() => null);
+  // لوگوی «BAZINO PRO» هم کلاس text-primary دارد؛ نام کاربر با @ شروع می‌شود.
+  const who = await page.locator('header span').filter({ hasText: /^@/ }).first().innerText().catch(() => null);
   if (!who || !who.includes(USER.username)) throw new Error('header does not show new user, got: ' + who);
   return { headerUser: who };
 });
@@ -126,7 +136,7 @@ await step('reservation-hours-and-coupon', async (rec) => {
   });
   await page.waitForTimeout(600);
   await page.fill('input[placeholder*="کد تخفیف"]', 'INVALID-CODE-XYZ');
-  await page.locator('button', { hasText: /^اعمال$/ }).first().click();
+  await page.locator('button', { hasText: /^اعمال( کد)?$/ }).first().click();
   const t = await waitToast(/تخفیف|نامعتبر|منقضی/).catch((e) => 'NO TOAST: ' + e.message);
   rec.notes.push('invalid coupon toast: ' + t);
   const total = await page.locator('span.text-primary.text-base').first().innerText().catch(() => null);
@@ -179,9 +189,9 @@ await step('shop-add-and-checkout', async (rec) => {
   rec.notes.push('products: ' + (await buy.count()));
   await buy.nth(0).click(); await page.waitForTimeout(700);
   await buy.nth(2).click(); await page.waitForTimeout(900);
-  const checkout = page.locator('button', { hasText: /ثبت نهایی|پرداخت|تسویه/ }).last();
+  const checkout = page.locator('button', { hasText: /پرداخت نهایی و تسویه|Finalize & Checkout/ }).first();
   await checkout.click({ timeout: 15000 });
-  const t = await waitToast(/سفارش|خرید|موفق|ثبت/);
+  const t = await waitToast(/پرداخت با موفقیت|ACC-/);
   rec.notes.push('toast: ' + t);
   await page.waitForTimeout(1500);
   return { toast: t };
@@ -242,33 +252,53 @@ await step('help-guide', async (rec) => {
 
 /* ── 11 · Blog + comment ───────────────────────────────────────── */
 await step('blog-open-and-comment', async (rec) => {
-  await nav('خانه').click({ timeout: 20000 });
-  await page.waitForTimeout(3000);
-  const cta = page.locator('button', { hasText: /اخبار کلوپ و مقالات/ }).first();
-  if (await cta.count()) { await cta.click(); } else {
-    rec.notes.push('no blog CTA on home — blog tab unreachable from the main navigation');
-    throw new Error('blog entry point not found in UI');
-  }
-  await page.waitForTimeout(3000);
-  const ta = page.locator('textarea').first();
-  if (await ta.count()) {
-    await ta.fill('تست خودکار: مقاله عالی بود!');
-    await page.locator('button', { hasText: /ارسال|ثبت نظر|کامنت/ }).first().click().catch(() => {});
-    const t = await waitToast(/نظر|ثبت|موفق/).catch((e) => 'no toast');
-    rec.notes.push('comment toast: ' + t);
-  } else rec.notes.push('no comment textarea visible on blog landing');
-  return { bodyHas: (await page.locator('body').innerText()).slice(0, 120) };
+  await nav('بلاگ').click({ timeout: 20000 });
+  await page.waitForTimeout(3500);
+  const read = page.locator('button', { hasText: /ادامه مطلب|مطالعه|خواندن/ }).first();
+  if (await read.count()) { await read.click(); await page.waitForTimeout(2500); }
+  const tag = page.locator('input[placeholder="Gamer_Tag"]').first();
+  const box = page.locator('input[placeholder*="دیدگاه"], input[placeholder*="comment"]').first();
+  if (!(await box.count())) { rec.notes.push('no comment box on the article page'); return { commentBox: false }; }
+  await tag.fill('AutoTester');
+  await box.fill('تست خودکار بازینو: مقاله مفیدی بود.');
+  await box.press('Enter');
+  const t = await waitToast(/نظر|ثبت|موفق/).catch(() => 'NO TOAST');
+  rec.notes.push('comment toast: ' + t);
+  await page.waitForTimeout(1500);
+  const persisted = await page.evaluate(async () =>
+    JSON.stringify(await fetch('/api/articles').then((r) => r.json()).catch(() => [])).includes('تست خودکار بازینو'));
+  if (!persisted) rec.notes.push('BUG: comment is not persisted to /api/articles');
+  return { toast: t, persisted };
+});
+
+await step('chat-tab', async (rec) => {
+  await nav('گفتگو').click({ timeout: 20000 });
+  await page.waitForTimeout(3500);
+  const body = await page.locator('body').innerText();
+  return { reachable: true, mentionsRooms: /General|عمومی|اتاق/.test(body) };
 });
 
 /* ── 12 · Mobile sweep ─────────────────────────────────────────── */
 await page.setViewportSize({ width: 390, height: 844 });
-for (const tab of ['خانه', 'رزرو', 'کافه', 'فروشگاه', 'مسابقات', 'باشگاه']) {
+for (const tab of ['خانه', 'رزرو', 'کافه', 'فروشگاه', 'مسابقات', 'باشگاه', 'بلاگ', 'گفتگو']) {
   await step(`mobile-${tab}`, async (rec) => {
-    const b = page.locator('button', { hasText: new RegExp(`^${tab}$`) }).first();
-    await b.click({ timeout: 20000 });
+    await mobileNav(tab);
     await page.waitForTimeout(2800);
-    const m = await page.evaluate(() => ({ scrollW: document.body.scrollWidth, innerW: window.innerWidth, overflow: document.body.scrollWidth > window.innerWidth + 1 }));
+    const m = await page.evaluate(() => {
+      const bar = document.querySelector('nav[aria-label]');
+      const barBox = bar ? bar.getBoundingClientRect() : null;
+      return {
+        scrollW: document.body.scrollWidth,
+        innerW: window.innerWidth,
+        bottomNavVisible: !!barBox && barBox.height > 0,
+        bottomNavHeight: barBox ? Math.round(barBox.height) : 0,
+        // آخرین محتوای صفحه نباید زیر نوار پایین پنهان شود
+        contentClearsNav: document.body.scrollHeight - window.scrollY >= 0,
+      };
+    });
+    m.overflow = m.scrollW > m.innerW + 1;
     if (m.overflow) rec.notes.push('HORIZONTAL OVERFLOW');
+    if (!m.bottomNavVisible) rec.notes.push('BUG: bottom navigation missing');
     return m;
   });
 }

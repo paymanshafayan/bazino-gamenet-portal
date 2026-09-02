@@ -332,13 +332,30 @@ export default function LoyaltyProfileTab({
                     <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
                       <td className={`px-4 py-3.5 font-bold text-gray-200 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{translatedDesc}</td>
                       <td className="px-4 py-3.5 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-block ${
-                          tx.type === 'Earned' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                        }`}>
-                          {tx.type === 'Earned' ? t('loyalty.earned', 'کسب امتیاز') : t('loyalty.redeemed', 'خرج امتیاز')}
-                        </span>
+                        {/* نوع تراکنش با یک شرط دوحالته رندر می‌شد، پس هر نوعی
+                            غیر از 'Earned' — از جمله 'Bonus' — برچسب «خرج امتیاز»
+                            می‌گرفت. ردیف هدیه‌ی خوش‌آمدگویی «خرج امتیاز +100 PTS»
+                            نشان داده می‌شد که با خودش در تناقض بود. حالا علامت
+                            خودِ امتیاز تعیین‌کننده است و 'Bonus' برچسب اختصاصی دارد. */}
+                        {(() => {
+                          const isSpend = tx.points < 0;
+                          const label = tx.type === 'Bonus'
+                            ? t('loyalty.bonus', 'هدیه باشگاه')
+                            : isSpend
+                              ? t('loyalty.redeemed', 'خرج امتیاز')
+                              : t('loyalty.earned', 'کسب امتیاز');
+                          return (
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-block ${
+                              isSpend
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                : tx.type === 'Bonus'
+                                  ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            }`}>
+                              {label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className={`px-4 py-3.5 text-center font-mono font-black ${tx.points > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {tx.points > 0 ? `+${tx.points}` : tx.points} PTS

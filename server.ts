@@ -86,11 +86,54 @@ export async function setDataSourceMode(mode: DataSourceMode): Promise<void> {
 }
 
 /** لیست نهایی یک بخش: در حالت sample → داده نمونه؛ در حالت database →
- *  داده دیتابیس، و اگر جدول خالی بود → داده نمونه (فال‌بک خودکار). */
+ *  داده دیتابیس، و اگر جدول خالی بود → داده نمونه (فال‌بک خودکار).
+ *
+ *  ⚠️ فقط برای داده‌ی **کاتالوگ** (سیستم‌ها، منوی کافه، محصولات، تورنمنت‌ها،
+ *  مقالات، اسلایدرها، اتاق‌های چت). برای داده‌ی تراکنشی از
+ *  resolveTransactionalList() استفاده کنید. */
 export async function resolveSampleList<T>(dbRows: T[], sampleRows: T[]): Promise<T[]> {
   const mode = await getDataSourceMode();
   if (mode === "sample") return sampleRows;
   return dbRows.length > 0 ? dbRows : sampleRows;
+}
+
+/** لیست نهایی داده‌ی **تراکنشی** (رزروها، تراکنش‌های امتیاز، کوپن‌ها).
+ *
+ *  فرق اساسی‌اش با resolveSampleList این است که دیتابیس همیشه منبع حقیقت است:
+ *  اگر حتی یک رکورد واقعی وجود داشته باشد، همان برگردانده می‌شود. داده‌ی نمونه
+ *  فقط وقتی نمایش داده می‌شود که هنوز هیچ رکورد واقعی ساخته نشده باشد، تا
+ *  صفحه‌ی یک نصب تازه خالی به‌نظر نرسد.
+ *
+ *  چرا لازم شد: resolveSampleList در حالت sample (که پیش‌فرض است) همیشه داده‌ی
+ *  نمونه را برمی‌گرداند. نتیجه این بود که مشتری رزرو می‌کرد، رزروش واقعاً در
+ *  reservation_logs ثبت می‌شد، ولی در «رزروهای فعال شما» سه رزرو نمونه‌ی متعلق
+ *  به کس دیگری می‌دید و رزرو خودش را هرگز پیدا نمی‌کرد. */
+export async function resolveTransactionalList<T>(dbRows: T[], sampleRows: T[]): Promise<T[]> {
+  if (dbRows.length > 0) return dbRows;
+  return (await getDataSourceMode()) === "sample" ? sampleRows : [];
+}
+
+/** لیست کاتالوگی که کاربر می‌تواند رویش محتوا بسازد (مقالات با نظرات، تورنمنت‌ها
+ *  با تیم‌ها): ردیف‌های دیتابیس روی هم‌شناسه‌ی خودشان در داده‌ی نمونه می‌نشینند و
+ *  بقیه‌ی ردیف‌های نمونه سر جایشان می‌مانند.
+ *
+ *  چرا لازم شد: وقتی کاربر روی یک مقاله‌ی نمونه نظر می‌گذارد، ensurePersisted آن
+ *  مقاله را در دیتابیس materialize می‌کند. با resolveSampleList، در حالت sample
+ *  همچنان کل لیست نمونه برگردانده می‌شد، پس نظر ثبت‌شده هرگز دیده نمی‌شد؛ و با
+ *  resolveTransactionalList فقط همان یک مقاله می‌ماند و بقیه ناپدید می‌شدند. */
+export async function resolveMergedList<T extends Record<string, any>>(
+  dbRows: T[],
+  sampleRows: T[],
+  key: string = "id"
+): Promise<T[]> {
+  if ((await getDataSourceMode()) !== "sample") {
+    return dbRows.length > 0 ? dbRows : sampleRows;
+  }
+  const byKey = new Map(dbRows.map((r) => [r[key], r]));
+  const merged = sampleRows.map((r) => byKey.get(r[key]) ?? r);
+  const sampleKeys = new Set(sampleRows.map((r) => r[key]));
+  for (const r of dbRows) if (!sampleKeys.has(r[key])) merged.push(r);
+  return merged;
 }
 
 /** پیدا کردن یک رکورد با کلید: در حالت sample → داده نمونه؛ در حالت database →
@@ -531,11 +574,20 @@ async function startServer() {
   // be logged in as themselves, at the same time, without seeing each
   // other's data.
   //
-  // Backward compatibility: requests with no/invalid token still fall back
-  // to the legacy "activeUsername" setting so the existing website (which
-  // doesn't send a token yet) keeps working exactly as before.
+  // A request with no (or an invalid) token is simply anonymous: it is served
+  // as "Guest" and sees no personal data at all. There is no server-wide
+  // "current user" concept anywhere in this codebase.
   // =========================================================================
   const JWT_SECRET = process.env.JWT_SECRET || (() => {
+    // در production یک راز پیش‌فرضِ عمومی یعنی هر کسی می‌تواند توکن ادمین جعل کند.
+    // یک هشدار در لاگ کافی نیست — لاگ دیده نمی‌شود و سایت ناامن بالا می‌ماند.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[Security] JWT_SECRET is not set. Refusing to start in production: without a real secret " +
+        "anyone can forge an admin token. Set JWT_SECRET to a long random value and restart."
+      );
+      process.exit(1);
+    }
     console.warn(
       "[Security] JWT_SECRET is not set in the environment. Using an INSECURE development-only fallback secret. " +
       "Set a real, random JWT_SECRET before deploying to production, or every token can be forged."
@@ -581,6 +633,18 @@ async function startServer() {
   // اشاره می‌کنند (دیسک موقتیِ هاست) را در هر دو حالت null می‌کند.
   await repairLegacyCatalogImages();
 
+  // One-time cleanup for installs created before identity moved fully into the
+  // JWT: the old shared "activeUsername" setting made anonymous visitors look
+  // like whoever logged in last. Nothing reads it any more, so blank it out so
+  // a future reader can't mistake it for live state.
+  try {
+    const stale = await bootStore.getSetting("activeUsername");
+    if (stale) {
+      await bootStore.setSetting("activeUsername", "");
+      console.log(`[${bootStore.name}] Cleared the obsolete shared "activeUsername" setting (identity now comes from the JWT only).`);
+    }
+  } catch { /* non-fatal */ }
+
   // Safety net only: if for some reason no admin account exists at all
   // (e.g. local dev before /install was ever completed), create a minimal
   // fallback admin so the app doesn't hard-crash. This never seeds samples.
@@ -599,22 +663,28 @@ async function startServer() {
     console.error(`[${bootStore.name}] Error checking/seeding minimal admin account:`, err);
   }
 
-  // Resolves the REAL current user for this specific request: prefers the
-  // user identified by a real JWT (req.authUsername) — which is what every
-  // properly-updated client (mobile app, future website version) sends —
-  // and only falls back to the legacy shared "activeUsername" setting when
-  // no token was sent at all, for backward compatibility with the current
-  // website.
+  // Resolves the REAL current user for this specific request — and ONLY from the
+  // signed JWT on that request.
+  //
+  // This used to fall back to a shared, server-wide "activeUsername" setting when
+  // no token was sent, as a compatibility shim for an older single-user version of
+  // the website. That shim leaked private data: because /api/auth/register and
+  // /api/auth/login overwrote the setting, an *anonymous* visitor calling
+  // GET /api/user received the full profile — including e-mail and phone number —
+  // of whoever logged in last, and the UI rendered them as that person. On a fresh
+  // install the setting is seeded to "admin", so every visitor saw the admin banner.
+  //
+  // No token now means Guest, full stop. Clients authenticate with a Bearer token
+  // (the website attaches one automatically via src/services/authToken.ts).
   async function getCurrentUser(req?: express.Request) {
     const store = getActiveDataProvider();
-    const tokenUsername = req && (req as any).authUsername;
-    const activeUsername = tokenUsername || (await store.getSetting("activeUsername")) || "Guest";
+    const tokenUsername = (req && (req as any).authUsername) || "Guest";
 
-    if (activeUsername === "Guest") {
+    if (tokenUsername === "Guest") {
       return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
     }
 
-    const row = await store.getUserByUsername(activeUsername);
+    const row = await store.getUserByUsername(tokenUsername);
     if (row) {
       return {
         username: row.username,
@@ -639,13 +709,9 @@ async function startServer() {
 
   // Requires a REAL authenticated user whose role is "admin".
   //
-  // This deliberately does NOT go through getCurrentUser(), because that helper
-  // falls back to the shared legacy "activeUsername" setting when no token is
-  // sent — and that setting is seeded to "admin" on a fresh install, which would
-  // make every anonymous visitor look like the administrator. Privileged routes
-  // therefore demand a real, signed JWT (req.authUsername) and re-check the role
-  // against the database on every request, so revoking a user's admin role takes
-  // effect immediately instead of living on inside an old token.
+  // Privileged routes demand a real, signed JWT (req.authUsername) and re-check
+  // the role against the database on every request, so revoking a user's admin
+  // role takes effect immediately instead of living on inside an old token.
   async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
       const username = (req as any).authUsername;
@@ -687,8 +753,8 @@ async function startServer() {
 
       // createUser hashes the password internally (bcrypt) before storing it
       await store.createUser({ username, password, email, phone: phone || "" });
-      // Kept for backward compatibility with the current website, which doesn't send a token yet
-      await store.setSetting("activeUsername", username);
+      // NOTE: deliberately does NOT write a server-wide "activeUsername" setting.
+      // Identity lives in the JWT returned below — see getCurrentUser().
 
       const newUser = {
         username,
@@ -730,8 +796,8 @@ async function startServer() {
         return res.status(400).json({ error: "نام کاربری یا کلمه عبور اشتباه است." });
       }
 
-      // Kept for backward compatibility with the current website, which doesn't send a token yet
-      await store.setSetting("activeUsername", found.username);
+      // NOTE: deliberately does NOT write a server-wide "activeUsername" setting.
+      // Identity lives in the JWT returned below — see getCurrentUser().
 
       const user = {
         username: found.username,
@@ -769,9 +835,8 @@ async function startServer() {
 
   app.post("/api/auth/logout", async (req, res) => {
     try {
-      // JWT logout is client-side (just discard the token). This also resets the
-      // legacy shared "activeUsername" setting so the current website keeps working.
-      await getActiveDataProvider().setSetting("activeUsername", "Guest");
+      // JWT logout is client-side: the browser discards the token. Nothing is
+      // stored server-side for a session, so there is nothing to clear here.
       res.json({ success: true, user: { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" } });
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -897,7 +962,7 @@ async function startServer() {
 
   app.get("/api/transactions", async (req, res) => {
     try {
-      const transactions = await resolveSampleList(await getActiveDataProvider().listTransactions(), SAMPLE_TRANSACTIONS);
+      const transactions = await resolveTransactionalList(await getActiveDataProvider().listTransactions(), SAMPLE_TRANSACTIONS);
       res.json(transactions);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -906,7 +971,7 @@ async function startServer() {
 
   app.get("/api/coupons", async (req, res) => {
     try {
-      const coupons = await resolveSampleList(await getActiveDataProvider().listCoupons(), SAMPLE_COUPONS);
+      const coupons = await resolveTransactionalList(await getActiveDataProvider().listCoupons(), SAMPLE_COUPONS);
       res.json(coupons);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -1078,10 +1143,28 @@ async function startServer() {
     }
   });
 
+  // A customer's own bookings and QR check-in codes. Private on purpose: a QR
+  // token is what unlocks a seat, so showing someone else's would let a visitor
+  // walk in on a session they never paid for.
+  //
+  //   • anonymous          → [] (the UI then asks them to sign in)
+  //   • signed-in customer → only rows whose username matches their token
+  //   • admin              → everything, so the front desk can see the floor
+  //
+  // Sample rows carry username: "" and are only ever returned while the club
+  // has no real bookings yet, so a fresh install doesn't look broken.
   app.get("/api/reservations", async (req, res) => {
     try {
-      const reservationLogs = await resolveSampleList(await getActiveDataProvider().listReservationLogs(), SAMPLE_RESERVATION_LOGS);
-      res.json(reservationLogs);
+      const store = getActiveDataProvider();
+      const username = (req as any).authUsername as string | undefined;
+      const all = await resolveTransactionalList(await store.listReservationLogs(), SAMPLE_RESERVATION_LOGS);
+
+      if (!username) return res.json([]);
+
+      const row = await store.getUserByUsername(username);
+      if ((row?.role || "gamer") === "admin") return res.json(all);
+
+      res.json(all.filter((r: any) => r.username === username));
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
@@ -1519,7 +1602,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       case "show_wallet": {
         if (user.username === "Guest") return { reply: "برای دیدن کیف پول و امتیازها باید وارد حساب کاربری بشی." };
         const fresh = await store.getUserByUsername(user.username);
-        const coupons = await resolveSampleList(await store.listCoupons(), SAMPLE_COUPONS);
+        const coupons = await resolveTransactionalList(await store.listCoupons(), SAMPLE_COUPONS);
         const activeCoupons = coupons.filter(c => c.isActive).slice(0, 3).map(c => c.code).join("، ") || "کد فعالی نداری";
         const tx = (await store.listTransactions()).slice(0, 3).map(t => `${t.description}: ${t.points}`).join(" | ");
         return { reply: `امتیاز فعلی شما ${fresh?.loyaltyPoints ?? user.loyaltyPoints} است. کدهای فعال: ${activeCoupons}. آخرین تراکنش‌ها: ${tx || "هنوز تراکنشی ثبت نشده"}` };
@@ -1534,14 +1617,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       }
 
       case "list_tournaments": {
-        const tournaments = await resolveSampleList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
+        const tournaments = await resolveMergedList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
         const list = tournaments.filter(t => t.status !== "Completed").slice(0, 4).map(t => `${t.title} (${t.game})`).join("، ");
         return { reply: list ? `تورنمنت‌های فعال و آینده: ${list}` : "فعلاً تورنمنت فعالی نداریم." };
       }
 
       case "register_tournament": {
         if (user.username === "Guest") return { reply: "برای ثبت‌نام تورنمنت باید وارد حساب کاربری باشی." };
-        const tournaments = await resolveSampleList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
+        const tournaments = await resolveMergedList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
         const needle = String(intent.params.tournamentName || "").toLowerCase();
         const tournament = tournaments.find(t => needle && (t.title.toLowerCase().includes(needle) || needle.includes(t.game.toLowerCase()))) || tournaments.find(t => t.status !== "Completed");
         if (!tournament) return { reply: "تورنمنت مناسبی برای ثبت‌نام پیدا نکردم." };
@@ -2011,7 +2094,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Tournaments
   app.get("/api/tournaments", async (req, res) => {
     try {
-      const tournaments = await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS);
+      const tournaments = await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS);
       res.json(tournaments.map(t => ({
         ...t,
         teams: JSON.parse(t.teams),
@@ -2062,7 +2145,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Blog News Articles & Comments
   app.get("/api/articles", async (req, res) => {
     try {
-      const articles = await resolveSampleList(await getActiveDataProvider().listArticles(), SAMPLE_ARTICLES);
+      const articles = await resolveMergedList(await getActiveDataProvider().listArticles(), SAMPLE_ARTICLES);
       res.json(articles.map(a => ({
         ...a,
         comments: JSON.parse(a.comments)
@@ -2131,13 +2214,16 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const store = getActiveDataProvider();
       const mode = await getDataSourceMode();
-      // در حالت نمونه، آمار داشبورد از داده‌های نمونه محاسبه می‌شود تا
-      // پنل مدیریت هم در حالت پیش‌فرض (sample) پر و زنده دیده شود.
-      const useSample = mode === "sample";
-      const cafeOrdersRows = useSample ? [] : await store.listCafeOrders();
-      const shopOrdersRows = useSample ? [] : await store.listShopOrders();
-      const reservationLogsRows = useSample ? SAMPLE_RESERVATION_LOGS : await store.listReservationLogs();
-      const systemsRows = useSample ? SAMPLE_SYSTEMS : await store.listSystems();
+      // سفارش‌ها همیشه مستقیم از دیتابیس خوانده می‌شوند. قبلاً در حالت sample
+      // (که پیش‌فرض است) به‌جای لیست واقعی، آرایه‌ی خالی برگردانده می‌شد؛ نتیجه
+      // این بود که مشتری سفارش می‌داد، سفارش در جدول cafe_orders ثبت می‌شد، ولی
+      // داشبورد ادمین «No active cafe orders» و «کل درآمد: ۰ تومان» نشان می‌داد.
+      // برای سفارش‌ها اصلاً داده‌ی نمونه‌ای وجود ندارد، پس چیزی برای پر کردن
+      // داشبوردِ نصب تازه از دست نمی‌رود.
+      const cafeOrdersRows = await store.listCafeOrders();
+      const shopOrdersRows = await store.listShopOrders();
+      const reservationLogsRows = await resolveTransactionalList(await store.listReservationLogs(), SAMPLE_RESERVATION_LOGS);
+      const systemsRows = await resolveSampleList(await store.listSystems(), SAMPLE_SYSTEMS);
 
       const parsedCafeOrders = cafeOrdersRows.map(o => ({ ...o, items: JSON.parse(o.items) }));
       const parsedShopOrders = shopOrdersRows.map(o => ({ ...o, cart: JSON.parse(o.cart) }));
@@ -3760,7 +3846,6 @@ Example format:
 
       // Save custom store settings
       await provider.setSetting("storeName", storeName || "بازینو (Bazino)");
-      await provider.setSetting("activeUsername", adminUsername);
 
       // Seed sample data ONLY if the admin explicitly checked this box —
       // this is the single place sample data ever gets loaded automatically.
@@ -4050,7 +4135,7 @@ Example format:
           indexHtmlTemplate = template;
         }
         const bootstrap = {
-          tournaments: await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+          tournaments: await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
           assetVersion: ASSET_VERSION,
         };
         // جلوگیری از شکستن HTML توسط دنباله‌هایی مثل "</script>" داخل JSON

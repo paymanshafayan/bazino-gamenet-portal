@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>معرفی جامع سیستم مدیریت گیم‌نت بازینو پرو (نسخه موبایل)</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;700;900&display=swap');
+        /* فونت عمداً از CDN بارگذاری نمی‌شود: روی شبکه‌های فیلترشده، @import
+           رندر کل صفحه را بلاک می‌کرد. پشته‌ی فونت سیستمی زیر همان ظاهر را
+           بدون هیچ درخواست خارجی می‌دهد. */
         
         :root {
             --bg-dark: #07080d;
@@ -22,7 +24,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            font-family: 'Vazirmatn', 'Vazir', 'Sahel', 'Segoe UI', Tahoma, Tahoma, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -390,7 +392,7 @@
                 </ul>
             </div>
             <div class="slide-visual">
-                <img src="public/gaming_hub_header_mockup.jpg" alt="Bazino Pro Ecosystem">
+                <img src="/gaming_hub_header_mockup.jpg" alt="Bazino Pro Ecosystem">
             </div>
         </div>
         <div class="slide-footer">
@@ -528,8 +530,8 @@
                 </ul>
             </div>
             <div class="slide-visual-double">
-                <img src="public/tournaments_panel.png" alt="Tournaments Panel">
-                <img src="public/cafe_panel.png" alt="Cafe Panel">
+                <img src="/tournaments_panel.png" alt="Tournaments Panel">
+                <img src="/cafe_panel.png" alt="Cafe Panel">
             </div>
         </div>
         <div class="slide-footer">

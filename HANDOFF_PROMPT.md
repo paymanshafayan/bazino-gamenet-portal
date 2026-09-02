@@ -425,6 +425,27 @@ npx node-gyp rebuild --release --nodedir=/usr/local     # ۷۰ ثانیه، بد
 با بیلد استاتیک هرگز دیده نمی‌شدند. **یک «غیرممکن»ِ بررسی‌نشده، کل کیفیت کار را محدود کرده بود.**
 
 
+### خواندن نتیجه‌ی CI فلاتر (بدون دسترسی به لاگ)
+
+دانلود لاگ اجراها بسته است (`results-receiver.actions.githubusercontent.com`)، ولی دو مسیر باز است:
+
+```bash
+# ۱) وضعیت هر استپ
+gh api repos/paymanshafayan/bazino-gamenet-portal/actions/runs/<RUN_ID>/jobs \
+  --jq '.jobs[].steps[] | (.number|tostring) + ". " + .name + " → " + (.conclusion//"?")'
+
+# ۲) متن دقیق خطا (annotation) — همان جایی که پیام ::error:: ورک‌فلو ظاهر می‌شود
+gh api repos/paymanshafayan/bazino-gamenet-portal/actions/runs/<RUN_ID>/jobs --jq '.jobs[].id' |
+while read jid; do
+  gh api repos/paymanshafayan/bazino-gamenet-portal/check-runs/$jid/annotations \
+    --jq '.[] | .annotation_level + ": " + .message'
+done
+```
+
+به‌علاوه خودِ ورک‌فلو `FLUTTER_CI_REPORT.md` را به برنچ commit می‌کند، پس خروجی کاملِ
+`analyze`/`test`/`build` با یک `git fetch` در دسترس است — حتی وقتی جاب قرمز شده باشد
+(استپ ثبت گزارش عمداً قبل از استپ گارد اجرا می‌شود).
+
 ---
 
 ## ۶. قواعد کاری که باید رعایت شوند

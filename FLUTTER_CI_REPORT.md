@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `0e860e8169c46bca37088e7efa3e0f9768c711cd`
+- commit: `a3906ff0cb632b1b6d32378ad27a78a19d932fca`
 - branch: `arena/01a05e95-bazino-gamenet-portal`
-- run:    33646693262
-- date:   2026-09-02 15:10 UTC
+- run:    33648613450
+- date:   2026-09-02 15:27 UTC
 
 ## flutter --version
 ```
@@ -111,49 +111,29 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-
-   info • 'localeId' is deprecated and shouldn't be used. Use SpeechListenOptions.localeId instead. Try replacing the use of the deprecated member with the replacement • lib/screens/jarvis_assistant.dart:224:7 • deprecated_member_use
-   info • 'listenFor' is deprecated and shouldn't be used. Use SpeechListenOptions.listenFor instead. Try replacing the use of the deprecated member with the replacement • lib/screens/jarvis_assistant.dart:225:7 • deprecated_member_use
-   info • 'pauseFor' is deprecated and shouldn't be used. Use SpeechListenOptions.pauseFor instead. Try replacing the use of the deprecated member with the replacement • lib/screens/jarvis_assistant.dart:226:7 • deprecated_member_use
-   info • 'partialResults' is deprecated and shouldn't be used. Use SpeechListenOptions.partialResults instead. Try replacing the use of the deprecated member with the replacement • lib/screens/jarvis_assistant.dart:227:7 • deprecated_member_use
-
-4 issues found. (ran in 7.1s)
+No issues found! (ran in 10.1s)
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter test
 ```
 
-::group::❌ Counter increments smoke test (failed)
-══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
-The following TestFailure was thrown running a test:
-Expected: exactly one matching candidate
-  Actual: _TextWidgetFinder:<Found 0 widgets with text "0": []>
-   Which: means none were found but one was expected
-
-When the exception was thrown, this was the stack:
-#4      main.<anonymous closure> (file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart:19:5)
-<asynchronous suspension>
-#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
-<asynchronous suspension>
-#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
-<asynchronous suspension>
-<asynchronous suspension>
-(elided one frame from package:stack_trace)
-
-This was caught by the test expectation on the following line:
-  file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart line 19
-The test description was:
-  Counter increments smoke test
-════════════════════════════════════════════════════════════════════════════════════════════════════
-Test failed. See exception logs above.
-The test description was: Counter increments smoke test
-
+::group::✅ Passing tests
+✅ BazinoApp — رندر بدون استثنا بالا می‌آید و MaterialApp با عنوان درست می‌دهد
+✅ BazinoApp — رندر اولین فریم قبل از خواندن SharedPreferences، لودر نشان می‌دهد
+✅ BazinoApp — رندر کاربر تازه صفحه‌ی intro را می‌بیند
+✅ BazinoApp — رندر کاربری که intro را دیده، دیگر آن را نمی‌بیند
+✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
+✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me
+✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ ناقص نباید کرش کند
+✅ parse کردن پاسخ سرور GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
+✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
+✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
 ::endgroup::
 
-::error::0 tests passed, 1 failed.
+🎉 10 tests passed.
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter build web
 ```
@@ -171,7 +151,7 @@ file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14436 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             33.8s
+Compiling lib/main.dart for the Web...                             47.4s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -180,8 +160,8 @@ Compiling lib/main.dart for the Web...                             33.8s
 ```
 flutter --version=0
 flutter pub get=0
-flutter analyze=1
-flutter test=1
+flutter analyze=0
+flutter test=0
 flutter build web=0
 ```
 

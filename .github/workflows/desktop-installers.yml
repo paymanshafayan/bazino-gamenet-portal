@@ -1,15 +1,28 @@
 name: Desktop Installers
 
+# دو راه اجرا:
+#  ۱) دستی (Run workflow) — فقط وقتی این فایل روی برنچ پیش‌فرض (main) هم باشد.
+#  ۲) خودکار با هر push که چیزی زیر desktop-app/ عوض کند — این راه روی هر برنچی کار می‌کند
+#     و همان چیزی است که به ایجنت اجازه می‌دهد خودش بیلد را شروع کند.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'نسخه (بدون v) — مثلاً 1.0.0'
-        required: true
-        default: '1.0.0'
+        description: 'نسخه (بدون v). خالی بگذارید تا از desktop-app/package.json خوانده شود.'
+        required: false
+        default: ''
+  push:
+    branches: ['**']
+    paths:
+      - 'desktop-app/**'
+      - '.github/workflows/desktop-installers.yml'
 
 permissions:
   contents: write
+
+concurrency:
+  group: desktop-installers-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -73,6 +86,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: installers
@@ -80,12 +95,35 @@ jobs:
       - name: List everything collected
         run: find installers -type f -exec ls -lh {} \;
 
+      - name: Decide the tag
+        id: meta
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION=$(node -p "require('./desktop-app/package.json').version")
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # اجرای دستی → یک انتشار رسمی. push → پیش‌انتشار با شماره‌ی run،
+          # تا بیلدهای آزمایشی هرگز روی انتشار واقعی ننشینند.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=desktop-v$VERSION"                       >> "$GITHUB_OUTPUT"
+            echo "name=BAZINO PRO Desktop v$VERSION"            >> "$GITHUB_OUTPUT"
+            echo "prerelease=false"                             >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=desktop-dev-${{ github.run_number }}"     >> "$GITHUB_OUTPUT"
+            echo "name=BAZINO PRO Desktop v$VERSION (build ${{ github.run_number }})" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true"                              >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: desktop-v${{ inputs.version }}
-          name: BAZINO PRO Desktop v${{ inputs.version }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
           body: |
-            نصاب‌های نسخه‌ی دسکتاپ نرم‌افزار مدیریت گیم‌نت.
+            نصاب‌های نسخه‌ی دسکتاپ نرم‌افزار مدیریت گیم‌نت بازینو.
 
             | سیستم‌عامل | فایل |
             |---|---|
@@ -94,7 +132,8 @@ jobs:
             | لینوکس | `.AppImage` |
 
             ⚠️ این نصاب‌ها **امضای دیجیتال ندارند**. ویندوز صفحه‌ی SmartScreen
-            («Windows protected your PC») نشان می‌دهد — «More info» سپس «Run anyway».
-            مک با Gatekeeper مسدود می‌کند — راست‌کلیک روی فایل، سپس Open.
+            («Windows protected your PC») نشان می‌دهد — روی «More info» و سپس
+            «Run anyway» بزنید. مک با Gatekeeper مسدود می‌کند — روی فایل راست‌کلیک
+            کنید و «Open» را بزنید.
           files: installers/**/*
           fail_on_unmatched_files: true

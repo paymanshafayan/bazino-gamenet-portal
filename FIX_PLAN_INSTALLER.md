@@ -129,3 +129,89 @@
 خودِ نصاب روی ویندوز/مک اجرا نمی‌شود تا من ببینم. من می‌توانم تأیید کنم که ورک‌فلو سبز شد،
 assetها ساخته و آپلود شدند، و مسیرهای سرور درست هدایت می‌کنند. **نصب واقعی و باز شدن پنجره‌ی
 اپ روی یک دستگاه ویندوز، حتماً باید توسط شما تست شود** — و نتیجه‌اش را در همین سند ثبت می‌کنم.
+
+---
+
+# نتیجه‌ی اولین اجرای واقعی — ۱۴۰۵/۰۶/۱۱
+
+ورک‌فلو توسط کاربر اضافه شد و با یک push زیر `desktop-app/` توسط من اجرا شد (run `33673142196`).
+
+| runner | نتیجه | مرحله‌ی شکست |
+|---|---|---|
+| **macos-latest** | ✅ **موفق** | — نصاب `.dmg` ساخته شد |
+| windows-latest | ❌ | `Build the site and the server bundle` |
+| ubuntu-latest | ❌ | `Build the installer` (electron-builder) |
+| release | ⏭️ رد شد (چون build کامل نبود) |
+
+> دانلود لاگ از این sandbox بسته است؛ فقط وضعیت استپ‌ها و annotationها خواندنی‌اند
+> (`Process completed with exit code 1`). تشخیص زیر بر پایه‌ی خواندن خودِ اسکریپت‌هاست، نه حدس.
+
+## ۱. 🔴 `npm run build` روی ویندوز اصلاً کار نمی‌کند
+
+```json
+"build": "vite build && (cd 'Management App/Bazino' && npm install && npm run build) && esbuild ..."
+```
+
+`npm run` روی ویندوز دستور را به **`cmd.exe`** می‌دهد، و cmd کوتیشن تکی را به‌عنوان کوتیشن مسیر
+نمی‌شناسد: `cd 'Management App/Bazino'` به `cd 'Management` تبدیل می‌شود و مسیر پیدا نمی‌شود.
+
+این فقط مشکل CI نیست — **هیچ توسعه‌دهنده‌ای روی ویندوز نمی‌تواند این پروژه را build کند.**
+
+**تغییر پیشنهادی:** حذف کامل subshell و کوتیشن، با فلگ خودِ npm که روی هر سه سیستم‌عامل یکسان است:
+
+```json
+"build": "vite build && npm --prefix \"Management App/Bazino\" install && npm --prefix \"Management App/Bazino\" run build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs"
+```
+
+## ۲. 🟠 لینوکس: باندل بیش از حد بزرگ است
+
+`prepare-server-bundle.js` بعد از تغییر من، **کل `node_modules` ریشه** را کپی می‌کند — که
+شامل devDependencies هم هست (`vite`, `typescript`, `esbuild`, `@types/*` و…). آن پوشه بعد
+به‌عنوان `extraResources` داخل نصاب بسته‌بندی می‌شود.
+
+دلیل آن تغییر، آفلاین‌بودن sandbox بود. ولی **روی CI شبکه هست**، پس ترتیب باید برعکس شود:
+
+1. اول `npm install --omit=dev` (درست و فقط production)،
+2. و فقط اگر شبکه نبود، کپی از `node_modules` ریشه به‌عنوان fallback.
+
+به‌علاوه هنگام کپی، `node_modules/.bin` (که پر از symlink است) و `.cache` کنار گذاشته شوند.
+
+## ۳. 🟡 دیدن خطا نباید به لاگ وابسته باشد
+
+چون دانلود لاگ در این محیط ممکن نیست، هر شکست بعدی هم کور خواهد بود. راه‌حل: در ورک‌فلو یک
+استپ `if: failure()` که خروجی مرحله‌ی شکست‌خورده را در `DESKTOP_BUILD_REPORT.md` بنویسد و
+مثل گزارش فلاتر به برنچ commit کند.
+
+## معیار پذیرش
+
+1. هر سه runner سبز شوند.
+2. job `release` اجرا شود و Release با هر سه asset ساخته شود.
+3. `npm run build` روی ویندوز کار کند (با همان تغییر package.json).
+4. حجم نصاب منطقی باشد (بدون devDependencies).
+5. بدون رگرسیون: `npm test` سبز و بوت co-located و دسکتاپ سالم.
+
+---
+
+## ⚠️ رگرسیونی که خودم ساختم و باید همین‌جا اعلام کنم
+
+ورک‌فلوی `Backend & Frontend Build + Tests` هم قرمز شد — **تقصیر تغییر من در Batch E**.
+آن تغییر، بوت در `NODE_ENV=production` بدون `JWT_SECRET` را عمداً کشنده کرد، و مرحله‌ی
+smoke-test دقیقاً همان کار را می‌کند:
+
+```yaml
+NODE_ENV=production PORT=3456 node dist/server.cjs > server.log 2>&1 &
+```
+
+بازتولید محلی:
+
+```
+$ NODE_ENV=production PORT=3456 node dist/server.cjs
+[Security] JWT_SECRET is not set. Refusing to start in production: ...
+
+$ NODE_ENV=production JWT_SECRET=ci PORT=3457 node dist/server.cjs
+[BAZINO Backend Server] is running beautifully with SQLite on http://0.0.0.0:3457   ✅
+```
+
+**رفتار سرور درست است** (سروری که در production بدون راز بالا بیاید، توکن ادمینش جعل‌شدنی است)؛
+چیزی که باید عوض شود خودِ ورک‌فلو است: یک `JWT_SECRET` یک‌بارمصرف برای smoke-test.
+چون اجازه‌ی ویرایش `.github/workflows/*` را ندارم، اصلاحش در چت داده می‌شود.

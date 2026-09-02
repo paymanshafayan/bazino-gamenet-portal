@@ -163,3 +163,79 @@ $ grep -c 'pub.dev'           flutter_app/pubspec.lock   →   0
 `main.yml` این کار را فقط روی `main` انجام می‌دهد). خطاهای مخصوص اندروید — Gradle، مانیفست،
 مجوزها — تا وقتی آن اجرا نشود دیده نمی‌شوند. پیشنهاد می‌کنم بعد از سبز شدن این دو مورد،
 یک job اندروید هم اضافه کنیم.
+
+---
+
+# ✅ نتیجه‌ی اجرا — ۱۴۰۵/۰۶/۱۱
+
+## تغییرات
+
+| مورد | فایل | تغییر |
+|---|---|---|
+| **E.22** | `flutter_app/test/widget_test.dart` | قالب پیش‌فرض `flutter create` کاملاً جایگزین شد با ۱۰ تست واقعی |
+| **E.23** | `flutter_app/lib/screens/jarvis_assistant.dart:223-233` | چهار پارامتر منسوخ داخل `stt.SpeechListenOptions` منتقل شدند |
+
+تست‌های جدید عمداً `main.dart` را import می‌کنند تا کل درخت ویجت‌ها واقعاً کامپایل شود
+(درسِ HANDOFF پروژه‌ی Mobilo: «`flutter test` فقط فایل‌هایی را کامپایل می‌کند که تست‌ها import کنند»).
+
+**چهار تست رندر:** ساخت `BazinoApp` با همان providerهای `main()` بدون استثنا · لودر در اولین فریم ·
+نمایش `BazinoIntroScreen` برای نصب تازه · نمایش‌ندادنش وقتی `bazino_intro_seen_v1 = true`.
+همه با `SharedPreferences.setMockInitialValues`.
+
+**شش تست منطق:** پیش‌فرض فارسی/RTL و مهمان بودن `AppState` · `UserState.fromJson` با پاسخ واقعی
+و با پاسخ ناقص · `GameSystem.fromJson` با **شناسه‌ی جدید `sys-2c95ca`** · `LoyaltyTx.fromJson` با
+نوع **`Bonus`** و با شرح خالی. این چهار مورد آخر عمداً همان چیزهایی را می‌سنجند که تغییرات اخیر
+سرور دست‌کاری کرده بودند.
+
+## راستی‌آزمایی — اجرای واقعی CI روی رانر گیت‌هاب
+
+اجرای `33648613450` روی کامیت `a3906ff` (Flutter 3.47.2 / Dart 3.13.2):
+
+```
+flutter --version=0
+flutter pub get=0
+flutter analyze=0      ← قبلاً 1
+flutter test=0         ← قبلاً 1
+flutter build web=0
+build/web size: 45M
+```
+
+```
+Analyzing flutter_app...
+No issues found! (ran in 10.1s)
+```
+
+```
+✅ BazinoApp — رندر بدون استثنا بالا می‌آید و MaterialApp با عنوان درست می‌دهد
+✅ BazinoApp — رندر اولین فریم قبل از خواندن SharedPreferences، لودر نشان می‌دهد
+✅ BazinoApp — رندر کاربر تازه صفحه‌ی intro را می‌بیند
+✅ BazinoApp — رندر کاربری که intro را دیده، دیگر آن را نمی‌بیند
+✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
+✅ UserState.fromJson — پاسخ واقعی /api/auth/me
+✅ UserState.fromJson — پاسخ ناقص نباید کرش کند
+✅ GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
+✅ LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
+✅ LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
+
+🎉 10 tests passed.
+```
+
+## بدون رگرسیون در سمت سرور
+
+| سنجه | نتیجه |
+|---|---|
+| `tests/dart-syntax-check.py` | ✅ ۱۸ فایل، ۶۸۹۳ خط، ۰ خطای نحوی |
+| `tests/flutter-contract.mjs` | ✅ **۳۰/۳۰** |
+| `npm test` | ✅ **۲۴۱/۲۴۱** |
+
+## انجام‌نشده (نیاز به یک تغییر در فایل ورک‌فلو دارد)
+
+**مورد E.25** — ورک‌فلو همچنان با `set +e` کار می‌کند، پس اگر مرحله‌ای بشکند جاب باز هم سبز
+می‌ماند. اصلاحش یک بلوک کوتاه در انتهای YAML است و چون من اجازه‌ی تغییر `.github/workflows/*`
+را ندارم، نسخه‌ی کامل در چت داده شد.
+
+**مورد E.24** — بازتولید `pubspec.lock` از `pub.dev` به‌جای میرور چینی، طبق پلن نیاز به تصمیم
+جداگانه‌ی کاربر دارد (نسخه‌ها ممکن است جابه‌جا شوند) و انجام نشد.
+
+**همچنان تست‌نشده:** `flutter build apk` — خطاهای Gradle، مانیفست و مجوزهای اندروید تا وقتی یک
+job اندروید اضافه نشود دیده نمی‌شوند. بیلد وب این‌ها را پوشش نمی‌دهد.

@@ -212,10 +212,15 @@ JSON از سورس دارت استخراج و روی سرور زنده آزمو�
 
 | # | مورد | شدت | وضعیت |
 |---|---|---|---|
-| E.22 | `flutter test` → ۰ پاس / ۱ شکست. `test/widget_test.dart` هنوز قالب پیش‌فرض `flutter create` است و دنبال اپ شمارنده می‌گردد؛ هیچ‌وقت چیزی از اپ بازینو را نسنجیده | 🟠 مهم | ⏳ پلن آماده |
-| E.23 | `flutter analyze` → ۴ ایراد. پارامترهای منسوخ `localeId`/`listenFor`/`pauseFor`/`partialResults` در `jarvis_assistant.dart:224-227`؛ باید `SpeechListenOptions` شود | 🟡 جزئی | ⏳ پلن آماده |
+| E.22 | `flutter test` → ۰ پاس / ۱ شکست. `test/widget_test.dart` هنوز قالب پیش‌فرض `flutter create` است و دنبال اپ شمارنده می‌گردد؛ هیچ‌وقت چیزی از اپ بازینو را نسنجیده | 🟠 مهم | ✅ رفع شد |
+| E.23 | `flutter analyze` → ۴ ایراد. پارامترهای منسوخ `localeId`/`listenFor`/`pauseFor`/`partialResults` در `jarvis_assistant.dart:224-227`؛ باید `SpeechListenOptions` شود | 🟡 جزئی | ✅ رفع شد |
 | E.24 | هر ۷۴ وابستگی در `pubspec.lock` به میرور چینی `pub.flutter-io.cn` اشاره می‌کنند و صفر مورد به `pub.dev` | 🟠 مهم | ⏳ نیاز به تأیید جداگانه |
 | E.25 | ورک‌فلوی CI هیچ‌وقت قرمز نمی‌شود (`set +e`)، پس شکست تست‌ها پنهان می‌ماند | 🟡 جزئی | ⏳ اصلاح YAML لازم است |
 
 **سالم بود:** `flutter pub get` ✅ · `flutter build web --release` ✅ (خروجی ۴۵MB) — یعنی کل کد اپ
 واقعاً کامپایل می‌شود و خطای نوع ندارد.
+
+**نتیجه (همان روز):** E.22 و E.23 رفع و با اجرای واقعی CI تأیید شدند —
+`flutter analyze` → `No issues found!` و `flutter test` → **۱۰ تست، همه سبز** (اجرای `33648613450`).
+E.24 (میرور چینی در `pubspec.lock`) و E.25 (سبزِ کاذب ورک‌فلو) باز مانده‌اند؛ اولی تصمیم کاربر
+می‌خواهد و دومی تغییر فایل ورک‌فلو که این نشست اجازه‌اش را ندارد.

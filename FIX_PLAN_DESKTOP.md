@@ -155,3 +155,81 @@ attempt 1 failed with ECONNRESET
 پوسته‌ی خودِ Electron: نوار عنوان، `autoHideMenuBar`، `dialog.showErrorBox` وقتی باندل نیست،
 `setWindowOpenHandler` برای لینک‌های خارجی، و ساخت نصب‌کننده با `electron-builder`.
 این‌ها فقط روی ماشینی با Electron قابل آزمودن‌اند.
+
+---
+
+# ✅ نتیجه‌ی اجرا — ۱۴۰۵/۰۶/۱۱
+
+## تغییرات
+
+| مورد | فایل | تغییر |
+|---|---|---|
+| **E.29** | `server/dataProviders.ts:12` | زنجیره‌ی anchor برای `createRequire` شد: `import.meta.url` → **`__filename`** → `cwd`. در باندل CJS حالا `<bundle>/dist/server.cjs` مبنا است، پس `node_modules` خودِ باندل پیدا می‌شود صرف‌نظر از اینکه cwd کجاست |
+| **E.30** | `desktop-app/scripts/prepare-server-bundle.js` | اگر `node_modules` ریشه موجود و کامل باشد **کپی** می‌شود (آفلاین و از قبل کامپایل‌شده)؛ `npm install` فقط fallback است. یک sanity check اضافه شد که خودِ `better-sqlite3` را از داخل باندل load می‌کند. مرحله‌ی `@electron/rebuild` وقتی Electron نصب نیست با هشدار صریح رد می‌شود به‌جای شکست |
+| **E.31** | `Management App/Bazino/src/components/Header.tsx` | `getServerAddressLabel()` آدرس واقعی را از `window.location` می‌سازد و LAN/آنلاین بودن را از روی hostname تشخیص می‌دهد |
+
+## راستی‌آزمایی
+
+**۱) اجرای دسکتاپ بدون هیچ دورزدنی** (symlink قبلی حذف شد):
+
+```
+── شبیه‌سازی پروسه‌ی main الکترون ──
+  cwd (userData)     : /home/user/.bazino-desktop-sim
+  BAZINO_STATIC_ROOT : .../desktop-app/server-bundle
+  NODE_ENV           : production
+──────────────────────────────────
+[Database Engine] Active provider initialized: SQLite
+[BAZINO Backend Server] is running beautifully with SQLite on http://0.0.0.0:3100
+
+$ ls ~/.bazino-desktop-sim/
+.jwt-secret  bazino.sqlite3  bazino.sqlite3-shm  bazino.sqlite3-wal
+        ↑ هیچ node_modules ای نیست — سرور خودش ماژول را پیدا کرد
+```
+
+**۲) ساخت باندل بدون اینترنت:**
+
+```
+📦 Copying the root project's node_modules (offline, already compiled)...
+✅ better-sqlite3 داخل bundle قابل بارگذاری است.
+⏭️  Electron نصب نیست — این مرحله رد شد.
+✅ همه چیز آماده‌ست.
+```
+
+**۳) هدر آدرس واقعی را نشان می‌دهد:**
+
+```
+برچسب آدرس سرور در هدر: آفلاین LAN: 127.0.0.1:3100      (سرور واقعاً روی ۳۱۰۰)
+```
+
+**۴) بدون رگرسیون در حالت co-located** — همان تغییر `createRequire` روی هر دو مسیر آزموده شد:
+
+```
+$ PORT=3200 node dist/server.cjs              → Active provider initialized: SQLite ✅
+$ cd /tmp && node <root>/dist/server.cjs      → Active provider initialized: SQLite ✅
+                                                 ↑ این حالت قبلاً غیرممکن بود
+```
+
+| سنجه | نتیجه |
+|---|---|
+| `npm test` (سایت) | ✅ **۲۴۱/۲۴۱** |
+| `tsc --noEmit` هر دو پروژه | ✅ |
+| هارنس `e2e-management.mjs` **روی باندل production دسکتاپ** | ✅ **۲۸/۲۸** |
+| خطای console / درخواست ناموفق | ✅ **۰ / ۰** |
+| overflow افقی در ۱۴۴۰×۹۰۰ | ✅ ندارد |
+
+## معیارهای پذیرش
+
+| # | معیار | نتیجه |
+|---|---|---|
+| ۱ | اجرای دسکتاپ بدون symlink یا دستکاری | ✅ |
+| ۲ | ساخت باندل بدون اینترنت | ✅ |
+| ۳ | هدر host و پورت واقعی را نشان دهد | ✅ |
+| ۴ | بدون رگرسیون co-located | ✅ ۲۴۱/۲۴۱ |
+| ۵ | عکس‌برداری دوباره با صفر خطای console | ✅ `03-after-fix.webp` |
+
+## همچنان تست‌نشده
+
+پوسته‌ی خودِ Electron (نوار عنوان، `autoHideMenuBar`، `dialog.showErrorBox`،
+`setWindowOpenHandler`) و ساخت نصب‌کننده با `electron-builder` — فقط روی ماشینی با Electron
+قابل آزمودن‌اند. ضمناً چون Electron نصب نبود، `@electron/rebuild` اجرا نشد؛ **قبل از ساخت
+نصب‌کننده‌ی واقعی حتماً باید اجرا شود**، وگرنه `better-sqlite3` با ABI الکترون سازگار نیست.

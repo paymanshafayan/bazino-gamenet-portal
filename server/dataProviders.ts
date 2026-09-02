@@ -4,15 +4,27 @@ import { createRequire } from 'module';
 
 // ESM compatibility bridge: this file (and its provider classes) uses
 // CommonJS `require(...)` for lazy-loading optional DB drivers.
-// Under ESM we use import.meta.url; under the CJS production bundle
-// (dist/server.cjs) neither import.meta.url nor __filename is reliably
-// defined by esbuild, so we fall back to an absolute path inside the
-// project root (createRequire only needs any absolute file path to
-// resolve node_modules from).
+//
+// The anchor path matters, because node resolves `node_modules` by walking UP
+// from it:
+//   • ESM (tsx dev)      → import.meta.url.
+//   • CJS bundle         → __filename, i.e. <bundle>/dist/server.cjs, so the
+//                          bundle's own node_modules is found no matter where
+//                          the process happens to be running from.
+//   • last resort        → cwd, which only works when cwd is the project root.
+//
+// That last resort used to be the CJS branch, and it broke the desktop build
+// outright: desktop-app/main.js chdirs to the per-user data folder before
+// requiring the bundle (so the SQLite file survives app updates), so the lookup
+// went to <userData>/node_modules and died with
+// "Cannot find module 'better-sqlite3'". The co-located deployment only ever
+// worked because cwd happened to be the project root.
 const require = createRequire(
   (typeof import.meta !== 'undefined' && (import.meta as any).url)
     ? (import.meta as any).url
-    : path.join(process.cwd(), 'server', 'dataProviders.ts')
+    : (typeof __filename !== 'undefined')
+      ? __filename
+      : path.join(process.cwd(), 'server', 'dataProviders.ts')
 );
 
 // -----------------------------------------------------------------------------

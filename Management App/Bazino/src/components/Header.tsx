@@ -26,6 +26,22 @@ interface HeaderProps {
   onOpenHelpGuide: () => void;
 }
 
+/**
+ * آدرسی که اپراتور باید برای رسیدن به این سرور از دستگاه دیگری وارد کند.
+ *
+ * قبلاً این متن هاردکد بود («آفلاین LAN: 192.168.1.100:3000») و هیچ ربطی به پورت واقعی
+ * نداشت — نسخه‌ی دسکتاپ روی پورت دیگری بالا می‌آمد و هدر همچنان ۳۰۰۰ نشان می‌داد،
+ * که برای کسی که می‌خواهد از صندوق یا گوشی وصل شود مستقیماً گمراه‌کننده است.
+ * حالا از خودِ آدرس صفحه خوانده می‌شود.
+ */
+function getServerAddressLabel(): string {
+  if (typeof window === 'undefined') return 'LAN: —';
+  const { hostname, port, protocol } = window.location;
+  const shown = port ? `${hostname}:${port}` : `${hostname}${protocol === 'https:' ? ':443' : ''}`;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname);
+  return `${isLocal ? 'آفلاین LAN' : 'آنلاین'}: ${shown}`;
+}
+
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
@@ -48,6 +64,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenHardwareModal,
   onOpenHelpGuide,
 }) => {
+  const serverAddressLabel = getServerAddressLabel();
+
   const [showOpMenu, setShowOpMenu] = React.useState(false);
 
   return (
@@ -66,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Monitor className="w-3.5 h-3.5 text-amber-400" />
             <span className="font-bold text-zinc-300">BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت)</span>
             <span className="px-1.5 py-0.2 text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-mono">
-              آفلاین LAN: 192.168.1.100:3000
+              {serverAddressLabel}
             </span>
           </div>
         </div>

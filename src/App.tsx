@@ -358,22 +358,23 @@ export default function App() {
     };
   }, [activeTab, layoutMode, isHomeContentReady]);
 
-  const handleRedeemPoints = async (points: number, couponValue: number, code: string) => {
+  // فقط تعداد امتیاز فرستاده می‌شود. ارزش کوپن و خودِ کد را سرور تعیین می‌کند —
+  // قبلاً هر سه از کلاینت می‌رفتند و می‌شد با ۱ امتیاز کوپن دلخواه ساخت.
+  const handleRedeemPoints = async (points: number) => {
     if (!user) return;
     try {
-      const res = await fetch('/api/loyalty/redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ points, couponValue, code })
-      });
-      if (res.ok) {
-        setUser({ ...user, points: user.loyaltyPoints - points });
-        addNotification(language === 'fa' ? 'کد تخفیف با موفقیت ایجاد شد.' : 'Discount code created.', 'success');
-        const updatedCoupons = await fetch('/api/coupons').then(r => r.json());
-        if(Array.isArray(updatedCoupons)) setActiveCoupons(updatedCoupons);
-      }
+      const data = await postJson('/api/loyalty/redeem', { points });
+      applyServerState(data);
+      if (Array.isArray(data?.activeCoupons)) setActiveCoupons(data.activeCoupons);
+      addNotification(
+        language === 'fa'
+          ? `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString()} تومانی ساخته شد: ${data?.code}`
+          : `A ${Number(data?.couponValue || 0).toLocaleString()} Toman discount code was created: ${data?.code}`,
+        'success'
+      );
     } catch (e) {
-      addNotification('Error redeeming points', 'error');
+      addNotification(errorMessage(e, language === 'fa' ? 'تبدیل امتیاز انجام نشد.' : 'Could not redeem points.'), 'error');
+      throw e;
     }
   };
 

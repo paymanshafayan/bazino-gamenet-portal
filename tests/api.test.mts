@@ -130,7 +130,8 @@ const contentEndpoints: Array<[string, number]> = [
   ['/api/articles', sample.SAMPLE_ARTICLES.length],
   ['/api/app-sliders', sample.SAMPLE_SLIDERS.length],
   ['/api/coupons', sample.SAMPLE_COUPONS.length],
-  ['/api/transactions', sample.SAMPLE_TRANSACTIONS.length],
+  // /api/transactions عمداً اینجا نیست: دیگر عمومی نیست و برای درخواست بدون توکن
+  // آرایه‌ی خالی برمی‌گرداند. تست‌های اختصاصی‌اش در سوئیت مالکیت پایین‌تر هستند.
 ];
 
 for (const [endpoint, expectedCount] of contentEndpoints) {
@@ -1180,6 +1181,86 @@ test('GET /api/themes/:id/theme.js is served for a built-in theme', async () => 
   if (!first) return; // no server themes installed — nothing to assert
   const res = await fetch(`${BASE}/api/themes/${first.id}/theme.js`);
   assert.ok(res.status === 200 || res.status === 404, `unexpected status ${res.status}`);
+});
+
+suite('31. API — ownership of loyalty transactions & coupons');
+
+const auth = () => ({ Authorization: `Bearer ${authToken}` });
+
+test('GET /api/transactions is empty for an anonymous visitor', async () => {
+  const data = await getJson(`${BASE}/api/transactions`);
+  assert.ok(Array.isArray(data));
+  assert.equal(data.length, 0, 'an anonymous visitor must not see anyone\'s point history');
+});
+
+test('a signed-in user only sees their own transactions', async () => {
+  const mine = await getJson(`${BASE}/api/transactions`, 200, auth());
+  assert.ok(Array.isArray(mine));
+  assert.ok(mine.every((t: any) => t.username === uniqueUser),
+    `found a transaction belonging to someone else: ${JSON.stringify(mine.find((t: any) => t.username !== uniqueUser))}`);
+  assert.ok(mine.some((t: any) => t.points === 100), 'the welcome bonus should belong to the new account');
+});
+
+test('an admin sees every transaction', async () => {
+  const all = await getJson(`${BASE}/api/transactions`, 200, adminAuth());
+  const mine = await getJson(`${BASE}/api/transactions`, 200, auth());
+  assert.ok(all.length >= mine.length, 'admin should see at least as much as a single user');
+});
+
+test('redeeming ignores a client-supplied coupon value', async () => {
+  // The old endpoint took couponValue straight from the body, so one point could
+  // mint an arbitrarily large coupon.
+  const { status, body } = await postJson(`${BASE}/api/loyalty/redeem`,
+    { points: 100, couponValue: 50_000_000, code: 'HACKED' }, auth());
+  assert.equal(status, 200, `redeem failed: ${JSON.stringify(body)}`);
+  assert.equal(body.couponValue, 100 * 100, 'the server must price the coupon itself');
+  assert.notEqual(body.code, 'HACKED', 'the server must generate the code itself');
+  assert.match(body.code, /^LOYAL-[0-9A-F]{8}$/);
+});
+
+test('redeeming rejects amounts below the minimum and non-numbers', async () => {
+  for (const points of [5, 0, -500, 'abc']) {
+    const { status } = await postJson(`${BASE}/api/loyalty/redeem`, { points }, auth());
+    assert.equal(status, 400, `points=${points} should have been rejected`);
+  }
+});
+
+test('redeeming requires authentication', async () => {
+  const { status } = await postJson(`${BASE}/api/loyalty/redeem`, { points: 100 });
+  assert.ok(status === 401 || status === 403, `expected an auth error, got ${status}`);
+});
+
+test('a personal coupon is hidden from other users and from anonymous visitors', async () => {
+  const mine = await getJson(`${BASE}/api/coupons`, 200, auth());
+  const personal = mine.find((c: any) => c.ownerUsername === uniqueUser);
+  assert.ok(personal, 'the redeemed coupon should be visible to its owner');
+
+  const anonymous = await getJson(`${BASE}/api/coupons`);
+  assert.ok(!anonymous.some((c: any) => c.code === personal.code),
+    'a personal coupon must not appear in the public list');
+  assert.ok(anonymous.every((c: any) => !c.ownerUsername),
+    'the public list must only contain ownerless promo codes');
+});
+
+test('another user cannot spend someone else\'s personal coupon', async () => {
+  const mine = await getJson(`${BASE}/api/coupons`, 200, auth());
+  const personal = mine.find((c: any) => c.ownerUsername === uniqueUser);
+  if (!personal) return;
+
+  const other = `e2e_thief_${Date.now().toString(36)}`;
+  const reg = await postJson(`${BASE}/api/auth/register`, {
+    username: other, password: 'Test@12345', email: `${other}@bazino.test`, phone: '09120000000',
+  });
+  assert.equal(reg.status, 200, `could not register the second user: ${JSON.stringify(reg.body)}`);
+  const thiefAuth = { Authorization: `Bearer ${reg.body.token}` };
+
+  const res = await fetch(`${BASE}/api/discount/validate?code=${personal.code}&total=999999`, { headers: thiefAuth });
+  assert.equal(res.status, 403, 'a coupon owned by someone else must be refused');
+});
+
+test('promo codes without an owner stay usable by everyone', async () => {
+  const res = await fetch(`${BASE}/api/discount/validate?code=BAZINO10&total=999999`);
+  assert.equal(res.status, 200, 'public promo codes must keep working for anonymous carts');
 });
 
 test('the SPA shell is returned for an unknown non-API path', async () => {

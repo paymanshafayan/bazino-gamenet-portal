@@ -8,7 +8,7 @@ import compression from "compression";
 import { formidable } from "formidable";
 import path from "path";
 import fs from "fs";
-import { createHash, randomUUID } from "crypto";
+import { createHash, randomUUID, randomBytes } from "crypto";
 import { createServer as createViteServer } from "vite";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -645,6 +645,18 @@ async function startServer() {
     }
   } catch { /* non-fatal */ }
 
+  // مهاجرت یک‌باره (تصمیم کاربر، گزینه‌ی «ب»): کدهای LOYAL-… که پیش از افزودن ستون
+  // ownerUsername ساخته شده‌اند مالک ندارند. اگر عمومی بمانند، هر کسی می‌تواند کدی را که
+  // مشتری دیگری با امتیازش خریده خرج کند؛ پس غیرفعال می‌شوند.
+  try {
+    const disabled = await bootStore.deactivateLegacyOwnerlessLoyaltyCoupons();
+    if (disabled > 0) {
+      console.log(`[${bootStore.name}] Deactivated ${disabled} legacy ownerless LOYAL-* coupon(s); they predate per-user coupon ownership.`);
+    }
+  } catch (err) {
+    console.warn(`[${bootStore.name}] Could not deactivate legacy loyalty coupons:`, err);
+  }
+
   // Safety net only: if for some reason no admin account exists at all
   // (e.g. local dev before /install was ever completed), create a minimal
   // fallback admin so the app doesn't hard-crash. This never seeds samples.
@@ -696,6 +708,14 @@ async function startServer() {
     }
 
     return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
+  }
+
+  /** آیا این نام کاربری نقش admin دارد؟ نقش هر بار از دیتابیس خوانده می‌شود، نه از توکن،
+   *  تا سلب دسترسی ادمین فوری اثر کند. */
+  async function isAdminUsername(username?: string): Promise<boolean> {
+    if (!username) return false;
+    const row = await getActiveDataProvider().getUserByUsername(username);
+    return (row?.role || "gamer") === "admin";
   }
 
   // Requires a REAL authenticated user (a valid token). Used by routes where
@@ -769,8 +789,9 @@ async function startServer() {
         id: "wel-" + Math.random().toString(36).substring(2, 9),
         points: 100,
         description: "هدیه خوش‌آمدگویی عضویت طلایی بازینو",
-        type: "Earned",
+        type: "Bonus",
         date: "امروز",
+        username,
       };
       await store.addTransaction(newTx);
 
@@ -948,9 +969,10 @@ async function startServer() {
           description,
           type: points > 0 ? "Earned" : "Redeemed",
           date: "امروز",
+          username: user.username !== "Guest" ? user.username : "",
         };
         await store.addTransaction(newTx);
-        const transactions = await store.listTransactions();
+        const transactions = (await store.listTransactions()).filter(t => (t.username || "") === user.username);
         res.json({ success: true, user, transactions });
       } else {
         res.status(400).json({ error: "Invalid points amount" });
@@ -960,72 +982,116 @@ async function startServer() {
     }
   });
 
+  // تاریخچه‌ی امتیاز خودِ کاربر. قبلاً کل جدول برگردانده می‌شد، یعنی هر مشتری الگوی خرید و
+  // رفت‌وآمد بقیه را می‌دید. ردیف‌های بدون username میراث‌اند و فقط به ادمین نشان داده می‌شوند.
   app.get("/api/transactions", async (req, res) => {
     try {
-      const transactions = await resolveTransactionalList(await getActiveDataProvider().listTransactions(), SAMPLE_TRANSACTIONS);
+      const store = getActiveDataProvider();
+      const username = (req as any).authUsername as string | undefined;
+      const all = await resolveTransactionalList(await store.listTransactions(), SAMPLE_TRANSACTIONS);
+
+      if (!username) return res.json([]);
+      if (await isAdminUsername(username)) return res.json(all);
+
+      const transactions = all.filter((t: any) => (t.username || "") === username);
       res.json(transactions);
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
   });
 
+  // کدهای تبلیغاتی عمومی (بدون مالک) + کدهای شخصیِ خودِ کاربر. یک کد LOYAL-… که مشتری با
+  // امتیازش خریده نباید در لیست بقیه ظاهر شود؛ چون یک‌بارمصرف است، اولین کسی که می‌دیدش آن را
+  // خرج می‌کرد و امتیاز صاحبش از بین می‌رفت.
   app.get("/api/coupons", async (req, res) => {
     try {
-      const coupons = await resolveTransactionalList(await getActiveDataProvider().listCoupons(), SAMPLE_COUPONS);
+      const store = getActiveDataProvider();
+      const username = (req as any).authUsername as string | undefined;
+      const all = await resolveTransactionalList(await store.listCoupons(), SAMPLE_COUPONS);
+
+      if (username && (await isAdminUsername(username))) return res.json(all);
+
+      const coupons = all.filter((c: any) => {
+        const owner = c.ownerUsername || "";
+        return owner === "" || owner === username;
+      });
       res.json(coupons);
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
   });
 
-  // Convert points to coupon
-  app.post("/api/loyalty/redeem", async (req, res) => {
+  // تبدیل امتیاز به کد تخفیف.
+  //
+  // نرخ تبدیل و خودِ کد **فقط اینجا** تعیین می‌شوند. قبلاً `couponValue` و `code` از بدنه‌ی
+  // درخواست خوانده می‌شدند و تنها اعتبارسنجی «آیا کاربر این‌قدر امتیاز دارد؟» بود؛ یعنی با یک
+  // درخواست دستی می‌شد با ۱ امتیاز یک کوپن ۵۰ میلیون تومانی ساخت، یا کدی ساخت که با یک کد
+  // تبلیغاتی موجود تداخل کند. همان قاعده‌ای که برای رزرو و سفارش رعایت شده بود، اینجا از قلم
+  // افتاده بود: هرگز به عددی که کلاینت می‌فرستد اعتماد نکن.
+  const POINTS_TO_TOMAN = 100;      // ۱ امتیاز = ۱۰۰ تومان
+  const MIN_REDEEM_POINTS = 100;
+
+  app.post("/api/loyalty/redeem", requireAuth, async (req, res) => {
     try {
-      const { points, couponValue, code } = req.body;
       const store = getActiveDataProvider();
       const user = await getCurrentUser(req);
 
-      if (user.loyaltyPoints >= points) {
-        if (user.username !== "Guest") {
-          await store.addLoyaltyPointsToUser(user.username, -points);
-          user.loyaltyPoints -= points;
-        }
-
-        const newTx = {
-          id: Math.random().toString(36).substring(2, 9),
-          points: -points,
-          description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} تومانی (${code})`,
-          type: "Redeemed",
-          date: "امروز",
-        };
-        await store.addTransaction(newTx);
-
-        const expiryDate = new Date(Date.now() + 30 * 86400000).toISOString();
-        const newCoupon = {
-          code,
-          type: "Fixed",
-          value: couponValue,
-          minOrder: couponValue * 1.5,
-          expiry: "۳۰ روز دیگر",
-          expiryDate,
-          maxUsageCount: 1,
-          usageCount: 0,
-          isActive: true,
-        };
-        await store.createCoupon(newCoupon);
-
-        const transactions = await store.listTransactions();
-        const coupons = await store.listCoupons();
-
-        res.json({
-          success: true,
-          user,
-          transactions,
-          activeCoupons: coupons
-        });
-      } else {
-        res.status(400).json({ error: "امتیاز کافی ندارید" });
+      const points = Math.floor(Number(req.body?.points));
+      if (!Number.isFinite(points) || points < MIN_REDEEM_POINTS) {
+        return res.status(400).json({ error: `حداقل امتیاز قابل تبدیل ${MIN_REDEEM_POINTS} امتیاز است.` });
       }
+      if (user.loyaltyPoints < points) {
+        return res.status(400).json({ error: "امتیاز کافی ندارید" });
+      }
+
+      const couponValue = points * POINTS_TO_TOMAN;
+
+      // کد یکتا، سمت سرور. اگر برخورد داشت چند بار دیگر تلاش می‌شود.
+      let code = "";
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = `LOYAL-${randomBytes(4).toString("hex").toUpperCase()}`;
+        if (!(await store.getCouponByCode(candidate))) { code = candidate; break; }
+      }
+      if (!code) {
+        return res.status(500).json({ error: "تولید کد تخفیف ناموفق بود. دوباره تلاش کنید." });
+      }
+
+      await store.addLoyaltyPointsToUser(user.username, -points);
+      user.loyaltyPoints -= points;
+
+      await store.addTransaction({
+        id: Math.random().toString(36).substring(2, 9),
+        points: -points,
+        description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} تومانی (${code})`,
+        type: "Redeemed",
+        date: "امروز",
+        username: user.username,
+      });
+
+      await store.createCoupon({
+        code,
+        type: "Fixed",
+        value: couponValue,
+        minOrder: couponValue * 1.5,
+        expiry: "۳۰ روز دیگر",
+        expiryDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+        maxUsageCount: 1,
+        usageCount: 0,
+        isActive: true,
+        ownerUsername: user.username,      // کد شخصی است: فقط خودش می‌بیند و خرج می‌کند
+      });
+
+      const allTransactions = await store.listTransactions();
+      const allCoupons = await store.listCoupons();
+
+      res.json({
+        success: true,
+        user,
+        code,
+        couponValue,
+        transactions: allTransactions.filter(t => (t.username || "") === user.username),
+        activeCoupons: allCoupons.filter(c => !c.ownerUsername || c.ownerUsername === user.username),
+      });
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
@@ -1083,7 +1149,7 @@ async function startServer() {
       // hourly rate — the client cannot influence how much is charged or earned.
       const durationHours = hoursBetween(st, et) || 1;
       const baseTotal = Math.round(durationHours * system.hourlyRate);
-      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode);
+      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, (req as any).authUsername);
       const totalPrice = Math.max(0, baseTotal - discountAmount);
       const pointsEarned = Math.floor(totalPrice / 10000);
 
@@ -1102,6 +1168,7 @@ async function startServer() {
         description: `امتیاز بابت رزرو سانس سیستم ${system.name}`,
         type: "Earned",
         date: "امروز",
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addTransaction(newTx);
 
@@ -1122,7 +1189,10 @@ async function startServer() {
 
       // Record the usage (increments usageCount; deactivates once maxUsageCount is reached)
       if (coupon) {
-        await store.recordCouponUsage(couponCode);
+        const consumed = await store.recordCouponUsage(couponCode);
+        if (!consumed) {
+          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+        }
       }
 
       const systems = await store.listSystems();
@@ -1160,9 +1230,7 @@ async function startServer() {
       const all = await resolveTransactionalList(await store.listReservationLogs(), SAMPLE_RESERVATION_LOGS);
 
       if (!username) return res.json([]);
-
-      const row = await store.getUserByUsername(username);
-      if ((row?.role || "gamer") === "admin") return res.json(all);
+      if (await isAdminUsername(username)) return res.json(all);
 
       res.json(all.filter((r: any) => r.username === username));
     } catch (e) {
@@ -1248,6 +1316,7 @@ async function startServer() {
         description: `تمدید ${hours} ساعته ${active.systemName}`,
         type: "Redeemed",
         date: "امروز",
+        username: user.username,
       });
 
       const updatedReservation = await store.getReservationLogById(active.id);
@@ -1483,6 +1552,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           description: `سفارش صوتی ${match.name} از طریق جارویس`,
           type: "Earned",
           date: "امروز",
+          username: user.username !== "Guest" ? user.username : "",
         });
         const orderId = "CF-" + Math.floor(1000 + Math.random() * 9000);
         await store.addCafeOrder({
@@ -1528,6 +1598,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           description: `تمدید ${hours} ساعته ${active.systemName} از طریق جارویس`,
           type: "Redeemed",
           date: "امروز",
+          username: user.username,
         });
         return { reply: `تمدید شد! ${active.systemName} تا ساعت ${newEndTime} تمدید شد و ${pointsNeeded} امتیاز کسر شد. خوش بگذره! ⚡`, newEndTime };
       }
@@ -1586,7 +1657,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         const log = { id: "res-" + Math.random().toString(36).substring(2, 9), systemId: system.id, username: user.username, systemName: system.name, startTime, endTime, totalPrice, date: "امروز", checkedIn: false, timestamp: new Date().toISOString() };
         await store.addReservationLog(log);
-        await store.addTransaction({ id: Math.random().toString(36).substring(2, 9), points: pointsEarned, description: `رزرو ${system.name} از طریق جارویس`, type: "Earned", date: "امروز" });
+        await store.addTransaction({ id: Math.random().toString(36).substring(2, 9), points: pointsEarned, description: `رزرو ${system.name} از طریق جارویس`, type: "Earned", date: "امروز", username: user.username !== "Guest" ? user.username : "" });
         return { reply: `رزرو انجام شد: ${system.name} از ${startTime} تا ${endTime}. ${pointsEarned} امتیاز هم به حسابت اضافه شد.`, reservation: log };
       }
 
@@ -1647,7 +1718,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const q = String(intent.params.query || "").toLowerCase();
         const item = items.find(i => i.name.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())) || items[0];
         if (!item || item.stock < 1) return { reply: "این کالا موجود نیست." };
-        const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode);
+        const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode, user.username);
         await store.decrementAccessoryStock(item.id, 1);
         const finalAmount = Math.max(0, item.price - discountAmount);
         const pointsEarned = Math.floor(finalAmount / 10000);
@@ -1900,10 +1971,15 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Server-authoritative coupon validation shared by cafe orders, shop orders,
   // and the standalone /api/discount/validate endpoint. The client only ever
   // sends a coupon *code* — the discount amount is always computed here.
-  async function validateCouponServerSide(amount: number, code?: string) {
+  async function validateCouponServerSide(amount: number, code?: string, username?: string) {
     if (!code) return { discountAmount: 0, coupon: null as any };
     const store = getActiveDataProvider();
     const coupon = await resolveSampleById(() => store.getCouponByCode(code), SAMPLE_COUPONS, code, "code");
+    // مخفی‌کردن کد از لیست کافی نیست: کسی که کد را از جای دیگری ببیند یا حدس بزند باز هم
+    // می‌تواند دستی واردش کند، پس مالکیت هنگام استفاده هم بررسی می‌شود.
+    if (coupon && (coupon as any).ownerUsername && (coupon as any).ownerUsername !== username) {
+      throw Object.assign(new Error("این کد تخفیف متعلق به حساب کاربری شما نیست."), { statusCode: 403 });
+    }
     if (!coupon || !coupon.isActive) {
       throw Object.assign(new Error("کد تخفیف معتبر نیست یا قبلاً استفاده شده است."), { statusCode: 400 });
     }
@@ -1943,7 +2019,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         totalPrice += menuItem.price * orderItem.quantity;
       }
 
-      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode);
+      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
       const pointsEarned = Math.floor(finalAmount / 10000);
 
@@ -1964,6 +2040,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         description: "امتیاز بابت سفارش بوفه کافه گیم‌نت",
         type: "Earned",
         date: "امروز",
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addTransaction(newTx);
 
@@ -1984,7 +2061,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       // Record the usage (increments usageCount; deactivates once maxUsageCount is reached)
       if (coupon) {
-        await store.recordCouponUsage(couponCode);
+        const consumed = await store.recordCouponUsage(couponCode);
+        if (!consumed) {
+          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+        }
       }
 
       const cafeItems = await store.listCafeItems();
@@ -2035,7 +2115,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         totalPrice += catalogItem.price * cartItem.quantity;
       }
 
-      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode);
+      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
       const pointsEarned = Math.floor(finalAmount / 10000);
 
@@ -2055,6 +2135,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         description: "امتیاز خرید موفق لوازم جانبی گیمینگ",
         type: "Earned",
         date: "امروز",
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addTransaction(newTx);
 
@@ -2073,7 +2154,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       // Record the usage (increments usageCount; deactivates once maxUsageCount is reached)
       if (coupon) {
-        await store.recordCouponUsage(couponCode);
+        const consumed = await store.recordCouponUsage(couponCode);
+        if (!consumed) {
+          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+        }
       }
 
       const accessories = await store.listAccessories();
@@ -2198,7 +2282,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { code, total } = req.query;
       const amount = Number(total || 0);
-      const { discountAmount, coupon } = await validateCouponServerSide(amount, String(code));
+      const { discountAmount, coupon } = await validateCouponServerSide(amount, String(code), (req as any).authUsername);
       res.json({ valid: true, discountAmount, coupon });
     } catch (e: any) {
       res.status(e.statusCode || 500).json({ valid: false, error: e.message || String(e) });

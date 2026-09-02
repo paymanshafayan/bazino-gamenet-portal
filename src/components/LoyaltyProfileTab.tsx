@@ -8,7 +8,7 @@ interface Props {
   user: UserState;
   transactions: LoyaltyTx[];
   activeCoupons: DiscountCode[];
-  onRedeemPoints: (points: number, couponValue: number, code: string) => void;
+  onRedeemPoints: (points: number) => void | Promise<void>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -27,32 +27,30 @@ export default function LoyaltyProfileTab({
   const pointsRate = 100; // 1 Point = 100 Tomans
   const couponValue = pointsToRedeem * pointsRate;
 
-  const handleRedeem = () => {
+  const [isRedeeming, setIsRedeeming] = useState(false);
+
+  // کد تخفیف دیگر اینجا ساخته نمی‌شود: مقدار و کد را سرور تعیین می‌کند و پیام موفقیت هم
+  // از همان‌جا می‌آید. `couponValue` بالا فقط برای پیش‌نمایش قبل از تأیید است.
+  const handleRedeem = async () => {
+    if (isRedeeming) return;
     if (user.loyaltyPoints < pointsToRedeem) {
       addNotification(
-        language === 'fa' ? 'امتیاز شما کافی نیست!' : 
-        language === 'en' ? 'Insufficient points!' : 
-        language === 'ru' ? 'Недостаточно баллов!' : 'Puanınız yetersiz!', 
+        language === 'fa' ? 'امتیاز شما کافی نیست!' :
+        language === 'en' ? 'Insufficient points!' :
+        language === 'ru' ? 'Недостаточно баллов!' : 'Puanınız yetersiz!',
         'error'
       );
       return;
     }
-    
-    // Generate a random unique coupon code
-    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const generatedCode = `LOYAL-${randomSuffix}`;
 
-    onRedeemPoints(pointsToRedeem, couponValue, generatedCode);
-    
-    const successMsg = language === 'fa' 
-      ? `با موفقیت ${pointsToRedeem} امتیاز تبدیل به کد تخفیف ${couponValue.toLocaleString()} تومانی شد!`
-      : language === 'en'
-      ? `Successfully converted ${pointsToRedeem} points into a ${couponValue.toLocaleString()} Tomans discount coupon!`
-      : language === 'ru'
-      ? `Успешно обменено ${pointsToRedeem} баллов на купон номиналом ${couponValue.toLocaleString()} томанов!`
-      : `Başarıyla ${pointsToRedeem} puan, ${couponValue.toLocaleString()} Tümenlik indirim kuponuna dönüştürüldü!`;
-
-    addNotification(successMsg, 'success');
+    setIsRedeeming(true);
+    try {
+      await onRedeemPoints(pointsToRedeem);
+    } catch {
+      /* پیام خطای واقعی سرور بالادست نمایش داده شد */
+    } finally {
+      setIsRedeeming(false);
+    }
   };
 
   const handleCopyCode = (code: string) => {
@@ -200,7 +198,7 @@ export default function LoyaltyProfileTab({
 
           <button
             onClick={handleRedeem}
-            disabled={user.loyaltyPoints < pointsToRedeem || user.loyaltyPoints < 100}
+            disabled={isRedeeming || user.loyaltyPoints < pointsToRedeem || user.loyaltyPoints < 100}
             className="w-full py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none font-display text-xs cursor-pointer"
           >
             <ArrowLeftRight className="w-5 h-5" />

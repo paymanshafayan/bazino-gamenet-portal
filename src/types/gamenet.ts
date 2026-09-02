@@ -14,6 +14,8 @@ export interface LoyaltyTx {
   // در این تایپ نیامده بود، برای همین UI آن را به شاخه‌ی «خرج امتیاز» می‌فرستاد.
   type: 'Earned' | 'Redeemed' | 'Bonus';
   date: string;
+  /** صاحب تراکنش. سرور تضمین می‌کند فقط تراکنش‌های خودِ کاربر برگردانده شوند. */
+  username?: string;
 }
 
 export interface GameSystem {
@@ -106,4 +108,6 @@ export interface DiscountCode {
   minOrder: number;
   expiry: string;
   isActive: boolean;
+  /** خالی = کد تبلیغاتی عمومی. پر = کد شخصیِ حاصل از تبدیل امتیاز، فقط برای همان کاربر. */
+  ownerUsername?: string;
 }

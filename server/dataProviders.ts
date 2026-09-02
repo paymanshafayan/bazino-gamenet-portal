@@ -67,8 +67,11 @@ export interface UserRow {
   role: string;
 }
 export interface ChatMessageRow { id: string; room: string; username: string; message: string; timestamp: string; }
-export interface TransactionRow { id: string; points: number; description: string; type: string; date: string; }
-export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; }
+/** username: صاحب تراکنش. رشته‌ی خالی = ردیف میراث (قبل از افزودن این ستون). */
+export interface TransactionRow { id: string; points: number; description: string; type: string; date: string; username?: string; }
+/** ownerUsername: رشته‌ی خالی = کد تبلیغاتی عمومی؛ نام کاربری = کد شخصیِ حاصل از تبدیل امتیاز
+ *  که فقط خودِ آن کاربر باید ببیند و خرج کند. */
+export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; ownerUsername?: string; }
 export interface SystemRow { id: string; name: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
 export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; }
 export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; }
@@ -123,6 +126,7 @@ export interface IDataStore {
   addChatMessage(msg: ChatMessageRow): Promise<void>;
 
   // Loyalty transactions
+  /** همه‌ی تراکنش‌ها. فیلتر per-user در لایه‌ی مسیرها انجام می‌شود (ادمین به همه نیاز دارد). */
   listTransactions(): Promise<TransactionRow[]>;
   addTransaction(tx: TransactionRow): Promise<void>;
 
@@ -131,8 +135,11 @@ export interface IDataStore {
   getCouponByCode(code: string): Promise<CouponRow | undefined>;
   createCoupon(coupon: CouponRow): Promise<void>;
   deactivateCoupon(code: string): Promise<void>;
-  /** Increments usageCount by 1 and deactivates the coupon once it reaches maxUsageCount. */
-  recordCouponUsage(code: string): Promise<void>;
+  /** مصرف اتمیک: شمارنده را یک واحد بالا می‌برد و در همان دستور، اگر به سقف رسید غیرفعالش می‌کند.
+   *  `true` یعنی مصرف ثبت شد؛ `false` یعنی کوپن بین اعتبارسنجی و اینجا تمام/غیرفعال شده بود. */
+  recordCouponUsage(code: string): Promise<boolean>;
+  /** یک‌بار در بوت: کدهای شخصی قدیمی (پیشوند LOYAL-) که مالک ندارند غیرفعال می‌شوند. */
+  deactivateLegacyOwnerlessLoyaltyCoupons(): Promise<number>;
 
   // Game systems & reservations
   listSystems(): Promise<SystemRow[]>;
@@ -303,6 +310,9 @@ export class SqliteStore implements IDataStore {
       { table: 'accessories', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'articles', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'app_sliders', column: 'mobileImageUrl', type: 'TEXT' },
+      // مالکیت: تراکنش امتیاز و کد تخفیف شخصی به یک کاربر تعلق دارند.
+      { table: 'transactions', column: 'username', type: "TEXT NOT NULL DEFAULT ''" },
+      { table: 'active_coupons', column: 'ownerUsername', type: "TEXT NOT NULL DEFAULT ''" },
     ];
     for (const { table, column, type } of wanted) {
       try {
@@ -360,7 +370,8 @@ export class SqliteStore implements IDataStore {
   // ---- Transactions ----
   async listTransactions() { return this.db.prepare(`SELECT * FROM transactions`).all() as TransactionRow[]; }
   async addTransaction(tx: TransactionRow) {
-    this.db.prepare(`INSERT INTO transactions (id, points, description, type, date) VALUES (?, ?, ?, ?, ?)`).run(tx.id, tx.points, tx.description, tx.type, tx.date);
+    this.db.prepare(`INSERT INTO transactions (id, points, description, type, date, username) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(tx.id, tx.points, tx.description, tx.type, tx.date, tx.username || '');
   }
 
   // ---- Coupons ----
@@ -372,13 +383,27 @@ export class SqliteStore implements IDataStore {
     return row ? { ...row, isActive: !!row.isActive } : undefined;
   }
   async createCoupon(c: CouponRow) {
-    this.db.prepare(`INSERT INTO active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)`)
-      .run(c.code, c.type, c.value, c.minOrder, c.expiry, c.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString(), c.maxUsageCount || 1);
+    this.db.prepare(`INSERT INTO active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive, ownerUsername) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?)`)
+      .run(c.code, c.type, c.value, c.minOrder, c.expiry, c.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString(), c.maxUsageCount || 1, c.ownerUsername || '');
   }
   async deactivateCoupon(code: string) { this.db.prepare(`UPDATE active_coupons SET isActive = 0 WHERE code = ?`).run(code); }
+  // یک دستور، نه دو تا: قبلاً بین «افزایش شمارنده» و «غیرفعال‌سازی» یک پنجره وجود داشت که
+  // دو درخواست هم‌زمان می‌توانستند یک کوپن یک‌بارمصرف را دو بار خرج کنند.
   async recordCouponUsage(code: string) {
-    this.db.prepare(`UPDATE active_coupons SET usageCount = usageCount + 1 WHERE code = ?`).run(code);
-    this.db.prepare(`UPDATE active_coupons SET isActive = 0 WHERE code = ? AND usageCount >= maxUsageCount`).run(code);
+    const info = this.db.prepare(
+      `UPDATE active_coupons
+          SET usageCount = usageCount + 1,
+              isActive   = CASE WHEN usageCount + 1 >= maxUsageCount THEN 0 ELSE isActive END
+        WHERE code = ? AND isActive = 1 AND usageCount < maxUsageCount`
+    ).run(code);
+    return info.changes > 0;
+  }
+  async deactivateLegacyOwnerlessLoyaltyCoupons() {
+    const info = this.db.prepare(
+      `UPDATE active_coupons SET isActive = 0
+        WHERE isActive = 1 AND (ownerUsername IS NULL OR ownerUsername = '') AND code LIKE 'LOYAL-%'`
+    ).run();
+    return info.changes;
   }
 
   // ---- Systems ----
@@ -667,6 +692,8 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.accessories','mobileImageUrl') IS NULL ALTER TABLE dbo.accessories ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.articles','mobileImageUrl') IS NULL ALTER TABLE dbo.articles ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.app_sliders','mobileImageUrl') IS NULL ALTER TABLE dbo.app_sliders ADD mobileImageUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.transactions','username') IS NULL ALTER TABLE dbo.transactions ADD username NVARCHAR(100) NOT NULL DEFAULT '';
+      IF COL_LENGTH('dbo.active_coupons','ownerUsername') IS NULL ALTER TABLE dbo.active_coupons ADD ownerUsername NVARCHAR(100) NOT NULL DEFAULT '';
     `);
     logDbQuery(this.name, 'SQL', 'Verified mobileImageUrl columns (cafe_items, accessories, articles, app_sliders).');
 
@@ -732,7 +759,8 @@ export class SqlServerStore implements IDataStore {
   async addTransaction(tx: TransactionRow) {
     await this.r().input('id', this.sql.NVarChar, tx.id).input('p', this.sql.Int, tx.points).input('d', this.sql.NVarChar, tx.description)
       .input('t', this.sql.NVarChar, tx.type).input('dt', this.sql.NVarChar, tx.date)
-      .query(`INSERT INTO dbo.transactions (id, points, description, type, date) VALUES (@id, @p, @d, @t, @dt)`);
+      .input('u', this.sql.NVarChar, tx.username || '')
+      .query(`INSERT INTO dbo.transactions (id, points, description, type, date, username) VALUES (@id, @p, @d, @t, @dt, @u)`);
   }
 
   // ---- Coupons ----
@@ -747,14 +775,26 @@ export class SqlServerStore implements IDataStore {
       .input('m', this.sql.Float, c.minOrder).input('e', this.sql.NVarChar, c.expiry)
       .input('ed', this.sql.NVarChar, c.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString())
       .input('mu', this.sql.Int, c.maxUsageCount || 1)
-      .query(`INSERT INTO dbo.active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive) VALUES (@c, @t, @v, @m, @e, @ed, @mu, 0, 1)`);
+      .input('own', this.sql.NVarChar, c.ownerUsername || '')
+      .query(`INSERT INTO dbo.active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive, ownerUsername) VALUES (@c, @t, @v, @m, @e, @ed, @mu, 0, 1, @own)`);
   }
   async deactivateCoupon(code: string) { await this.r().input('c', this.sql.NVarChar, code).query(`UPDATE dbo.active_coupons SET isActive = 0 WHERE code = @c`); }
+  // یک UPDATE شرطی — رجوع کنید به توضیح نسخه‌ی SQLite درباره‌ی مصرف هم‌زمان.
   async recordCouponUsage(code: string) {
-    await this.r().input('c', this.sql.NVarChar, code).query(`
-      UPDATE dbo.active_coupons SET usageCount = usageCount + 1 WHERE code = @c;
-      UPDATE dbo.active_coupons SET isActive = 0 WHERE code = @c AND usageCount >= maxUsageCount;
+    const res = await this.r().input('c', this.sql.NVarChar, code).query(`
+      UPDATE dbo.active_coupons
+         SET usageCount = usageCount + 1,
+             isActive   = CASE WHEN usageCount + 1 >= maxUsageCount THEN 0 ELSE isActive END
+       WHERE code = @c AND isActive = 1 AND usageCount < maxUsageCount;
     `);
+    return (res.rowsAffected?.[0] ?? 0) > 0;
+  }
+  async deactivateLegacyOwnerlessLoyaltyCoupons() {
+    const res = await this.r().query(`
+      UPDATE dbo.active_coupons SET isActive = 0
+       WHERE isActive = 1 AND (ownerUsername IS NULL OR ownerUsername = '') AND code LIKE 'LOYAL-%';
+    `);
+    return res.rowsAffected?.[0] ?? 0;
   }
 
   // ---- Systems ----
@@ -1081,7 +1121,7 @@ export class MongoStore implements IDataStore {
 
   // ---- Transactions ----
   async listTransactions() { return (await this.col('transactions').find({}).toArray()).map((r: any) => this.strip(r)); }
-  async addTransaction(tx: TransactionRow) { await this.col('transactions').insertOne({ ...tx }); }
+  async addTransaction(tx: TransactionRow) { await this.col('transactions').insertOne({ ...tx, username: tx.username || '' }); }
 
   // ---- Coupons ----
   async listCoupons() { return (await this.col('active_coupons').find({}).toArray()).map((r: any) => this.strip(r)); }
@@ -1095,16 +1135,32 @@ export class MongoStore implements IDataStore {
       expiryDate: c.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString(),
       maxUsageCount: c.maxUsageCount || 1,
       usageCount: 0,
-      isActive: true
+      isActive: true,
+      ownerUsername: c.ownerUsername || ''
     });
   }
   async deactivateCoupon(code: string) { await this.col('active_coupons').updateOne({ code }, { $set: { isActive: false } }); }
+  // findOneAndUpdate اتمیک است: فیلتر شامل شرط «هنوز ظرفیت دارد» می‌شود، پس دو درخواست
+  // هم‌زمان نمی‌توانند هر دو موفق شوند.
   async recordCouponUsage(code: string) {
-    await this.col('active_coupons').updateOne({ code }, { $inc: { usageCount: 1 } });
-    const c = await this.col('active_coupons').findOne({ code });
-    if (c && c.usageCount >= c.maxUsageCount) {
+    const before = await this.col('active_coupons').findOneAndUpdate(
+      { code, isActive: true, $expr: { $lt: ['$usageCount', '$maxUsageCount'] } },
+      { $inc: { usageCount: 1 } },
+      { returnDocument: 'before' }
+    );
+    const doc: any = (before as any)?.value ?? before;
+    if (!doc) return false;
+    if ((doc.usageCount ?? 0) + 1 >= (doc.maxUsageCount ?? 1)) {
       await this.col('active_coupons').updateOne({ code }, { $set: { isActive: false } });
     }
+    return true;
+  }
+  async deactivateLegacyOwnerlessLoyaltyCoupons() {
+    const res = await this.col('active_coupons').updateMany(
+      { isActive: true, code: { $regex: '^LOYAL-' }, $or: [{ ownerUsername: { $exists: false } }, { ownerUsername: '' }] },
+      { $set: { isActive: false } }
+    );
+    return res.modifiedCount ?? 0;
   }
 
   // ---- Systems ----

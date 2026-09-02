@@ -451,7 +451,7 @@ npx node-gyp rebuild --release --nodedir=/usr/local     # ۷۰ ثانیه، بد
 
 | مورد | مانع فعلی | پله‌ی ۳: از کاربر چه بخواهیم |
 |---|---|---|
-| اجرای اپ **Flutter** | SDK فلاتر نصب نیست و `storage.googleapis.com` بسته است | آرشیو Flutter SDK (نسخه‌ی پایدار لینوکس x64) روی ریپو، یا خروجی build از ماشین خودشان |
+| اجرای اپ **Flutter** | هر سه پله طی شد — گزارش کامل: `FLUTTER_SETUP_ATTEMPT.md`. دو دیوار مستقل: Dart SDK لینوکس (فقط از `storage.googleapis.com`) و `pub.dev`. هیچ Dart SDK لینوکسی روی گیت‌هاب/npm/PyPI ایندکس نشده | **آپلود SDK را نخواهید** — بی‌فایده است چون `pub.dev` هم بسته است. درخواست درست: افزودن `.github/workflows/flutter-test.yml` (محتوا در `FLUTTER_SETUP_ATTEMPT.md` §۴). قرارداد API اپ بدون SDK با `tests/flutter-contract.mjs` تست می‌شود |
 | اجرای اپ **دسکتاپ Electron** | باینری Electron از CDN بسته دانلود می‌شود | آرشیو `electron-vXX-linux-x64.zip` یا اجازه‌ی تست فقط روی CI |
 | **GTmetrix / Lighthouse واقعی** | نیاز به دامنه‌ی عمومی دارد | خودِ کاربر یک بار روی `bazino.pro` اندازه بگیرد و خروجی را بدهد |
 | بیلد **production کامل** | `npm run build` بخش `Management App/Bazino` را هم بیلد می‌کند (تست‌نشده) | ابتدا پله‌ی ۱: همان بخش را جداگانه بیلد کن و خطای واقعی را بخوان |

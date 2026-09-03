@@ -1,10 +1,21 @@
 # 🎨 سیستم قالب‌بندی بازینو (Bazino Theme Engine)
 
-این پوشه موتور قالب‌بندی پروژه است که به سه هدف اصلی پاسخ می‌دهد:
+این پوشه موتور قالب‌بندی پروژه است (نسخه ۲ — «بخش‌محور»). اهداف:
 
-1. **هر قالب تمام صفحات سایت را پوشش می‌دهد** (نه فقط صفحه اصلی)
-2. **هر قالب فایل CSS مجزای خودش را دارد** + **کامپوننت صفحه اصلی اختصاصی**
-3. **تغییر قالب، ظاهر کامل تمام صفحات را عوض می‌کند**
+1. **هر قالب تمام صفحات سایت را پوشش می‌دهد** — رنگ/فونت از طریق توکن‌های CSS به هدر، دکمه‌ها، بج‌ها و همه‌ی تب‌ها می‌رسد.
+2. **هر قالب می‌تواند بخش‌های دلخواه سایت را جایگزین کند** (هدر، هرو، فوتر، نوار موبایل، بخش‌های صفحه اصلی) — مثل Partial View؛ بقیه پیش‌فرض می‌مانند.
+3. **چهارزبانه و دوجهته**: fa/en/ru/tr، RTL/LTR — متن‌های قالب (`strings`) و اسلایدهای ادمین همگی چهارزبانه‌اند.
+4. **سازگار با گذشته**: قالب‌های نسخه ۱ (`registerComponent('home', …)`) بدون تغییر کار می‌کنند.
+
+**خلاصه‌ی تغییرات v1 → v2**
+
+| موضوع | نسخه ۱ | نسخه ۲ |
+|---|---|---|
+| `theme.js` | اجباری، فقط `home` | اختیاری؛ `header/hero/home.*/footer/mobileNav` + `home` |
+| رنگ‌ها | فقط داخل `.theme-<id>` اعمال می‌شد | `--primary-color`/`--bz-*` روی `body[data-theme]` به همه‌ی کلاس‌های Tailwind می‌رسد |
+| متن قالب | hard-code fa/en | `theme.json.strings.{fa,en,ru,tr}` + `props.ts()` |
+| اسلایدر | `featuredGames` (fa/en) | `props.slides` نرمال‌شده‌ی چهارزبانه (عنوان + توضیح + target) |
+| اعتبارسنجی | فقط وجود فایل‌ها | نام بخش‌ها هم بررسی می‌شود (ناشناخته → 400)؛ بج‌ها در پنل |
 
 ---
 
@@ -78,38 +89,40 @@ theme.zip
 در `theme.js`: `props.ts('cta')` → رشته‌ی زبان فعلی، با fallback `en` → اولین زبان موجود → خودِ کلید.
 اسلایدهای پنل ادمین هم چهارزبانه‌اند: `props.slides[i].title[language]` / `.desc[language]`.
 
-## 🔄 جریان بارگذاری قالب (نام قالب → کامپوننت)
-
-سایت قالب را دقیقاً به این ترتیب بارگذاری می‌کند:
+## 🔄 جریان بارگذاری قالب (نام قالب → بخش‌ها)
 
 ```
-۱) نام/شناسه قالب فعال را می‌خواند:
-     localStorage['themeId'] (کاربر انتخاب کرده)
-     یا theme.json قالب (هنگام نصب از ZIP ذخیره می‌شود)
-     یا سرو GET /api/themes (لیست قالب‌های نصب‌شده روی سرور)
+۱) تعیین قالب فعال:
+     GET /api/themes → activeThemeId (قالب سراسری سایت که ادمین فعال کرده)
+     فقط اگر localStorage['themeChoice'] === 'personal' باشد، localStorage['themeId']
+     (انتخاب شخصی کاربر) بر آن غالب می‌شود. فعال‌سازی از پنل این کلید را پاک می‌کند.
 
-۲) theme.css قالب بارگذاری می‌شود  ← استایل تمام صفحات (یک <style> فعال)
+۲) theme.css بارگذاری می‌شود ← یک <style id="bazino-active-theme-css"> فعال
+     body[data-theme='<id>'] + کلاس theme-<id> روی ریشه‌ی اپ ست می‌شود
+     theme.json.tokens به متغیرهای --bz-<key> روی body تبدیل می‌شود
+     پل توکن در index.css، --primary-color/--bz-* را به کلاس‌های Tailwind می‌رساند
 
-۳) theme.js قالب از پوشه قالب بارگذاری می‌شود:
-     GET /api/themes/<id>/theme.js   (قالب‌های سروری)
-     یا از باندل (قالب‌های سیستمی)
+۳) theme.js (اگر وجود داشته باشد) با useThemeScript بارگذاری می‌شود:
+     GET /api/themes/<id>/theme.js?v=<installedAt>
+     قالب هر بخش را با window.BazinoThemeSDK.registerComponent('<region>', …) ثبت می‌کند
 
-۴) کامپوننت ثبت می‌شود:
-     window.BazinoThemeSDK.registerComponent('home', factory)
-     و صفحه اصلی را با props استاندارد رندر می‌کند
+۴) رندر: هر نقطه‌ی سایت که <ThemeRegion name="hero"> دارد،
+     اگر قالب آن بخش را ثبت کرده باشد → کامپوننت قالب با props استاندارد
+     وگرنه → کامپوننت پیش‌فرض سایت
+     ('home' نسخه ۱ کل صفحه‌ی اصلی را می‌گیرد و hero/home.* نادیده گرفته می‌شوند)
 
-۵) اگر کامپوننت ثبت نشود ← پیام خطای واضح (نه صفحه خالی، نه پیش‌فرض بی‌صدا)
+۵) خطای اجرای theme.js → پیام واضح در کنسول/رابط، و آن بخش به پیش‌فرض برمی‌گردد
 ```
 
-> نکته: قالب‌های سیستمی (dark-gold, gaming-amp, geco-purple, ...) همان‌ها را
-> به‌صورت باندل‌شده در کد دارند (`GamingAmpHome.tsx` و ...) — فرمت ZIP برای
-> قالب‌های نصب‌شده توسط ادمین است که `theme.js` آن‌ها از سرور سرو می‌شود.
+> قالب‌های سیستمی (dark-gold, cyberpunk-cyan, geco-purple, gaming-amp, console-grid)
+> کامپوننت‌هایشان باندل‌شده است؛ فرمت ZIP برای قالب‌های نصب‌شده توسط ادمین است.
 
 ---
 
 ## 🏗 بخش‌های استاندارد صفحه اصلی هر قالب
 
-هر قالب (در `theme.js`) باید صفحه اصلی را از بخش‌های زیر بسازد. این فهرست
+اگر قالب کل صفحه‌ی اصلی را می‌گیرد (`home` نسخه ۱) باید آن را از بخش‌های زیر بسازد؛
+در نسخه ۲ هر ردیف معادل یک region مستقل است و می‌توانید فقط همان را جایگزین کنید. این فهرست
 «قرارداد محتوایی» بین قالب‌هاست تا همه قالب‌ها داده‌های یکسان و کامل کلوپ را
 نمایش دهند. داده‌ها از همان `props` استاندارد SDK می‌آیند.
 
@@ -121,20 +134,20 @@ theme.zip
 - ترتیب بخش‌ها آزاد است (هر قالب چیدمان خودش را دارد) ولی همه باید از همان `props` استاندارد بخوانند.
 - لوگوی سایت مادر فقط از `props.logoUrl` نمایش داده شود (قانون «حق انحصاری لوگو»).
 
-| # | بخش | وضعیت | توضیح | منبع داده |
-|---|---|---|---|---|
-| ۱ | **ژانرهای بازی** | ⭐ اجباری | گرید دسته‌بندی بازی‌ها (شوتر، مسابقه‌ای، نقش‌آفرینی و...) | `gameGenres` |
-| ۲ | **تورنمنت‌های فعال** | ⭐ اجباری | کاروسل/گرید تورنمنت‌ها با وضعیت، تصویر و جایزه | `tournaments` |
-| ۳ | **نتایج مسابقات** | ⭐ اجباری | برد نتایج اخیر مسابقات (اسکوربورد) | `matchHistory` |
-| ۴ | **سالن‌ها و خدمات** | ⭐ اجباری | معرفی سالن‌ها/زون‌های کلوپ (VIP، کافه، فروشگاه و...) | `loungeSections` |
-| ۵ | **Hero / اسلایدر اصلی** | ⬜ اختیاری | اسلایدهای بازی‌های ویژه: تصویر، عنوان، توضیح، دکمه CTA | `featuredGames` |
-| ۶ | **تعرفه‌ها / پاس‌ها** | ⬜ اختیاری | پلن‌های قیمت‌گذاری (ساعتی، روزانه، VIP) | `pricingPackages` |
-| ۷ | **مربیان و تیم** | ⬜ اختیاری | معرفی کادر/مربیان | `staffTeam` |
-| ۸ | **چرا ما + آمار** | ⬜ اختیاری | امتیازات کلوپ + آمار | `settings` |
-| ۹ | **درباره کلوپ** | ⬜ اختیاری | داستان/معرفی کلوپ | `settings` |
-| ۱۰ | **محصولات ویژه** | ⬜ اختیاری | ویترین فروشگاه | `settings`/داده‌ها |
-| ۱۱ | **تماس، آدرس و نقشه** | ⬜ اختیاری | اطلاعات تماس، شبکه‌های اجتماعی، نقشه | `settings` |
-| ۱۲ | **CTA های ناوبری** | ⬜ اختیاری | دکمه‌های رفتن به رزرو/کافه/فروشگاه/مسابقات | `onNavigate` |
+| # | بخش | region (v2) | وضعیت در `home` | توضیح | منبع داده |
+|---|---|---|---|---|---|
+| ۱ | **ژانرهای بازی** | `home.genres` | ⭐ اجباری | گرید دسته‌بندی بازی‌ها | `gameGenres` |
+| ۲ | **تورنمنت‌های فعال** | `home.tournaments` | ⭐ اجباری | کاروسل/گرید تورنمنت‌ها با وضعیت، تصویر و جایزه | `tournaments` |
+| ۳ | **نتایج مسابقات** | `home.results` | ⭐ اجباری | برد نتایج اخیر مسابقات | `matchHistory` |
+| ۴ | **سالن‌ها و خدمات** | `home.lounges` | ⭐ اجباری | سالن‌ها/زون‌های کلوپ (VIP، کافه، فروشگاه…) | `loungeSections` |
+| ۵ | **Hero / اسلایدر اصلی** | `hero` | ⬜ اختیاری | اسلایدهای ادمین: تصویر، عنوان/توضیح چهارزبانه، دکمه CTA | `slides` (fallback: `featuredGames`) |
+| ۶ | **تعرفه‌ها / پاس‌ها** | `home.pricing` | ⬜ اختیاری | پلن‌های قیمت‌گذاری | `pricingPackages` |
+| ۷ | **مربیان و تیم** | `home.staff` | ⬜ اختیاری | معرفی کادر/مربیان | `staffTeam` |
+| ۸ | **تماس، آدرس و نقشه** | `home.location` | ⬜ اختیاری | اطلاعات تماس، شبکه‌های اجتماعی، نقشه | `settings` |
+| ۹ | **هدر / ناوبری** | `header` | — | لوگو (`logoUrl`)، منوی تب‌ها (`activeTab`, `onNavigate`)، کاربر (`user`) | `t`, `settings` |
+| ۱۰ | **فوتر** | `footer` | — | اطلاعات کلوپ، لینک‌ها | `settings` |
+| ۱۱ | **نوار پایین موبایل** | `mobileNav` | — | ناوبری موبایل | `activeTab`, `onNavigate` |
+| ۱۲ | **چرا ما / درباره / محصولات / CTA** | (داخل `home`) | ⬜ اختیاری | بخش‌های آزاد | `settings`, `onNavigate` |
 
 ### قرارداد داده (props) — نسخه ۲ (سازگار با نسخه ۱)
 
@@ -159,10 +172,18 @@ theme.zip
 ## 📁 ساختار پوشه‌ها
 
 ```
+src/themeSdk/
+├── sdk.ts              ← SDK v2: THEME_REGIONS، ThemeComponentProps، رجیستری، makeThemeStrings (ts)
+├── ThemeRegion.tsx     ← <ThemeRegion name="hero"> — رندر بخش قالب یا fallback پیش‌فرض
+└── useThemeScript.ts   ← بارگذاری/تخلیه‌ی theme.js قالب فعال (کش نسخه‌دار)
+
+server/themeStore.ts    ← نصب اتمیک ZIP، KNOWN_REGIONS، detectRegisteredRegions، strings/tokens در /api/themes
+
 src/themes/
-├── index.ts            ← موتور قالب‌ها (ثبت، بارگذاری، تزریق، قالب سفارشی)
+├── index.ts            ← موتور قالب‌ها (ثبت، بارگذاری CSS، تزریق توکن‌ها، قالب سفارشی)
 ├── zip.ts              ← پکیج قالب با فرمت ZIP (پارس/ساخت/دانلود)
-├── themeZipCore.ts     ← هسته مشترک پارس/ساخت ZIP (کلاینت + سرور)
+├── themeZipCore.ts     ← هسته مشترک پارس/ساخت ZIP + قالب نمونه‌ی v2 (Neon Storm)
+├── themeCssUtils.ts    ← ابزارهای CSS (استخراج id/رنگ، حذف کامنت)
 ├── dark-gold.css       ← قالب پیش‌فرض طلایی
 ├── cyberpunk-cyan.css  ← سایبرپانک فیروزه‌ای
 ├── geco-purple.css     ← جکو بنفش
@@ -191,7 +212,7 @@ themes/<theme-id>/
 my-theme/
 ├── theme.json
 ├── theme.css
-├── theme.js
+├── theme.js      (اختیاری)
 └── assets/
 ```
 
@@ -200,23 +221,39 @@ my-theme/
 {
   "name": "Neon Storm",          // نام قالب (نمایش در پنل)
   "id": "neon-storm",            // شناسه (باید با body[data-theme] در CSS یکی باشد)
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "sdkVersion": 2,               // ۱ = فقط home؛ ۲ = بخش‌ها/strings/tokens
   "description": "قالب نئونی برای کلوپ گیمینگ",
-  "colors": {
-    "primary": "#00ff88",
-    "bg": "#04070c",
-    "card": "#0b1220"
-  }
+  "colors": { "primary": "#00ff88", "bg": "#04070c", "card": "#0b1220" },
+  "tokens": {                    // → --bz-<key> روی body
+    "card-2": "#0a1a12",
+    "font-display": "\"Orbitron\", \"Vazirmatn\", sans-serif"
+  },
+  "strings": {                   // متن‌های خود قالب — هر ۴ زبان
+    "fa": { "title": "طوفان نئون", "cta": "رزرو کن" },
+    "en": { "title": "Neon Storm", "cta": "Book now" },
+    "ru": { "title": "Неоновый шторм", "cta": "Забронировать" },
+    "tr": { "title": "Neon Fırtına", "cta": "Rezervasyon yap" }
+  },
+  "regions": ["hero", "footer"]  // اعلامی؛ سرور از theme.js هم تشخیص می‌دهد
 }
 ```
 
 ### گام ۳: theme.css (اجباری — فرمت جدید، پوشش تمام صفحات)
 ```css
-body[data-theme='neon-storm'] { --primary-color: #00ff88; --dark-bg-color: #04070c; /* ... */ }
-.theme-neon-storm .site-header { /* ... */ }
-.theme-neon-storm .bg-dark-card { /* ... */ }
-.theme-neon-storm .btn { /* ... */ }
-/* ... تمام صفحات را پوشش دهید ... */
+/* ۱) توکن‌ها — همین بلوک به‌تنهایی هدر/دکمه‌ها/بج‌ها/کارت‌های همه‌ی صفحات را رنگ می‌کند */
+body[data-theme='neon-storm'] {
+  --primary-color: #00ff88; --secondary-color: #00b8ff; --accent-color: #ff2bd6;
+  --dark-bg-color: #04070c; --dark-card-color: #0b1220;
+  --bz-card-2: #0a1a12; --bz-text: #eafff4; --bz-muted: #8aa39a; --bz-border: rgba(0,255,136,.25);
+  --bz-font-display: "Orbitron", "Vazirmatn", sans-serif;   /* fallback فارسی/روسی اجباری */
+}
+/* ۲) استایل بخش‌های خود قالب (اسکوپ‌شده) */
+.theme-neon-storm .neon-hero { background: url('assets/banner.svg') center/cover; }
+.theme-neon-storm .neon-footer { border-top: 1px solid var(--bz-border); }
+/* ۳) در صورت نیاز، override اجزای پیش‌فرض سایت */
+.theme-neon-storm .site-header { backdrop-filter: blur(8px); }
+/* از margin-inline-start / padding-inline-end به‌جای left/right استفاده کنید (RTL) */
 ```
 
 ### گام ۴: theme.js (اختیاری — جایگزینی بخش‌ها با SDK v2)
@@ -276,8 +313,17 @@ cd my-theme && zip -r ../my-theme.zip theme.json theme.css theme.js assets
 ```
 سپس در پنل مدیریت → «مدیریت قالب‌ها» → «نصب قالب جدید» → تب **نصب از فایل ZIP**.
 
-> نمونه‌ی آماده: دکمه «دانلود قالب نمونه» در همان پنل، یک ZIP کامل معتبر
-> (شامل هر سه فایل اجباری + assets) می‌سازد — الگوی `Neon Storm`.
+> نمونه‌ی آماده: دکمه «دانلود قالب نمونه» در همان پنل، یک ZIP کامل معتبر v2
+> (theme.json با strings/tokens، theme.css، theme.js با بخش‌های `hero` + `footer`، assets) می‌سازد — الگوی `Neon Storm`.
+> قالب فقط-CSS: همان ZIP بدون `theme.js` — در پنل با بج «CSS-only» نمایش داده می‌شود.
+
+### گام ۶: چک‌لیست قبل از انتشار
+- نصب بدون خطا؛ نام بخش‌ها فقط از فهرست مجاز.
+- صفحه‌ی اصلی در هر ۴ زبان (تیتر هرو در fa/ru قابل خواندن — fallback فونت).
+- RTL در فارسی درست (بدون `left/right` ثابت).
+- رنگ هدر/دکمه‌ها با قالب هماهنگ (توکن‌ها روی `body[data-theme]`).
+- اسلایدهای پنل با عنوان/توضیح زبان فعال نمایش داده شوند (`props.slides`).
+- کنسول بدون خطا؛ بدون `eval`/`new Function`/CDN خارجی (CSP).
 
 ---
 
@@ -345,9 +391,20 @@ document.body.setAttribute('data-theme', 'cyberpunk-cyan');
 ```
 
 در `App.tsx` این کار به‌صورت خودکار انجام می‌شود:
-- `useState` مقدار ذخیره‌شده (`localStorage['themeId']`) را می‌خواند
-- `useEffect` با تغییر `themeId` فایل CSS قالب جدید را بارگذاری می‌کند
-- برای قالب‌های سروری، `theme.js` از پوشه قالب بارگذاری و کامپوننت صفحه اصلی ثبت می‌شود
+- قالب فعال از `GET /api/themes` (`activeThemeId`) می‌آید؛ `localStorage['themeId']` فقط با `themeChoice === 'personal'` غالب است
+- `useEffect` با تغییر `themeId` فایل CSS و توکن‌های قالب جدید را بارگذاری می‌کند
+- `useThemeScript` برای قالب‌های سروری `theme.js` را بارگذاری می‌کند و بخش‌ها ثبت می‌شوند
+- هر `<ThemeRegion name="…">` در App/HomeTab بخش قالب یا پیش‌فرض را رندر می‌کند
+
+### استفاده از `ThemeRegion` در کد سایت
+
+```tsx
+import { ThemeRegion } from '../themeSdk/ThemeRegion';
+
+<ThemeRegion name="hero" props={regionProps} fallback={<DefaultHero … />} />
+```
+برای اضافه‌کردن بخش جدید: نام را به `THEME_REGIONS` (sdk.ts) **و** `KNOWN_REGIONS` (themeStore.ts) اضافه کنید
+(تست واحد برابر بودن این دو را چک می‌کند)، سپس در محل رندر `<ThemeRegion>` بگذارید و در این README مستند کنید.
 
 ---
 
@@ -364,8 +421,9 @@ document.body.setAttribute('data-theme', 'cyberpunk-cyan');
 
 - `index.css` فقط استایل‌های «پایه و مشترک» را نگه می‌دارد؛ استایل اختصاصی قالب‌ها **نباید** به آن اضافه شود.
 - فایل `gaming-hub.css` مربوط به قالب قدیمی حذف‌شده است و فقط برای حفظ کد نگه داشته شده.
-- **پکیج ZIP بدون `theme.js` دیگر معتبر نیست** — از این پس همه قالب‌ها باید هر سه فایل
-  (`theme.json` + `theme.css` + `theme.js`) را داشته باشند.
+- `theme.js` **اختیاری** است (قالب فقط-CSS معتبر است)؛ اگر وجود دارد فقط نام بخش‌های مجاز را ثبت کند.
+- فونت تیتر بدون fallback فارسی/روسی (مثل Orbitron تنها) تیتر را در fa/ru ناپدید می‌کند.
+- `theme.js` تحت CSP سایت اجرا می‌شود: بدون `eval`/`new Function`، بدون اسکریپت/فونت از CDN خارجی.
 
 ## Performance gate for uploaded ZIP themes
 

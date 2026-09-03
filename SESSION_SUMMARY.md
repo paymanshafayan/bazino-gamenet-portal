@@ -851,3 +851,19 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - `vite build` ریشه → موفق ✅ (vendor-react + index همان ۱۵۱KB)
 - flutter_app ساختار سالم (pubspec + lib + پلتفرم‌ها) ✅
 - هیچ ارجاعی در کد به مسیرهای حذف‌شده وجود ندارد ✅
+
+## ۱۴۰۵/۰۶/۱۲ — ترجمه‌ی کامل سایت به fa/en/ru/tr (+ CSP، تم، منوی زبان)
+
+**کامیت‌ها (شاخه `arena/01a067ac-bazino-gamenet-portal`):** `ad6414f` CSP → `3a7ebe3` پایداری تم → `4e78eb4` منوی زبان + GeoIP → `3239806` بچ A/B/D → `3d4bb51` بچ C → `9ea336e` بچ E → بچ F (تست‌ها/مستندات).
+
+**الگو:** به‌جای کلیدهای انتزاعی، هر متن به‌صورت inline با `L(language, { fa, en, ru, tr })` (در `src/utils/i18n.ts`) نوشته شده تا diff قابل بازبینی بماند. RTL فقط برای fa؛ اعداد با `localeOf(language)`؛ واحد پول «تومان» و نام‌های برند حفظ شدند.
+
+**ابزار:** `scripts/i18n-extract.mts` (extract / apply / audit روی AST) — ~۹۰۰ سه‌تایی را استخراج و پس از ترجمه جای‌گذاری کرد؛ موارد تودرتو دستی اصلاح شدند.
+
+**سرور:** `server/apiMessages.ts` دیکشنری ۴۹ پیام × ۴ زبان؛ `server.ts` همه‌ی خطاهای کاربرپسند را با `apiError(req, KEY)` برمی‌گرداند (متن ترجمه‌شده + `code`). کلاینت زبان انتخابی را با هدر `X-Lang` می‌فرستد (اینترسپتور `src/services/authToken.ts`)؛ در نبود آن `Accept-Language`.
+
+**تست‌ها:** `npm test` = ۲۴۶/۲۴۶ (۳ تست جدید: کامل‌بودن دیکشنری API، نبودن متن خام فارسی در server.ts، نبودن سه‌تایی fa/en در کامپوننت‌ها). `tsc` و `vite build` سبز.
+
+**بررسی بصری (Chromium واقعی، production build):** صفحه‌ی اصلی و رزرو در هر ۴ زبان (`final-{lang}-home|reserve.png`) و ۱۶ بخش پنل مدیریت در ru/tr (`i18n-admin-{lang}-NN.png`): صفر خطای کنسول؛ تنها متن فارسی باقی‌مانده در ru/tr داده‌های نمونه‌ی دیتابیس است (E.42).
+
+**خارج از محدوده:** اپ Flutter، Management App، theme.js شخص ثالث، ترجمه‌ی sampleData.

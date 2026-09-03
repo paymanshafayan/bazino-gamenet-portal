@@ -79,6 +79,12 @@ export function registerComponent(name: string, factory: () => ThemeComponentDef
   registry.set(name, { factory });
 }
 
+/** حذف کامپوننت ثبت‌شده (بعد از حذف قالب یا قبل از بارگذاری نسخه‌ی جدید theme.js) */
+export function unregisterComponent(name: string): void {
+  unmountComponent(name);
+  registry.delete(name);
+}
+
 /** آیا قالب برای این اسلات کامپوننت دارد؟ */
 export function hasComponent(name: string): boolean {
   return registry.has(name);

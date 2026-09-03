@@ -61,6 +61,8 @@ export interface ThemeInfo {
   assetFiles?: string[];
   /** کامپوننت صفحه اصلی قالب (theme.js) — برای قالب‌های سروری/نصب‌شده */
   componentJs?: string;
+  /** زمان نصب روی سرور (ms) — برای cache-busting فایل‌های css/js بعد از نصب نسخه‌ی جدید */
+  installedAt?: number;
 }
 
 /* ---------- قالب‌های سیستمی ---------- */
@@ -123,8 +125,22 @@ function injectStyleTag(themeId: string, css: string) {
   activeStyleTag = tag;
 }
 
-/** کش CSS قالب‌های سروری (تا هر بار تعویض قالب، fetch تکراری نشود) */
+/** کش CSS قالب‌های سروری (تا هر بار تعویض قالب، fetch تکراری نشود) — کلید: id + نسخه‌ی نصب */
 const serverCssCache = new Map<string, string>();
+
+/** پاک‌کردن کش یک قالب سروری (بعد از حذف یا نصب نسخه‌ی جدید با همان شناسه) */
+export function invalidateServerThemeCache(themeId?: string): void {
+  if (!themeId) { serverCssCache.clear(); return; }
+  for (const key of Array.from(serverCssCache.keys())) {
+    if (key === themeId || key.startsWith(themeId + '@')) serverCssCache.delete(key);
+  }
+}
+
+/** آدرس فایل قالب سروری با نسخه (installedAt) تا مرورگر/CDN نسخه‌ی قدیمی را ندهد */
+export function versionedThemeUrl(url: string, theme: Pick<ThemeInfo, 'installedAt'>): string {
+  if (!theme.installedAt) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'v=' + Math.floor(theme.installedAt);
+}
 
 /** بارگذاری و اعمال استایل یک قالب (built-in یا custom). */
 export function loadThemeStylesheet(theme: ThemeInfo): Promise<void> | void {
@@ -136,18 +152,19 @@ export function loadThemeStylesheet(theme: ThemeInfo): Promise<void> | void {
   //  - در غیر این صورت CSS از روی رنگ‌ها تولید می‌شود (ساخت سریع)
   if (theme.type === 'custom') {
     if (theme.cssUrl) {
-      const cached = serverCssCache.get(theme.id);
+      const cacheKey = theme.id + '@' + (theme.installedAt || 0);
+      const cached = serverCssCache.get(cacheKey);
       if (cached !== undefined) {
         injectStyleTag(theme.id, cached);
         return;
       }
-      return fetch(theme.cssUrl)
+      return fetch(versionedThemeUrl(theme.cssUrl, theme), { cache: 'no-cache' })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
         })
         .then(css => {
-          serverCssCache.set(theme.id, css);
+          serverCssCache.set(cacheKey, css);
           injectStyleTag(theme.id, css);
         })
         .catch(err => {

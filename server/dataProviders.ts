@@ -1,4 +1,5 @@
 import path from 'path';
+import { dataPath, installConfigPath as installConfigFile } from './paths';
 import bcrypt from 'bcryptjs';
 import { createRequire } from 'module';
 
@@ -275,7 +276,7 @@ export class SqliteStore implements IDataStore {
   private db: any;
 
   private getDbPath(): string {
-    return this.config.filePath || path.join(process.cwd(), 'bazino.sqlite3');
+    return this.config.filePath || dataPath('bazino.sqlite3');
   }
 
   async connect(): Promise<{ success: boolean; message: string }> {
@@ -1082,9 +1083,17 @@ export class MongoStore implements IDataStore {
       `mongodb://${this.config.username ? `${this.config.username}:${this.config.password}@` : ''}${this.config.host || 'localhost'}:${this.config.port || 27017}/?authSource=admin`;
     this.client = new MongoClient(uri);
     await this.client.connect();
-    this.db = this.client.db(this.config.dbName || 'bazino');
+    let dbName = this.config.dbName || 'bazino';
+    let hostLabel = this.config.host || 'localhost';
+    try {
+      const u = new URL(uri);
+      hostLabel = u.host;
+      const fromPath = u.pathname.replace(/^\//, '');
+      if (!this.config.dbName && fromPath) dbName = fromPath;
+    } catch { /* non-URL connection string */ }
+    this.db = this.client.db(dbName);
     this.isConnected = true;
-    logDbQuery(this.name, 'SYSTEM', `Connected to MongoDB: ${this.config.host || 'localhost'}/${this.config.dbName || 'bazino'}`);
+    logDbQuery(this.name, 'SYSTEM', `Connected to MongoDB: ${hostLabel}/${dbName}`);
     return { success: true, message: 'Connected to MongoDB successfully.' };
   }
 
@@ -1326,10 +1335,17 @@ export function setActiveDataProvider(provider: IDataStore) {
 
 export async function initializeActiveProvider(): Promise<IDataStore> {
   const fs = require('fs');
-  const installConfigPath = path.join(process.cwd(), 'install-config.json');
+  const installConfigPath = installConfigFile();
 
   let provider: IDataStore = new SqliteStore();
-  if (fs.existsSync(installConfigPath)) {
+  // اولویت ۱: متغیر محیطی MONGO_URL (Railway MongoDB) — بدون نیاز به صفحه‌ی نصب.
+  // اولویت ۲: install-config.json (ویزارد نصب). اولویت ۳: SQLite در DATA_DIR.
+  const envMongo = (process.env.MONGO_URL || process.env.MONGODB_URI || '').trim();
+  if (envMongo) {
+    provider = new MongoStore();
+    provider.config = { connectionString: envMongo, dbName: process.env.MONGO_DB_NAME || 'bazino', source: 'env' };
+    console.log('[Database Engine] MONGO_URL detected → using MongoDB (env-configured)');
+  } else if (fs.existsSync(installConfigPath)) {
     try {
       const configData = JSON.parse(fs.readFileSync(installConfigPath, 'utf8'));
       if (configData.isInstalled) {

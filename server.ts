@@ -44,11 +44,15 @@ import {
   readThemeCss,
   getThemeAsset,
   getThemeComponentJs,
-  exportThemeZip
+  exportThemeZip,
+  ensureThemesDir,
+  cleanupStaleThemeDirs,
+  THEMES_DIR
 } from "./server/themeStore";
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
+import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
 
 /* ═══════════════════════════════════════════════════════════════════
    DATA SOURCE MODE — «منبع داده سایت و اپلیکیشن»
@@ -654,6 +658,9 @@ async function startServer() {
   // "installSampleData" toggle, or later via the admin panel's reset button.
   // =========================================================================
   await initializeActiveProvider();
+  ensureThemesDir();
+  cleanupStaleThemeDirs();
+  console.log(`[Storage] data dir: ${DATA_DIR}${IS_PERSISTENT_DATA_DIR ? " (persistent, BAZINO_DATA_DIR)" : " (cwd — set BAZINO_DATA_DIR for persistence on ephemeral hosts)"}`);
   const bootStore = getActiveDataProvider();
 
   // ردیف‌های قدیمی کاتالوگ (لینک unsplash یا جایگذار عمومی cafe-320) را در
@@ -2933,12 +2940,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           return res.status(400).json(apiError(req, "ZIP_MISSING"));
         }
         const fallbackName = (req.query.name as string) || undefined;
-        const result = await installThemeZip(new Uint8Array(buffer), fallbackName);
+        // replace=1 → نصب نسخه‌ی جدید روی همان شناسه (جایگزینی اتمیک پوشه)
+        const replace = String(req.query.replace || "") === "1";
+        const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
         if ("error" in result) {
-          return res.status(400).json({ error: result.error, performance: result.performance });
+          return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
         }
-        logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${result.theme.id}" installed (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
-        res.json({ success: true, theme: result.theme, performance: result.performance });
+        const store = getActiveDataProvider();
+        logDbQuery(store.name, "SYSTEM", `Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
+        // فعال‌سازی سراسری همین‌جا (اتمیک با نصب) — قبلاً کلاینت جداگانه صدا می‌زد و در صورت
+        // خطا، قالب نصب می‌شد ولی پیش‌فرض سایت عوض نمی‌شد.
+        const activate = String(req.query.activate || "1") !== "0";
+        if (activate) await store.setSetting("activeThemeId", result.theme.id);
+        const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+        res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
       } catch (e) {
         console.error("Theme install error:", e);
         res.status(500).json({ error: String(e) });
@@ -3008,12 +3023,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   });
 
   // حذف قالب (پوشه کامل قالب حذف می‌شود)
-  app.delete("/api/admin/themes/:id", (req, res) => {
+  app.delete("/api/admin/themes/:id", async (req, res) => {
     try {
       const removed = deleteTheme(req.params.id);
       if (!removed) return res.status(404).json({ error: "Theme not found" });
-      logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${req.params.id}" deleted (folder removed)`);
-      res.json({ success: true, serverThemes: listInstalledThemes() });
+      const store = getActiveDataProvider();
+      logDbQuery(store.name, "SYSTEM", `Theme "${req.params.id}" deleted (folder removed)`);
+      // اگر قالب حذف‌شده، قالب فعال سراسری بود → به پیش‌فرض برگرد؛ وگرنه بازدیدکنندگان
+      // با یک شناسه‌ی مرده می‌ماندند و هر بار به پیش‌فرض «سقوط» می‌کردند.
+      let activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+      if (activeThemeId === req.params.id) {
+        activeThemeId = "dark-gold";
+        await store.setSetting("activeThemeId", activeThemeId);
+      }
+      res.json({ success: true, serverThemes: listInstalledThemes(), activeThemeId });
     } catch (e) {
       res.status(400).json({ error: String(e) });
     }
@@ -3157,7 +3180,11 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // =========================================================================
   // MOBILE APP DOWNLOADS — مستقل از قالب سایت
   // =========================================================================
-  const getMobileAppDownloadDir = () => path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "downloads");
+  // فایل APK آپلودشده باید ماندگار باشد → در DATA_DIR/downloads (وقتی BAZINO_DATA_DIR ست شده)؛
+  // در غیر این صورت همان public/downloads قبلی.
+  const getMobileAppDownloadDir = () => IS_PERSISTENT_DATA_DIR
+    ? dataPath("downloads")
+    : path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "downloads");
   const getMobileAppApkPath = () => path.join(getMobileAppDownloadDir(), MOBILE_APP_APK_FILE_NAME);
   const MAX_APK_BYTES = 160 * 1024 * 1024;
 
@@ -3997,16 +4024,19 @@ Example format:
   // =========================================================================
   app.get("/api/install/status", async (req, res) => {
     try {
-      const installConfigPath = path.join(process.cwd(), 'install-config.json');
+      const installConfigPath = installConfigFile();
+      const envMongo = !!(process.env.MONGO_URL || process.env.MONGODB_URI);
       if (fs.existsSync(installConfigPath)) {
         const configData = JSON.parse(fs.readFileSync(installConfigPath, 'utf8'));
         return res.json({
           isInstalled: !!configData.isInstalled,
-          dbType: configData.dbType || 'sqlite',
-          installedAt: configData.installedAt || ''
+          dbType: envMongo ? 'mongodb' : (configData.dbType || 'sqlite'),
+          installedAt: configData.installedAt || '',
+          configSource: envMongo ? 'env' : 'install-config'
         });
       }
-      res.json({ isInstalled: false });
+      // MONGO_URL از محیط → سایت عملاً نصب‌شده است (ادمین fallback ساخته می‌شود)
+      res.json({ isInstalled: envMongo, dbType: envMongo ? 'mongodb' : 'sqlite', configSource: envMongo ? 'env' : 'none' });
     } catch (e) {
       res.json({ isInstalled: false });
     }
@@ -4081,7 +4111,7 @@ Example format:
         installedAt: new Date().toISOString()
       };
 
-      const installConfigPath = path.join(process.cwd(), 'install-config.json');
+      const installConfigPath = dataPath('install-config.json');
       fs.writeFileSync(installConfigPath, JSON.stringify(installConfig, null, 2), 'utf8');
 
       // Set global active provider
@@ -4100,6 +4130,45 @@ Example format:
     } catch (err: any) {
       console.error("Installation failure:", err);
       res.status(500).json(apiError(req, "INSTALL_FAILED", { detail: err.message }));
+    }
+  });
+
+  // وضعیت ذخیره‌سازی ماندگار + موتور دیتابیس (برای کارت «زیرساخت» در پنل)
+  app.get("/api/admin/storage-status", async (req, res) => {
+    try {
+      const provider = getActiveDataProvider();
+      const themes = listInstalledThemes();
+      const dirSize = (dir: string): number => {
+        try {
+          let total = 0;
+          for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, e.name);
+            total += e.isDirectory() ? dirSize(full) : fs.statSync(full).size;
+          }
+          return total;
+        } catch { return 0; }
+      };
+      const envMongo = !!(process.env.MONGO_URL || process.env.MONGODB_URI);
+      const sqlitePath = dataPath("bazino.sqlite3");
+      res.json({
+        dataDir: DATA_DIR,
+        persistent: IS_PERSISTENT_DATA_DIR,
+        writable: isDataDirWritable(),
+        platform: process.env.RAILWAY_PROJECT_ID ? "railway" : (process.env.RENDER ? "render" : "generic"),
+        usedBytes: dirSize(DATA_DIR),
+        themesDir: THEMES_DIR,
+        installedThemes: themes.map(t => ({ id: t.id, name: t.name, version: t.version, installedAt: t.installedAt })),
+        activeThemeId: (await provider.getSetting("activeThemeId")) || "dark-gold",
+        db: {
+          provider: provider.name,
+          connected: provider.isConnected,
+          configSource: envMongo ? "env:MONGO_URL" : (fs.existsSync(installConfigFile()) ? "install-config.json" : "default"),
+          sqliteFile: provider.name === "SQLite" ? sqlitePath : undefined,
+          sqliteBytes: provider.name === "SQLite" && fs.existsSync(sqlitePath) ? fs.statSync(sqlitePath).size : undefined,
+        },
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
     }
   });
 

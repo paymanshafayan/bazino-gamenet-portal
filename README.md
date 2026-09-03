@@ -69,6 +69,8 @@ npx tsx scripts/test-theme-sdk.mts             # تست SDK کامپوننت ق�
 | `GEMINI_API_KEY` | کلید API گوگل جمینای (برای ترجمه خودکار و دستیار هوشمند در پنل ادمین) |
 | `APP_URL` | آدرس عمومی میزبانی برنامه |
 | `JWT_SECRET` | کلید امضای توکن‌های احراز هویت (در production الزامی است) |
+| `BAZINO_DATA_DIR` | پوشه‌ی داده‌های ماندگار (قالب‌های نصب‌شده `themes/`، فایل SQLite، `install-config.json`، APK). پیش‌فرض: پوشه‌ی جاری. روی Railway یک Volume با مسیر `/data` بسازید و `BAZINO_DATA_DIR=/data` بدهید؛ در غیر این صورت قالب‌ها با هر دیپلوی پاک می‌شوند. |
+| `MONGO_URL` (یا `MONGODB_URI`) | اگر تنظیم شود، سرور بدون نیاز به پنل نصب مستقیماً به MongoDB وصل می‌شود (Railway: Reference به سرویس Mongo). نام دیتابیس از `MONGO_DB_NAME` یا مسیر URL؛ پیش‌فرض `bazino`. |
 
 ## 📁 ساختار پروژه
 

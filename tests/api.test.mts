@@ -49,6 +49,7 @@ if (!existsSync(bundle)) {
         PORT: String(PORT),
         JWT_SECRET: 'test-secret-for-e2e-suite',
         BAZINO_STATIC_ROOT: workDir,
+        BAZINO_DATA_DIR: path.join(workDir, 'data'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -901,7 +902,7 @@ test('multipart APK upload publishes a large file byte-for-byte', async () => {
   assert.equal(res.status, 200, JSON.stringify(body));
   assert.equal(body.success, true);
 
-  const apkPath = path.join(workDir, 'public', 'downloads', 'bazino-app.apk');
+  const apkPath = path.join(workDir, 'data', 'downloads', 'bazino-app.apk');
   assert.ok(existsSync(apkPath), 'the final APK was not published at the stable download path');
   assert.deepEqual(readFileSync(apkPath), expected, 'the published APK differs from the multipart upload');
 
@@ -957,7 +958,7 @@ test('chunked APK upload survives a dropped chunk and publishes byte-for-byte', 
   assert.equal(finRes.status, 200, `finalize failed: ${JSON.stringify(finBody)}`);
   assert.equal(finBody.success, true);
 
-  const apkPath = path.join(workDir, 'public', 'downloads', 'bazino-app.apk');
+  const apkPath = path.join(workDir, 'data', 'downloads', 'bazino-app.apk');
   assert.ok(existsSync(apkPath), 'the final APK was not published at the stable download path');
   assert.deepEqual(readFileSync(apkPath), expected, 'the chunked upload published a corrupt APK');
 
@@ -1022,7 +1023,7 @@ test('chunked APK upload rejects out-of-order chunks, incomplete finalize, and c
   });
   assert.equal(res.status, 404, 'finalize did not reject a cancelled session');
 
-  const downloadsDir = path.join(workDir, 'public', 'downloads');
+  const downloadsDir = path.join(workDir, 'data', 'downloads');
   const leftovers = readdirSync(downloadsDir).filter((name) => name.endsWith('.part'));
   assert.deepEqual(leftovers, [], 'cancelled session left a partial file behind');
 });
@@ -1377,6 +1378,77 @@ test('the SPA shell is returned for an unknown non-API path', async () => {
 });
 
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   33. Theme store — install / update / delete lifecycle
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('33. API — theme store lifecycle');
+
+const themeZipMod = await import('../src/themes/themeZipCore.ts');
+const themeV1 = themeZipMod.buildSampleThemeZip();
+const parsedV1: any = themeZipMod.parseThemeZip(themeV1, 'x');
+const themeV2 = themeZipMod.buildThemeZip(parsedV1.css + '\n/* v2 */', { ...parsedV1.meta, version: '2.0.0' }, parsedV1.assets, parsedV1.componentJs);
+const THEME_ID = parsedV1.meta.id as string;
+const installTheme = (zip: Uint8Array, qs = '') => fetch(`${BASE}/api/admin/themes/install?name=t${qs}`, {
+  method: 'POST', headers: { ...adminAuth(), 'Content-Type': 'application/zip' }, body: Buffer.from(zip),
+});
+
+test('install: creates the theme under BAZINO_DATA_DIR and makes it the site default', async () => {
+  const res = await installTheme(themeV1);
+  const body: any = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.theme.id, THEME_ID);
+  assert.equal(body.activeThemeId, THEME_ID, 'install must activate site-wide atomically');
+  assert.equal(body.replaced, false);
+  assert.ok(existsSync(path.join(workDir, 'data', 'themes', THEME_ID, 'theme.css')), 'theme folder must live in the data dir');
+  const list: any = await getJson(`${BASE}/api/themes`);
+  assert.equal(list.activeThemeId, THEME_ID);
+  assert.ok(list.serverThemes.some((t: any) => t.id === THEME_ID && t.installedAt > 0));
+});
+
+test('install same id without replace → 409 THEME_EXISTS and old files untouched', async () => {
+  const res = await installTheme(themeV2);
+  const body: any = await res.json();
+  assert.equal(res.status, 409);
+  assert.equal(body.code, 'THEME_EXISTS');
+  const css = await (await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).text();
+  assert.ok(!css.includes('/* v2 */'), 'v1 css must still be served');
+});
+
+test('install with replace=1 → atomic update, new version served, still active', async () => {
+  const res = await installTheme(themeV2, '&replace=1');
+  const body: any = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.replaced, true);
+  assert.equal(body.theme.version, '2.0.0');
+  assert.equal(body.activeThemeId, THEME_ID);
+  const css = await (await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).text();
+  assert.ok(css.includes('/* v2 */'), 'v2 css must be served after update');
+  const dirs = readdirSync(path.join(workDir, 'data', 'themes'));
+  assert.deepEqual(dirs.filter(d => d.startsWith('.')), [], 'no temp/backup dirs may remain');
+});
+
+test('delete active theme → folder removed AND site default reset to dark-gold', async () => {
+  const res = await fetch(`${BASE}/api/admin/themes/${THEME_ID}`, { method: 'DELETE', headers: adminAuth() });
+  const body: any = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.activeThemeId, 'dark-gold', 'a deleted theme must not stay the site default');
+  assert.ok(!existsSync(path.join(workDir, 'data', 'themes', THEME_ID)));
+  const list: any = await getJson(`${BASE}/api/themes`);
+  assert.equal(list.activeThemeId, 'dark-gold');
+  assert.equal((await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).status, 404);
+});
+
+test('storage-status reports the persistent data dir', async () => {
+  const res = await fetch(`${BASE}/api/admin/storage-status`, { headers: adminAuth() });
+  const body: any = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.persistent, true);
+  assert.equal(body.dataDir, path.join(workDir, 'data'));
+  assert.equal(body.db.provider, 'SQLite');
+  assert.ok(existsSync(path.join(workDir, 'data', 'bazino.sqlite3')), 'sqlite file must live in the data dir');
+});
 
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

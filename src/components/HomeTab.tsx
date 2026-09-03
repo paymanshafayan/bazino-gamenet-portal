@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, startTrans
 import { Tournament } from '../types/gamenet';
 import InitialAvatar from './InitialAvatar';
 import { useLanguage } from '../context/LanguageContext';
-import { hasComponent, mountComponent, unmountComponent } from '../themeSdk/sdk';
+import { hasComponent, mountComponent, unmountComponent, unregisterComponent } from '../themeSdk/sdk';
 import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 import { vimg } from '../utils/assetVersion';
 
@@ -44,7 +44,7 @@ interface Props {
   tournaments: Tournament[];
   onNavigate: (tab: 'loyalty' | 'reservations' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'csharp') => void;
   /** قالب‌های دارای کامپوننت اختصاصی (theme.js) — اطلاعات از App می‌آید */
-  themeComponent?: { cssUrl: string; assetsBase: string } | null;
+  themeComponent?: { cssUrl: string; assetsBase: string; installedAt?: number } | null;
 }
 
 export default function HomeTab({ tournaments, onNavigate, themeId, themeComponent,
@@ -64,11 +64,20 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
   // بارگذاری theme.js قالب — برای قالب‌های نصب‌شده (server themes) اجباری است:
   // صفحه اصلی قالب بدون کامپوننتش معنی ندارد، پس اگر بارگذاری/ثبت نشد، یک پیام
   // خطای واضح در کنسول و یک placeholder با پیام خطا نمایش می‌دهیم (به‌جای سکوت).
+  const themeComponentKey = themeComponent ? `${themeComponent.cssUrl}@${themeComponent.installedAt || 0}` : '';
   useEffect(() => {
-    if (!themeComponent) return;
+    if (!themeComponent) {
+      // قالب فعال دیگر کامپوننت سروری ندارد (حذف شد یا به قالب داخلی برگشتیم) →
+      // کامپوننت قبلی نباید در رجیستری بماند.
+      unregisterComponent('home');
+      return;
+    }
     let cancelled = false;
+    // نسخه‌ی قبلی (مثلاً v1 همین قالب) را پاک کن تا theme.js جدید ثبت شود
+    unregisterComponent('home');
     const script = document.createElement('script');
-    script.src = themeComponent.cssUrl.replace(/\/theme\.css$/, '/theme.js');
+    const base = themeComponent.cssUrl.replace(/\/theme\.css$/, '/theme.js');
+    script.src = themeComponent.installedAt ? `${base}?v=${Math.floor(themeComponent.installedAt)}` : base;
     script.async = true;
     script.onload = () => {
       if (cancelled) return;
@@ -87,7 +96,8 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       cancelled = true;
       if (script.parentNode) script.parentNode.removeChild(script);
     };
-  }, [themeComponent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themeComponentKey]);
 
 
   const getSocialLinks = () => {

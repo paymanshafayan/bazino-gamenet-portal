@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, startTransition } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
 import bazinoLogo from './assets/images/bazino_logo_user-80.webp'; // 48 CSS px × DPR2 ≈ 80px واقعی
 import {
@@ -124,9 +124,14 @@ export default function App() {
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
 
+  // هر بار پنل ادمین قالبی نصب/حذف می‌کند، این شمارنده بالا می‌رود تا لیست سروری
+  // (و installedAt جدید برای cache-busting) دوباره از سرور خوانده شود.
+  const [themeStoreVersion, setThemeStoreVersion] = useState(0);
+  const refreshServerThemes = useCallback(() => setThemeStoreVersion(v => v + 1), []);
+
   // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
   useEffect(() => {
-    fetch('/api/themes')
+    fetch('/api/themes', { cache: 'no-store' })
       .then(r => r.json())
       .then((data: { serverThemes?: any[]; activeThemeId?: string }) => {
         const serverThemes: ThemeInfo[] = (data.serverThemes || []).map(t => ({
@@ -141,10 +146,13 @@ export default function App() {
           hasAssets: t.hasAssets,
           assetFiles: t.assetFiles,
           assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
+          installedAt: t.installedAt,
         }));
         setAvailableThemesState(prev => {
-          const existing = new Set(prev.map(t => t.id));
-          const merged = [...prev, ...serverThemes.filter(t => !existing.has(t.id))];
+          // قالب‌های سروری همیشه از پاسخ تازه‌ی سرور جایگزین می‌شوند (نسخه/installedAt جدید)؛
+          // قالب‌های داخلی و محلی حفظ می‌شوند.
+          const nonServer = prev.filter(t => t.kind !== 'server');
+          const merged = [...nonServer, ...serverThemes];
           // حالا که لیست کامل (داخلی + محلی + سروری) را داریم، قالب فعال را
           // اعتبارسنجی می‌کنیم. اگر کاربر انتخابی نداشته، قالب فعال سراسری سرور
           // اعمال می‌شود؛ اگر id ناشناخته بود، به پیش‌فرض برمی‌گردیم.
@@ -152,15 +160,31 @@ export default function App() {
             const knownIds = new Set(merged.map(t => t.id));
             const serverActive = data.activeThemeId;
             if (!hasStoredThemeChoice.current && serverActive && knownIds.has(serverActive)) return serverActive;
-            return knownIds.has(current) ? current : 'dark-gold';
+            if (knownIds.has(current)) return current;
+            // قالب ذخیره‌شده‌ی کاربر دیگر روی سرور وجود ندارد (حذف شده یا فایل‌سیستم سرور
+            // موقتی بوده). به‌جای سقوط بی‌صدا، هشدار بده تا علت دیده شود.
+            console.warn(`[Themes] stored theme "${current}" is no longer available on the server → falling back`);
+            const fallback = serverActive && knownIds.has(serverActive) ? serverActive : 'dark-gold';
+            window.setTimeout(() => addNotification(
+              L(language, {
+                fa: `قالب «${current}» دیگر روی سرور وجود ندارد؛ قالب «${fallback}» اعمال شد.`,
+                en: `Theme "${current}" no longer exists on the server; switched to "${fallback}".`,
+                ru: `Тема «${current}» больше не существует на сервере; применена «${fallback}».`,
+                tr: `"${current}" teması artık sunucuda yok; "${fallback}" uygulandı.`,
+              }), 'info'), 0);
+            return fallback;
           });
           // اگر قالب فعال یک قالب سروری است، استایلش الان بارگذاری می‌شود
           // (useEffect پایین با تغییر availableThemes دوباره اجرا می‌شود)
           return merged;
         });
       })
-      .catch(err => console.error('[Themes] Failed to fetch server themes:', err));
-  }, []);
+      .catch(err => {
+        // خطای شبکه → انتخاب کاربر دست نمی‌خورد (قبلاً هم چیزی تغییر نمی‌داد، ولی صریح می‌کنیم)
+        console.error('[Themes] Failed to fetch server themes (keeping current theme):', err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themeStoreVersion]);
 
   useEffect(() => {
     localStorage.setItem('themeId', themeId);
@@ -522,7 +546,7 @@ export default function App() {
               themeComponent={(() => {
                 const th = availableThemes.find(x => x.id === themeId);
                 return th && th.kind === 'server' && th.cssUrl
-                  ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
+                  ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets'), installedAt: th.installedAt }
                   : null;
               })()}
             />
@@ -541,6 +565,7 @@ export default function App() {
           setThemeId={setThemeId} 
           availableThemes={availableThemes} 
           setAvailableThemes={setAvailableThemes} 
+          refreshServerThemes={refreshServerThemes}
           addNotification={addNotification} 
           layoutMode={layoutMode}
           setLayoutMode={setLayoutMode}

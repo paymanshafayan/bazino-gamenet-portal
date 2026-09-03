@@ -867,3 +867,11 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 **بررسی بصری (Chromium واقعی، production build):** صفحه‌ی اصلی و رزرو در هر ۴ زبان (`final-{lang}-home|reserve.png`) و ۱۶ بخش پنل مدیریت در ru/tr (`i18n-admin-{lang}-NN.png`): صفر خطای کنسول؛ تنها متن فارسی باقی‌مانده در ru/tr داده‌های نمونه‌ی دیتابیس است (E.42).
 
 **خارج از محدوده:** اپ Flutter، Management App، theme.js شخص ثالث، ترجمه‌ی sampleData.
+
+## ۱۴۰۵/۰۶/۱۲ — سیستم قالب: ماندگاری (Volume/Mongo)، نصب اتمیک، حذف امن، فعال‌سازی سراسری
+
+- `server/paths.ts` جدید؛ `BAZINO_DATA_DIR` و `MONGO_URL` (README به‌روز شد).
+- themeStore: نصب اتمیک با replace، cleanup پوشه‌های نیمه‌کاره، `installedAt` در فهرست.
+- server.ts: نصب = فعال‌سازی سراسری، DELETE ریست activeThemeId، `GET /api/admin/storage-status`.
+- کلاینت: بدون fallback بی‌صدا، کش نسخه‌دار، دکمه‌ی «انتخاب به‌عنوان قالب سایت» سراسری، کارت زیرساخت و «حالت به‌روزرسانی» در پنل.
+- تست: ۲۵۱/۲۵۱ + فلو UI در Chromium واقعی (`browser-test/t2-*.png`). Railway واقعی تست‌نشده.

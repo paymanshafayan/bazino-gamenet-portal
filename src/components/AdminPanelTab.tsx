@@ -42,6 +42,7 @@ import ThemeScreenshot from './ThemeScreenshot';
 import VisualHelpGuide from './VisualHelpGuide';
 import AdminMobileAppDownloadPanel from './AdminMobileAppDownloadPanel';
 import type { ThemeInfo } from '../themes';
+import { invalidateServerThemeCache } from '../themes';
 import {
   parseThemeZip,
   buildSampleThemeZip,
@@ -58,6 +59,8 @@ interface Props {
   setThemeId?: (id: string) => void;
   availableThemes?: ThemeInfo[];
   setAvailableThemes?: React.Dispatch<React.SetStateAction<ThemeInfo[]>>;
+  /** بعد از نصب/حذف قالب روی سرور، App لیست سروری را دوباره می‌خواند */
+  refreshServerThemes?: () => void;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
   layoutMode?: 'classic' | 'hub';
   setLayoutMode?: (mode: 'classic' | 'hub') => void;
@@ -69,6 +72,7 @@ export default function AdminPanelTab({
   setThemeId, 
   availableThemes = [], 
   setAvailableThemes,
+  refreshServerThemes,
   layoutMode = 'classic',
   setLayoutMode
 }: Props) {
@@ -117,6 +121,9 @@ export default function AdminPanelTab({
   // ZIP theme install states
   const [zipFileName, setZipFileName] = useState('');
   const [zipParsed, setZipParsed] = useState<ParsedZipTheme | null>(null);
+  /** شناسه‌ی موجود که فایل انتخاب‌شده آن را به‌روزرسانی می‌کند (نصب نسخه‌ی جدید) */
+  const [zipReplacesExisting, setZipReplacesExisting] = useState<ThemeInfo | null>(null);
+  const [storageStatus, setStorageStatus] = useState<any>(null);
   const [zipFileBytes, setZipFileBytes] = useState<Uint8Array | null>(null);
   const [zipError, setZipError] = useState('');
   const [isParsingZip, setIsParsingZip] = useState(false);
@@ -825,11 +832,18 @@ export default function AdminPanelTab({
         return;
       }
 
-      // بررسی تکراری نبودن شناسه (بین قالب‌های محلی و سروری)
-      if (availableThemes.some(t => t.id === result.meta.id)) {
-        setZipError(L(language, { fa: `قالبی با شناسه «${result.meta.id}» قبلاً نصب شده است`, en: `A theme with id "${result.meta.id}" is already installed`, ru: `Тема с идентификатором «${result.meta.id}» уже установлена`, tr: `«${result.meta.id}» kimlikli tema zaten yüklü` }));
-        addNotification(L(language, { fa: 'قالب تکراری است', en: 'Duplicate theme', ru: 'Дублирующаяся тема', tr: 'Tema zaten mevcut' }), 'error');
-        return;
+      // شناسه‌ی تکراری: اگر قالب سروری است → حالت «به‌روزرسانی» (جایگزینی اتمیک نسخه‌ی قبلی)؛
+      // اگر داخلی/محلی است → خطا.
+      const existing = availableThemes.find(t => t.id === result.meta.id);
+      setZipReplacesExisting(null);
+      if (existing) {
+        if (existing.kind === 'server') {
+          setZipReplacesExisting(existing);
+        } else {
+          setZipError(L(language, { fa: `شناسه «${result.meta.id}» متعلق به یک قالب داخلی/محلی است و قابل جایگزینی نیست`, en: `Id "${result.meta.id}" belongs to a built-in/local theme and cannot be replaced`, ru: `Идентификатор «${result.meta.id}» принадлежит встроенной/локальной теме и не может быть заменён`, tr: `«${result.meta.id}» kimliği yerleşik/yerel bir temaya ait ve değiştirilemez` }));
+          addNotification(L(language, { fa: 'قالب تکراری است', en: 'Duplicate theme', ru: 'Дублирующаяся тема', tr: 'Tema zaten mevcut' }), 'error');
+          return;
+        }
       }
 
       // IMPORTANT: do not use `new Function`/`eval` to syntax-check theme.js here.
@@ -863,7 +877,8 @@ export default function AdminPanelTab({
 
     setIsInstallingZip(true);
     try {
-      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}`, {
+      const replace = zipReplacesExisting ? '&replace=1' : '';
+      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}${replace}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/zip' },
         body: zipFileBytes as unknown as BodyInit,
@@ -886,30 +901,33 @@ export default function AdminPanelTab({
         cssUrl: data.theme.cssUrl,
         hasAssets: data.theme.hasAssets,
         assetFiles: data.theme.assetFiles,
+        installedAt: data.theme.installedAt,
+        assetsBase: data.theme.cssUrl ? data.theme.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
       };
 
-      setAvailableThemes(prev => [...prev, serverTheme]);
+      // کش CSS نسخه‌ی قبلی (در صورت به‌روزرسانی) باید دور ریخته شود
+      invalidateServerThemeCache(serverTheme.id);
+      setAvailableThemes(prev => [...prev.filter(t => t.id !== serverTheme.id), serverTheme]);
       const fixedCount = Array.isArray(data.performance?.findings)
         ? data.performance.findings.filter((finding: { severity?: string }) => finding.severity === 'fixed').length
         : 0;
       const warningCount = Array.isArray(data.performance?.findings)
         ? data.performance.findings.filter((finding: { severity?: string }) => finding.severity === 'warning').length
         : 0;
-      addNotification(L(language, { fa: `قالب «${serverTheme.name}» روی سرور نصب و فعال شد${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} فایل assets)` : ''}`, en: `Theme "${serverTheme.name}" installed on server & activated${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} assets)` : ''}`, ru: `Тема «${serverTheme.name}» установлена на сервер и активирована${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} файлов assets)` : ''}`, tr: `«${serverTheme.name}» teması sunucuya yüklendi ve etkinleştirildi${serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} asset dosyası)` : ''}` }), 'success');
+      const assetsNote = serverTheme.hasAssets ? ` (${serverTheme.assetFiles?.length} assets)` : '';
+      addNotification(data.replaced
+        ? L(language, { fa: `قالب «${serverTheme.name}» به نسخه ${serverTheme.version || ''} به‌روزرسانی و فعال شد${assetsNote}`, en: `Theme "${serverTheme.name}" updated to v${serverTheme.version || ''} & activated${assetsNote}`, ru: `Тема «${serverTheme.name}» обновлена до v${serverTheme.version || ''} и активирована${assetsNote}`, tr: `«${serverTheme.name}» teması v${serverTheme.version || ''} sürümüne güncellendi ve etkinleştirildi${assetsNote}` })
+        : L(language, { fa: `قالب «${serverTheme.name}» روی سرور نصب و به‌عنوان قالب پیش‌فرض سایت فعال شد${assetsNote}`, en: `Theme "${serverTheme.name}" installed on server & set as site default${assetsNote}`, ru: `Тема «${serverTheme.name}» установлена на сервер и назначена темой сайта по умолчанию${assetsNote}`, tr: `«${serverTheme.name}» teması sunucuya yüklendi ve site varsayılanı yapıldı${assetsNote}` }), 'success');
       if (fixedCount || warningCount) {
         addNotification(L(language, { fa: `بررسی عملکرد قالب: ${fixedCount} اصلاح خودکار و ${warningCount} مورد نیازمند بررسی دستی.`, en: `Theme performance check: ${fixedCount} automatic fixes and ${warningCount} items needing review.`, ru: `Проверка производительности темы: ${fixedCount} автоисправлений и ${warningCount} замечаний для ручной проверки.`, tr: `Tema performans kontrolü: ${fixedCount} otomatik düzeltme ve ${warningCount} manuel inceleme gerektiren madde.` }), 'info');
       }
 
-      // فعال‌سازی فوری در همین مرورگر
+      // فعال‌سازی فوری در همین مرورگر (فعال‌سازی سراسری را خود سرور هم‌زمان با نصب انجام داده)
       if (setThemeId) setThemeId(serverTheme.id);
-      // فعال‌سازی سراسری روی سرور تا بازدیدکنندگان دیگر هم قالب نصب‌شده را ببینند.
-      // خطای این مرحله نباید نصب موفق را خراب کند.
-      fetch('/api/admin/themes/activate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ themeId: serverTheme.id }),
-      }).catch(err => console.warn('[Themes] Failed to set server-wide active theme:', err));
+      // لیست سروری را از منبع حقیقت دوباره بخوان (installedAt دقیق برای cache-busting)
+      refreshServerThemes?.();
 
+      setZipReplacesExisting(null);
       setZipParsed(null);
       setZipFileBytes(null);
       setZipFileName('');
@@ -969,6 +987,38 @@ export default function AdminPanelTab({
     }
   };
 
+  /* ---------- انتخاب قالب = فعال‌سازی سراسری (پیش‌فرض سایت) + همین مرورگر ----------
+   * قبلاً فقط setThemeId محلی صدا زده می‌شد؛ ادمین فکر می‌کرد پیش‌فرض سایت عوض شده
+   * ولی فقط مرورگر خودش عوض شده بود. */
+  const handleActivateTheme = async (theme: ThemeInfo) => {
+    if (setThemeId) setThemeId(theme.id);
+    if (theme.kind === 'colors' || theme.kind === 'zip') {
+      // قالب فقط در localStorage همین مرورگر وجود دارد → نمی‌تواند پیش‌فرض سراسری باشد
+      addNotification(L(language, { fa: 'این قالب فقط در همین مرورگر ذخیره شده و به‌عنوان پیش‌فرض سایت قابل انتخاب نیست؛ آن را به‌صورت ZIP روی سرور نصب کنید.', en: 'This theme exists only in this browser and cannot be the site default; install it on the server as a ZIP.', ru: 'Эта тема хранится только в этом браузере и не может быть темой сайта по умолчанию; установите её на сервер как ZIP.', tr: 'Bu tema yalnızca bu tarayıcıda kayıtlı ve site varsayılanı olamaz; sunucuya ZIP olarak yükleyin.' }), 'info');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/themes/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ themeId: theme.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      addNotification(L(language, { fa: `قالب «${theme.name}» به‌عنوان قالب پیش‌فرض سایت برای همه‌ی بازدیدکنندگان فعال شد`, en: `"${theme.name}" is now the site-wide default theme`, ru: `«${theme.name}» — теперь тема сайта по умолчанию для всех посетителей`, tr: `«${theme.name}» artık tüm ziyaretçiler için site varsayılan teması` }), 'success');
+    } catch (e: any) {
+      addNotification(L(language, { fa: `فعال‌سازی سراسری ناموفق بود: ${e?.message || ''}`, en: `Site-wide activation failed: ${e?.message || ''}`, ru: `Не удалось активировать для всего сайта: ${e?.message || ''}`, tr: `Site genelinde etkinleştirme başarısız: ${e?.message || ''}` }), 'error');
+    }
+  };
+
+  const loadStorageStatus = async () => {
+    try {
+      const res = await fetch('/api/admin/storage-status', { cache: 'no-store' });
+      if (res.ok) setStorageStatus(await res.json());
+    } catch { /* اختیاری */ }
+  };
+  useEffect(() => { if (activeSubTab === 'themes') loadStorageStatus(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeSubTab, availableThemes.length]);
+
   const handleDeleteTheme = async (theme: ThemeInfo) => {
     // قالب‌های سروری: پوشه اختصاصی قالب روی سرور هم حذف می‌شود
     if (theme.kind === 'server') {
@@ -989,6 +1039,8 @@ export default function AdminPanelTab({
     if (setAvailableThemes) {
       setAvailableThemes(prev => prev.filter(t => t.id !== theme.id));
     }
+    invalidateServerThemeCache(theme.id);
+    if (theme.kind === 'server') refreshServerThemes?.();
     if (themeId === theme.id && setThemeId) {
       setThemeId('dark-gold');
     }
@@ -1739,6 +1791,25 @@ export default function AdminPanelTab({
           
           {activeSubTab === 'themes' && (
             <div className="animate-fade-in space-y-6">
+              {storageStatus && (
+                <div className={`rounded-xl border p-4 text-xs flex flex-col md:flex-row md:items-center gap-3 md:gap-6 ${storageStatus.persistent ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                  <div className="flex-1 space-y-1">
+                    <div className="font-black uppercase tracking-wider text-[10px] text-gray-400">{L(language, { fa: 'زیرساخت ذخیره‌سازی قالب‌ها', en: 'Theme storage infrastructure', ru: 'Инфраструктура хранения тем', tr: 'Tema depolama altyapısı' })}</div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
+                      <span dir="ltr">{L(language, { fa: 'مسیر داده:', en: 'Data dir:', ru: 'Каталог данных:', tr: 'Veri dizini:' })} <b className="text-white">{storageStatus.dataDir}</b></span>
+                      <span>{L(language, { fa: 'ماندگاری:', en: 'Persistent:', ru: 'Постоянное:', tr: 'Kalıcı:' })} <b className={storageStatus.persistent ? 'text-emerald-400' : 'text-amber-400'}>{storageStatus.persistent ? L(language, { fa: 'بله (Volume)', en: 'yes (volume)', ru: 'да (volume)', tr: 'evet (volume)' }) : L(language, { fa: 'خیر — موقتی', en: 'no — ephemeral', ru: 'нет — временное', tr: 'hayır — geçici' })}</b></span>
+                      <span>{L(language, { fa: 'دیتابیس:', en: 'Database:', ru: 'База данных:', tr: 'Veritabanı:' })} <b className="text-white">{storageStatus.db?.provider}</b> <span className="text-gray-500">({storageStatus.db?.configSource})</span></span>
+                      <span>{L(language, { fa: 'قالب‌های نصب‌شده:', en: 'Installed themes:', ru: 'Установлено тем:', tr: 'Yüklü temalar:' })} <b className="text-white">{storageStatus.installedThemes?.length ?? 0}</b></span>
+                      <span>{L(language, { fa: 'قالب پیش‌فرض سایت:', en: 'Site default theme:', ru: 'Тема сайта по умолчанию:', tr: 'Site varsayılan teması:' })} <b className="text-primary">{storageStatus.activeThemeId}</b></span>
+                    </div>
+                    {!storageStatus.persistent && (
+                      <p className="text-amber-300 leading-relaxed mt-1">
+                        {L(language, { fa: 'هشدار: پوشه‌ی قالب‌ها روی فایل‌سیستم موقتی سرور است و با هر دیپلوی/ری‌استارت پاک می‌شود. روی Railway یک Volume با مسیر /data بسازید و متغیر BAZINO_DATA_DIR=/data را تنظیم کنید.', en: 'Warning: the themes folder lives on the server\'s ephemeral filesystem and is wiped on every deploy/restart. On Railway, add a Volume mounted at /data and set BAZINO_DATA_DIR=/data.', ru: 'Внимание: папка тем находится на временной файловой системе сервера и очищается при каждом деплое/перезапуске. На Railway добавьте Volume с путём /data и задайте BAZINO_DATA_DIR=/data.', tr: 'Uyarı: tema klasörü sunucunun geçici dosya sisteminde ve her dağıtımda/yeniden başlatmada silinir. Railway\'de /data yoluna bağlı bir Volume ekleyin ve BAZINO_DATA_DIR=/data ayarlayın.' })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-dark-card p-6 border border-white/5 rounded-xl">
                 <div>
                   <h3 className="text-xl font-black uppercase mb-1">{L(language, { fa: 'مدیریت قالب‌ها', en: 'Theme Management', ru: 'Управление темами', tr: 'Tema Yönetimi' })}</h3>
@@ -1923,6 +1994,11 @@ export default function AdminPanelTab({
                       )}
 
                       {/* Parsed Metadata Preview */}
+                      {zipParsed && !zipError && zipReplacesExisting && (
+                        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 text-xs text-cyan-200 leading-relaxed">
+                          {L(language, { fa: `حالت به‌روزرسانی: قالب «${zipReplacesExisting.name}» (نسخه ${zipReplacesExisting.version || '?'}) هم‌اکنون نصب است. با نصب، نسخه‌ی قبلی به‌صورت اتمیک با نسخه ${zipParsed.meta.version || '?'} جایگزین می‌شود و قالب فعال می‌ماند.`, en: `Update mode: "${zipReplacesExisting.name}" (v${zipReplacesExisting.version || '?'}) is already installed. Installing will atomically replace it with v${zipParsed.meta.version || '?'} and keep it active.`, ru: `Режим обновления: «${zipReplacesExisting.name}» (v${zipReplacesExisting.version || '?'}) уже установлена. Установка атомарно заменит её на v${zipParsed.meta.version || '?'} и оставит активной.`, tr: `Güncelleme modu: «${zipReplacesExisting.name}» (v${zipReplacesExisting.version || '?'}) zaten yüklü. Kurulum, onu v${zipParsed.meta.version || '?'} ile atomik olarak değiştirir ve etkin tutar.` })}
+                        </div>
+                      )}
                       {zipParsed && !zipError && (
                         <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
                           <div className="flex items-center justify-between">
@@ -2159,11 +2235,11 @@ export default function AdminPanelTab({
                     
                     <div className="mt-auto pt-4 border-t border-white/5 flex gap-2">
                       <button 
-                        onClick={() => setThemeId && setThemeId(theme.id)}
+                        onClick={() => handleActivateTheme(theme)}
                         disabled={themeId === theme.id}
                         className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors ${themeId === theme.id ? 'bg-primary/20 text-primary cursor-default' : 'bg-white/5 text-gray-300 hover:bg-primary hover:text-black'}`}
                       >
-                        {themeId === theme.id ? (L(language, { fa: 'فعال', en: 'Active', ru: 'Активна', tr: 'Aktif' })) : (L(language, { fa: 'انتخاب', en: 'Select', ru: 'Выбрать', tr: 'Seç' }))}
+                        {themeId === theme.id ? (L(language, { fa: 'فعال (پیش‌فرض سایت)', en: 'Active (site default)', ru: 'Активна (по умолчанию)', tr: 'Aktif (site varsayılanı)' })) : (L(language, { fa: 'انتخاب به‌عنوان قالب سایت', en: 'Set as site theme', ru: 'Сделать темой сайта', tr: 'Site teması yap' }))}
                       </button>
                     </div>
                   </div>

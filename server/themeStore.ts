@@ -27,9 +27,10 @@ import {
   type ParsedZipTheme
 } from "../src/themes/themeZipCore";
 import { optimizeThemeImages, optimizeUploadedTheme, type ThemePerformanceReport } from "./themePerformance";
+import { dataPath } from "./paths";
 
 /** پوشه ریشه قالب‌های نصب‌شده روی سرور */
-export const THEMES_DIR = path.join(process.cwd(), "themes");
+export const THEMES_DIR = dataPath("themes");
 
 /** مسیر پوشه یک قالب — با اعتبارسنجی امنیتی (جلوگیری از path traversal) */
 export function getThemeDir(id: string): string {
@@ -47,6 +48,15 @@ export function getThemeDir(id: string): string {
 /** اطمینان از وجود پوشه ریشه */
 export function ensureThemesDir(): void {
   fs.mkdirSync(THEMES_DIR, { recursive: true });
+}
+
+/** پاک‌سازی پوشه‌های موقت باقی‌مانده از نصب‌های ناتمام (کرش وسط نصب) */
+export function cleanupStaleThemeDirs(): void {
+  try {
+    for (const d of fs.readdirSync(THEMES_DIR, { withFileTypes: true })) {
+      if (d.isDirectory() && d.name.startsWith(".")) fs.rmSync(path.join(THEMES_DIR, d.name), { recursive: true, force: true });
+    }
+  } catch { /* پوشه هنوز ساخته نشده */ }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -67,7 +77,7 @@ export interface InstalledThemeInfo {
 export function listInstalledThemes(): InstalledThemeInfo[] {
   ensureThemesDir();
   const items = fs.readdirSync(THEMES_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory())
+    .filter(d => d.isDirectory() && !d.name.startsWith("."))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const themes: InstalledThemeInfo[] = [];
@@ -132,7 +142,12 @@ function validateThemeComponentJs(componentJs: string): string | null {
   return null;
 }
 
-export async function installThemeZip(buffer: Uint8Array, fallbackName?: string): Promise<{ theme: InstalledThemeInfo; parsed: ParsedZipTheme; performance: ThemePerformanceReport } | { error: string; performance?: ThemePerformanceReport }> {
+export interface InstallOptions { /** نصب روی شناسه‌ی موجود = جایگزینی اتمیک نسخه‌ی قبلی */ replace?: boolean }
+export type InstallResult =
+  | { theme: InstalledThemeInfo; parsed: ParsedZipTheme; performance: ThemePerformanceReport; replaced: boolean }
+  | { error: string; code?: "THEME_EXISTS" | "INVALID"; performance?: ThemePerformanceReport };
+
+export async function installThemeZip(buffer: Uint8Array, fallbackName?: string, options: InstallOptions = {}): Promise<InstallResult> {
   const parsed = parseThemeZip(buffer, fallbackName);
   if (isZipParseError(parsed)) return { error: parsed.error };
 
@@ -155,14 +170,18 @@ export async function installThemeZip(buffer: Uint8Array, fallbackName?: string)
   if (optimizedComponentError) return { error: optimizedComponentError, performance: performanceResult.report };
 
   const id = sanitizeThemeId(optimized.meta.id || "");
-  const dir = getThemeDir(id);
+  const finalDir = getThemeDir(id);
   ensureThemesDir();
 
-  // اگر قالب قبلاً نصب شده → خطا (برای نصب مجدد ابتدا حذف شود)
-  if (fs.existsSync(dir)) {
-    return { error: `قالبی با شناسه «${id}» قبلاً نصب شده است`, performance: performanceResult.report };
+  const alreadyInstalled = fs.existsSync(finalDir);
+  if (alreadyInstalled && !options.replace) {
+    return { error: `قالبی با شناسه «${id}» قبلاً نصب شده است`, code: "THEME_EXISTS", performance: performanceResult.report };
   }
 
+  // نوشتن در پوشه‌ی موقت کنار مقصد، سپس جابه‌جایی اتمیک. اگر وسط نوشتن خطا بخورد،
+  // نسخه‌ی قبلی دست‌نخورده می‌ماند و هیچ‌وقت یک قالب نیمه‌نوشته سرو نمی‌شود.
+  const dir = path.join(THEMES_DIR, `.${id}.installing-${process.pid}-${Date.now()}`);
+  fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
 
   // theme.json (متادیتای نرمال‌شده)
@@ -197,8 +216,21 @@ export async function installThemeZip(buffer: Uint8Array, fallbackName?: string)
     }
   }
 
+  // جابه‌جایی اتمیک: نسخه‌ی قبلی → .old ، موقت → مقصد ، سپس حذف .old
+  const backup = path.join(THEMES_DIR, `.${id}.old-${Date.now()}`);
+  try {
+    if (alreadyInstalled) fs.renameSync(finalDir, backup);
+    fs.renameSync(dir, finalDir);
+  } catch (e) {
+    // برگرداندن نسخه‌ی قبلی در صورت شکست
+    if (alreadyInstalled && fs.existsSync(backup) && !fs.existsSync(finalDir)) fs.renameSync(backup, finalDir);
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw e;
+  }
+  fs.rmSync(backup, { recursive: true, force: true });
+
   const theme = listInstalledThemes().find(t => t.id === id)!;
-  return { theme, parsed: optimized, performance: performanceResult.report };
+  return { theme, parsed: optimized, performance: performanceResult.report, replaced: alreadyInstalled };
 }
 
 /* ═══════════════════════════════════════════════════════════════

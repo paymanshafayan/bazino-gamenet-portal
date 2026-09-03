@@ -66,7 +66,26 @@ jobs:
       - name: Build the installer
         working-directory: desktop-app
         run: npx electron-builder --${{ matrix.platform }} --publish never
-
+      - name: Save the failure for the agent
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p /tmp/diag
+          {
+            echo "## ${{ matrix.os }} — failed"
+            echo '```'
+            ls -lhR desktop-app/release 2>&1 | head -40
+            echo '---'
+            node -v; npm -v
+            du -sh desktop-app/server-bundle 2>/dev/null
+            du -sh desktop-app/server-bundle/node_modules 2>/dev/null
+            echo '```'
+          } > /tmp/diag/${{ matrix.artifact }}.md
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diag-${{ matrix.artifact }}
+          path: /tmp/diag/*.md
       - name: Show what was produced
         shell: bash
         working-directory: desktop-app

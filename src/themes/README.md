@@ -46,12 +46,23 @@ theme.zip
 | region | چه چیزی را جایگزین می‌کند |
 |---|---|
 | `header` | هدر/ناوبری بالای همه‌ی صفحات |
-| `hero` | اسلایدر/هرو بالای صفحه‌ی اصلی (اسلایدهای ادمین در `props.slides`) |
+| `hero` | جایگاه بالای صفحه‌ی اصلی — **هر طراحی آزاد است** (ویدئو، بنر ثابت، انیمیشن، اسلایدر…). اسلایدر فقط پیش‌فرض سایت است؛ اسلایدهای ادمین در `props.slides` در دسترس‌اند ولی استفاده‌شان اختیاری است |
 | `home.genres`, `home.lounges`, `home.results`, `home.tournaments`, `home.pricing`, `home.staff`, `home.location` | بخش‌های مستقل صفحه‌ی اصلی |
 | `footer` | فوتر همه‌ی صفحات |
 | `mobileNav` | نوار ناوبری پایین موبایل |
 | `home` | **کل** صفحه‌ی اصلی (قرارداد نسخه ۱ — همچنان پشتیبانی می‌شود؛ اگر ثبت شود، `hero` و `home.*` نادیده گرفته می‌شوند) |
 
+- **یک region فقط یک «جایگاه» است، نه یک نوع کامپوننت.** موتور هیچ محدودیتی روی خروجی `render` نمی‌گذارد؛ هرچه برگردانید همان‌جا رندر می‌شود (حتی `null`). مثلاً `hero` می‌تواند ویدئوی تمام‌عرض باشد:
+
+  ```js
+  SDK.registerComponent('hero', { apiVersion: 2, render: function (p) {
+    return R.createElement('section', { className: 'arena-hero', dir: p.dir },
+      R.createElement('video', { src: p.assetsBase + '/intro.mp4', autoPlay: true, muted: true, loop: true, playsInline: true }),
+      R.createElement('h1', null, p.ts('heroTitle')),
+      R.createElement('button', { onClick: function () { p.onNavigate('reservations'); } }, p.ts('cta')));
+  } });
+  ```
+  توصیه (نه اجبار): اگر ادمین اسلایدی تعریف کرده (`p.slides.length > 0`)، متن/لینک آن را جایی نشان دهید تا محتوای پنل بی‌اثر نماند.
 - نام‌های ناشناخته (مثلاً `sidebar`) هنگام نصب با خطای واضح **رد** می‌شوند.
 - سرور بخش‌های ثبت‌شده را از `theme.js` تشخیص می‌دهد و در پنل ادمین به‌صورت بج (`hero footer` / `CSS-only`) نشان می‌دهد.
 
@@ -140,7 +151,7 @@ theme.zip
 | ۲ | **تورنمنت‌های فعال** | `home.tournaments` | ⭐ اجباری | کاروسل/گرید تورنمنت‌ها با وضعیت، تصویر و جایزه | `tournaments` |
 | ۳ | **نتایج مسابقات** | `home.results` | ⭐ اجباری | برد نتایج اخیر مسابقات | `matchHistory` |
 | ۴ | **سالن‌ها و خدمات** | `home.lounges` | ⭐ اجباری | سالن‌ها/زون‌های کلوپ (VIP، کافه، فروشگاه…) | `loungeSections` |
-| ۵ | **Hero / اسلایدر اصلی** | `hero` | ⬜ اختیاری | اسلایدهای ادمین: تصویر، عنوان/توضیح چهارزبانه، دکمه CTA | `slides` (fallback: `featuredGames`) |
+| ۵ | **Hero** (طراحی آزاد: ویدئو/بنر/اسلایدر…) | `hero` | ⬜ اختیاری | پیش‌فرض سایت اسلایدر ادمین است؛ قالب هر چیزی می‌تواند بگذارد | `slides` اختیاری (fallback: `featuredGames`) |
 | ۶ | **تعرفه‌ها / پاس‌ها** | `home.pricing` | ⬜ اختیاری | پلن‌های قیمت‌گذاری | `pricingPackages` |
 | ۷ | **مربیان و تیم** | `home.staff` | ⬜ اختیاری | معرفی کادر/مربیان | `staffTeam` |
 | ۸ | **تماس، آدرس و نقشه** | `home.location` | ⬜ اختیاری | اطلاعات تماس، شبکه‌های اجتماعی، نقشه | `settings` |

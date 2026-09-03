@@ -3680,6 +3680,44 @@ namespace GameNet.Infrastructure.Migrations
     }
   });
 
+  // The desktop Web Sync secret is admin-only. The public settings endpoint deliberately
+  // excludes it; this endpoint exposes only its status/masked suffix on read, and returns
+  // the full value only immediately after an explicit admin save/generate operation.
+  app.get("/api/admin/sync-settings", async (_req, res) => {
+    try {
+      const value = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
+      const apiKey = value ? String(value) : "";
+      res.json({
+        key: SYNC_API_KEY_SETTING,
+        configured: Boolean(apiKey),
+        masked: apiKey ? `${apiKey.slice(0, 4)}••••${apiKey.slice(-4)}` : "",
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load sync settings" });
+    }
+  });
+
+  app.post("/api/admin/sync-settings", async (req, res) => {
+    try {
+      const requested = req.body?.generate
+        ? randomBytes(32).toString("hex")
+        : String(req.body?.apiKey || "").trim();
+      if (requested.length < 16) {
+        return res.status(400).json({ error: "Sync API key must contain at least 16 characters" });
+      }
+      await getActiveDataProvider().setSetting(SYNC_API_KEY_SETTING, requested);
+      res.json({
+        success: true,
+        key: SYNC_API_KEY_SETTING,
+        apiKey: requested,
+        masked: `${requested.slice(0, 4)}••••${requested.slice(-4)}`,
+      });
+    } catch (err) {
+      console.error("Error saving sync settings:", err);
+      res.status(500).json({ error: "Failed to save sync settings" });
+    }
+  });
+
   app.get("/api/admin/jarvis-ai-providers", async (_req, res) => {
     try {
       const providers = await getJarvisAiProviders(false);

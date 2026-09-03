@@ -318,3 +318,7 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 - پیام مشترک: `Cannot find module '@electron/rebuild/bin.js'`.
 - در `@electron/rebuild@3.7.1` مسیر درست CLI برابر `lib/cli.js` است، نه `bin.js` در ریشه‌ی package.
 - اصلاح resolve به مسیر CLI واقعی انجام شد.
+
+## ۱۴۰۵/۰۶/۱۲ — Web Sync در پنل مدیریت
+
+- E.34: کلید `gamenet_sync_api_key` در backend وجود داشت اما UI پنل فقط تنظیمات جارویس را نشان می‌داد. رفع شد؛ کارت تولید/ذخیره/کپی کلید Web Sync به پنل اضافه شد و مقدار عمومی secret افشا نمی‌شود.

@@ -649,6 +649,35 @@ test('/api/sync/* rejects a wrong or missing key once one is configured', async 
   }
 });
 
+test('admin Web Sync settings generate and mask the shared secret', async () => {
+  const generated = await fetch(`${BASE}/api/admin/sync-settings`, {
+    method: 'POST',
+    headers: { ...adminAuth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ generate: true }),
+  });
+  const generatedBody = await generated.json();
+  assert.equal(generated.status, 200, JSON.stringify(generatedBody));
+  assert.equal(generatedBody.success, true);
+  assert.equal(typeof generatedBody.apiKey, 'string');
+  assert.ok(generatedBody.apiKey.length >= 64, 'generated key is too short');
+  assert.equal(generatedBody.masked.includes(generatedBody.apiKey), false, 'masked response leaked the full key');
+
+  try {
+    const read = await fetch(`${BASE}/api/admin/sync-settings`, { headers: adminAuth() });
+    const readBody = await read.json();
+    assert.equal(read.status, 200);
+    assert.equal(readBody.configured, true);
+    assert.equal(readBody.masked.includes(generatedBody.apiKey), false, 'read endpoint leaked the full key');
+  } finally {
+    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' }, adminAuth());
+  }
+});
+
+test('anonymous callers cannot read Web Sync admin settings', async () => {
+  const res = await fetch(`${BASE}/api/admin/sync-settings`);
+  assert.equal(res.status, 401);
+});
+
 test('the sync API key is never exposed through GET /api/settings', async () => {
   const KEY = 'e2e-secret-should-not-leak';
   await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: KEY }, adminAuth());

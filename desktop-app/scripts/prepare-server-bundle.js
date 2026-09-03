@@ -33,8 +33,15 @@ function fail(message) {
   process.exit(1);
 }
 
-function copyRecursive(src, dest) {
-  fs.cpSync(src, dest, { recursive: true });
+function copyRecursive(src, dest, options = {}) {
+  const filter = options.excludeBuildTools
+    ? (source) => {
+        const relative = path.relative(src, source);
+        const first = relative.split(path.sep)[0];
+        return first !== '.cache' && first !== '.bin';
+      }
+    : undefined;
+  fs.cpSync(src, dest, { recursive: true, filter });
 }
 
 function main() {
@@ -66,42 +73,40 @@ function main() {
   const prodOnlyPkg = { name: rootPkg.name, version: rootPkg.version, dependencies: rootPkg.dependencies };
   fs.writeFileSync(path.join(BUNDLE_DIR, 'package.json'), JSON.stringify(prodOnlyPkg, null, 2));
 
-  // Dependencies: prefer COPYING the root project's already-installed (and already
-  // compiled) node_modules. The previous version always ran `npm install` here, which
-  // needs the network AND recompiles better-sqlite3 from source — on a machine without
-  // access to nodejs.org for the Node headers that fails outright, even though a
-  // perfectly good build was sitting one folder up. Network install stays as a fallback.
+  // CI has network access and should install only runtime dependencies. This keeps
+  // devDependencies (Vite, TypeScript, Electron tooling, caches, etc.) out of the
+  // packaged application's extraResources and makes the installer substantially smaller.
+  // A copy of the root modules remains an offline fallback for local machines where npm
+  // cannot reach the registry or download Node headers.
   const rootModules = path.join(ROOT, 'node_modules');
   const bundleModules = path.join(BUNDLE_DIR, 'node_modules');
   const prodDeps = Object.keys(prodOnlyPkg.dependencies || {});
 
-  const copiedFromRoot = (() => {
-    if (!fs.existsSync(rootModules)) return false;
-    // Every production dependency must already be present, otherwise the copy would
-    // produce a bundle that is quietly missing something at runtime.
-    const missing = prodDeps.filter((d) => !fs.existsSync(path.join(rootModules, ...d.split('/'))));
-    if (missing.length) {
-      console.log(`ℹ️  node_modules ریشه این‌ها را ندارد: ${missing.join(', ')} — به npm install برمی‌گردیم.`);
-      return false;
-    }
-    console.log('📦 Copying the root project\'s node_modules (offline, already compiled)...');
-    copyRecursive(rootModules, bundleModules);
-    return true;
-  })();
+  let installedProductionDeps = false;
+  try {
+    console.log('📥 Installing PRODUCTION-only dependencies into the bundle...');
+    execSync('npm install --omit=dev --no-audit --no-fund', { cwd: BUNDLE_DIR, stdio: 'inherit' });
+    installedProductionDeps = true;
+  } catch (e) {
+    console.warn('⚠️  نصب وابستگی‌های production در bundle شکست خورد؛ fallback آفلاین بررسی می‌شود.');
+  }
 
-  if (!copiedFromRoot) {
-    console.log('📥 Installing PRODUCTION-only dependencies into the bundle (this needs network access)...');
-    try {
-      execSync('npm install --omit=dev --no-audit --no-fund', { cwd: BUNDLE_DIR, stdio: 'inherit' });
-    } catch (e) {
+  if (!installedProductionDeps) {
+    if (!fs.existsSync(rootModules)) {
       fail(
-        'npm install در پوشه‌ی bundle شکست خورد و node_modules ریشه هم قابل استفاده نبود.\n' +
-        '   راه‌حل ساده: یک بار در ریشه‌ی پروژه "npm install" بزنید و دوباره این اسکریپت را اجرا کنید.\n' +
-        '   اگر better-sqlite3 موقع کامپایل به nodejs.org گیر کرد (شبکه‌ی محدود)، هدرهای Node\n' +
-        '   معمولاً از قبل روی سیستم هستند:\n' +
-        '     cd node_modules/better-sqlite3 && npx node-gyp rebuild --release --nodedir=/usr/local'
+        'npm install در پوشه‌ی bundle شکست خورد و node_modules ریشه هم وجود ندارد.\n' +
+        '   اتصال شبکه را بررسی کنید یا ابتدا در ریشه‌ی پروژه "npm install" بزنید.'
       );
     }
+    const missing = prodDeps.filter((d) => !fs.existsSync(path.join(rootModules, ...d.split('/'))));
+    if (missing.length) {
+      fail(
+        `node_modules ریشه این وابستگی‌های production را ندارد: ${missing.join(', ')}\n` +
+        '   دوباره "npm install" را در ریشه اجرا کنید و سپس این اسکریپت را تکرار کنید.'
+      );
+    }
+    console.log('📦 Copying the root project\'s node_modules as an offline fallback...');
+    copyRecursive(rootModules, bundleModules, { excludeBuildTools: true });
   }
 
   // Sanity check: the bundle must be able to load the native SQLite driver, otherwise the

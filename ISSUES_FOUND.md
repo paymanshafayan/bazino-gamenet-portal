@@ -300,3 +300,9 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 | E.33 | commit کردن نصاب در ریپو عملی نیست (سقف ۱۰۰MB گیت‌هاب، تورم دائمی تاریخچه، و fs موقتی Railway) — نیاز به میزبانی روی GitHub Releases و redirect از سرور | 🟠 مهم | ⏳ پلن آماده |
 
 پلن کامل با معماری، تغییرات لازم در `server.ts` و فایل ورک‌فلوی سه‌پلتفرمی: `FIX_PLAN_INSTALLER.md`
+
+## ۱۴۰۵/۰۶/۱۲ — اصلاح خطای installer ویندوز و لینوکس
+
+- خطای Windows در `npm run build` ناشی از استفاده از single quote در `cd 'Management App/Bazino'` بود؛ به `npm --prefix "Management App/Bazino"` اصلاح شد.
+- خطای Linux ناشی از نبود metadata لازم برای target `deb` بود؛ homepage، author email و maintainer اضافه شد.
+- bundle ساز اکنون در CI وابستگی‌های production-only نصب می‌کند و فقط در صورت شکست نصب، fallback آفلاین دارد.

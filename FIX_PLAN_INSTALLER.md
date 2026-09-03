@@ -215,3 +215,17 @@ $ NODE_ENV=production JWT_SECRET=ci PORT=3457 node dist/server.cjs
 **رفتار سرور درست است** (سروری که در production بدون راز بالا بیاید، توکن ادمینش جعل‌شدنی است)؛
 چیزی که باید عوض شود خودِ ورک‌فلو است: یک `JWT_SECRET` یک‌بارمصرف برای smoke-test.
 چون اجازه‌ی ویرایش `.github/workflows/*` را ندارم، اصلاحش در چت داده می‌شود.
+
+## نتیجه‌ی اصلاح دور دوم — ۱۴۰۵/۰۶/۱۲
+
+با تأیید «شروع کن» اصلاحات زیر انجام شد:
+
+- اسکریپت `build` ریشه از `cd` با single quote به `npm --prefix` تغییر کرد؛ بنابراین مسیر دارای فاصله در Windows هم درست اجرا می‌شود.
+- `desktop-app/package.json` برای ساخت `.deb` دارای `homepage`، ایمیل author و maintainer شد.
+- `prepare-server-bundle.js` ابتدا فقط وابستگی‌های production را داخل bundle نصب می‌کند تا devDependencies وارد installer نشوند؛ در محیط آفلاین، کپی کنترل‌شده‌ی `node_modules` ریشه fallback است.
+- بررسی بارگذاری `better-sqlite3` بعد از آماده‌سازی bundle حفظ شد.
+- `npm run build` محلی موفق شد.
+- `node desktop-app/scripts/prepare-server-bundle.js` موفق شد؛ در sandbox نصب npm به‌علت عدم دسترسی به Node headers شکست خورد و fallback آفلاین استفاده شد.
+- `npm test`: **241/241 سبز**.
+
+فایل workflow عمداً توسط agent تغییر داده نشد؛ طبق محدودیت GitHub App، اصلاح diagnostics باید توسط مالک workflow اعمال شود. برای اجرای مجدد، push تغییرات desktop-app کافی است. خطای `JWT_SECRET` در workflow جداگانه‌ی build-test همچنان نیازمند اضافه‌شدن secret موقت CI در همان workflow است.

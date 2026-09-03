@@ -231,7 +231,7 @@ export default function ConsoleGridClassic({
     }
 
     const finalAmount = Math.max(0, totalRawPrice - discount);
-    const pointsEarned = Math.floor(finalAmount / 3000); // 1 point per 3000 Tomans spent on food
+    const pointsEarned = Math.floor(finalAmount / 10); // 1 point per 10 TL
 
     try {
       const res = await fetch('/api/cafe/order', {
@@ -294,7 +294,7 @@ export default function ConsoleGridClassic({
     }
 
     const finalAmount = Math.max(0, totalRawPrice - discount);
-    const pointsEarned = Math.floor(finalAmount / 5000); // 1 point per 5000 Toman spend on accessories
+    const pointsEarned = Math.floor(finalAmount / 10); // 1 point per 10 TL
 
     try {
       const res = await fetch('/api/accessories/order', {
@@ -535,7 +535,7 @@ export default function ConsoleGridClassic({
               <div className="bg-[#050a0e] p-3 rounded-lg border border-white/5 flex justify-between items-center text-xs font-bold">
                 <span className="text-gray-400">{L(language, { fa: 'مبلغ کل نهایی:', en: 'Final Estimated Cost:', ru: 'Итоговая стоимость:', tr: 'Toplam Tutar:' })}</span>
                 <span className="text-white font-mono text-sm font-black">
-                  {Math.max(0, (selectedSystem.hourlyRate * reservationHours) - (activeCoupons.find(c => c.code === reservationCoupon)?.value || 0)).toLocaleString(localeOf(language))} تومان
+                  {Math.max(0, (selectedSystem.hourlyRate * reservationHours) - (activeCoupons.find(c => c.code === reservationCoupon)?.value || 0)).toLocaleString(localeOf(language))} لیر
                 </span>
               </div>
 
@@ -597,20 +597,20 @@ export default function ConsoleGridClassic({
             
             <div className="grid grid-cols-2 gap-2">
               <button 
-                onClick={() => handleRedeemPointsAction(100, 15000)}
+                onClick={() => handleRedeemPointsAction(100, 10)}
                 className="p-2.5 border border-white/5 hover:border-[#00ff66] hover:bg-[#00ff66]/5 rounded-xl text-right transition-all flex flex-col justify-between"
               >
                 <span className="text-[10px] text-gray-500 font-bold">100 {L(language, { fa: 'امتیاز', en: 'pts', ru: 'баллов', tr: 'puan' })}</span>
-                <span className="text-xs font-black text-white mt-1">{(15000).toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}</span>
+                <span className="text-xs font-black text-white mt-1">{(10).toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                 <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">{L(language, { fa: 'کد تخفیف بازی نو', en: 'BAZINO discount code', ru: 'Промокод BAZINO', tr: 'BAZINO indirim kodu' })}</span>
               </button>
 
               <button 
-                onClick={() => handleRedeemPointsAction(250, 40000)}
+                onClick={() => handleRedeemPointsAction(250, 25)}
                 className="p-2.5 border border-white/5 hover:border-[#00ff66] hover:bg-[#00ff66]/5 rounded-xl text-right transition-all flex flex-col justify-between"
               >
                 <span className="text-[10px] text-gray-500 font-bold">250 {L(language, { fa: 'امتیاز', en: 'pts', ru: 'баллов', tr: 'puan' })}</span>
-                <span className="text-xs font-black text-white mt-1">{(40000).toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}</span>
+                <span className="text-xs font-black text-white mt-1">{(25).toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                 <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">{L(language, { fa: 'کد تخفیف بازی نو', en: 'BAZINO discount code', ru: 'Промокод BAZINO', tr: 'BAZINO indirim kodu' })}</span>
               </button>
             </div>
@@ -728,7 +728,7 @@ export default function ConsoleGridClassic({
                   {Math.max(0, Object.entries(cafeCart).reduce((sum, [id, qty]) => {
                     const price = cafeItems.find(c => c.id === id)?.price || 0;
                     return sum + price * (qty as number);
-                  }, 0) - (activeCoupons.find(c => c.code === cafeCoupon)?.value || 0)).toLocaleString(localeOf(language))} تومان
+                  }, 0) - (activeCoupons.find(c => c.code === cafeCoupon)?.value || 0)).toLocaleString(localeOf(language))} لیر
                 </span>
               </div>
 
@@ -800,7 +800,7 @@ export default function ConsoleGridClassic({
                   {Math.max(0, Object.entries(shopCart).reduce((sum, [id, qty]) => {
                     const price = accessories.find(a => a.id === id)?.price || 0;
                     return sum + price * (qty as number);
-                  }, 0) - (activeCoupons.find(c => c.code === shopCoupon)?.value || 0)).toLocaleString(localeOf(language))} تومان
+                  }, 0) - (activeCoupons.find(c => c.code === shopCoupon)?.value || 0)).toLocaleString(localeOf(language))} لیر
                 </span>
               </div>
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Tournament } from '../types/gamenet';
 import { Trophy, Calendar, Users, Plus, UserPlus, Trash2, Check, Star, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { PaymentCheckout, getPaymentConfig } from '../legal/PaymentCheckout';
 import { L, localeOf, formatJalaliForLanguage } from '../utils/i18n';
 
 // Jalali Date Helpers
@@ -134,7 +135,7 @@ export default function TournamentsTab({
           time: '۱۵:۰۰',
           tournamentTitle: t.title,
           game: t.game,
-          details: L(language, { fa: `ورودی: ${t.registrationFee.toLocaleString(localeOf(language))} تومان | ظرفیت: ${t.registeredTeamsCount}/${t.maxTeams} تیم`, en: `Entry: ${t.registrationFee.toLocaleString(localeOf(language))} Tomans | Capacity: ${t.registeredTeamsCount}/${t.maxTeams} Teams`, ru: `Взнос: ${t.registrationFee.toLocaleString(localeOf(language))} томанов | Вместимость: ${t.registeredTeamsCount}/${t.maxTeams} команд`, tr: `Giriş: ${t.registrationFee.toLocaleString(localeOf(language))} Toman | Kapasite: ${t.registeredTeamsCount}/${t.maxTeams} Takım` }),
+          details: L(language, { fa: `ورودی: ${t.registrationFee.toLocaleString(localeOf(language))} لیر | ظرفیت: ${t.registeredTeamsCount}/${t.maxTeams} تیم`, en: `Entry: ${t.registrationFee.toLocaleString(localeOf(language))} TL | Capacity: ${t.registeredTeamsCount}/${t.maxTeams} Teams`, ru: `Взнос: ${t.registrationFee.toLocaleString(localeOf(language))} TL | Вместимость: ${t.registeredTeamsCount}/${t.maxTeams} команд`, tr: `Giriş: ${t.registrationFee.toLocaleString(localeOf(language))} TL | Kapasite: ${t.registeredTeamsCount}/${t.maxTeams} Takım` }),
           badgeColor: 'from-primary to-yellow-500',
         });
       }
@@ -336,6 +337,8 @@ export default function TournamentsTab({
   // ثبت‌نام حالا واقعاً به سرور می‌رود؛ توست موفقیت و پاک‌کردن فرم فقط پس از
   // تأیید سرور انجام می‌شوند (قبلاً تیم فقط در state کلاینت ظاهر می‌شد و با
   // یک refresh ناپدید می‌شد).
+  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number; title: string } | null>(null);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTournament || isSubmitting) return;
@@ -345,6 +348,14 @@ export default function TournamentsTab({
     }
 
     const allMembers = [leaderName, ...members];
+    // هزینهٔ ثبت‌نام > 0 و درگاه فعال → پرداخت PayTR؛ ثبت تیم پس از callback انجام می‌شود
+    if (selectedTournament.registrationFee > 0) {
+      const pay = await getPaymentConfig();
+      if (pay.enabled) {
+        setCheckout({ params: { tournamentId: selectedTournament.id, team: { name: teamName, leader: leaderName, members: allMembers } }, amount: selectedTournament.registrationFee, title: selectedTournament.title });
+        return;
+      }
+    }
     setIsSubmitting(true);
     try {
       await onRegisterTeam(selectedTournament.id, {
@@ -353,8 +364,8 @@ export default function TournamentsTab({
         members: allMembers,
       });
 
-      // Award loyalty points for tournament registration fee: 1 point per 10,000 Tomans
-      const pointsEarned = Math.floor(selectedTournament.registrationFee / 10000);
+      // Award loyalty points for tournament registration fee: 1 point per 10 TL
+      const pointsEarned = Math.floor(selectedTournament.registrationFee / 10);
       await onAddLoyaltyPoints(pointsEarned, `ثبت‌نام تیم ${teamName} در تورنمنت ${selectedTournament.title}`);
 
       addNotification(`تیم "${teamName}" با موفقیت در تورنمنت ثبت‌نام شد! ${pointsEarned} امتیاز وفاداری باشگاه مشتریان به شما تعلق گرفت.`, 'success');
@@ -372,6 +383,7 @@ export default function TournamentsTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in font-sans" dir={dir}>
+      {checkout && <PaymentCheckout kind="tournament" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onClose={() => setCheckout(null)} />}
       
       {/* Tournament Selector and Bracket Display */}
       <div className="lg:col-span-2 flex flex-col gap-6">
@@ -413,7 +425,7 @@ export default function TournamentsTab({
                 <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-primary" /> {L(language, { fa: 'ظرفیت:', en: 'Teams:', ru: 'Команд:', tr: 'Kapasite:' })} {selectedTournament.registeredTeamsCount}/{selectedTournament.maxTeams}</span>
               </div>
               <span className="px-3 py-1 rounded bg-primary/10 text-primary border border-primary/20 font-black text-xs font-mono">
-                {L(language, { fa: 'جایزه بزرگ: ۵,۰۰0,۰۰۰ تومان + ۱۰۰۰ امتیاز', en: 'Prize: 5,000,000 Tomans + 1,000 PTS', ru: 'Главный приз: 5 000 000 туманов + 1000 баллов', tr: 'Büyük Ödül: 5.000.000 Toman + 1000 Puan' })}
+                {L(language, { fa: 'جایزه بزرگ: ۱۰,۰۰۰ لیر + ۱۰۰۰ امتیاز', en: 'Prize: 10,000 TL + 1,000 PTS', ru: 'Главный приз: 10 000 TL + 1000 баллов', tr: 'Büyük Ödül: 10.000 TL + 1000 Puan' })}
               </span>
             </div>
 
@@ -819,7 +831,7 @@ export default function TournamentsTab({
                 <h4 className="text-white text-xs font-bold mt-1 font-display">{selectedTournament?.title}</h4>
                 <div className="flex justify-between items-center text-xs text-primary font-bold mt-2 pt-2 border-t border-white/5 font-mono">
                   <span>{L(language, { fa: 'هزینه ورودی تیم:', en: 'Entry Fee:', ru: 'Взнос команды:', tr: 'Takım Giriş Ücreti:' })}</span>
-                  <span>{selectedTournament?.registrationFee.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                  <span>{selectedTournament?.registrationFee.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
               </div>
 
@@ -892,7 +904,7 @@ export default function TournamentsTab({
                 <div className="flex justify-between text-xs text-gray-400 font-bold font-mono">
                   <span>{L(language, { fa: 'امتیاز دریافتی بابت ثبت‌نام:', en: 'Loyalty Points Earned:', ru: 'Баллы лояльности за регистрацию:', tr: 'Kayıt için Kazanılan Puan:' })}</span>
                   <span className="text-primary font-bold">
-                    {selectedTournament ? Math.floor(selectedTournament.registrationFee / 10000) : 0} PTS
+                    {selectedTournament ? Math.floor(selectedTournament.registrationFee / 10) : 0} PTS
                   </span>
                 </div>
               </div>

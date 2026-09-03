@@ -52,6 +52,7 @@ import {
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
+import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
 import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -482,7 +483,7 @@ async function startServer() {
         "default-src 'self'",
         "base-uri 'self'",
         "object-src 'none'",
-        "script-src 'self' 'unsafe-inline'",
+        "script-src 'self' 'unsafe-inline' https://www.paytr.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
@@ -1064,7 +1065,7 @@ async function startServer() {
   // درخواست دستی می‌شد با ۱ امتیاز یک کوپن ۵۰ میلیون تومانی ساخت، یا کدی ساخت که با یک کد
   // تبلیغاتی موجود تداخل کند. همان قاعده‌ای که برای رزرو و سفارش رعایت شده بود، اینجا از قلم
   // افتاده بود: هرگز به عددی که کلاینت می‌فرستد اعتماد نکن.
-  const POINTS_TO_TOMAN = 100;      // ۱ امتیاز = ۱۰۰ تومان
+  const POINTS_TO_TOMAN = 0.1;      // ۱ امتیاز = ۰٫۱ TL (۱۰۰ امتیاز = ۱۰ TL)
   const MIN_REDEEM_POINTS = 100;
 
   app.post("/api/loyalty/redeem", requireAuth, async (req, res) => {
@@ -1080,7 +1081,7 @@ async function startServer() {
         return res.status(400).json(apiError(req, "NOT_ENOUGH_POINTS"));
       }
 
-      const couponValue = points * POINTS_TO_TOMAN;
+      const couponValue = Math.round(points * POINTS_TO_TOMAN * 100) / 100;
 
       // کد یکتا، سمت سرور. اگر برخورد داشت چند بار دیگر تلاش می‌شود.
       let code = "";
@@ -1098,7 +1099,7 @@ async function startServer() {
       await store.addTransaction({
         id: Math.random().toString(36).substring(2, 9),
         points: -points,
-        description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} تومانی (${code})`,
+        description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} لیری (${code})`,
         type: "Redeemed",
         date: "امروز",
         username: user.username,
@@ -1187,7 +1188,7 @@ async function startServer() {
       const baseTotal = Math.round(durationHours * system.hourlyRate);
       const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, (req as any).authUsername);
       const totalPrice = Math.max(0, baseTotal - discountAmount);
-      const pointsEarned = Math.floor(totalPrice / 10000);
+      const pointsEarned = Math.floor(totalPrice / 10);
 
       await store.setSystemReserved(systemId, true);
 
@@ -1578,7 +1579,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }
 
         await store.decrementCafeInventory(match.id, 1);
-        const pointsEarned = Math.floor(match.price / 10000);
+        const pointsEarned = Math.floor(match.price / 10);
         if (user.username !== "Guest") {
           await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         }
@@ -1689,7 +1690,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         if (overlapping) return { reply: `سیستم پیشنهادی در بازه ${startTime} تا ${endTime} رزرو است؛ یک بازه دیگر بگو.` };
         await store.setSystemReserved(system.id, true);
         const totalPrice = Math.round(system.hourlyRate * hours);
-        const pointsEarned = Math.floor(totalPrice / 10000);
+        const pointsEarned = Math.floor(totalPrice / 10);
         await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         const log = { id: "res-" + Math.random().toString(36).substring(2, 9), systemId: system.id, username: user.username, systemName: system.name, startTime, endTime, totalPrice, date: "امروز", checkedIn: false, timestamp: new Date().toISOString() };
         await store.addReservationLog(log);
@@ -1720,7 +1721,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const free = systems.filter(s => s.isActive && !s.isReserved).sort((a, b) => b.hourlyRate - a.hourlyRate);
         if (free.length === 0) return { reply: "الان هیچ سیستم آزادی پیدا نکردم." };
         const s = free[0];
-        return { reply: `پیشنهاد من ${s.name} است؛ نوع ${s.type} با تعرفه ${s.hourlyRate.toLocaleString()} تومان در ساعت و الان آزاد است.` };
+        return { reply: `پیشنهاد من ${s.name} است؛ نوع ${s.type} با تعرفه ${s.hourlyRate.toLocaleString()} لیر در ساعت و الان آزاد است.` };
       }
 
       case "list_tournaments": {
@@ -1746,7 +1747,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
         const q = String(intent.params.query || "").toLowerCase();
         const matches = items.filter(i => i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())).slice(0, 5);
-        return { reply: matches.length ? `این کالاها را پیدا کردم: ${matches.map(i => `${i.name} (${i.price.toLocaleString()} تومان)`).join("، ")}` : "کالایی با این مشخصات پیدا نکردم." };
+        return { reply: matches.length ? `این کالاها را پیدا کردم: ${matches.map(i => `${i.name} (${i.price.toLocaleString()} لیر)`).join("، ")}` : "کالایی با این مشخصات پیدا نکردم." };
       }
 
       case "purchase_shop_item": {
@@ -1757,10 +1758,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode, user.username);
         await store.decrementAccessoryStock(item.id, 1);
         const finalAmount = Math.max(0, item.price - discountAmount);
-        const pointsEarned = Math.floor(finalAmount / 10000);
+        const pointsEarned = Math.floor(finalAmount / 10);
         if (user.username !== "Guest") await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         await store.addShopOrder({ id: "ACC-" + Math.floor(1000 + Math.random() * 9000), cart: JSON.stringify([{ item, quantity: 1 }]), totalPrice: item.price, discountApplied: discountAmount, finalAmount, couponCode: coupon ? intent.params.couponCode : "", date: "امروز", status: "Processing" });
-        return { reply: `خرید «${item.name}» ثبت شد. مبلغ نهایی ${finalAmount.toLocaleString()} تومان است.` };
+        return { reply: `خرید «${item.name}» ثبت شد. مبلغ نهایی ${finalAmount.toLocaleString()} لیر است.` };
       }
 
       case "read_messages": {
@@ -2026,7 +2027,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       throw Object.assign(new Error("این کد تخفیف به سقف تعداد مجاز استفاده رسیده است."), { statusCode: 400 });
     }
     if (amount < coupon.minOrder) {
-      throw Object.assign(new Error(`حداقل مبلغ خرید جهت استفاده از این کد ${coupon.minOrder.toLocaleString()} تومان است.`), { statusCode: 400 });
+      throw Object.assign(new Error(`حداقل مبلغ خرید جهت استفاده از این کد ${coupon.minOrder.toLocaleString()} TL است.`), { statusCode: 400 });
     }
     const discountAmount = coupon.type === "Percent" ? amount * (coupon.value / 100) : coupon.value;
     return { discountAmount: Math.min(discountAmount, amount), coupon };
@@ -2057,7 +2058,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
-      const pointsEarned = Math.floor(finalAmount / 10000);
+      const pointsEarned = Math.floor(finalAmount / 10);
 
       // Deduct stock inventory (already validated above)
       for (const orderItem of items) {
@@ -2153,7 +2154,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
-      const pointsEarned = Math.floor(finalAmount / 10000);
+      const pointsEarned = Math.floor(finalAmount / 10);
 
       for (const cartItem of cart) {
         await store.decrementAccessoryStock(cartItem.item.id, cartItem.quantity);
@@ -2260,6 +2261,124 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
+  });
+
+
+  // =========================================================================
+  // ONLINE PAYMENTS (PayTR) — پیش‌فاکتور و تکمیل سفارش بعد از callback
+  // =========================================================================
+  const POINTS_PER_CURRENCY_UNIT = 10;   // هر ۱۰ TL = ۱ امتیاز (معادل قاعده‌ی قبلی ÷10000)
+
+  async function paymentQuote(kind: OrderKind, params: any, username?: string) {
+    const store = getActiveDataProvider();
+    if (kind === "reservation") {
+      const { systemId, startTime, endTime, date, couponCode } = params || {};
+      const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
+      if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
+      const st = startTime || "12:00", et = endTime || "14:00", reservationDate = date || "امروز";
+      if (await store.hasOverlappingReservation(systemId, reservationDate, st, et)) throw Object.assign(new Error("SLOT_TAKEN"), { statusCode: 409, code: "SLOT_TAKEN" });
+      const durationHours = hoursBetween(st, et) || 1;
+      const baseTotal = Math.round(durationHours * system.hourlyRate);
+      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, username);
+      const amount = Math.max(0, baseTotal - discountAmount);
+      return {
+        amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
+        basket: [{ name: `${system.name} (${durationHours}h)`, unitPrice: amount, qty: 1 }],
+        payload: { systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", amount, systemName: system.name },
+      };
+    }
+    if (kind === "cafe") {
+      const { items, couponCode, tableNumber } = params || {};
+      if (!Array.isArray(items) || items.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
+      for (const it of items) {
+        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const m = await resolveSampleById(() => store.getCafeItemById(id), SAMPLE_CAFE_ITEMS, id);
+        if (!m) throw Object.assign(new Error(`Menu item not found: ${id}`), { statusCode: 404 });
+        if (m.inventory < qty) throw Object.assign(new Error(`Out of stock: ${m.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
+        total += m.price * qty; basket.push({ name: m.name, unitPrice: m.price, qty }); lines.push({ item: { id: m.id, name: m.name, price: m.price }, quantity: qty });
+      }
+      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
+      const amount = Math.max(0, total - discountAmount);
+      return { amount, description: `Kafe siparişi (${lines.length} kalem)`, basket, payload: { items: lines, couponCode: coupon ? couponCode : "", tableNumber: tableNumber || "میز عمومی", totalPrice: total, discountAmount, amount } };
+    }
+    if (kind === "shop") {
+      const { cart, couponCode } = params || {};
+      if (!Array.isArray(cart) || cart.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
+      for (const it of cart) {
+        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const a = await resolveSampleById(() => store.getAccessoryById(id), SAMPLE_ACCESSORIES, id);
+        if (!a) throw Object.assign(new Error(`Product not found: ${id}`), { statusCode: 404 });
+        if (a.stock < qty) throw Object.assign(new Error(`Out of stock: ${a.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
+        total += a.price * qty; basket.push({ name: a.name, unitPrice: a.price, qty }); lines.push({ item: { id: a.id, name: a.name, price: a.price }, quantity: qty });
+      }
+      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
+      const amount = Math.max(0, total - discountAmount);
+      return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
+    }
+    // tournament
+    const { tournamentId, team } = params || {};
+    const tour = await resolveSampleById(() => store.getTournamentById(tournamentId), SAMPLE_TOURNAMENTS, tournamentId);
+    if (!tour) throw Object.assign(new Error("Tournament not found"), { statusCode: 404 });
+    if (tour.registeredTeamsCount >= tour.maxTeams) throw Object.assign(new Error("Tournament is full"), { statusCode: 400, code: "TOURNAMENT_FULL" });
+    if (!team?.name) throw Object.assign(new Error("Team name required"), { statusCode: 400 });
+    const amount = Number(tour.registrationFee) || 0;
+    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, title: tour.title } };
+  }
+
+  async function creditPoints(username: string, amount: number, description: string) {
+    const store = getActiveDataProvider();
+    const pointsEarned = Math.floor(amount / POINTS_PER_CURRENCY_UNIT);
+    if (username && pointsEarned > 0) await store.addLoyaltyPointsToUser(username, pointsEarned);
+    await store.addTransaction({ id: Math.random().toString(36).substring(2, 9), points: pointsEarned, description, type: "Earned", date: "امروز", username: username || "" });
+    return pointsEarned;
+  }
+
+  async function paymentFulfil(kind: OrderKind, p: any, username: string) {
+    const store = getActiveDataProvider();
+    if (kind === "reservation") {
+      await store.setSystemReserved(p.systemId, true);
+      const id = Math.random().toString(36).substring(2, 9);
+      await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString() });
+      if (p.couponCode) await store.recordCouponUsage(p.couponCode);
+      const points = await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
+      return { reservationId: id, points };
+    }
+    if (kind === "cafe") {
+      for (const l of p.items) await store.decrementCafeInventory(l.item.id, l.quantity);
+      const id = "CF-" + Math.floor(1000 + Math.random() * 9000);
+      await store.addCafeOrder({ id, items: JSON.stringify(p.items), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, tableNumber: p.tableNumber, date: "امروز", status: "Pending" });
+      if (p.couponCode) await store.recordCouponUsage(p.couponCode);
+      const points = await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
+      return { orderId: id, points };
+    }
+    if (kind === "shop") {
+      for (const l of p.cart) await store.decrementAccessoryStock(l.item.id, l.quantity);
+      const id = "ACC-" + Math.floor(1000 + Math.random() * 9000);
+      await store.addShopOrder({ id, cart: JSON.stringify(p.cart), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, date: "امروز", status: "Processing" });
+      if (p.couponCode) await store.recordCouponUsage(p.couponCode);
+      const points = await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
+      return { orderId: id, points };
+    }
+    const tour = await resolveSampleById(() => store.getTournamentById(p.tournamentId), SAMPLE_TOURNAMENTS, p.tournamentId);
+    if (!tour) throw new Error("Tournament vanished");
+    await ensurePersisted(() => store.getTournamentById(p.tournamentId), t => store.createTournament(t), tour);
+    const teams = JSON.parse(tour.teams || "[]"); teams.push(p.team);
+    await store.registerTournamentTeam(p.tournamentId, JSON.stringify(teams), tour.registeredTeamsCount + 1);
+    const points = await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title}`);
+    return { registered: true, points };
+  }
+
+  registerPaymentRoutes({
+    app,
+    getStore: getActiveDataProvider,
+    requireAdmin,
+    authUsername: (req) => (req as any).authUsername || undefined,
+    quote: paymentQuote,
+    fulfil: paymentFulfil,
+    currency: "TL",
+    pointsPerUnit: POINTS_PER_CURRENCY_UNIT,
   });
 
   // Blog News Articles & Comments

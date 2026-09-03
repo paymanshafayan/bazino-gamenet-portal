@@ -25,7 +25,7 @@ export default function LoyaltyProfileTab({
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // Conversion rates
-  const pointsRate = 100; // 1 Point = 100 Tomans
+  const pointsRate = 0.1; // 1 Point = 0.1 TL
   const couponValue = pointsToRedeem * pointsRate;
 
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -95,7 +95,7 @@ export default function LoyaltyProfileTab({
               <span className="text-gray-400 text-xs font-bold font-mono">PTS</span>
             </div>
             <p className="text-gray-400 text-xs mt-3 leading-relaxed">
-              {t('loyalty.approxValue', 'برابر با ارزش حدودی')} <strong className="text-primary font-mono font-bold">{(user.loyaltyPoints * pointsRate).toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</strong> {t('loyalty.discountDirect', 'تخفیف مستقیم کافه و سیستم')}
+              {t('loyalty.approxValue', 'برابر با ارزش حدودی')} <strong className="text-primary font-mono font-bold">{(user.loyaltyPoints * pointsRate).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</strong> {t('loyalty.discountDirect', 'تخفیف مستقیم کافه و سیستم')}
             </p>
           </div>
 
@@ -177,11 +177,11 @@ export default function LoyaltyProfileTab({
           <div className="bg-card-2 border border-white/5 rounded-xl p-4 mb-6">
             <div className="flex justify-between text-xs text-gray-400 mb-2.5">
               <span>{t('loyalty.couponValue', 'ارزش کد تخفیف:')}</span>
-              <span className="text-primary font-bold font-mono">+{couponValue.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+              <span className="text-primary font-bold font-mono">+{couponValue.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
             </div>
             <div className="flex justify-between text-xs text-gray-400 mb-2.5">
               <span>{t('loyalty.minOrder', 'حداقل سفارش خرید:')}</span>
-              <span className="text-gray-300 font-medium font-mono">{(couponValue * 1.5).toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+              <span className="text-gray-300 font-medium font-mono">{(couponValue * 1.5).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
             </div>
             <div className="flex justify-between text-xs text-gray-400">
               <span>{t('loyalty.validity', 'مدت اعتبار کد تخفیف:')}</span>
@@ -232,7 +232,7 @@ export default function LoyaltyProfileTab({
                         {coupon.type === 'Fixed' ? t('loyalty.typeFixed', 'مبلغ ثابت') : t('loyalty.typePercent', 'درصدی')}
                       </span>
                       <h4 className="text-2xl font-black text-white mt-3 font-mono">
-                        {coupon.value.toLocaleString(localeOf(language))} {coupon.type === 'Fixed' ? t('common.currency', 'تومان') : '%'}
+                        {coupon.value.toLocaleString(localeOf(language))} {coupon.type === 'Fixed' ? t('common.currency', 'لیر') : '%'}
                       </h4>
                     </div>
                     
@@ -250,7 +250,7 @@ export default function LoyaltyProfileTab({
                       <span>{t('loyalty.couponLabel', 'کد کوپن:')} </span>
                       <strong className="text-primary tracking-widest text-sm font-bold">{coupon.code}</strong>
                     </div>
-                    <span className="text-[10px] text-gray-500">{t('loyalty.minOrderLabel', 'حداقل خرید:')} {coupon.minOrder.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                    <span className="text-[10px] text-gray-500">{t('loyalty.minOrderLabel', 'حداقل خرید:')} {coupon.minOrder.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                   </div>
                 </div>
               ))}
@@ -268,7 +268,7 @@ export default function LoyaltyProfileTab({
             <div>
               <h4 className="text-white text-sm font-bold font-display uppercase tracking-wide">{t('loyalty.howToEarnTitle', 'چگونه امتیاز کسب کنم؟')}</h4>
               <p className="text-gray-400 text-xs mt-2.5 leading-relaxed">
-                {t('loyalty.howToEarnDesc', 'به ازای هر ۱۰,۰۰۰ تومان هزینه در بوفه، رزرو سیستم یا خرید تجهیزات جانبی، ۱ امتیاز وفاداری دریافت می‌کنید.')}
+                {t('loyalty.howToEarnDesc', 'به ازای هر ۱۰ لیر هزینه در بوفه، رزرو سیستم یا خرید تجهیزات جانبی، ۱ امتیاز وفاداری دریافت می‌کنید.')}
               </p>
             </div>
           </div>
@@ -315,7 +315,7 @@ export default function LoyaltyProfileTab({
                         .replace('امتیاز سفارش پیتزا پپرونی و ردبول از کافه بوفه', 'Points for ordering Pepperoni Pizza and RedBull from Cafe Buffet')
                         .replace('تبدیل', 'Converted')
                         .replace('امتیاز به کد تخفیف', 'points to discount code')
-                        .replace('تومانی', 'Tomans')
+                        .replace('لیری', 'TL')
                         .replace('سیستم', 'System')
                         .replace('کافه', 'Cafe');
 

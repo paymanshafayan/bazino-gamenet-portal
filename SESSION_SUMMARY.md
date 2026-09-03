@@ -895,3 +895,13 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 ## ۱۴۰۵/۰۶/۱۳ — تصاویر واقعی + تحقیق درگاه PayTR
 - تصاویر نمونه‌ی هرو/ژانر/سالن/اسلاید موبایل با عکس‌های واقعی جایگزین شد (`public/images/real/`, `sharp`، همه‌ی سایزها). کافه/فروشگاه هنوز نمونه.
 - تحقیق PayTR و ذخیره در `docs/payments/` (چک‌لیست الزامات سایت + مرجع API). هنوز هیچ کدی برای پرداخت نوشته نشده؛ برنامه‌ی ۵ مرحله‌ای در `PAYTR.md §۴`.
+
+## ۱۴۰۵/۰۶/۱۳ — PayTR + صفحات قانونی مستقل از قالب + TL
+
+- راهنمای گام‌به‌گام دریافت درگاه: `docs/payments/PAYTR-BASVURU-REHBERI.md` (مدارک، ثبت‌نام در سایت، دریافت merchant_id/key/salt، تنظیم Bildirim URL، حالت تست → زنده، ریسک KKTC).
+- بک‌اند: `server/payments/paytr.ts` (امضاها/HTTP) و `server/payments/routes.ts` (config/create/callback/orders/mock/admin list/refund)؛ جدول `payment_orders` در هر سه پرووایدر؛ env: `PAYTR_MERCHANT_ID/KEY/SALT`, `PAYTR_TEST_MODE` (پیش‌فرض ۱), `PAYTR_MOCK`, `PUBLIC_URL`.
+- فرانت مستقل از قالب: `src/legal/` (LegalShell, LegalPage, ContactPage, LegalFooter, PaymentBadges, PaymentCheckout, PaymentResultPage, LegalAdminSection, legalContent). مسیرها در `routes.ts` (`standalonePageFromPath`)، رندر قبل از ThemeRegionProvider در `App.tsx`.
+- خریدها (کافه/فروشگاه/رزرو/تورنمنت): اگر `/api/payments/config.enabled` → مودال PayTR؛ وگرنه مسیر قدیمی بدون پرداخت (سازگاری عقب‌رو).
+- واحد پول TL در کل سایت؛ امتیاز = مبلغ/10.
+- تست‌ها: ۲۸۳/۲۸۳ (۲۴ تست جدید: امضاهای PayTR، محتوای قانونی، استقلال از قالب، جریان create→mock→callback، idempotency، هش نامعتبر، رزرو/هم‌پوشانی، فهرست ادمین، تنظیمات).
+- تست‌نشده: درگاه واقعی PayTR، رندر فونت فارسی در sandbox، Railway.

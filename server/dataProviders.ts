@@ -97,6 +97,15 @@ export interface UserMessageRow { id: string; sender: string; recipient: string;
 export interface ThemeRow { id: string; name: string; nameEn: string; primaryColor: string; primaryHover: string; darkBg: string; darkCard: string; accentRed: string; }
 export interface SliderRow { id: string; imageUrl: string; mobileImageUrl?: string; target: string; titleFa: string; titleEn: string; titleRu: string; titleTr: string; descFa?: string; descEn?: string; descRu?: string; descTr?: string; }
 export interface SettingRow { key: string; value: string; }
+/** سفارش پرداخت آنلاین (PayTR). مبالغ به کوروش (×100). payload = JSON اطلاعات لازم برای تکمیل سفارش بعد از تأیید. */
+export interface PaymentOrderRow {
+  merchantOid: string; kind: string; username: string; email: string; amountKurus: number; currency: string;
+  status: string; provider: string; payload: string; result: string; totalAmountKurus: number;
+  failedCode: string; failedMsg: string; createdAt: string; updatedAt: string;
+}
+
+/** ستون‌های قابل به‌روزرسانی payment_orders (برای پرووایدرهایی که SET را پویا می‌سازند). */
+export const PAYMENT_ORDER_COLUMNS = new Set(['status', 'totalAmountKurus', 'failedCode', 'failedMsg', 'result', 'updatedAt', 'email', 'username', 'payload']);
 
 export interface AdminSeedInput { username: string; password: string; email: string; phone: string; }
 
@@ -130,6 +139,12 @@ export interface IDataStore {
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
   listSettings(): Promise<SettingRow[]>;
+
+  // Online payments (PayTR)
+  createPaymentOrder(o: PaymentOrderRow): Promise<void>;
+  getPaymentOrder(merchantOid: string): Promise<PaymentOrderRow | undefined>;
+  updatePaymentOrder(merchantOid: string, fields: Partial<PaymentOrderRow>): Promise<void>;
+  listPaymentOrders(limit?: number): Promise<PaymentOrderRow[]>;
 
   // Chat
   listChatRooms(): Promise<string[]>;
@@ -308,6 +323,7 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS user_messages (id TEXT PRIMARY KEY, sender TEXT, recipient TEXT, title TEXT, body TEXT, date TEXT, isRead INTEGER DEFAULT 0, type TEXT);
       CREATE TABLE IF NOT EXISTS themes (id TEXT PRIMARY KEY, name TEXT, nameEn TEXT, primaryColor TEXT, primaryHover TEXT, darkBg TEXT, darkCard TEXT, accentRed TEXT);
       CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, mobileImageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT, descFa TEXT, descEn TEXT, descRu TEXT, descTr TEXT);
+      CREATE TABLE IF NOT EXISTS payment_orders (merchantOid TEXT PRIMARY KEY, kind TEXT, username TEXT, email TEXT, amountKurus INTEGER, currency TEXT, status TEXT, provider TEXT, payload TEXT, result TEXT, totalAmountKurus INTEGER DEFAULT 0, failedCode TEXT DEFAULT '', failedMsg TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT);
     `);
     logDbQuery(this.name, 'SQL', 'CREATE TABLE IF NOT EXISTS ... (17 tables verified)');
     this.addMissingColumns();
@@ -509,6 +525,19 @@ export class SqliteStore implements IDataStore {
   }
   async setCafeOrderStatus(id: string, status: string) { this.db.prepare(`UPDATE cafe_orders SET status = ? WHERE id = ?`).run(status, id); }
 
+  // ---- Payment orders (PayTR) ----
+  async createPaymentOrder(o: PaymentOrderRow) {
+    this.db.prepare(`INSERT INTO payment_orders (merchantOid, kind, username, email, amountKurus, currency, status, provider, payload, result, totalAmountKurus, failedCode, failedMsg, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.merchantOid, o.kind, o.username, o.email, o.amountKurus, o.currency, o.status, o.provider, o.payload, o.result, o.totalAmountKurus, o.failedCode, o.failedMsg, o.createdAt, o.updatedAt);
+  }
+  async getPaymentOrder(merchantOid: string) { return this.db.prepare(`SELECT * FROM payment_orders WHERE merchantOid = ?`).get(merchantOid) as PaymentOrderRow | undefined; }
+  async updatePaymentOrder(merchantOid: string, f: Partial<PaymentOrderRow>) {
+    const keys = Object.keys(f).filter(k => k !== 'merchantOid');
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE payment_orders SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE merchantOid = ?`).run(...keys.map(k => (f as any)[k]), merchantOid);
+  }
+  async listPaymentOrders(limit = 200) { return this.db.prepare(`SELECT * FROM payment_orders ORDER BY createdAt DESC LIMIT ?`).all(limit) as PaymentOrderRow[]; }
+
   // ---- Accessories / shop ----
   async listAccessories() { return this.db.prepare(`SELECT * FROM accessories`).all() as AccessoryRow[]; }
   async getAccessoryById(id: string) { return this.db.prepare(`SELECT * FROM accessories WHERE id = ?`).get(id) as AccessoryRow | undefined; }
@@ -699,6 +728,7 @@ export class SqlServerStore implements IDataStore {
       IF OBJECT_ID('dbo.articles','U') IS NULL CREATE TABLE dbo.articles (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(300), content NVARCHAR(MAX), category NVARCHAR(50), imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), author NVARCHAR(100), date NVARCHAR(50), comments NVARCHAR(MAX));
       IF OBJECT_ID('dbo.user_messages','U') IS NULL CREATE TABLE dbo.user_messages (id NVARCHAR(50) PRIMARY KEY, sender NVARCHAR(100), recipient NVARCHAR(100), title NVARCHAR(200), body NVARCHAR(MAX), date NVARCHAR(50), isRead BIT DEFAULT 0, type NVARCHAR(50));
       IF OBJECT_ID('dbo.themes','U') IS NULL CREATE TABLE dbo.themes (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), nameEn NVARCHAR(100), primaryColor NVARCHAR(20), primaryHover NVARCHAR(20), darkBg NVARCHAR(20), darkCard NVARCHAR(20), accentRed NVARCHAR(20));
+      IF OBJECT_ID('dbo.payment_orders','U') IS NULL CREATE TABLE dbo.payment_orders (merchantOid NVARCHAR(64) PRIMARY KEY, kind NVARCHAR(50), username NVARCHAR(100), email NVARCHAR(200), amountKurus BIGINT, currency NVARCHAR(10), status NVARCHAR(30), provider NVARCHAR(30), payload NVARCHAR(MAX), result NVARCHAR(MAX), totalAmountKurus BIGINT DEFAULT 0, failedCode NVARCHAR(20) DEFAULT '', failedMsg NVARCHAR(500) DEFAULT '', createdAt NVARCHAR(50), updatedAt NVARCHAR(50));
       IF OBJECT_ID('dbo.app_sliders','U') IS NULL CREATE TABLE dbo.app_sliders (id NVARCHAR(50) PRIMARY KEY, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), target NVARCHAR(50), titleFa NVARCHAR(300), titleEn NVARCHAR(300), titleRu NVARCHAR(300), titleTr NVARCHAR(300));
     `);
     logDbQuery(this.name, 'SQL', `Schema verified on database [${dbName}] (17 tables).`);
@@ -920,6 +950,27 @@ export class SqlServerStore implements IDataStore {
     await this.r().input('s', this.sql.NVarChar, status).input('id', this.sql.NVarChar, id).query(`UPDATE dbo.cafe_orders SET status = @s WHERE id = @id`);
   }
 
+  // ---- Payment orders (PayTR) ----
+  async createPaymentOrder(o: PaymentOrderRow) {
+    await this.r().input('oid', this.sql.NVarChar, o.merchantOid).input('k', this.sql.NVarChar, o.kind).input('u', this.sql.NVarChar, o.username)
+      .input('e', this.sql.NVarChar, o.email).input('a', this.sql.BigInt, o.amountKurus).input('c', this.sql.NVarChar, o.currency)
+      .input('s', this.sql.NVarChar, o.status).input('p', this.sql.NVarChar, o.provider).input('pl', this.sql.NVarChar, o.payload)
+      .input('r', this.sql.NVarChar, o.result).input('t', this.sql.BigInt, o.totalAmountKurus).input('fc', this.sql.NVarChar, o.failedCode)
+      .input('fm', this.sql.NVarChar, o.failedMsg).input('ca', this.sql.NVarChar, o.createdAt).input('ua', this.sql.NVarChar, o.updatedAt)
+      .query(`INSERT INTO dbo.payment_orders (merchantOid, kind, username, email, amountKurus, currency, status, provider, payload, result, totalAmountKurus, failedCode, failedMsg, createdAt, updatedAt) VALUES (@oid, @k, @u, @e, @a, @c, @s, @p, @pl, @r, @t, @fc, @fm, @ca, @ua)`);
+  }
+  async getPaymentOrder(merchantOid: string) { return (await this.r().input('oid', this.sql.NVarChar, merchantOid).query(`SELECT * FROM dbo.payment_orders WHERE merchantOid = @oid`)).recordset[0]; }
+  async updatePaymentOrder(merchantOid: string, f: Partial<PaymentOrderRow>) {
+    // فقط نام ستون‌های شناخته‌شده وارد متن کوئری می‌شوند؛ مقادیر همگی پارامتری‌اند.
+    const keys = Object.keys(f).filter(k => k !== 'merchantOid' && PAYMENT_ORDER_COLUMNS.has(k));
+    if (!keys.length) return;
+    const req = this.r().input('oid', this.sql.NVarChar, merchantOid);
+    keys.forEach((k, i) => { const v = (f as any)[k]; req.input(`v${i}`, typeof v === 'number' ? this.sql.BigInt : this.sql.NVarChar, v); });
+    const columnSet = keys.map((k, i) => k + ' = @v' + i).join(', ');
+    await req.query(`UPDATE dbo.payment_orders SET ${columnSet} WHERE merchantOid = @oid`);
+  }
+  async listPaymentOrders(limit = 200) { return (await this.r().input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.payment_orders ORDER BY createdAt DESC`)).recordset as PaymentOrderRow[]; }
+
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.r().query(`SELECT * FROM dbo.accessories`)).recordset as AccessoryRow[]; }
   async getAccessoryById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.accessories WHERE id = @id`)).recordset[0]; }
@@ -1112,6 +1163,7 @@ export class MongoStore implements IDataStore {
     await this.col('settings').createIndex({ key: 1 }, { unique: true });
     await this.col('chat_rooms').createIndex({ name: 1 }, { unique: true });
     await this.col('active_coupons').createIndex({ code: 1 }, { unique: true });
+    await this.col('payment_orders').createIndex({ merchantOid: 1 }, { unique: true });
     logDbQuery(this.name, 'NoSQL', 'db.createIndex(...) on users/settings/chat_rooms/active_coupons');
     return { success: true, message: `MongoDB collections/indexes verified on database [${this.config.dbName || 'bazino'}].` };
   }
@@ -1241,6 +1293,12 @@ export class MongoStore implements IDataStore {
   async getCafeOrderById(id: string) { const row = await this.col('cafe_orders').findOne({ id }); return row ? this.strip(row) : undefined; }
   async addCafeOrder(o: CafeOrderRow) { await this.col('cafe_orders').insertOne({ ...o }); }
   async setCafeOrderStatus(id: string, status: string) { await this.col('cafe_orders').updateOne({ id }, { $set: { status } }); }
+
+  // ---- Payment orders (PayTR) ----
+  async createPaymentOrder(o: PaymentOrderRow) { await this.col('payment_orders').insertOne({ ...o }); }
+  async getPaymentOrder(merchantOid: string) { const row = await this.col('payment_orders').findOne({ merchantOid }); return row ? this.strip(row) : undefined; }
+  async updatePaymentOrder(merchantOid: string, f: Partial<PaymentOrderRow>) { const { merchantOid: _m, ...rest } = f; await this.col('payment_orders').updateOne({ merchantOid }, { $set: rest }); }
+  async listPaymentOrders(limit = 200) { return (await this.col('payment_orders').find({}).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
 
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.col('accessories').find({}).toArray()).map((r: any) => this.strip(r)); }

@@ -49,7 +49,12 @@ import {
   Sparkles, Home, Instagram, Send, Youtube, Twitter, Facebook, Settings, ChevronDown,
   Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight, Palette
 } from 'lucide-react';
-import { tabFromPath, pathFromTab } from './utils/routes';
+import { tabFromPath, pathFromTab, standalonePageFromPath } from './utils/routes';
+// صفحات قانونی/تماس/پرداخت عمداً lazy نیستند تا هرگز به قالب و ThemeRegion وابسته نباشند
+import { LegalPage } from './legal/LegalPage';
+import { ContactPage } from './legal/ContactPage';
+import { PaymentResultPage } from './legal/PaymentResultPage';
+import { LegalFooter } from './legal/LegalFooter';
 
 /* ────────────────────────────────────────────────────────────────
    THEME BOOTSTRAP (یک‌بار قبل از اولین رندر)
@@ -288,6 +293,17 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  /** ناوبری به مسیرهای مستقل از قالب (/legal/*, /contact) یا تب‌ها */
+  const navigateStandalone = useCallback((pathOrTab: string) => {
+    if (pathOrTab.startsWith('/')) {
+      if (window.location.pathname !== pathOrTab) window.history.pushState({}, '', pathOrTab);
+      setCurrentPath(pathOrTab);
+    } else {
+      setActiveTab(pathOrTab);
+    }
+    window.scrollTo({ top: 0 });
+  }, [setActiveTab]);
+
   // Keep the LCP-only LandingHero as the first commit. HomeTab contains all below-fold
   // cards and effects, so mounting it only after the load event's first idle window avoids
   // competing style/layout work with the hero image paint.
@@ -478,7 +494,7 @@ export default function App() {
       applyServerState(data);
       if (Array.isArray(data?.activeCoupons)) setActiveCoupons(data.activeCoupons);
       addNotification(
-        L(language, { fa: `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} تومانی ساخته شد: ${data?.code}`, en: `A ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} Toman discount code was created: ${data?.code}`, ru: `Создан промокод на ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} туманов: ${data?.code}`, tr: `${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} Toman indirim kodu oluşturuldu: ${data?.code}` }),
+        L(language, { fa: `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} لیری ساخته شد: ${data?.code}`, en: `A ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} TL discount code was created: ${data?.code}`, ru: `Создан промокод на ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} TL: ${data?.code}`, tr: `${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} TL indirim kodu oluşturuldu: ${data?.code}` }),
         'success'
       );
     } catch (e) {
@@ -660,6 +676,14 @@ export default function App() {
         />
       </Suspense>
     );
+  }
+
+  // صفحات مستقل از قالب: پیش از ThemeRegionProvider رندر می‌شوند و هیچ قالبی به آن‌ها دسترسی ندارد
+  const standalone = standalonePageFromPath(currentPath, window.location.search);
+  if (standalone) {
+    if (standalone.type === 'legal') return <LegalPage slug={standalone.slug} onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} />;
+    if (standalone.type === 'contact') return <ContactPage onBack={() => navigateStandalone('home')} />;
+    return <PaymentResultPage outcome={standalone.outcome} oid={standalone.oid} onBack={() => navigateStandalone('home')} onGoTo={navigateStandalone} />;
   }
 
   if (currentPath === '/app-download') {
@@ -1032,6 +1056,8 @@ export default function App() {
       {activeTab !== 'admin' && !(layoutMode === 'hub' && activeTab === 'home') && (
         <ThemeRegion name="footer" fallback={null} className="w-full" />
       )}
+      {/* نوار قانونی ثابت: خارج از ThemeRegion؛ قالب‌ها نمی‌توانند آن را جایگزین یا پنهان کنند */}
+      {activeTab !== 'admin' && <LegalFooter onNavigate={navigateStandalone} />}
 
       <ScrollToTop 
         hidden={activeTab === 'admin' || activeTab === 'hub' || activeTab === 'console_grid'} 

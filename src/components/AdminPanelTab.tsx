@@ -53,6 +53,7 @@ import {
 import { L, localeOf } from '../utils/i18n';
 import { adminSectionFromPath, pathFromAdminSection, navigateTo, type AdminSection } from '../utils/routes';
 import { Search } from 'lucide-react';
+import { LegalAdminSection } from '../legal/LegalAdminSection';
 
 /** نام و کلیدواژه‌های هر بخش پنل — برای عنوان صفحه، هدر بخش و جستجوی سریع */
 export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; ru: string; tr: string; keywords: string }> = {
@@ -198,7 +199,7 @@ export default function AdminPanelTab({
   // Form states for adding items
   const [newSystem, setNewSystem] = useState({ name: '', type: 'PC', hourlyRate: 25000, isActive: true });
   const [newCafe, setNewCafe] = useState({ name: '', category: 'Foods', price: 50000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, inventory: 20, isAvailable: true });
-  const [newAccessory, setNewAccessory] = useState({ name: '', description: '', price: 1000000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
+  const [newAccessory, setNewAccessory] = useState({ name: '', description: '', price: 1000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
   const [newTournament, setNewTournament] = useState({ title: '', game: '', registrationFee: 100000, startDate: '۱۴۰۵/۰۵/۰۱', maxTeams: 8 });
   const [newArticle, setNewArticle] = useState({ title: '', content: '', category: 'News', imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true });
 
@@ -1399,7 +1400,7 @@ export default function AdminPanelTab({
       });
       if (res.ok) {
         addNotification(savedNote(L(language, { fa: 'تجهیزات گیمینگ جدید در انبار دیتابیس ذخیره شد', en: 'New gaming gear saved to the store database', ru: 'Новое игровое оборудование сохранено в БД склада', tr: 'Yeni oyun ekipmanı depo veritabanına kaydedildi' })), 'success');
-        setNewAccessory({ name: '', description: '', price: 1000000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
+        setNewAccessory({ name: '', description: '', price: 1000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
         fetchData();
       } else {
         addNotification(await serverError(res, L(language, { fa: 'خطا در ثبت سخت‌افزار جدید', en: 'Failed to add new hardware', ru: 'Не удалось добавить оборудование', tr: 'Yeni donanım kaydedilemedi' })), 'error');
@@ -2403,7 +2404,7 @@ export default function AdminPanelTab({
                     <TrendingUp className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{L(language, { fa: 'کل درآمد فروشگاه و بوفه', en: 'Total Revenue', ru: 'Общая выручка магазина и буфета', tr: 'Toplam Mağaza ve Büfe Geliri' })}</span>
-                  <span className="text-xl font-black text-white mt-1">{(stats.totalSales || 0).toLocaleString(localeOf(language))} <span className="text-xs text-primary font-bold">{L(language, { fa: 'تومان', en: 'Toman', ru: 'туман', tr: 'Toman' })}</span></span>
+                  <span className="text-xl font-black text-white mt-1">{(stats.totalSales || 0).toLocaleString(localeOf(language))} <span className="text-xs text-primary font-bold">{L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span></span>
                   <p className="text-[10px] text-gray-500 font-bold mt-2 font-mono">Real-time ledger audit log</p>
                 </div>
 
@@ -2485,7 +2486,7 @@ export default function AdminPanelTab({
                         <div className="p-4 bg-white/5 border border-white/5 rounded-xl flex flex-col">
                           <span className="text-[10px] text-gray-400 font-bold">{L(language, { fa: 'درآمد امروز دسکتاپ', en: 'Synced Sales Today', ru: 'Выручка десктопа сегодня', tr: 'Bugünkü Masaüstü Geliri' })}</span>
                           <span className="text-lg font-black text-white mt-1">
-                            {(stats.gamenetSyncStatus.total_revenue_today || 0).toLocaleString(localeOf(language))} <span className="text-xs text-primary font-bold">{L(language, { fa: 'تومان', en: 'Toman', ru: 'туман', tr: 'Toman' })}</span>
+                            {(stats.gamenetSyncStatus.total_revenue_today || 0).toLocaleString(localeOf(language))} <span className="text-xs text-primary font-bold">{L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                           </span>
                         </div>
                       </div>
@@ -2571,7 +2572,7 @@ export default function AdminPanelTab({
                         </div>
 
                         <div className="flex items-center gap-3 justify-end">
-                          <span className="text-xs font-bold text-white font-mono">{(order.finalAmount || order.totalPrice).toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туман', tr: 'Toman' })}</span>
+                          <span className="text-xs font-bold text-white font-mono">{(order.finalAmount || order.totalPrice).toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                           
                           {/* Order State Controller dropdown */}
                           <select 
@@ -2618,7 +2619,7 @@ export default function AdminPanelTab({
                         </div>
 
                         <div className="flex items-center gap-3 justify-end">
-                          <span className="text-xs font-bold text-white font-mono">{order.finalAmount.toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туман', tr: 'Toman' })}</span>
+                          <span className="text-xs font-bold text-white font-mono">{order.finalAmount.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                           
                           <select 
                             value={order.status}
@@ -2672,7 +2673,7 @@ export default function AdminPanelTab({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نرخ هر ساعت (تومان)', en: 'Hourly rate (Toman)', ru: 'Тариф в час (туман)', tr: 'Saatlik ücret (Toman)' })}</label>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نرخ هر ساعت (TL)', en: 'Hourly rate (TL)', ru: 'Тариф в час (TL)', tr: 'Saatlik ücret (TL)' })}</label>
                     <input 
                       type="number" 
                       required
@@ -2704,7 +2705,7 @@ export default function AdminPanelTab({
                           <span className={`w-2 h-2 rounded-full ${sys.isActive ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`}></span>
                           <span>{sys.name}</span>
                         </h4>
-                        <p className="text-[10px] text-gray-400 mt-1 font-mono">{sys.type} — {sys.hourlyRate.toLocaleString(localeOf(language))} {L(language, { fa: 'تومان/ساعت', en: 'Toman/hr', ru: 'туман/час', tr: 'Toman/saat' })}</p>
+                        <p className="text-[10px] text-gray-400 mt-1 font-mono">{sys.type} — {sys.hourlyRate.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر/ساعت', en: 'TL/hr', ru: 'туман/час', tr: 'TL/saat' })}</p>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -2766,7 +2767,7 @@ export default function AdminPanelTab({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'قیمت فروش (تومان)', en: 'Sale price (Toman)', ru: 'Цена продажи (туман)', tr: 'Satış fiyatı (Toman)' })}</label>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'قیمت فروش (TL)', en: 'Sale price (TL)', ru: 'Цена продажи (TL)', tr: 'Satış fiyatı (TL)' })}</label>
                     <input 
                       type="number" 
                       required
@@ -2838,7 +2839,7 @@ export default function AdminPanelTab({
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
-                          <span className="text-[10px] text-gray-400 font-mono">{item.price.toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туман', tr: 'Toman' })}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{item.price.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             {L(language, { fa: 'موجودی:', en: 'Stock:', ru: 'Остаток:', tr: 'Stok:' })} {item.inventory}
                           </span>
@@ -2892,7 +2893,7 @@ export default function AdminPanelTab({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'قیمت (تومان)', en: 'Price (Toman)', ru: 'Цена (туман)', tr: 'Fiyat (Toman)' })}</label>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'قیمت (TL)', en: 'Price (TL)', ru: 'Цена (TL)', tr: 'Fiyat (TL)' })}</label>
                     <input 
                       type="number" 
                       required
@@ -2973,7 +2974,7 @@ export default function AdminPanelTab({
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{acc.name}</h4>
                         <div className="flex justify-between items-center mt-1.5">
-                          <span className="text-[10px] text-gray-400 font-mono">{acc.price.toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туман', tr: 'Toman' })}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{acc.price.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             {L(language, { fa: 'موجودی:', en: 'Stock:', ru: 'Остаток:', tr: 'Stok:' })} {acc.stock}
                           </span>
@@ -3025,7 +3026,7 @@ export default function AdminPanelTab({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'هزینه ثبت نام تیم (تومان)', en: 'Team entry fee (Toman)', ru: 'Взнос команды (туман)', tr: 'Takım kayıt ücreti (Toman)' })}</label>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'هزینه ثبت نام تیم (TL)', en: 'Team entry fee (TL)', ru: 'Взнос команды (TL)', tr: 'Takım kayıt ücreti (TL)' })}</label>
                     <input 
                       type="number" 
                       required
@@ -4191,6 +4192,9 @@ export default function AdminPanelTab({
                   </div>
                 </div>
               </div>
+
+              {/* SECTION 4b: LEGAL / COMPANY / PAYMENTS (feeds the theme-independent pages) */}
+              <LegalAdminSection siteSettings={siteSettings} saveSetting={handleSaveSetting} addNotification={addNotification} />
 
               {/* SECTION 5: FACTORY RESET & DATABASE PURGE */}
               <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 space-y-6">

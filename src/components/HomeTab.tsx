@@ -1137,7 +1137,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
                             {language === 'tr' && 'Giriş Ücreti'}
                           </span>
                           <span className="font-mono text-primary font-black text-xs">
-                            {tournament.registrationFee.toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}
+                            {tournament.registrationFee.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}
                           </span>
                         </div>
                         <div className="space-y-1">
@@ -1226,7 +1226,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
                 <p className="text-gray-400 text-xs mt-1.5 font-bold">{getLocText(pack.duration)}</p>
                 <div className="mt-4 flex items-baseline gap-1">
                   <span className="text-3xl font-black text-primary font-mono">{pack.price.toLocaleString(localeOf(language))}</span>
-                  <span className="text-xs text-gray-500 font-bold">{L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}</span>
+                  <span className="text-xs text-gray-500 font-bold">{L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                 </div>
               </div>
 

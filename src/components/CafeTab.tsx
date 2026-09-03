@@ -3,6 +3,7 @@ import { CafeItem, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Check, X, Sparkles, Coffee, Utensils, Zap } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { postJson, errorMessage, toServerCart } from '../services/postJson';
+import { PaymentCheckout, getPaymentConfig } from '../legal/PaymentCheckout';
 import { L, localeOf } from '../utils/i18n';
 
 interface Props {
@@ -100,7 +101,7 @@ export default function CafeTab({
 
     const subtotal = getSubtotal();
     if (subtotal < found.minOrder) {
-      const errorMin = L(language, { fa: `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString(localeOf(language))} تومان است.`, en: `Minimum order value to apply this code is ${found.minOrder.toLocaleString(localeOf(language))} Tomans.`, ru: `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString(localeOf(language))} томанов.`, tr: `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString(localeOf(language))} Toman.` });
+      const errorMin = L(language, { fa: `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString(localeOf(language))} لیر است.`, en: `Minimum order value to apply this code is ${found.minOrder.toLocaleString(localeOf(language))} TL.`, ru: `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString(localeOf(language))} TL.`, tr: `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString(localeOf(language))} TL.` });
       addNotification(errorMin, 'error');
       return;
     }
@@ -113,6 +114,7 @@ export default function CafeTab({
   };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number } | null>(null);
 
   // سفارش واقعاً به بک‌اند فرستاده می‌شود. قیمت، تخفیف، کسر موجودی و امتیاز همه
   // سمت سرور محاسبه می‌شوند (POST /api/cafe/order)، پس اینجا هیچ عددی به کاربر
@@ -127,6 +129,13 @@ export default function CafeTab({
       return;
     }
 
+    // اگر درگاه آنلاین فعال باشد، پرداخت از مسیر مستقل از قالب PayTR انجام می‌شود و سفارش پس از callback ثبت می‌گردد
+    const pay = await getPaymentConfig();
+    if (pay.enabled) {
+      setCheckout({ params: { items: toServerCart(cart), couponCode: appliedCoupon?.code || '', tableNumber: systemNumber }, amount: getSubtotal() - getDiscountAmount() });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const data = await postJson('/api/cafe/order', {
@@ -138,7 +147,7 @@ export default function CafeTab({
       onServerState(data);
 
       const orderId = data?.order?.id ? ` (${data.order.id})` : '';
-      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10000);
+      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10);
       const successMsg = L(language, { fa: `سفارش شما ثبت شد${orderId}! بلافاصله پس از آماده‌سازی روی صندلی ${systemNumber} تحویل داده می‌شود. ${pointsEarned} امتیاز به شما تعلق گرفت.`, en: `Your order has been registered${orderId}! It will be delivered to seat ${systemNumber} immediately after preparation. You earned ${pointsEarned} points.`, ru: `Ваш заказ зарегистрирован${orderId}! Он будет доставлен к вашему месту ${systemNumber} сразу после приготовления. Получено ${pointsEarned} баллов.`, tr: `Siparişiniz alındı${orderId}! Hazırlanır hazırlanmaz ${systemNumber} numaralı koltuğa teslim edilecek. ${pointsEarned} puan kazandınız.` });
 
       addNotification(successMsg, 'success');
@@ -161,6 +170,7 @@ export default function CafeTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
+      {checkout && <PaymentCheckout kind="cafe" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)} />}
       
       {/* Menu items list */}
       <div className="lg:col-span-3 flex flex-col gap-6">
@@ -266,7 +276,7 @@ export default function CafeTab({
                         {L(language, { fa: 'قیمت:', en: 'Price:', ru: 'Цена:', tr: 'Fiyat:' })}
                       </span>
                       <strong className="text-primary font-black font-mono text-lg">{item.price.toLocaleString(localeOf(language))}</strong>
-                      <span className="text-gray-400 text-[10px] mr-1 font-bold">{t('common.currency', 'تومان')}</span>
+                      <span className="text-gray-400 text-[10px] mr-1 font-bold">{t('common.currency', 'لیر')}</span>
                     </div>
 
                     <button
@@ -359,7 +369,7 @@ export default function CafeTab({
                         <h4 className="text-white text-xs font-bold truncate font-display">{mappedItemName}</h4>
                         <div className="flex items-center justify-between mt-1 font-mono">
                           <span className="text-primary font-bold text-xs">
-                            {(item.item.price * item.qty).toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}
+                            {(item.item.price * item.qty).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}
                           </span>
 
                           {/* Qty actions */}
@@ -435,7 +445,7 @@ export default function CafeTab({
                     {language === 'ru' && 'Подитог товаров:'}
                     {language === 'tr' && 'Yiyecekler Toplamı:'}
                   </span>
-                  <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                  <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-400 font-bold">
@@ -445,12 +455,12 @@ export default function CafeTab({
                       {language === 'ru' && 'Сумма скидки:'}
                       {language === 'tr' && 'İndirim Tutarı:'}
                     </span>
-                    <span>-{discount.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                    <span>-{discount.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-white/5 pt-2.5 text-sm font-black text-white font-sans">
                   <span>{t('booking.totalPrice', 'مبلغ قابل پرداخت:')}</span>
-                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
 
                 {/* Loyalty points display */}
@@ -461,10 +471,10 @@ export default function CafeTab({
                     <span>{t('booking.pointsToEarn', 'کسب امتیاز باشگاه:')}</span>
                   </div>
                   <span className="relative z-10 block text-[10px] leading-relaxed text-gray-400 font-medium font-sans">
-                    {language === 'fa' && <>با تکمیل این سفارش، <strong className="text-white font-bold">{Math.floor(total / 10000)} امتیاز</strong> دریافت خواهید کرد.</>}
-                    {language === 'en' && <>By confirming this order, you will earn <strong className="text-white font-bold">{Math.floor(total / 10000)} points</strong>.</>}
-                    {language === 'ru' && <>После оплаты заказа вам начислится <strong className="text-white font-bold">{Math.floor(total / 10000)} баллов</strong>.</>}
-                    {language === 'tr' && <>Bu siparişi tamamladığınızda <strong className="text-white font-bold">{Math.floor(total / 10000)} puan</strong> kazanacaksınız.</>}
+                    {language === 'fa' && <>با تکمیل این سفارش، <strong className="text-white font-bold">{Math.floor(total / 10)} امتیاز</strong> دریافت خواهید کرد.</>}
+                    {language === 'en' && <>By confirming this order, you will earn <strong className="text-white font-bold">{Math.floor(total / 10)} points</strong>.</>}
+                    {language === 'ru' && <>После оплаты заказа вам начислится <strong className="text-white font-bold">{Math.floor(total / 10)} баллов</strong>.</>}
+                    {language === 'tr' && <>Bu siparişi tamamladığınızda <strong className="text-white font-bold">{Math.floor(total / 10)} puan</strong> kazanacaksınız.</>}
                   </span>
                 </div>
               </div>

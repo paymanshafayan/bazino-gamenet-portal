@@ -387,3 +387,19 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 - `docs/payments/PAYTR.md`: چک‌لیست ۱۸ موردی الزامات سایت برای تأیید سانال پوز + وضعیت فعلی هر مورد + مدارک شرکتی + معماری پیشنهادی + ریسک KKTC.
 - `docs/payments/paytr-api-reference.md`: مرجع فنی iFrame API (گام ۱/۲، فرمول‌های HMAC، کدهای خطا، کارت‌های تست، İade، Durum Sorgu، اسکلت Node).
 - کمبودهای شناسایی‌شده در سایت: هیچ صفحه‌ی قانونی (Mesafeli Satış، Ön Bilgilendirme، KVKK/Gizlilik، İptal-İade، Teslimat) وجود ندارد؛ لوگوی Visa/Mastercard/Troy/PayTR نیست؛ صفحه‌ی İletişim مستقل با نام قانونی/ایمیل دامنه‌ای/شماره مالیاتی نیست؛ واحد پول «تومان» است؛ صفحات success/fail و Bildirim URL وجود ندارد. (ثبت به‌عنوان E.65 تا E.69 — پیاده‌سازی در انتظار تأیید کاربر.)
+
+## ۱۴۰۵/۰۶/۱۳ — درگاه PayTR، صفحات قانونی مستقل از قالب، واحد پول TL
+
+| # | مورد | شدت | وضعیت |
+|---|---|---|---|
+| E.65 | هیچ متن قانونی (Mesafeli Satış، Ön Bilgilendirme، KVKK/Gizlilik، İptal-İade، Teslimat، Çerez، Üyelik) وجود نداشت — شرط تأیید PayTR | 🔴 بحرانی (کسب‌وکار) | ✅ `src/legal/legalContent.ts` — ۸ متن پیش‌فرض ۴زبانه با جای‌گذاری `{{company}}/{{taxNo}}/…`؛ صفحه‌ی `/legal/<slug>`؛ قابل ویرایش از پنل (`legal_<slug>_<lang>` در site settings)؛ چک‌باکس رضایت الزامی پیش از پرداخت (سرور هم `consent:true` را می‌خواهد) |
+| E.66 | لوگوی Visa/Mastercard/Troy/PayTR/3D-Secure در سایت نبود | 🟡 متوسط | ✅ `PaymentBadges.tsx` (SVG درون‌خطی، در فوتر، صفحه‌ی پرداخت، صفحات قانونی، تماس). لوگوی رسمی PayTR بعداً از پک رسمی جایگزین می‌شود |
+| E.67 | صفحه‌ی İletişim با مشخصات قانونی فروشنده نبود؛ فیلد نام قانونی/شماره مالیاتی/ایمیل/تلفن ثابت وجود نداشت | 🟠 مهم | ✅ `/contact` + تنظیمات جدید `company_legal_name`, `company_tax_no`, `company_registration_no`, `company_email`, `company_landline`, `company_country` (پنل → شخصی‌سازی). مقادیر ناشناخته خالی/placeholder |
+| E.68 | واحد پول در تمام سایت «تومان» بود؛ اعداد به لیر نمی‌خورد (امتیاز = مبلغ/10000) | 🟠 مهم | ✅ همه‌جا TL/لیر؛ قیمت‌های نمونه بازمقیاس؛ ۱ امتیاز به ازای هر ۱۰ TL؛ بازخرید ۱ امتیاز = ۰٫۱ TL؛ تست واحد ضدبازگشت تومان |
+| E.69 | پرداخت آنلاین واقعی وجود نداشت (سفارش‌ها بدون پول ثبت می‌شدند) | 🔴 بحرانی | ✅ `server/payments/` — PayTR iFrame API: قیمت‌گذاری سمت سرور، `merchant_oid`، امضای HMAC، `test_mode`، Bildirim URL (`/api/payments/paytr/callback`، هش، idempotent، پاسخ `OK`، عدم تطابق مبلغ → failed)، انجام سفارش فقط پس از callback، `paid_unfulfilled` برای بررسی دستی، بازپرداخت از پنل. شبیه‌ساز درگاه با `PAYTR_MOCK=1` برای تست |
+| E.70 | مودال پرداخت زیر نوار پایین موبایل/دکمه‌ی اسکرول می‌رفت | 🟢 جزئی | ✅ `createPortal` به body با z-index بالا |
+| E.71 | نتیجه‌ی پرداخت با oid نامعتبر (۴۰۰) صفحه را کرش می‌کرد | 🟢 جزئی | ✅ حالت «سفارش یافت نشد» |
+
+- استقلال از قالب: صفحات `/legal/*`, `/contact`, `/payment/*` و نوار قانونی پایین و مودال پرداخت **خارج از ThemeRegionProvider**، بدون هیچ کلاس/توکن قالب، با پالت ثابت و CSS `!important` رندر می‌شوند؛ تست واحد این را قفل می‌کند (`theme-independent pages never use theme tokens`). قالب‌های v1 بدون تغییر کار می‌کنند.
+- Callback فرم‌urlencoded است؛ پارسر مخصوص فقط روی همین مسیر.
+- تأیید در Chromium واقعی (fa/tr، دسکتاپ/موبایل): صفحات قانونی، تماس، فوتر، جریان کامل فروشگاه → چک‌باکس → iframe شبیه‌ساز → callback → `/payment/success` (وضعیت success)، پنل ادمین (شرکت/متن‌ها/فهرست پرداخت‌ها). فونت فارسی در sandbox نصب نبود (فقط لاتین رندر شد) — چینش RTL فارسی **تست‌نشده**. درگاه واقعی PayTR (اعتبارنامه ندارید) **تست‌نشده**. تست‌ها ۲۸۳/۲۸۳.

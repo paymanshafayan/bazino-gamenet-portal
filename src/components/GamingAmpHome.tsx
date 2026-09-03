@@ -275,7 +275,7 @@ export default function GamingAmpHome({
                   )}
                   <h3 className="text-xl font-bold mb-2 uppercase text-center">{getLocText(pkg.title)}</h3>
                   <div className="text-[#00d8ff] font-black text-4xl my-6 flex items-baseline gap-1">
-                    {pkg.price.toLocaleString(localeOf(language))} <span className="text-sm text-gray-400 font-normal">{L(language, { fa: 'تومان', en: 'IRR', ru: 'туманов', tr: 'Toman' })}</span>
+                    {pkg.price.toLocaleString(localeOf(language))} <span className="text-sm text-gray-400 font-normal">{L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                   </div>
                   <span className="text-xs text-gray-400 uppercase tracking-widest text-center mb-8 bg-white/5 px-4 py-2 rounded-full w-full">{getLocText(pkg.duration)}</span>
                   

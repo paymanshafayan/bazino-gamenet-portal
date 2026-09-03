@@ -3,6 +3,7 @@ import { Accessory, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Tag, CreditCard, ChevronRight, Check, X, Sparkles, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { postJson, errorMessage, toServerCart } from '../services/postJson';
+import { PaymentCheckout, getPaymentConfig } from '../legal/PaymentCheckout';
 import { L, localeOf } from '../utils/i18n';
 
 interface Props {
@@ -101,7 +102,7 @@ export default function ShopTab({
 
     const subtotal = getSubtotal();
     if (subtotal < found.minOrder) {
-      const errorMin = L(language, { fa: `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString(localeOf(language))} تومان است.`, en: `Minimum order value to apply this code is ${found.minOrder.toLocaleString(localeOf(language))} Tomans.`, ru: `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString(localeOf(language))} томанов.`, tr: `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString(localeOf(language))} Toman.` });
+      const errorMin = L(language, { fa: `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString(localeOf(language))} لیر است.`, en: `Minimum order value to apply this code is ${found.minOrder.toLocaleString(localeOf(language))} TL.`, ru: `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString(localeOf(language))} TL.`, tr: `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString(localeOf(language))} TL.` });
       addNotification(errorMin, 'error');
       return;
     }
@@ -118,8 +119,16 @@ export default function ShopTab({
   // خرید واقعاً به بک‌اند فرستاده می‌شود (POST /api/accessories/order). شماره‌ی
   // فاکتور، مبلغ نهایی، کسر موجودی و امتیاز همه از پاسخ سرور می‌آیند — قبلاً
   // شماره‌ی فاکتور با Math.random ساخته می‌شد و هیچ سفارشی ثبت نمی‌شد.
+  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number } | null>(null);
+
   const handleCheckout = async () => {
     if (cart.length === 0 || isSubmitting) return;
+
+    const pay = await getPaymentConfig();
+    if (pay.enabled) {
+      setCheckout({ params: { cart: toServerCart(cart), couponCode: appliedCoupon?.code || '' }, amount: getSubtotal() - getDiscountAmount() });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -131,7 +140,7 @@ export default function ShopTab({
       onServerState(data);
 
       const invoice = data?.order?.id ? ` (${data.order.id})` : '';
-      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10000);
+      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10);
       const successMsg = L(language, { fa: `پرداخت با موفقیت انجام شد${invoice}! ${pointsEarned} امتیاز وفاداری به حساب شما اضافه گردید.`, en: `Payment completed successfully${invoice}! ${pointsEarned} loyalty points have been added to your account.`, ru: `Оплата прошла успешно${invoice}! Вам начислено ${pointsEarned} баллов лояльности.`, tr: `Ödeme başarıyla tamamlandı${invoice}! ${pointsEarned} sadakat puanı hesabınıza eklendi.` });
 
       addNotification(successMsg, 'success');
@@ -154,6 +163,7 @@ export default function ShopTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
+      {checkout && <PaymentCheckout kind="shop" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)} />}
       
       {/* Products list area */}
       <div className="lg:col-span-3 flex flex-col gap-6">
@@ -249,11 +259,12 @@ export default function ShopTab({
                         {L(language, { fa: 'قیمت ویژه:', en: 'Special Price:', ru: 'Спеццена:', tr: 'Özel Fiyat:' })}
                       </span>
                       <strong className="text-primary font-black font-mono text-lg">{accessory.price.toLocaleString(localeOf(language))}</strong>
-                      <span className="text-gray-400 text-[10px] mr-1 font-bold">{t('common.currency', 'تومان')}</span>
+                      <span className="text-gray-400 text-[10px] mr-1 font-bold">{t('common.currency', 'لیر')}</span>
                     </div>
 
                     <button
                       onClick={() => addToCart(accessory)}
+                      data-shop-add
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-primary text-primary font-black text-[10px] uppercase tracking-wider hover:bg-primary hover:text-black transition-all font-display cursor-pointer"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
@@ -316,7 +327,7 @@ export default function ShopTab({
                         <h4 className="text-white text-xs font-bold truncate font-display">{mappedItemName}</h4>
                         <div className="flex items-center justify-between mt-1 font-mono">
                           <span className="text-primary font-bold text-xs">
-                            {(item.item.price * item.qty).toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}
+                            {(item.item.price * item.qty).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}
                           </span>
 
                           {/* Qty actions */}
@@ -392,7 +403,7 @@ export default function ShopTab({
                     {language === 'ru' && 'Подитог товаров:'}
                     {language === 'tr' && 'Ekipmanlar Toplamı:'}
                   </span>
-                  <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                  <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-400 font-bold">
@@ -402,12 +413,12 @@ export default function ShopTab({
                       {language === 'ru' && 'Сумма скидки:'}
                       {language === 'tr' && 'İndirim Tutarı:'}
                     </span>
-                    <span>-{discount.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                    <span>-{discount.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-white/5 pt-2.5 text-sm font-black text-white font-sans">
                   <span>{t('booking.totalPrice', 'مبلغ قابل پرداخت:')}</span>
-                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
+                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
 
                 {/* Loyalty points display */}
@@ -418,10 +429,10 @@ export default function ShopTab({
                     <span>{t('booking.pointsToEarn', 'کسب امتیاز باشگاه:')}</span>
                   </div>
                   <span className="relative z-10 block text-[10px] leading-relaxed text-gray-400 font-medium font-sans">
-                    {language === 'fa' && <>با نهایی کردن خرید، <strong className="text-white font-bold">{Math.floor(total / 10000)} امتیاز</strong> به باشگاه مشتریان شما افزوده می‌شود.</>}
-                    {language === 'en' && <>By confirming this purchase, you will receive <strong className="text-white font-bold">{Math.floor(total / 10000)} points</strong>.</>}
-                    {language === 'ru' && <>После покупки вы получите <strong className="text-white font-bold">{Math.floor(total / 10000)} баллов</strong> на клубную карту.</>}
-                    {language === 'tr' && <>Satın alma işlemini tamamladığınızda, <strong className="text-white font-bold">{Math.floor(total / 10000)} puan</strong> kazanırsınız.</>}
+                    {language === 'fa' && <>با نهایی کردن خرید، <strong className="text-white font-bold">{Math.floor(total / 10)} امتیاز</strong> به باشگاه مشتریان شما افزوده می‌شود.</>}
+                    {language === 'en' && <>By confirming this purchase, you will receive <strong className="text-white font-bold">{Math.floor(total / 10)} points</strong>.</>}
+                    {language === 'ru' && <>После покупки вы получите <strong className="text-white font-bold">{Math.floor(total / 10)} баллов</strong> на клубную карту.</>}
+                    {language === 'tr' && <>Satın alma işlemini tamamladığınızda, <strong className="text-white font-bold">{Math.floor(total / 10)} puan</strong> kazanırsınız.</>}
                   </span>
                 </div>
               </div>
@@ -429,6 +440,7 @@ export default function ShopTab({
               {/* Purchase button */}
               <button
                 onClick={handleCheckout}
+                data-shop-checkout
                 disabled={isSubmitting}
                 className="w-full mt-2 py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 cursor-pointer font-display text-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >

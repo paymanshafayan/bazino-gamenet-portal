@@ -6,6 +6,9 @@
  *   /admin           → admin (بخش dashboard)
  *   /admin/themes    → admin (بخش themes)
  *   /app-download    → صفحه‌ی دانلود اپ (خارج از تب‌ها؛ در App.tsx جدا رندر می‌شود)
+ *   /legal/:slug     → متن‌های قانونی (مستقل از قالب)
+ *   /contact         → تماس/مشخصات قانونی (مستقل از قالب)
+ *   /payment/success | /payment/fail → نتیجهٔ پرداخت (مستقل از قالب)
  *
  * هدف: آدرس مرورگر همیشه صفحه‌ی فعلی را نشان دهد و رفرش کاربر را به همان
  * صفحه (حتی داخل پنل مدیریت) برگرداند.
@@ -46,4 +49,22 @@ export function navigateTo(path: string, replace = false): void {
   if (window.location.pathname === path) return;
   if (replace) window.history.replaceState({}, '', path);
   else window.history.pushState({}, '', path);
+}
+
+/** صفحات مستقل از قالب که خارج از تب‌ها رندر می‌شوند. */
+export type StandalonePage =
+  | { type: 'legal'; slug: string }
+  | { type: 'contact' }
+  | { type: 'payment'; outcome: 'success' | 'fail'; oid: string }
+  | null;
+
+export function standalonePageFromPath(pathname: string, search = ''): StandalonePage {
+  const parts = pathname.replace(/^\/+|\/+$/g, '').split('/');
+  if (parts[0] === 'legal') return { type: 'legal', slug: parts[1] || 'terms' };
+  if (parts[0] === 'contact') return { type: 'contact' };
+  if (parts[0] === 'payment' && (parts[1] === 'success' || parts[1] === 'fail')) {
+    const oid = new URLSearchParams(search).get('oid') || '';
+    return { type: 'payment', outcome: parts[1], oid };
+  }
+  return null;
 }

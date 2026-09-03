@@ -229,10 +229,10 @@ export const translations: TranslationDictionary = {
     tr: 'Nasıl puan kazanırım?',
   },
   'loyalty.howToEarnDesc': {
-    fa: 'به ازای هر ۱۰,۰۰۰ تومان هزینه در بوفه، رزرو سیستم یا خرید تجهیزات جانبی، ۱ امتیاز وفاداری دریافت می‌کنید.',
-    en: 'For every 10,000 Tomans spent in the buffet, system booking, or purchasing accessories, you receive 1 loyalty point.',
-    ru: 'За каждые 10 000 томанов, потраченных в буфете, бронировании или покупке аксессуаров, вы получаете 1 балл.',
-    tr: 'Büfede, sistem rezervasyonunda veya aksesuar alımında harcanan her 10.000 Toman için 1 sadakat puanı kazanırsınız.',
+    fa: 'به ازای هر ۱۰ لیر هزینه در بوفه، رزرو سیستم یا خرید تجهیزات جانبی، ۱ امتیاز وفاداری دریافت می‌کنید.',
+    en: 'For every 10 TL spent in the buffet, system booking, or purchasing accessories, you receive 1 loyalty point.',
+    ru: 'За каждые 10 TL, потраченных в буфете, бронировании или покупке аксессуаров, вы получаете 1 балл.',
+    tr: 'Büfede, sistem rezervasyonunda veya aksesuar alımında harcanan her 10 TL için 1 sadakat puanı kazanırsınız.',
   },
   'loyalty.levelsTitle': {
     fa: 'سطوح کاربری گیمرها',
@@ -609,10 +609,10 @@ export const translations: TranslationDictionary = {
 
   // Common UI words
   'common.currency': {
-    fa: 'تومان',
-    en: 'Tomans',
-    ru: 'томанов',
-    tr: 'Toman',
+    fa: 'لیر',
+    en: 'TL',
+    ru: 'TL',
+    tr: 'TL',
   },
   'common.today': {
     fa: 'امروز',

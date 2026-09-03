@@ -624,5 +624,113 @@ test('the vite CSS-inlining plugin is still wired up', () => {
   assert.match(cfg, /plugins:\s*\[[\s\S]*inlineRenderBlockingCss\(\)/, 'plugin not registered');
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   10. PayTR helpers (امضاها طبق مستندات dev.paytr.com)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('10. PayTR helpers');
+
+const paytr = await import('../server/payments/paytr.ts');
+const { createHmac } = await import('node:crypto');
+const creds = { merchantId: '123456', merchantKey: 'k3y', merchantSalt: 's4lt' };
+
+test('readPaytrConfig is null without credentials and enabled with them / mock', () => {
+  assert.equal(paytr.readPaytrConfig({}), null);
+  const live = paytr.readPaytrConfig({ PAYTR_MERCHANT_ID: '1', PAYTR_MERCHANT_KEY: 'a', PAYTR_MERCHANT_SALT: 'b', PAYTR_TEST_MODE: '0' });
+  assert.equal(live?.testMode, false);
+  assert.equal(live?.mock, false);
+  const mock = paytr.readPaytrConfig({ PAYTR_MOCK: '1' });
+  assert.equal(mock?.mock, true);
+  assert.equal(mock?.testMode, true, 'test mode must default to on');
+});
+
+test('merchant_oid is alphanumeric and ≤ 64 chars', () => {
+  const oid = paytr.generateMerchantOid();
+  assert.match(oid, /^[A-Za-z0-9]{8,64}$/);
+  assert.ok(paytr.isValidMerchantOid(oid));
+  assert.ok(!paytr.isValidMerchantOid('bad-oid_1'));
+});
+
+test('user_basket is base64 JSON of [name, "price", qty] triples', () => {
+  const b64 = paytr.encodeBasket([{ name: 'Latte', unitPrice: 120, qty: 2 }]);
+  const arr = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+  assert.deepEqual(arr, [['Latte', '120.00', 2]]);
+});
+
+test('paytr_token matches the documented HMAC-SHA256 formula', () => {
+  const input = { userIp: '1.2.3.4', merchantOid: 'BZ1', email: 'a@b.co', amountKurus: 12345, userBasketB64: 'W10=', currency: 'TL' as const, noInstallment: 1 as const, maxInstallment: 0, userName: 'n', userAddress: 'a', userPhone: 'p', okUrl: 'https://x/ok', failUrl: 'https://x/fail' };
+  const msg = '123456' + '1.2.3.4' + 'BZ1' + 'a@b.co' + '12345' + 'W10=' + '1' + '0' + 'TL' + '1' + 's4lt';
+  const expected = createHmac('sha256', 'k3y').update(msg).digest('base64');
+  assert.equal(paytr.buildPaytrToken(creds, input, true), expected);
+  assert.notEqual(paytr.buildPaytrToken(creds, input, false), expected, 'test_mode must be part of the signature');
+});
+
+test('callback hash verifies and rejects tampering', () => {
+  const hash = paytr.buildCallbackHash(creds, 'BZ1', 'success', '12345');
+  const expected = createHmac('sha256', 'k3y').update('BZ1' + 's4lt' + 'success' + '12345').digest('base64');
+  assert.equal(hash, expected);
+  assert.ok(paytr.verifyCallbackHash(creds, { merchant_oid: 'BZ1', status: 'success', total_amount: '12345', hash }));
+  assert.ok(!paytr.verifyCallbackHash(creds, { merchant_oid: 'BZ1', status: 'success', total_amount: '99999', hash }));
+  assert.ok(!paytr.verifyCallbackHash(creds, { merchant_oid: 'BZ1', status: 'failed', total_amount: '12345', hash }));
+});
+
+test('refund form signs merchant_id + merchant_oid + return_amount with a dot decimal', () => {
+  const f = paytr.buildRefundForm(creds, 'BZ1', 11.97);
+  assert.equal(f.get('return_amount'), '11.97');
+  const expected = createHmac('sha256', 'k3y').update('123456' + 'BZ1' + '11.97' + 's4lt').digest('base64');
+  assert.equal(f.get('paytr_token'), expected);
+});
+
+test('toKurus rounds to integer kuruş', () => {
+  assert.equal(paytr.toKurus(12.345), 1235);
+  assert.equal(paytr.toKurus(100), 10000);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   11. Legal content (theme-independent pages)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('11. Legal content');
+
+const legal = await import('../src/legal/legalContent.ts');
+
+test('every legal slug has a title and body in fa/en/ru/tr', () => {
+  for (const slug of legal.LEGAL_SLUGS) {
+    for (const lang of ['fa', 'en', 'ru', 'tr'] as const) {
+      assert.ok(legal.LEGAL_TITLES[slug][lang], `${slug}.${lang} title`);
+      assert.ok(legal.LEGAL_DEFAULTS[slug][lang]?.length > 100, `${slug}.${lang} body too short`);
+    }
+  }
+});
+
+test('fillLegalTemplate replaces every placeholder', () => {
+  const out = legal.fillLegalTemplate('{{company}} / {{address}} / {{email}} / {{phone}} / {{taxNo}} / {{site}}', { company: 'C', address: 'A', email: 'E', phone: 'P', taxNo: 'T', site: 'S' });
+  assert.equal(out, 'C / A / E / P / T / S');
+  assert.ok(!legal.fillLegalTemplate(legal.LEGAL_DEFAULTS.terms.tr, { company: 'C', address: 'A', email: 'E', phone: 'P', taxNo: 'T', site: 'S' }).includes('{{'));
+});
+
+test('theme-independent pages never use theme tokens', () => {
+  const files = ['src/legal/LegalShell.tsx', 'src/legal/LegalFooter.tsx', 'src/legal/LegalPage.tsx', 'src/legal/ContactPage.tsx', 'src/legal/PaymentCheckout.tsx', 'src/legal/PaymentResultPage.tsx', 'src/legal/PaymentBadges.tsx'];
+  const forbidden = [/bg-dark-card/, /text-primary/, /bg-primary/, /--primary-color/, /ThemeRegion/, /useThemeScript/, /themeSdk/];
+  for (const f of files) {
+    // کامنت‌ها را حذف می‌کنیم؛ فقط کد واقعی (import/JSX/className) بررسی می‌شود
+    const src = read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const re of forbidden) assert.ok(!re.test(src), `${f} references theme token ${re}`);
+  }
+});
+
+test('App.tsx renders legal/contact/payment pages before ThemeRegionProvider and a fixed LegalFooter', () => {
+  const app = read('src/App.tsx');
+  const standaloneIdx = app.indexOf('standalonePageFromPath(currentPath');
+  const providerIdx = app.indexOf('<ThemeRegionProvider');
+  assert.ok(standaloneIdx > 0 && providerIdx > 0 && standaloneIdx < providerIdx, 'standalone pages must be returned before the theme provider mounts');
+  assert.ok(app.includes('<LegalFooter'), 'LegalFooter missing');
+});
+
+test('no Toman/تومان currency string survives in the frontend', () => {
+  const dir = path.join(ROOT, 'src');
+  const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  const offenders = walk(dir).filter(f => /\.(tsx?|json)$/.test(f) && !f.includes(`${path.sep}data${path.sep}csharp`)).filter(f => /تومان|Toman|томан/i.test(readFileSync(f, 'utf8')));
+  assert.deepEqual(offenders.map(f => path.relative(ROOT, f)), []);
+});
+
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });
 await vite.close();

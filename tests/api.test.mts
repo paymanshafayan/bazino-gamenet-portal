@@ -50,6 +50,10 @@ if (!existsSync(bundle)) {
         JWT_SECRET: 'test-secret-for-e2e-suite',
         BAZINO_STATIC_ROOT: workDir,
         BAZINO_DATA_DIR: path.join(workDir, 'data'),
+        // درگاه شبیه‌سازی‌شده تا جریان create → callback → fulfil بدون paytr.com تست شود
+        PAYTR_MOCK: '1',
+        PAYTR_TEST_MODE: '1',
+        PUBLIC_URL: `http://127.0.0.1:${PORT}`,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -301,13 +305,13 @@ test('a percentage coupon computes the right discount', async () => {
 });
 
 test('a fixed coupon returns its face value', async () => {
-  const data = await getJson(`${BASE}/api/discount/validate?code=REDBULL&total=200000`);
+  const data = await getJson(`${BASE}/api/discount/validate?code=REDBULL&total=2000`);
   assert.equal(data.valid, true, JSON.stringify(data));
-  assert.equal(data.discountAmount, 45000);
+  assert.equal(data.discountAmount, 90);
 });
 
 test('a coupon below its minimum order is rejected', async () => {
-  const res = await fetch(`${BASE}/api/discount/validate?code=BAZINO10&total=1000`);
+  const res = await fetch(`${BASE}/api/discount/validate?code=BAZINO10&total=100`);
   assert.equal(res.status, 400, 'minOrder rule not enforced');
   const body = await res.json();
   assert.equal(body.valid, false);
@@ -416,10 +420,15 @@ test('extending a reservation requires authentication once logged out', async ()
 test('extend clamps the requested hours to at most 4', async () => {
   const { status, body } = await postJson(`${BASE}/api/reservations/extend`, { hours: 99 },
     { Authorization: `Bearer ${authToken}` });
-  // 4h costs 200 points; the fresh user only has ~100, so the clamp shows up as
-  // the "not enough points" price rather than a 99-hour charge.
-  assert.equal(status, 400, `expected the 4h-clamped price to be unaffordable: ${JSON.stringify(body)}`);
-  assert.ok(String(body.error).includes('200'), `expected a 4h (200 point) quote, got: ${body.error}`);
+  // 4h costs 200 points. Depending on how many points the e2e user has earned
+  // so far, the clamp shows up either as a 200-point quote in the error or as a
+  // 200-point charge — never as a 99-hour (4950-point) one.
+  if (status === 400) {
+    assert.ok(String(body.error).includes('200'), `expected a 4h (200 point) quote, got: ${body.error}`);
+  } else {
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.pointsCharged, 200, `expected the clamp to charge 4h = 200 points: ${JSON.stringify(body)}`);
+  }
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1243,7 +1252,7 @@ test('redeeming ignores a client-supplied coupon value', async () => {
   const { status, body } = await postJson(`${BASE}/api/loyalty/redeem`,
     { points: 100, couponValue: 50_000_000, code: 'HACKED' }, auth());
   assert.equal(status, 200, `redeem failed: ${JSON.stringify(body)}`);
-  assert.equal(body.couponValue, 100 * 100, 'the server must price the coupon itself');
+  assert.equal(body.couponValue, 100 * 0.1, 'the server must price the coupon itself (1 point = 0.1 TL)');
   assert.notEqual(body.code, 'HACKED', 'the server must generate the code itself');
   assert.match(body.code, /^LOYAL-[0-9A-F]{8}$/);
 });
@@ -1490,6 +1499,168 @@ test('storage-status reports the persistent data dir', async () => {
   assert.equal(body.dataDir, path.join(workDir, 'data'));
   assert.equal(body.db.provider, 'SQLite');
   assert.ok(existsSync(path.join(workDir, 'data', 'bazino.sqlite3')), 'sqlite file must live in the data dir');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Payments (PayTR, mock gateway)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('17. API — payments (PayTR mock)');
+
+let paidOid = '';
+
+test('payment config reports the mock gateway in test mode with TL currency', async () => {
+  const cfg: any = await getJson(`${BASE}/api/payments/config`);
+  assert.equal(cfg.enabled, true);
+  assert.equal(cfg.mock, true);
+  assert.equal(cfg.testMode, true);
+  assert.equal(cfg.currency, 'TL');
+  assert.equal(cfg.pointsPerUnit, 10);
+});
+
+test('create refuses without legal consent', async () => {
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, { kind: 'shop', params: { cart: [{ item: { id: sample.SAMPLE_ACCESSORIES[0].id }, quantity: 1 }] }, consent: false });
+  assert.equal(status, 400);
+  assert.equal(body.code, 'CONSENT_REQUIRED');
+});
+
+test('create refuses an unknown kind and an empty cart', async () => {
+  const a = await postJson(`${BASE}/api/payments/paytr/create`, { kind: 'lottery', params: {}, consent: true });
+  assert.equal(a.status, 400);
+  const b = await postJson(`${BASE}/api/payments/paytr/create`, { kind: 'cafe', params: { items: [] }, consent: true });
+  assert.equal(b.status, 400);
+  assert.equal(b.body.code, 'CART_EMPTY');
+});
+
+test('create prices the shop cart server-side and returns a pending order + iframe url', async () => {
+  const acc = sample.SAMPLE_ACCESSORIES[0];
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'shop', params: { cart: [{ item: { id: acc.id, price: 1 }, quantity: 2 }], couponCode: '' }, consent: true, lang: 'tr',
+    customer: { name: 'Test Buyer', email: 'buyer@example.com', phone: '05551112233' },
+  }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.amount, acc.price * 2, 'client-sent price must be ignored');
+  assert.equal(body.amountKurus, acc.price * 2 * 100);
+  assert.equal(body.currency, 'TL');
+  assert.match(body.merchantOid, /^[A-Za-z0-9]{8,64}$/);
+  assert.ok(String(body.iframeUrl).includes(`/api/payments/paytr/mock/${body.merchantOid}`));
+  paidOid = body.merchantOid;
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(order.status, 'pending');
+});
+
+test('callback with a bad hash is rejected and does not change the order', async () => {
+  const res = await fetch(`${BASE}/api/payments/paytr/callback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ merchant_oid: paidOid, status: 'success', total_amount: '1', hash: 'nope' }).toString(),
+  });
+  assert.equal(res.status, 400);
+  assert.match(await res.text(), /bad hash/);
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(order.status, 'pending');
+});
+
+test('mock gateway page renders and a successful decision fulfils the shop order', async () => {
+  const page = await fetch(`${BASE}/api/payments/paytr/mock/${paidOid}`);
+  assert.equal(page.status, 200);
+  assert.ok((await page.text()).includes('mock-pay-ok'));
+
+  const acc = sample.SAMPLE_ACCESSORIES[0];
+  const statsBefore: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  const ordersBefore = Number(statsBefore.shopOrdersCount ?? statsBefore.shopOrders?.length ?? 0);
+
+  const decide = await fetch(`${BASE}/api/payments/paytr/mock/${paidOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'success' }).toString(),
+  });
+  assert.equal(decide.status, 200);
+  assert.ok((await decide.text()).includes(`/payment/success?oid=${paidOid}`));
+
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(order.status, 'success', JSON.stringify(order));
+
+  // در حالت sample لیست عمومی ثابت است؛ ثبت سفارش را از آمار ادمین می‌سنجیم
+  const statsAfter: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  const ordersAfter = Number(statsAfter.shopOrdersCount ?? statsAfter.shopOrders?.length ?? 0);
+  assert.equal(ordersAfter, ordersBefore + 1, 'exactly one shop order must be created by the callback');
+  const created = (statsAfter.shopOrders || []).find((o: any) => o.finalAmount === acc.price * 2 && JSON.stringify(o.cart).includes(acc.id));
+  assert.ok(created, 'fulfilled shop order must contain the paid cart');
+});
+
+test('a duplicate success callback is idempotent (returns OK, no double fulfilment)', async () => {
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  const statsBefore: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  const ordersBefore = Number(statsBefore.shopOrdersCount ?? 0);
+  const decide = await fetch(`${BASE}/api/payments/paytr/mock/${paidOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'success' }).toString(),
+  });
+  assert.equal(decide.status, 200);
+  const statsAfter: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  assert.equal(Number(statsAfter.shopOrdersCount ?? 0), ordersBefore, 'no second shop order on duplicate callback');
+  const again: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(again.status, order.status);
+});
+
+test('a failed decision marks the order failed with the PayTR reason code', async () => {
+  const item = sample.SAMPLE_CAFE_ITEMS[0];
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'cafe', params: { items: [{ item: { id: item.id }, quantity: 1 }], tableNumber: 'PC-1' }, consent: true,
+  });
+  assert.equal(status, 200, JSON.stringify(body));
+  await fetch(`${BASE}/api/payments/paytr/mock/${body.merchantOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'failed' }).toString(),
+  });
+  const order: any = await getJson(`${BASE}/api/payments/orders/${body.merchantOid}`);
+  assert.equal(order.status, 'failed');
+  assert.equal(order.failedCode, '6');
+});
+
+test('reservation payment quotes hours × hourlyRate and blocks the slot after success', async () => {
+  const sys = sample.SAMPLE_SYSTEMS.find((s: any) => !s.isReserved) || sample.SAMPLE_SYSTEMS[0];
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'reservation', params: { systemId: sys.id, startTime: '10:00', endTime: '12:00', date: '2030-01-01' }, consent: true,
+  }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.amount, sys.hourlyRate * 2);
+  await fetch(`${BASE}/api/payments/paytr/mock/${body.merchantOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'success' }).toString(),
+  });
+  const order: any = await getJson(`${BASE}/api/payments/orders/${body.merchantOid}`);
+  assert.equal(order.status, 'success', JSON.stringify(order));
+  const dup = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'reservation', params: { systemId: sys.id, startTime: '11:00', endTime: '13:00', date: '2030-01-01' }, consent: true,
+  });
+  assert.equal(dup.status, 409, 'overlapping slot must be refused before opening a payment');
+});
+
+test('admin can list payments; anonymous cannot', async () => {
+  const anon = await fetch(`${BASE}/api/admin/payments`);
+  assert.ok(anon.status === 401 || anon.status === 403);
+  const res = await fetch(`${BASE}/api/admin/payments`, { headers: adminAuth() });
+  assert.equal(res.status, 200);
+  const rows: any = await res.json();
+  assert.ok(Array.isArray(rows) && rows.some((r: any) => r.merchantOid === paidOid));
+  assert.ok(!('payload' in rows[0] && rows[0].payload), 'payload must not leak in the list');
+});
+
+test('legal overrides and company fields round-trip through site settings', async () => {
+  const set = await postJson(`${BASE}/api/admin/settings`, { key: 'legal_refund_tr', value: '## Test\n- madde' }, adminAuth());
+  assert.equal(set.status, 200);
+  await postJson(`${BASE}/api/admin/settings`, { key: 'company_tax_no', value: '1234567890' }, adminAuth());
+  const pub: any = await getJson(`${BASE}/api/settings`);
+  assert.equal(pub.legal_refund_tr, '## Test\n- madde');
+  assert.equal(pub.company_tax_no, '1234567890');
+  assert.ok(pub.company_legal_name, 'seeded company_legal_name missing');
+});
+
+test('SPA shell is served for the theme-independent routes', async () => {
+  for (const p of ['/legal/distance-sales', '/contact', '/payment/success?oid=x']) {
+    const res = await fetch(`${BASE}${p}`);
+    assert.equal(res.status, 200, p);
+    assert.match(res.headers.get('content-type') || '', /text\/html/);
+  }
 });
 
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });

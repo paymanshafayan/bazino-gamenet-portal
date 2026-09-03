@@ -86,19 +86,22 @@ export const SAMPLE_ARTICLES: ArticleRow[] = [
 ];
 
 /* ---------- کدهای تخفیف فعال (۴ مورد) ---------- */
+// همه‌ی کدهای نمونه تبلیغاتی‌اند: ownerUsername خالی یعنی عمومی و در دسترس همه.
 export const SAMPLE_COUPONS: CouponRow[] = [
-  { code: 'BAZINO10', type: 'Percent', value: 10, minOrder: 100000, expiry: '۳۰ روز دیگر', expiryDate: new Date(Date.now() + 30 * 86400000).toISOString(), maxUsageCount: 100, usageCount: 12, isActive: true },
-  { code: 'VIPGOLD', type: 'Percent', value: 15, minOrder: 200000, expiry: '۱۵ روز دیگر', expiryDate: new Date(Date.now() + 15 * 86400000).toISOString(), maxUsageCount: 50, usageCount: 4, isActive: true },
-  { code: 'REDBULL', type: 'Fixed', value: 45000, minOrder: 150000, expiry: '۷ روز دیگر', expiryDate: new Date(Date.now() + 7 * 86400000).toISOString(), maxUsageCount: 25, usageCount: 0, isActive: true },
-  { code: 'WELCOME', type: 'Fixed', value: 50000, minOrder: 250000, expiry: '۶۰ روز دیگر', expiryDate: new Date(Date.now() + 60 * 86400000).toISOString(), maxUsageCount: 200, usageCount: 31, isActive: true }
+  { code: 'BAZINO10', type: 'Percent', value: 10, minOrder: 100000, expiry: '۳۰ روز دیگر', expiryDate: new Date(Date.now() + 30 * 86400000).toISOString(), maxUsageCount: 100, usageCount: 12, isActive: true, ownerUsername: '' },
+  { code: 'VIPGOLD', type: 'Percent', value: 15, minOrder: 200000, expiry: '۱۵ روز دیگر', expiryDate: new Date(Date.now() + 15 * 86400000).toISOString(), maxUsageCount: 50, usageCount: 4, isActive: true, ownerUsername: '' },
+  { code: 'REDBULL', type: 'Fixed', value: 45000, minOrder: 150000, expiry: '۷ روز دیگر', expiryDate: new Date(Date.now() + 7 * 86400000).toISOString(), maxUsageCount: 25, usageCount: 0, isActive: true, ownerUsername: '' },
+  { code: 'WELCOME', type: 'Fixed', value: 50000, minOrder: 250000, expiry: '۶۰ روز دیگر', expiryDate: new Date(Date.now() + 60 * 86400000).toISOString(), maxUsageCount: 200, usageCount: 31, isActive: true, ownerUsername: '' }
 ];
 
 /* ---------- تراکنش‌های باشگاه وفاداری (۴ مورد) ---------- */
+// username خالی = ردیف نمایشی بدون مالک. این‌ها فقط تا وقتی نمایش داده می‌شوند که هنوز هیچ
+// تراکنش واقعی‌ای وجود نداشته باشد (resolveTransactionalList).
 export const SAMPLE_TRANSACTIONS: TransactionRow[] = [
-  { id: 'tx-1', points: 100, description: 'شارژ اولیه حساب کاربری (خوش‌آمدگویی)', type: 'Bonus', date: 'امروز' },
-  { id: 'tx-2', points: 250, description: 'امتیاز خرید پکیج طلایی VIP آرنا', type: 'Earned', date: 'دیروز' },
-  { id: 'tx-3', points: -150, description: 'تبدیل ۱۵۰ امتیاز به کد تخفیف ۱۵۰,۰۰۰ تومانی (VIPGOLD)', type: 'Redeemed', date: '۲ روز پیش' },
-  { id: 'tx-4', points: 80, description: 'امتیاز رزرو ۴ ساعته سیستم شماره ۳', type: 'Earned', date: '۴ روز پیش' }
+  { id: 'tx-1', points: 100, description: 'شارژ اولیه حساب کاربری (خوش‌آمدگویی)', type: 'Bonus', date: 'امروز', username: '' },
+  { id: 'tx-2', points: 250, description: 'امتیاز خرید پکیج طلایی VIP آرنا', type: 'Earned', date: 'دیروز', username: '' },
+  { id: 'tx-3', points: -150, description: 'تبدیل ۱۵۰ امتیاز به کد تخفیف ۱۵۰,۰۰۰ تومانی (VIPGOLD)', type: 'Redeemed', date: '۲ روز پیش', username: '' },
+  { id: 'tx-4', points: 80, description: 'امتیاز رزرو ۴ ساعته سیستم شماره ۳', type: 'Earned', date: '۴ روز پیش', username: '' }
 ];
 
 /* ---------- لاگ‌های رزرو نمونه (۳ مورد) ---------- */

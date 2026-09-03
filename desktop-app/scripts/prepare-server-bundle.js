@@ -22,7 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..', '..'); // project root (desktop-app is one level under it)
 const DESKTOP_APP_DIR = path.join(__dirname, '..');
@@ -33,8 +33,15 @@ function fail(message) {
   process.exit(1);
 }
 
-function copyRecursive(src, dest) {
-  fs.cpSync(src, dest, { recursive: true });
+function copyRecursive(src, dest, options = {}) {
+  const filter = options.excludeBuildTools
+    ? (source) => {
+        const relative = path.relative(src, source);
+        const first = relative.split(path.sep)[0];
+        return first !== '.cache' && first !== '.bin';
+      }
+    : undefined;
+  fs.cpSync(src, dest, { recursive: true, filter });
 }
 
 function main() {
@@ -66,14 +73,53 @@ function main() {
   const prodOnlyPkg = { name: rootPkg.name, version: rootPkg.version, dependencies: rootPkg.dependencies };
   fs.writeFileSync(path.join(BUNDLE_DIR, 'package.json'), JSON.stringify(prodOnlyPkg, null, 2));
 
-  console.log('📥 Installing PRODUCTION-only dependencies into the bundle (this needs network access)...');
+  // CI has network access and should install only runtime dependencies. This keeps
+  // devDependencies (Vite, TypeScript, Electron tooling, caches, etc.) out of the
+  // packaged application's extraResources and makes the installer substantially smaller.
+  // A copy of the root modules remains an offline fallback for local machines where npm
+  // cannot reach the registry or download Node headers.
+  const rootModules = path.join(ROOT, 'node_modules');
+  const bundleModules = path.join(BUNDLE_DIR, 'node_modules');
+  const prodDeps = Object.keys(prodOnlyPkg.dependencies || {});
+
+  let installedProductionDeps = false;
   try {
+    console.log('📥 Installing PRODUCTION-only dependencies into the bundle...');
     execSync('npm install --omit=dev --no-audit --no-fund', { cwd: BUNDLE_DIR, stdio: 'inherit' });
+    installedProductionDeps = true;
+  } catch (e) {
+    console.warn('⚠️  نصب وابستگی‌های production در bundle شکست خورد؛ fallback آفلاین بررسی می‌شود.');
+  }
+
+  if (!installedProductionDeps) {
+    if (!fs.existsSync(rootModules)) {
+      fail(
+        'npm install در پوشه‌ی bundle شکست خورد و node_modules ریشه هم وجود ندارد.\n' +
+        '   اتصال شبکه را بررسی کنید یا ابتدا در ریشه‌ی پروژه "npm install" بزنید.'
+      );
+    }
+    const missing = prodDeps.filter((d) => !fs.existsSync(path.join(rootModules, ...d.split('/'))));
+    if (missing.length) {
+      fail(
+        `node_modules ریشه این وابستگی‌های production را ندارد: ${missing.join(', ')}\n` +
+        '   دوباره "npm install" را در ریشه اجرا کنید و سپس این اسکریپت را تکرار کنید.'
+      );
+    }
+    console.log('📦 Copying the root project\'s node_modules as an offline fallback...');
+    if (fs.existsSync(bundleModules)) fs.rmSync(bundleModules, { recursive: true, force: true });
+    copyRecursive(rootModules, bundleModules, { excludeBuildTools: true });
+  }
+
+  // Sanity check: the bundle must be able to load the native SQLite driver, otherwise the
+  // desktop app dies at startup with "Cannot find module 'better-sqlite3'" — which is
+  // exactly how this used to fail in the field.
+  try {
+    require(path.join(bundleModules, 'better-sqlite3'));
+    console.log('✅ better-sqlite3 داخل bundle قابل بارگذاری است.');
   } catch (e) {
     fail(
-      'npm install در پوشه‌ی bundle شکست خورد. این مرحله به اینترنت نیاز دارد ' +
-      '(برای دانلود همون dependency هایی که سرور اصلی استفاده می‌کنه: express, better-sqlite3, ...). ' +
-      'خروجی کامل خطا رو بالاتر ببینید.'
+      `better-sqlite3 داخل bundle بارگذاری نشد: ${e.message}\n` +
+      '   بدون این، نسخه‌ی دسکتاپ موقع اجرا بالا نمی‌آید.'
     );
   }
 
@@ -81,14 +127,37 @@ function main() {
   console.log('\n🔧 Rebuilding native modules (better-sqlite3, ...) against Electron\'s Node ABI...');
   console.log('   (Electron ships its own Node.js build with a different native module ABI than');
   console.log('   your system Node — skipping this step will crash the packaged app at runtime.)');
-  try {
-    execSync('npx --yes @electron/rebuild --module-dir .', { cwd: BUNDLE_DIR, stdio: 'inherit' });
-  } catch (e) {
-    fail(
-      'electron-rebuild شکست خورد. بدون این مرحله، ماژول‌های native مثل better-sqlite3 با ' +
-      'نسخه‌ی Node.js داخل Electron سازگار نیستن و اپ پکیج‌شده موقع اجرا کرش می‌کنه. ' +
-      'مطمئن شید توی خود desktop-app هم "npm install" اجرا شده (برای در دسترس بودن @electron/rebuild).'
-    );
+  const electronInstalled = fs.existsSync(path.join(DESKTOP_APP_DIR, 'node_modules', 'electron'));
+  if (!electronInstalled) {
+    console.log('⏭️  Electron نصب نیست — این مرحله رد شد.');
+    console.log('   ⚠️  باندل فعلی فقط با Node.js سیستم کار می‌کند (برای تست محلی سرور کافی است).');
+    console.log('   قبل از ساخت نصب‌کننده، حتماً در desktop-app یک بار "npm install" بزنید و این');
+    console.log('   اسکریپت را دوباره اجرا کنید، وگرنه اپ پکیج‌شده موقع اجرا کرش می‌کند.');
+  } else {
+    try {
+      // Resolve the rebuild CLI from desktop-app explicitly. Running `npx` from the
+      // server bundle is ambiguous on Windows and may select a freshly downloaded CLI
+      // that cannot discover the Electron package in its parent directory.
+      const rebuildMain = require.resolve('@electron/rebuild', { paths: [DESKTOP_APP_DIR] });
+      const rebuildBin = path.join(path.dirname(rebuildMain), 'cli.js');
+      if (!fs.existsSync(rebuildBin)) {
+        throw new Error(`فایل CLI بازسازی Electron پیدا نشد: ${rebuildBin}`);
+      }
+      const electronPackage = JSON.parse(
+        fs.readFileSync(path.join(DESKTOP_APP_DIR, 'node_modules', 'electron', 'package.json'), 'utf8')
+      );
+      execFileSync(process.execPath, [
+        rebuildBin,
+        '--module-dir', BUNDLE_DIR,
+        '--electron-version', electronPackage.version,
+      ], { cwd: DESKTOP_APP_DIR, stdio: 'inherit' });
+    } catch (e) {
+      fail(
+        'electron-rebuild شکست خورد. بدون این مرحله، ماژول‌های native مثل better-sqlite3 با ' +
+        'نسخه‌ی Node.js داخل Electron سازگار نیستن و اپ پکیج‌شده موقع اجرا کرش می‌کنه.\n' +
+        `   جزئیات: ${e.message}`
+      );
+    }
   }
 
   console.log('\n✅ همه چیز آماده‌ست.');

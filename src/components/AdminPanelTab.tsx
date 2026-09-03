@@ -31,6 +31,7 @@ import {
   ChevronLeft,
   RefreshCw,
   Key,
+  Globe,
   HelpCircle,
   MessageSquare,
   Smartphone,
@@ -90,6 +91,10 @@ export default function AdminPanelTab({
   const [loading, setLoading] = useState(true);
   const [jarvisAiProviders, setJarvisAiProviders] = useState<any[]>([]);
   const [isSavingJarvisProviders, setIsSavingJarvisProviders] = useState(false);
+  const [syncApiKey, setSyncApiKey] = useState('');
+  const [syncApiKeyMasked, setSyncApiKeyMasked] = useState('');
+  const [isSyncKeyConfigured, setIsSyncKeyConfigured] = useState(false);
+  const [isSavingSyncKey, setIsSavingSyncKey] = useState(false);
 
   // Customization & Settings states
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
@@ -297,6 +302,46 @@ export default function AdminPanelTab({
     }
   }, [siteSettings]);
 
+  const loadSyncSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/sync-settings');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'load failed');
+      setIsSyncKeyConfigured(Boolean(data.configured));
+      setSyncApiKeyMasked(data.masked || '');
+      setSyncApiKey('');
+    } catch (e) {
+      addNotification(language === 'fa' ? 'خطا در دریافت تنظیمات Web Sync' : 'Failed to load Web Sync settings', 'error');
+    }
+  };
+
+  const saveSyncApiKey = async (generate = false) => {
+    setIsSavingSyncKey(true);
+    try {
+      const res = await fetch('/api/admin/sync-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(generate ? { generate: true } : { apiKey: syncApiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'save failed');
+      setSyncApiKey(data.apiKey || '');
+      setSyncApiKeyMasked(data.masked || '');
+      setIsSyncKeyConfigured(true);
+      addNotification(language === 'fa' ? 'کلید Web Sync ذخیره شد؛ همین مقدار را در برنامه دسکتاپ وارد کنید.' : 'Web Sync key saved; enter this value in the desktop app.', 'success');
+    } catch (e) {
+      addNotification(language === 'fa' ? 'کلید Web Sync ذخیره نشد' : 'Web Sync key could not be saved', 'error');
+    } finally {
+      setIsSavingSyncKey(false);
+    }
+  };
+
+  const copySyncApiKey = async () => {
+    if (!syncApiKey) return;
+    await navigator.clipboard.writeText(syncApiKey);
+    addNotification(language === 'fa' ? 'کلید کپی شد' : 'Key copied', 'success');
+  };
+
   const loadJarvisProviders = async () => {
     try {
       const data = await fetch('/api/admin/jarvis-ai-providers').then(r => r.json());
@@ -312,7 +357,10 @@ export default function AdminPanelTab({
   };
 
   useEffect(() => {
-    if (activeSubTab === 'apiKeys') void loadJarvisProviders();
+    if (activeSubTab === 'apiKeys') {
+      void loadJarvisProviders();
+      void loadSyncSettings();
+    }
   }, [activeSubTab]);
 
   const updateJarvisProvider = (index: number, patch: Record<string, any>) => {
@@ -1164,6 +1212,24 @@ export default function AdminPanelTab({
   };
 
   // Submit new items
+  // در حالت داده‌ی نمونه، رکورد تازه در دیتابیس ذخیره می‌شود ولی سایت و همین فهرست‌ها
+  // همچنان داده‌ی آماده را نشان می‌دهند. این رفتار عمدی است، اما توست موفقیت قبلاً چیزی
+  // درباره‌اش نمی‌گفت و ادمین فکر می‌کرد رکوردش گم شده است.
+  /** متن خطای واقعی سرور. این فرم‌ها تا امروز فقط شاخه‌ی res.ok را داشتند، پس اگر سرور
+   *  خطا برمی‌گرداند (مثلاً برخورد شناسه) هیچ چیزی به ادمین گفته نمی‌شد و دکمه بی‌صدا می‌ماند. */
+  const serverError = async (res: Response, fallback: string) => {
+    try {
+      const data = await res.json();
+      if (data && typeof data.error === 'string') return data.error;
+    } catch { /* پاسخ JSON نبود */ }
+    return fallback;
+  };
+
+  const savedNote = (msg: string) =>
+    dataSource === 'sample'
+      ? `${msg} — برای نمایش آن، «منبع داده» را در بخش سفارشی‌سازی کلوپ روی «دیتابیس» بگذارید.`
+      : msg;
+
   const handleAddSystem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSystem.name.trim()) return;
@@ -1174,9 +1240,11 @@ export default function AdminPanelTab({
         body: JSON.stringify(newSystem)
       });
       if (res.ok) {
-        addNotification('سیستم گیمینگ جدید با موفقیت به سرور افزوده شد', 'success');
+        addNotification(savedNote('سیستم گیمینگ جدید با موفقیت به سرور افزوده شد'), 'success');
         setNewSystem({ name: '', type: 'PC', hourlyRate: 25000, isActive: true });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت سیستم جدید'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت سیستم جدید', 'error');
@@ -1193,9 +1261,11 @@ export default function AdminPanelTab({
         body: JSON.stringify(newCafe)
       });
       if (res.ok) {
-        addNotification('آیتم بوفه جدید با موفقیت در دیتابیس ثبت شد', 'success');
+        addNotification(savedNote('آیتم بوفه جدید با موفقیت در دیتابیس ثبت شد'), 'success');
         setNewCafe({ name: '', category: 'Foods', price: 50000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, inventory: 20, isAvailable: true });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت آیتم بوفه'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت کالا', 'error');
@@ -1212,9 +1282,11 @@ export default function AdminPanelTab({
         body: JSON.stringify(newAccessory)
       });
       if (res.ok) {
-        addNotification('تجهیزات گیمینگ جدید در انبار دیتابیس ذخیره شد', 'success');
+        addNotification(savedNote('تجهیزات گیمینگ جدید در انبار دیتابیس ذخیره شد'), 'success');
         setNewAccessory({ name: '', description: '', price: 1000000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت سخت‌افزار جدید'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت سخت‌افزار جدید', 'error');
@@ -1234,6 +1306,8 @@ export default function AdminPanelTab({
         addNotification('تورنمنت گیمینگ جدید با موفقیت فعال گردید', 'success');
         setNewTournament({ title: '', game: '', registrationFee: 100000, startDate: '۱۴۰۵/۰۵/۰۱', maxTeams: 8 });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت تورنمنت'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت تورنمنت', 'error');
@@ -1253,6 +1327,8 @@ export default function AdminPanelTab({
         addNotification('مقاله جدید در بخش اخبار بلاگ منتشر شد', 'success');
         setNewArticle({ title: '', content: '', category: 'News', imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true });
         fetchData();
+      } else {
+        addNotification(await serverError(res, 'خطا در ثبت مقاله خبررسانی'), 'error');
       }
     } catch (e) {
       addNotification('خطا در ثبت مقاله خبررسانی', 'error');
@@ -1506,6 +1582,7 @@ export default function AdminPanelTab({
                         activeSubTab === 'mobileAppDownload' ? 'دانلود اپلیکیشن' :
                         activeSubTab === 'customization' ? 'سفارشی‌سازی' :
                         activeSubTab === 'dbLogs' ? 'لاگ‌های دیتابیس' :
+                        activeSubTab === 'presentation' ? 'پرزنتیشن' :
                         'تنظیمات کلید‌ها'
                       }» نیاز به راهنمایی دارید؟`
                     : `Need assistance with "${activeSubTab.toUpperCase()}" section?`}
@@ -4010,30 +4087,39 @@ export default function AdminPanelTab({
                       {language === 'fa' ? 'هیچ لاگی در سیستم ثبت نشده است.' : 'No database queries logged yet.'}
                     </div>
                   ) : (
-                    dbLogsList.map((log: any, idx: number) => (
-                      <div key={idx} className="p-2.5 bg-white/5 border-l-2 border-emerald-500 rounded-r-lg space-y-1.5 hover:bg-white/10 transition-all">
+                    dbLogsList.map((log: any, idx: number) => {
+                      // سرور این لاگ‌ها را با فیلدهای { provider, type, command, timestamp }
+                      // می‌فرستد (server/dataProviders.ts → logDbQuery). این کامپوننت قبلاً
+                      // دنبال log.operation و log.query می‌گشت که هرگز وجود نداشتند، برای همین
+                      // ردیف‌ها بدون متن SQL و بدون برچسب نوع عملیات رندر می‌شدند.
+                      // هر دو شکل پشتیبانی می‌شود تا اگر جای دیگری نام قدیمی را بفرستد نشکند.
+                      const operation = log.type ?? log.operation ?? '—';
+                      const command = log.command ?? log.query ?? '';
+                      return (
+                      <div key={log.id ?? idx} className="p-2.5 bg-white/5 border-l-2 border-emerald-500 rounded-r-lg space-y-1.5 hover:bg-white/10 transition-all">
                         <div className="flex justify-between items-center text-[10px]">
                           <div className="flex items-center gap-2">
                             <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-400 rounded border border-emerald-900 font-bold">
                               {log.provider}
                             </span>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
-                              log.operation === 'INSERT' || log.operation === 'UPDATE' ? 'bg-amber-950 text-amber-400' :
-                              log.operation === 'SELECT' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400'
+                              operation === 'INSERT' || operation === 'UPDATE' || operation === 'SQL' ? 'bg-amber-950 text-amber-400' :
+                              operation === 'SELECT' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400'
                             }`}>
-                              {log.operation}
+                              {operation}
                             </span>
                           </div>
                           <span className="text-gray-500 font-mono">{log.timestamp}</span>
                         </div>
-                        <p className="text-gray-300 font-mono text-xs leading-relaxed break-words">{log.query}</p>
+                        <p className="text-gray-300 font-mono text-xs leading-relaxed break-words">{command}</p>
                         {log.params && log.params.length > 0 && (
                           <div className="text-[10px] text-gray-500 font-mono bg-black/40 p-1 rounded">
                             Parameters: <span className="text-gray-400">{JSON.stringify(log.params)}</span>
                           </div>
                         )}
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -4042,6 +4128,37 @@ export default function AdminPanelTab({
 
           {activeSubTab === 'apiKeys' && (
             <div className="animate-fade-in space-y-6">
+              <div className="bg-dark-card border border-emerald-500/20 rounded-2xl p-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-white flex items-center gap-2 font-display">
+                      <Globe className="w-5 h-5 text-emerald-400" />
+                      <span>{language === 'fa' ? 'اتصال Web Sync دسکتاپ' : 'Desktop Web Sync connection'}</span>
+                      <span className={`text-[10px] px-2 py-1 rounded-full ${isSyncKeyConfigured ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                        {isSyncKeyConfigured ? (language === 'fa' ? 'فعال' : 'Configured') : (language === 'fa' ? 'تنظیم نشده' : 'Not configured')}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1 max-w-3xl leading-relaxed">
+                      {language === 'fa' ? 'این کلید برای اتصال امن برنامه دسکتاپ به سایت استفاده می‌شود؛ مقدار واقعی فقط بعد از ذخیره/تولید نمایش داده می‌شود.' : 'This secret authenticates the desktop app to the website; the full value is shown only after save or generation.'}
+                    </p>
+                  </div>
+                  <button onClick={() => void saveSyncApiKey(true)} disabled={isSavingSyncKey} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-black text-xs rounded-xl flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    {language === 'fa' ? 'تولید کلید جدید' : 'Generate new key'}
+                  </button>
+                </div>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input type="password" value={syncApiKey} onChange={(e) => setSyncApiKey(e.target.value)} placeholder={isSyncKeyConfigured ? `کلید فعلی: ${syncApiKeyMasked} — برای تغییر مقدار جدید وارد کنید` : 'یک کلید حداقل ۱۶ کاراکتری وارد کنید'} className="flex-1 bg-[#0d1224] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono dir-ltr text-left" />
+                  <button onClick={() => void saveSyncApiKey(false)} disabled={isSavingSyncKey || syncApiKey.trim().length < 16} className="px-4 py-2.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-black font-black text-xs rounded-xl">
+                    {language === 'fa' ? 'ذخیره کلید' : 'Save key'}
+                  </button>
+                  <button onClick={() => void copySyncApiKey()} disabled={!syncApiKey} className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl flex items-center gap-2">
+                    <ClipboardCopy className="w-4 h-4" /> {language === 'fa' ? 'کپی' : 'Copy'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-3" dir="rtl">آدرس اتصال در برنامه دسکتاپ: <span className="font-mono text-emerald-300" dir="ltr">https://bazino.pro</span> — سپس همین کلید را در Web Sync وارد کنید.</p>
+              </div>
+
               <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
                   <div>

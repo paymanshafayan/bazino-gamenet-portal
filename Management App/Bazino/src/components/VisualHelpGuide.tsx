@@ -13,6 +13,7 @@ import {
   Shield,
   Settings,
 } from 'lucide-react';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 export type HelpSection = 'stations' | 'buffet' | 'customers' | 'accounting' | 'operators' | 'settings';
 
@@ -90,6 +91,7 @@ const SLIDES: Slide[] = [
 ];
 
 export default function VisualHelpGuide({ isOpen, onClose, initialSection }: Props) {
+  useModalDismiss(isOpen, onClose);
   const [activeStep, setActiveStep] = useState(0);
 
   useEffect(() => {

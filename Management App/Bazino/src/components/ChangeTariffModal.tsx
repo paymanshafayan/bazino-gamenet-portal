@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Tag, Check } from 'lucide-react';
 import { Station, TariffRate, CurrencyCode } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface ChangeTariffModalProps {
   station: Station;
@@ -18,6 +19,9 @@ export const ChangeTariffModal: React.FC<ChangeTariffModalProps> = ({
   onClose,
   onConfirmChangeTariff,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const [selectedTariffId, setSelectedTariffId] = useState<string>(
     station.activeSession?.tariffId || station.currentTariffId || tariffs[0]?.id
   );

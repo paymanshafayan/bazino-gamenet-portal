@@ -1,4 +1,5 @@
 import { Download, QrCode, Smartphone, X } from 'lucide-react';
+import QrCodeImage from './QrCodeImage';
 import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
@@ -9,7 +10,6 @@ export default function MobileAppDownloadWidget({ onOpenDownloadPage }: Props) {
   const { language, dir } = useLanguage();
   const [isFa, isRu, isTr] = [language === 'fa', language === 'ru', language === 'tr'];
   const pageUrl = `${window.location.origin}/app-download`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=${encodeURIComponent(pageUrl)}`;
 
   const copy = {
     title: isFa ? 'اپلیکیشن موبایل بازینو' : isRu ? 'Мобильное приложение Bazino' : isTr ? 'Bazino Mobil Uygulaması' : 'Bazino Mobile App',
@@ -29,13 +29,13 @@ export default function MobileAppDownloadWidget({ onOpenDownloadPage }: Props) {
     <aside
       dir={dir}
       aria-label={copy.title}
-      className="fixed bottom-5 right-5 left-5 sm:left-auto sm:w-[360px] z-[85] rounded-[28px] border border-white/10 bg-[#070b16]/95 text-white shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl overflow-hidden"
+      className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px)+1rem)] md:bottom-5 right-5 left-5 sm:left-auto sm:w-[360px] z-[55] rounded-[28px] border border-white/10 bg-[#070b16]/95 text-white shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl overflow-hidden"
       style={{ colorScheme: 'dark' }}
     >
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-violet-400 to-amber-300" />
       <div className="p-4 flex gap-4 items-center">
         <div className="shrink-0 rounded-2xl bg-white p-2 shadow-lg shadow-cyan-500/10">
-          <img src={qrUrl} alt={copy.scan} width="112" height="112" className="block w-28 h-28" loading="lazy" />
+          <QrCodeImage value={pageUrl} size={112} color="#070913" background="#ffffff" alt={copy.scan} className="block w-28 h-28" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">

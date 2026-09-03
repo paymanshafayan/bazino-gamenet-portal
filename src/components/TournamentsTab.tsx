@@ -84,8 +84,8 @@ const getMonthName = (m: number, lang: string): string => {
 interface Props {
   themeId?: string;
   tournaments: Tournament[];
-  onAddLoyaltyPoints: (points: number, desc: string) => void;
-  onRegisterTeam: (tournamentId: string, team: { name: string; leader: string; members: string[] }) => void;
+  onAddLoyaltyPoints: (points: number, desc: string) => void | Promise<void>;
+  onRegisterTeam: (tournamentId: string, team: { name: string; leader: string; members: string[] }) => void | Promise<void>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -336,31 +336,43 @@ export default function TournamentsTab({
     setMembers(members.filter((_, i) => i !== idx));
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ثبت‌نام حالا واقعاً به سرور می‌رود؛ توست موفقیت و پاک‌کردن فرم فقط پس از
+  // تأیید سرور انجام می‌شوند (قبلاً تیم فقط در state کلاینت ظاهر می‌شد و با
+  // یک refresh ناپدید می‌شد).
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTournament) return;
+    if (!selectedTournament || isSubmitting) return;
     if (!teamName.trim() || !leaderName.trim()) {
       addNotification('لطفاً نام تیم و نام سرپرست را وارد کنید.', 'error');
       return;
     }
 
     const allMembers = [leaderName, ...members];
-    onRegisterTeam(selectedTournament.id, {
-      name: teamName,
-      leader: leaderName,
-      members: allMembers,
-    });
+    setIsSubmitting(true);
+    try {
+      await onRegisterTeam(selectedTournament.id, {
+        name: teamName,
+        leader: leaderName,
+        members: allMembers,
+      });
 
-    // Award loyalty points for tournament registration fee: 1 point per 10,000 Tomans
-    const pointsEarned = Math.floor(selectedTournament.registrationFee / 10000);
-    onAddLoyaltyPoints(pointsEarned, `ثبت‌نام تیم ${teamName} در تورنمنت ${selectedTournament.title}`);
+      // Award loyalty points for tournament registration fee: 1 point per 10,000 Tomans
+      const pointsEarned = Math.floor(selectedTournament.registrationFee / 10000);
+      await onAddLoyaltyPoints(pointsEarned, `ثبت‌نام تیم ${teamName} در تورنمنت ${selectedTournament.title}`);
 
-    addNotification(`تیم "${teamName}" با موفقیت در تورنمنت ثبت‌نام شد! ${pointsEarned} امتیاز وفاداری باشگاه مشتریان به شما تعلق گرفت.`, 'success');
+      addNotification(`تیم "${teamName}" با موفقیت در تورنمنت ثبت‌نام شد! ${pointsEarned} امتیاز وفاداری باشگاه مشتریان به شما تعلق گرفت.`, 'success');
 
-    // Reset Form
-    setTeamName('');
-    setLeaderName('');
-    setMembers([]);
+      // Reset Form
+      setTeamName('');
+      setLeaderName('');
+      setMembers([]);
+    } catch {
+      // پیام خطای واقعی سرور را خود onRegisterTeam نمایش داده است.
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

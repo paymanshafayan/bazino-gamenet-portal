@@ -1,0 +1,112 @@
+name: Flutter Test & Web Build
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-test.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: flutter-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Run the checks and build the report
+        working-directory: flutter_app
+        run: |
+          set +e
+          R="$GITHUB_WORKSPACE/FLUTTER_CI_REPORT.md"
+
+          {
+            echo "# Flutter CI report"
+            echo
+            echo "- commit: \`${{ github.sha }}\`"
+            echo "- branch: \`${{ github.ref_name }}\`"
+            echo "- run:    ${{ github.run_id }}"
+            echo "- date:   $(date -u '+%Y-%m-%d %H:%M UTC')"
+          } > "$R"
+
+          section () {   # section "<title>" <command...>
+            title="$1"; shift
+            echo                >> "$R"
+            echo "## $title"    >> "$R"
+            echo '```'          >> "$R"
+            "$@" > /tmp/out.txt 2>&1
+            code=$?
+            tail -150 /tmp/out.txt >> "$R"
+            echo '```'          >> "$R"
+            if [ $code -eq 0 ]; then
+              echo "**exit $code — OK**" >> "$R"
+            else
+              echo "**exit $code — FAILED**" >> "$R"
+            fi
+            echo "$title=$code" >> "$GITHUB_WORKSPACE/codes.txt"
+          }
+
+          : > "$GITHUB_WORKSPACE/codes.txt"
+          section "flutter --version" flutter --version
+          section "flutter pub get"   flutter pub get
+          section "flutter analyze"   flutter analyze
+          section "flutter test"      flutter test
+          section "flutter build web" flutter build web --release
+
+          {
+            echo
+            echo "## Summary"
+            echo '```'
+            cat "$GITHUB_WORKSPACE/codes.txt"
+            echo '```'
+            echo
+            echo "build/web size: $(du -sh build/web 2>/dev/null | cut -f1 || echo 'not built')"
+          } >> "$R"
+
+          cat "$R"
+
+      - name: Commit the report back to the branch
+        run: |
+          git config user.name  "flutter-ci"
+          git config user.email "flutter-ci@users.noreply.github.com"
+          git add FLUTTER_CI_REPORT.md
+          if git diff --cached --quiet; then
+            echo "report unchanged"
+          else
+            git commit -m "ci(flutter): report for ${{ github.sha }} [skip ci]"
+            pushed=no
+            for i in 1 2 3; do
+              git pull --rebase --autostash origin "${{ github.ref_name }}" || true
+              if git push origin "HEAD:${{ github.ref_name }}"; then pushed=yes; break; fi
+              sleep 5
+            done
+            [ "$pushed" = yes ] || echo "::warning::could not push the report"
+          fi
+
+      - name: Fail the job if analyze or test failed
+        run: |
+          if [ ! -f codes.txt ]; then
+            echo "::error::codes.txt is missing — the checks step did not run"
+            exit 1
+          fi
+          bad=$(grep -E '^(flutter pub get|flutter analyze|flutter test|flutter build web)=' codes.txt | grep -v '=0$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::$(echo "$bad" | tr '\n' ' ') — see FLUTTER_CI_REPORT.md"
+            exit 1
+          fi
+          echo "all checks passed"

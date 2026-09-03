@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Plus, Tag, HelpCircle } from 'lucide-react';
 import { Station, StationType, BuffetItem, Customer, TariffRate, ShopExpense, Invoice, Operator, AppTheme, SoundAlarmConfig, CurrencyCode, WalletTransaction, ServiceItem, PaymentType, BackupSettings, WebSyncStatus, StationStatus } from './types';
 import { INITIAL_STATIONS, INITIAL_BUFFET_ITEMS, INITIAL_CUSTOMERS, INITIAL_TARIFFS, INITIAL_EXPENSES, INITIAL_OPERATORS, THEMES_LIST, DEFAULT_SOUND_CONFIG } from './data/mockData';
 import { playAlarmSound } from './utils/audio';
+import { useSavedValue, PERSIST_DEBOUNCE_MS } from './hooks/useSavedValue';
 import { safeGetStorage, safeSetStorage, safeRemoveStorage } from './utils/storage';
 import { calculateCustomerRank, getBirthdayFlags } from './utils/formatters';
 import { applyAppTheme } from './utils/theme';
@@ -84,29 +85,59 @@ export default function App() {
   const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [helpGuideSection, setHelpGuideSection] = useState<HelpSection | undefined>(undefined);
 
-  // Persistence Sync effect
-  useEffect(() => {
-    safeSetStorage('bazino_stations', stations);
-    safeSetStorage('bazino_buffet', buffetItems);
-    safeSetStorage('bazino_customers', customers);
-    safeSetStorage('bazino_tariffs', tariffs);
-    safeSetStorage('bazino_expenses', expenses);
-    safeSetStorage('bazino_invoices', invoices);
-    safeSetStorage('bazino_wallet_tx', walletTransactions);
-    safeSetStorage('bazino_operators', operators);
-    safeSetStorage('bazino_theme', currentTheme);
-    safeSetStorage('bazino_sound', soundConfig);
-    safeSetStorage('bazino_backup_settings', backupSettings);
-    safeSetStorage('bazino_service_hours_reset_date', lastServiceHoursResetDate);
-    safeSetStorage('bazino_web_sync_status', webSyncStatus);
+  // ارجاع پایدار: اگر این یک arrow inline بماند، هر رندرِ App یک تابع تازه می‌سازد و
+  // memo روی StationCard بی‌اثر می‌شود. بقیه‌ی هندلرها مستقیماً همان setState هستند که
+  // React تضمین می‌کند مرجعشان ثابت بماند.
+  const handleEditStation = useCallback((st: Station) => {
+    setEditingStationTarget(st);
+    setShowManageStationModal(true);
+  }, []);
 
-    // Save state to Express backend server for power outage resilience
-    fetch('/api/state', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stations, buffetItems, customers, invoices }),
-    }).catch(() => {});
-  }, [stations, buffetItems, customers, tariffs, expenses, invoices, walletTransactions, operators, currentTheme, soundConfig, backupSettings, lastServiceHoursResetDate, webSyncStatus]);
+  // Persistence Sync
+  //
+  // قبلاً همه‌ی این‌ها در یک افکت با سیزده وابستگی بودند، پس تغییر هر کدام باعث بازنویسی
+  // *همه‌ی* کلیدها و یک POST کامل می‌شد — و چون تیک ثانیه‌شمار هم `stations` را عوض می‌کرد،
+  // این اتفاق هر ثانیه می‌افتاد. حالا سه تفکیک اعمال شده:
+  //   ۱) هر داده کلید خودش را دارد و فقط وقتی خودش عوض شود نوشته می‌شود،
+  //   ۲) نوشتن در localStorage فقط وقتی محتوای serialize‌شده واقعاً فرق کرده باشد،
+  //   ۳) POST به سرور با تأخیر جمع‌بندی می‌شود تا رگبار تغییرات یک درخواست شود.
+  useSavedValue('bazino_stations', stations);
+  useSavedValue('bazino_buffet', buffetItems);
+  useSavedValue('bazino_customers', customers);
+  useSavedValue('bazino_tariffs', tariffs);
+  useSavedValue('bazino_expenses', expenses);
+  useSavedValue('bazino_invoices', invoices);
+  useSavedValue('bazino_wallet_tx', walletTransactions);
+  useSavedValue('bazino_operators', operators);
+  useSavedValue('bazino_theme', currentTheme);
+  useSavedValue('bazino_sound', soundConfig);
+  useSavedValue('bazino_backup_settings', backupSettings);
+  useSavedValue('bazino_service_hours_reset_date', lastServiceHoursResetDate);
+  useSavedValue('bazino_web_sync_status', webSyncStatus);
+
+  // Save state to the Express backend for power-outage resilience.
+  // Debounced, and skipped entirely when the payload is byte-identical to the last one
+  // we sent — an idle club should generate zero traffic.
+  const lastPushedRef = useRef<string>('');
+  useEffect(() => {
+    const payload = JSON.stringify({ stations, buffetItems, customers, invoices });
+    if (payload === lastPushedRef.current) return;
+
+    const id = setTimeout(() => {
+      lastPushedRef.current = payload;
+      fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      }).catch(() => {
+        // شکست شبکه یعنی این محتوا هنوز روی سرور نیست — علامت را پس می‌گیریم تا
+        // تغییر بعدی دوباره تلاش کند و داده‌ی اپراتور بی‌صدا از دست نرود.
+        lastPushedRef.current = '';
+      });
+    }, PERSIST_DEBOUNCE_MS);
+
+    return () => clearTimeout(id);
+  }, [stations, buffetItems, customers, invoices]);
 
   // Recompute birthday flags for every customer on each render of `customers` (Item #17)
   const customersWithBirthdayFlags = useMemo<Customer[]>(() => {
@@ -142,10 +173,20 @@ export default function App() {
   }, [lastServiceHoursResetDate]);
 
   // Master Timer Tick Interval (Runs every 1 second)
+  //
+  // این تیک قبلاً بی‌قید `prevStations.map(...)` را برمی‌گرداند، پس حتی وقتی هیچ ایستگاهی
+  // در حال بازی نبود هم یک آرایه‌ی *جدید* تحویل React می‌داد. مرجع جدید یعنی وابستگی
+  // `stations` عوض شده، و افکت ذخیره‌سازی هر ثانیه اجرا می‌شد: ۱۱ نوشتن همگام در
+  // localStorage به‌علاوه‌ی یک POST پنج‌کیلوبایتی. اندازه‌گیری‌شده در حالت کاملاً بی‌کار:
+  // ۱۵ درخواست در ۱۵ ثانیه، و افت نرخ فریم به ۳٫۳ (سایت اصلی روی همان مرورگر ۶۰).
+  //
+  // حالا اگر هیچ ایستگاهی تغییر نکرده باشد، دقیقاً همان مرجع قبلی برگردانده می‌شود و
+  // React اصلاً رندر نمی‌کند.
   useEffect(() => {
     const timer = setInterval(() => {
-      setStations((prevStations) =>
-        prevStations.map((st) => {
+      setStations((prevStations) => {
+        let changed = false;
+        const nextStations = prevStations.map((st) => {
           if (st.status === 'PLAYING' && st.activeSession && !st.activeSession.isPaused) {
             const nextElapsed = st.activeSession.elapsedSeconds + 1;
             let nextStatus: StationStatus = st.status;
@@ -165,6 +206,7 @@ export default function App() {
               }
             }
 
+            changed = true;
             return {
               ...st,
               status: nextStatus,
@@ -185,6 +227,7 @@ export default function App() {
               if (soundConfig.enabled) {
                 playAlarmSound(soundConfig.soundType, soundConfig.volume);
               }
+              changed = true;
               return {
                 ...st,
                 activeSession: {
@@ -197,8 +240,11 @@ export default function App() {
           }
 
           return st;
-        })
-      );
+        });
+
+        // مرجع قبلی = بدون re-render. کل صرفه‌جویی همین یک خط است.
+        return changed ? nextStations : prevStations;
+      });
     }, 1000);
 
     return () => clearInterval(timer);
@@ -762,16 +808,13 @@ export default function App() {
                   station={station}
                   tariffs={tariffs}
                   currency={currency}
-                  onStartSession={(st) => setModalStartStation(st)}
+                  onStartSession={setModalStartStation}
                   onPauseResume={handlePauseResume}
-                  onChangeTariffMidGame={(st) => setModalTariffStation(st)}
-                  onTransferStation={(st) => setModalTransferStation(st)}
-                  onAddBuffetServices={(st) => setModalBuffetStation(st)}
-                  onCheckoutSession={(st) => setModalCheckoutStation(st)}
-                  onEditStation={(st) => {
-                    setEditingStationTarget(st);
-                    setShowManageStationModal(true);
-                  }}
+                  onChangeTariffMidGame={setModalTariffStation}
+                  onTransferStation={setModalTransferStation}
+                  onAddBuffetServices={setModalBuffetStation}
+                  onCheckoutSession={setModalCheckoutStation}
+                  onEditStation={handleEditStation}
                 />
               ))}
             </div>

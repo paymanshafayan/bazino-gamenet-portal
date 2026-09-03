@@ -6,7 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 interface Props {
   themeId?: string;
   articles: Article[];
-  onAddComment: (articleId: string, comment: { gamerTag: string; content: string }) => void;
+  onAddComment: (articleId: string, comment: { gamerTag: string; content: string }) => void | Promise<void>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -29,7 +29,7 @@ export default function BlogTab({
     ? articles
     : articles.filter(a => a.category === activeCategory);
 
-  const handlePostComment = (e: React.FormEvent) => {
+  const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedArticleId) return;
     if (!commentGamerTag.trim() || !commentContent.trim()) {
@@ -44,20 +44,17 @@ export default function BlogTab({
       return;
     }
 
-    onAddComment(selectedArticleId, {
-      gamerTag: commentGamerTag.trim(),
-      content: commentContent.trim(),
-    });
-
-    const successMsg = language === 'fa'
-      ? 'دیدگاه شما با موفقیت ثبت شد!'
-      : language === 'en'
-      ? 'Your comment was posted successfully!'
-      : language === 'ru'
-      ? 'Ваш комментарий успешно опубликован!'
-      : 'Yorumunuz başarıyla gönderildi!';
-    addNotification(successMsg, 'success');
-    setCommentContent('');
+    // فقط پس از تأیید سرور فرم پاک می‌شود؛ در صورت خطا متن کاربر حفظ می‌ماند
+    // تا دوباره تایپش نکند. پیام موفقیت/خطا را خود onAddComment می‌دهد.
+    try {
+      await onAddComment(selectedArticleId, {
+        gamerTag: commentGamerTag.trim(),
+        content: commentContent.trim(),
+      });
+      setCommentContent('');
+    } catch {
+      /* پیام خطا بالادست نمایش داده شد */
+    }
   };
 
   return (

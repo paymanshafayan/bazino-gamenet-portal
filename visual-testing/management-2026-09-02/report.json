@@ -1,0 +1,308 @@
+{
+  "when": "2026-09-02T16:33:29.640Z",
+  "steps": [
+    {
+      "name": "tab · ایستگاه‌های بازی",
+      "status": "ok",
+      "notes": [
+        "BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت) آفلاین LAN: 192.168.1.100:3000 دانلود گزارش فنی (.md) پایگاه دا"
+      ],
+      "result": {
+        "chars": 2348,
+        "overflow": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "01-stations.png"
+    },
+    {
+      "name": "tab · بوفه و انبار داری",
+      "status": "ok",
+      "notes": [
+        "BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت) آفلاین LAN: 192.168.1.100:3000 دانلود گزارش فنی (.md) پایگاه دا"
+      ],
+      "result": {
+        "chars": 1346,
+        "overflow": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "02-buffet.png"
+    },
+    {
+      "name": "tab · اعضا و کیف پول",
+      "status": "ok",
+      "notes": [
+        "BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت) آفلاین LAN: 192.168.1.100:3000 دانلود گزارش فنی (.md) پایگاه دا"
+      ],
+      "result": {
+        "chars": 1188,
+        "overflow": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "03-members.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "tab · حسابداری و نمودارها",
+      "status": "ok",
+      "notes": [
+        "BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت) آفلاین LAN: 192.168.1.100:3000 دانلود گزارش فنی (.md) پایگاه دا"
+      ],
+      "result": {
+        "chars": 2168,
+        "overflow": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "04-accounting.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "tab · دسترسی اپراتورها",
+      "status": "ok",
+      "notes": [
+        "BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت) آفلاین LAN: 192.168.1.100:3000 دانلود گزارش فنی (.md) پایگاه دا"
+      ],
+      "result": {
+        "chars": 1472,
+        "overflow": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "05-operators.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "tab · تنظیمات و تم‌ها",
+      "status": "ok",
+      "notes": [
+        "BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت) آفلاین LAN: 192.168.1.100:3000 دانلود گزارش فنی (.md) پایگاه دا"
+      ],
+      "result": {
+        "chars": 2002,
+        "overflow": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "06-settings.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · باز کردن زبانه ایستگاه‌ها",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · شروع تایم روی یک ایستگاه خالی",
+      "status": "ok",
+      "notes": [
+        "modal: BAZINO PRO Desktop v4.2.0 (نرم‌افزار دسکتاپ سرور گیم‌نت) آفلاین LAN: 192.168.1.100:3000 دانلود گزارش فنی (.md) پایگاه داده محلی (SQLite / PostgreSQL) "
+      ],
+      "result": {
+        "modalOpened": true
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "07-start-session-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن مودال شروع تایم",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · مودال افزایش بوفه",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 15000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "08-buffet-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · مودال تغییر تعرفه",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 15000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "09-tariff-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · مودال جابه‌جایی ایستگاه",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 15000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "10-transfer-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · مودال تسویه (پایان و تسویه)",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 15000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "11-checkout-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · مودال تعریف ایستگاه جدید",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 15000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "12-new-station-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · مودال مدیریت تعرفه‌ها",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 15000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "13-tariffs-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "flow · راهنمای تصویری",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 15000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "14-help-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "flow · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "sync · مودال همگام وب",
+      "status": "FAIL",
+      "notes": [],
+      "error": "TimeoutError: locator.click: Timeout 20000ms exceeded.",
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "15-websync-modal.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "sync · تست اتصال به سرور",
+      "status": "ok",
+      "notes": [
+        "دکمه تست اتصال پیدا نشد"
+      ],
+      "result": {
+        "skipped": true
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "shot": "16-websync-test.png",
+      "shotError": "TimeoutError: page.screenshot: Timeout 20000ms exceeded.\nCall log:\n  - taking pa"
+    },
+    {
+      "name": "sync · بستن",
+      "status": "ok",
+      "notes": [],
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "state · وضعیت روی سرور ذخیره می‌شود (/api/state)",
+      "status": "ok",
+      "notes": [
+        "{\"keys\":[\"stations\",\"buffetItems\",\"customers\",\"invoices\"],\"stations\":8}"
+      ],
+      "result": {
+        "keys": [
+          "stations",
+          "buffetItems",
+          "customers",
+          "invoices"
+        ],
+        "stations": 8
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    },
+    {
+      "name": "sync · مسیرهای /api/sync بدون کلید رد می‌شوند",
+      "status": "ok",
+      "notes": [
+        "{\"/api/sync/reservations\":200,\"/api/sync/logs\":200}"
+      ],
+      "result": {
+        "/api/sync/reservations": 200,
+        "/api/sync/logs": 200
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": []
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: net::ERR_FAILED"
+  ],
+  "networkFailures": [
+    "FAILED https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap"
+  ]
+}

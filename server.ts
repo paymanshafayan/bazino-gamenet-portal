@@ -8,7 +8,7 @@ import compression from "compression";
 import { formidable } from "formidable";
 import path from "path";
 import fs from "fs";
-import { createHash, randomUUID } from "crypto";
+import { createHash, randomUUID, randomBytes } from "crypto";
 import { createServer as createViteServer } from "vite";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -86,11 +86,54 @@ export async function setDataSourceMode(mode: DataSourceMode): Promise<void> {
 }
 
 /** لیست نهایی یک بخش: در حالت sample → داده نمونه؛ در حالت database →
- *  داده دیتابیس، و اگر جدول خالی بود → داده نمونه (فال‌بک خودکار). */
+ *  داده دیتابیس، و اگر جدول خالی بود → داده نمونه (فال‌بک خودکار).
+ *
+ *  ⚠️ فقط برای داده‌ی **کاتالوگ** (سیستم‌ها، منوی کافه، محصولات، تورنمنت‌ها،
+ *  مقالات، اسلایدرها، اتاق‌های چت). برای داده‌ی تراکنشی از
+ *  resolveTransactionalList() استفاده کنید. */
 export async function resolveSampleList<T>(dbRows: T[], sampleRows: T[]): Promise<T[]> {
   const mode = await getDataSourceMode();
   if (mode === "sample") return sampleRows;
   return dbRows.length > 0 ? dbRows : sampleRows;
+}
+
+/** لیست نهایی داده‌ی **تراکنشی** (رزروها، تراکنش‌های امتیاز، کوپن‌ها).
+ *
+ *  فرق اساسی‌اش با resolveSampleList این است که دیتابیس همیشه منبع حقیقت است:
+ *  اگر حتی یک رکورد واقعی وجود داشته باشد، همان برگردانده می‌شود. داده‌ی نمونه
+ *  فقط وقتی نمایش داده می‌شود که هنوز هیچ رکورد واقعی ساخته نشده باشد، تا
+ *  صفحه‌ی یک نصب تازه خالی به‌نظر نرسد.
+ *
+ *  چرا لازم شد: resolveSampleList در حالت sample (که پیش‌فرض است) همیشه داده‌ی
+ *  نمونه را برمی‌گرداند. نتیجه این بود که مشتری رزرو می‌کرد، رزروش واقعاً در
+ *  reservation_logs ثبت می‌شد، ولی در «رزروهای فعال شما» سه رزرو نمونه‌ی متعلق
+ *  به کس دیگری می‌دید و رزرو خودش را هرگز پیدا نمی‌کرد. */
+export async function resolveTransactionalList<T>(dbRows: T[], sampleRows: T[]): Promise<T[]> {
+  if (dbRows.length > 0) return dbRows;
+  return (await getDataSourceMode()) === "sample" ? sampleRows : [];
+}
+
+/** لیست کاتالوگی که کاربر می‌تواند رویش محتوا بسازد (مقالات با نظرات، تورنمنت‌ها
+ *  با تیم‌ها): ردیف‌های دیتابیس روی هم‌شناسه‌ی خودشان در داده‌ی نمونه می‌نشینند و
+ *  بقیه‌ی ردیف‌های نمونه سر جایشان می‌مانند.
+ *
+ *  چرا لازم شد: وقتی کاربر روی یک مقاله‌ی نمونه نظر می‌گذارد، ensurePersisted آن
+ *  مقاله را در دیتابیس materialize می‌کند. با resolveSampleList، در حالت sample
+ *  همچنان کل لیست نمونه برگردانده می‌شد، پس نظر ثبت‌شده هرگز دیده نمی‌شد؛ و با
+ *  resolveTransactionalList فقط همان یک مقاله می‌ماند و بقیه ناپدید می‌شدند. */
+export async function resolveMergedList<T extends Record<string, any>>(
+  dbRows: T[],
+  sampleRows: T[],
+  key: string = "id"
+): Promise<T[]> {
+  if ((await getDataSourceMode()) !== "sample") {
+    return dbRows.length > 0 ? dbRows : sampleRows;
+  }
+  const byKey = new Map(dbRows.map((r) => [r[key], r]));
+  const merged = sampleRows.map((r) => byKey.get(r[key]) ?? r);
+  const sampleKeys = new Set(sampleRows.map((r) => r[key]));
+  for (const r of dbRows) if (!sampleKeys.has(r[key])) merged.push(r);
+  return merged;
 }
 
 /** پیدا کردن یک رکورد با کلید: در حالت sample → داده نمونه؛ در حالت database →
@@ -531,11 +574,20 @@ async function startServer() {
   // be logged in as themselves, at the same time, without seeing each
   // other's data.
   //
-  // Backward compatibility: requests with no/invalid token still fall back
-  // to the legacy "activeUsername" setting so the existing website (which
-  // doesn't send a token yet) keeps working exactly as before.
+  // A request with no (or an invalid) token is simply anonymous: it is served
+  // as "Guest" and sees no personal data at all. There is no server-wide
+  // "current user" concept anywhere in this codebase.
   // =========================================================================
   const JWT_SECRET = process.env.JWT_SECRET || (() => {
+    // در production یک راز پیش‌فرضِ عمومی یعنی هر کسی می‌تواند توکن ادمین جعل کند.
+    // یک هشدار در لاگ کافی نیست — لاگ دیده نمی‌شود و سایت ناامن بالا می‌ماند.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[Security] JWT_SECRET is not set. Refusing to start in production: without a real secret " +
+        "anyone can forge an admin token. Set JWT_SECRET to a long random value and restart."
+      );
+      process.exit(1);
+    }
     console.warn(
       "[Security] JWT_SECRET is not set in the environment. Using an INSECURE development-only fallback secret. " +
       "Set a real, random JWT_SECRET before deploying to production, or every token can be forged."
@@ -581,6 +633,30 @@ async function startServer() {
   // اشاره می‌کنند (دیسک موقتیِ هاست) را در هر دو حالت null می‌کند.
   await repairLegacyCatalogImages();
 
+  // One-time cleanup for installs created before identity moved fully into the
+  // JWT: the old shared "activeUsername" setting made anonymous visitors look
+  // like whoever logged in last. Nothing reads it any more, so blank it out so
+  // a future reader can't mistake it for live state.
+  try {
+    const stale = await bootStore.getSetting("activeUsername");
+    if (stale) {
+      await bootStore.setSetting("activeUsername", "");
+      console.log(`[${bootStore.name}] Cleared the obsolete shared "activeUsername" setting (identity now comes from the JWT only).`);
+    }
+  } catch { /* non-fatal */ }
+
+  // مهاجرت یک‌باره (تصمیم کاربر، گزینه‌ی «ب»): کدهای LOYAL-… که پیش از افزودن ستون
+  // ownerUsername ساخته شده‌اند مالک ندارند. اگر عمومی بمانند، هر کسی می‌تواند کدی را که
+  // مشتری دیگری با امتیازش خریده خرج کند؛ پس غیرفعال می‌شوند.
+  try {
+    const disabled = await bootStore.deactivateLegacyOwnerlessLoyaltyCoupons();
+    if (disabled > 0) {
+      console.log(`[${bootStore.name}] Deactivated ${disabled} legacy ownerless LOYAL-* coupon(s); they predate per-user coupon ownership.`);
+    }
+  } catch (err) {
+    console.warn(`[${bootStore.name}] Could not deactivate legacy loyalty coupons:`, err);
+  }
+
   // Safety net only: if for some reason no admin account exists at all
   // (e.g. local dev before /install was ever completed), create a minimal
   // fallback admin so the app doesn't hard-crash. This never seeds samples.
@@ -599,22 +675,28 @@ async function startServer() {
     console.error(`[${bootStore.name}] Error checking/seeding minimal admin account:`, err);
   }
 
-  // Resolves the REAL current user for this specific request: prefers the
-  // user identified by a real JWT (req.authUsername) — which is what every
-  // properly-updated client (mobile app, future website version) sends —
-  // and only falls back to the legacy shared "activeUsername" setting when
-  // no token was sent at all, for backward compatibility with the current
-  // website.
+  // Resolves the REAL current user for this specific request — and ONLY from the
+  // signed JWT on that request.
+  //
+  // This used to fall back to a shared, server-wide "activeUsername" setting when
+  // no token was sent, as a compatibility shim for an older single-user version of
+  // the website. That shim leaked private data: because /api/auth/register and
+  // /api/auth/login overwrote the setting, an *anonymous* visitor calling
+  // GET /api/user received the full profile — including e-mail and phone number —
+  // of whoever logged in last, and the UI rendered them as that person. On a fresh
+  // install the setting is seeded to "admin", so every visitor saw the admin banner.
+  //
+  // No token now means Guest, full stop. Clients authenticate with a Bearer token
+  // (the website attaches one automatically via src/services/authToken.ts).
   async function getCurrentUser(req?: express.Request) {
     const store = getActiveDataProvider();
-    const tokenUsername = req && (req as any).authUsername;
-    const activeUsername = tokenUsername || (await store.getSetting("activeUsername")) || "Guest";
+    const tokenUsername = (req && (req as any).authUsername) || "Guest";
 
-    if (activeUsername === "Guest") {
+    if (tokenUsername === "Guest") {
       return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
     }
 
-    const row = await store.getUserByUsername(activeUsername);
+    const row = await store.getUserByUsername(tokenUsername);
     if (row) {
       return {
         username: row.username,
@@ -628,6 +710,14 @@ async function startServer() {
     return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
   }
 
+  /** آیا این نام کاربری نقش admin دارد؟ نقش هر بار از دیتابیس خوانده می‌شود، نه از توکن،
+   *  تا سلب دسترسی ادمین فوری اثر کند. */
+  async function isAdminUsername(username?: string): Promise<boolean> {
+    if (!username) return false;
+    const row = await getActiveDataProvider().getUserByUsername(username);
+    return (row?.role || "gamer") === "admin";
+  }
+
   // Requires a REAL authenticated user (a valid token). Used by routes where
   // acting as "Guest" would make no sense (e.g. checking "my" reservation).
   function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -639,13 +729,9 @@ async function startServer() {
 
   // Requires a REAL authenticated user whose role is "admin".
   //
-  // This deliberately does NOT go through getCurrentUser(), because that helper
-  // falls back to the shared legacy "activeUsername" setting when no token is
-  // sent — and that setting is seeded to "admin" on a fresh install, which would
-  // make every anonymous visitor look like the administrator. Privileged routes
-  // therefore demand a real, signed JWT (req.authUsername) and re-check the role
-  // against the database on every request, so revoking a user's admin role takes
-  // effect immediately instead of living on inside an old token.
+  // Privileged routes demand a real, signed JWT (req.authUsername) and re-check
+  // the role against the database on every request, so revoking a user's admin
+  // role takes effect immediately instead of living on inside an old token.
   async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
       const username = (req as any).authUsername;
@@ -687,8 +773,8 @@ async function startServer() {
 
       // createUser hashes the password internally (bcrypt) before storing it
       await store.createUser({ username, password, email, phone: phone || "" });
-      // Kept for backward compatibility with the current website, which doesn't send a token yet
-      await store.setSetting("activeUsername", username);
+      // NOTE: deliberately does NOT write a server-wide "activeUsername" setting.
+      // Identity lives in the JWT returned below — see getCurrentUser().
 
       const newUser = {
         username,
@@ -703,8 +789,9 @@ async function startServer() {
         id: "wel-" + Math.random().toString(36).substring(2, 9),
         points: 100,
         description: "هدیه خوش‌آمدگویی عضویت طلایی بازینو",
-        type: "Earned",
+        type: "Bonus",
         date: "امروز",
+        username,
       };
       await store.addTransaction(newTx);
 
@@ -730,8 +817,8 @@ async function startServer() {
         return res.status(400).json({ error: "نام کاربری یا کلمه عبور اشتباه است." });
       }
 
-      // Kept for backward compatibility with the current website, which doesn't send a token yet
-      await store.setSetting("activeUsername", found.username);
+      // NOTE: deliberately does NOT write a server-wide "activeUsername" setting.
+      // Identity lives in the JWT returned below — see getCurrentUser().
 
       const user = {
         username: found.username,
@@ -769,9 +856,8 @@ async function startServer() {
 
   app.post("/api/auth/logout", async (req, res) => {
     try {
-      // JWT logout is client-side (just discard the token). This also resets the
-      // legacy shared "activeUsername" setting so the current website keeps working.
-      await getActiveDataProvider().setSetting("activeUsername", "Guest");
+      // JWT logout is client-side: the browser discards the token. Nothing is
+      // stored server-side for a session, so there is nothing to clear here.
       res.json({ success: true, user: { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" } });
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -883,9 +969,10 @@ async function startServer() {
           description,
           type: points > 0 ? "Earned" : "Redeemed",
           date: "امروز",
+          username: user.username !== "Guest" ? user.username : "",
         };
         await store.addTransaction(newTx);
-        const transactions = await store.listTransactions();
+        const transactions = (await store.listTransactions()).filter(t => (t.username || "") === user.username);
         res.json({ success: true, user, transactions });
       } else {
         res.status(400).json({ error: "Invalid points amount" });
@@ -895,72 +982,116 @@ async function startServer() {
     }
   });
 
+  // تاریخچه‌ی امتیاز خودِ کاربر. قبلاً کل جدول برگردانده می‌شد، یعنی هر مشتری الگوی خرید و
+  // رفت‌وآمد بقیه را می‌دید. ردیف‌های بدون username میراث‌اند و فقط به ادمین نشان داده می‌شوند.
   app.get("/api/transactions", async (req, res) => {
     try {
-      const transactions = await resolveSampleList(await getActiveDataProvider().listTransactions(), SAMPLE_TRANSACTIONS);
+      const store = getActiveDataProvider();
+      const username = (req as any).authUsername as string | undefined;
+      const all = await resolveTransactionalList(await store.listTransactions(), SAMPLE_TRANSACTIONS);
+
+      if (!username) return res.json([]);
+      if (await isAdminUsername(username)) return res.json(all);
+
+      const transactions = all.filter((t: any) => (t.username || "") === username);
       res.json(transactions);
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
   });
 
+  // کدهای تبلیغاتی عمومی (بدون مالک) + کدهای شخصیِ خودِ کاربر. یک کد LOYAL-… که مشتری با
+  // امتیازش خریده نباید در لیست بقیه ظاهر شود؛ چون یک‌بارمصرف است، اولین کسی که می‌دیدش آن را
+  // خرج می‌کرد و امتیاز صاحبش از بین می‌رفت.
   app.get("/api/coupons", async (req, res) => {
     try {
-      const coupons = await resolveSampleList(await getActiveDataProvider().listCoupons(), SAMPLE_COUPONS);
+      const store = getActiveDataProvider();
+      const username = (req as any).authUsername as string | undefined;
+      const all = await resolveTransactionalList(await store.listCoupons(), SAMPLE_COUPONS);
+
+      if (username && (await isAdminUsername(username))) return res.json(all);
+
+      const coupons = all.filter((c: any) => {
+        const owner = c.ownerUsername || "";
+        return owner === "" || owner === username;
+      });
       res.json(coupons);
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
   });
 
-  // Convert points to coupon
-  app.post("/api/loyalty/redeem", async (req, res) => {
+  // تبدیل امتیاز به کد تخفیف.
+  //
+  // نرخ تبدیل و خودِ کد **فقط اینجا** تعیین می‌شوند. قبلاً `couponValue` و `code` از بدنه‌ی
+  // درخواست خوانده می‌شدند و تنها اعتبارسنجی «آیا کاربر این‌قدر امتیاز دارد؟» بود؛ یعنی با یک
+  // درخواست دستی می‌شد با ۱ امتیاز یک کوپن ۵۰ میلیون تومانی ساخت، یا کدی ساخت که با یک کد
+  // تبلیغاتی موجود تداخل کند. همان قاعده‌ای که برای رزرو و سفارش رعایت شده بود، اینجا از قلم
+  // افتاده بود: هرگز به عددی که کلاینت می‌فرستد اعتماد نکن.
+  const POINTS_TO_TOMAN = 100;      // ۱ امتیاز = ۱۰۰ تومان
+  const MIN_REDEEM_POINTS = 100;
+
+  app.post("/api/loyalty/redeem", requireAuth, async (req, res) => {
     try {
-      const { points, couponValue, code } = req.body;
       const store = getActiveDataProvider();
       const user = await getCurrentUser(req);
 
-      if (user.loyaltyPoints >= points) {
-        if (user.username !== "Guest") {
-          await store.addLoyaltyPointsToUser(user.username, -points);
-          user.loyaltyPoints -= points;
-        }
-
-        const newTx = {
-          id: Math.random().toString(36).substring(2, 9),
-          points: -points,
-          description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} تومانی (${code})`,
-          type: "Redeemed",
-          date: "امروز",
-        };
-        await store.addTransaction(newTx);
-
-        const expiryDate = new Date(Date.now() + 30 * 86400000).toISOString();
-        const newCoupon = {
-          code,
-          type: "Fixed",
-          value: couponValue,
-          minOrder: couponValue * 1.5,
-          expiry: "۳۰ روز دیگر",
-          expiryDate,
-          maxUsageCount: 1,
-          usageCount: 0,
-          isActive: true,
-        };
-        await store.createCoupon(newCoupon);
-
-        const transactions = await store.listTransactions();
-        const coupons = await store.listCoupons();
-
-        res.json({
-          success: true,
-          user,
-          transactions,
-          activeCoupons: coupons
-        });
-      } else {
-        res.status(400).json({ error: "امتیاز کافی ندارید" });
+      const points = Math.floor(Number(req.body?.points));
+      if (!Number.isFinite(points) || points < MIN_REDEEM_POINTS) {
+        return res.status(400).json({ error: `حداقل امتیاز قابل تبدیل ${MIN_REDEEM_POINTS} امتیاز است.` });
       }
+      if (user.loyaltyPoints < points) {
+        return res.status(400).json({ error: "امتیاز کافی ندارید" });
+      }
+
+      const couponValue = points * POINTS_TO_TOMAN;
+
+      // کد یکتا، سمت سرور. اگر برخورد داشت چند بار دیگر تلاش می‌شود.
+      let code = "";
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = `LOYAL-${randomBytes(4).toString("hex").toUpperCase()}`;
+        if (!(await store.getCouponByCode(candidate))) { code = candidate; break; }
+      }
+      if (!code) {
+        return res.status(500).json({ error: "تولید کد تخفیف ناموفق بود. دوباره تلاش کنید." });
+      }
+
+      await store.addLoyaltyPointsToUser(user.username, -points);
+      user.loyaltyPoints -= points;
+
+      await store.addTransaction({
+        id: Math.random().toString(36).substring(2, 9),
+        points: -points,
+        description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} تومانی (${code})`,
+        type: "Redeemed",
+        date: "امروز",
+        username: user.username,
+      });
+
+      await store.createCoupon({
+        code,
+        type: "Fixed",
+        value: couponValue,
+        minOrder: couponValue * 1.5,
+        expiry: "۳۰ روز دیگر",
+        expiryDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+        maxUsageCount: 1,
+        usageCount: 0,
+        isActive: true,
+        ownerUsername: user.username,      // کد شخصی است: فقط خودش می‌بیند و خرج می‌کند
+      });
+
+      const allTransactions = await store.listTransactions();
+      const allCoupons = await store.listCoupons();
+
+      res.json({
+        success: true,
+        user,
+        code,
+        couponValue,
+        transactions: allTransactions.filter(t => (t.username || "") === user.username),
+        activeCoupons: allCoupons.filter(c => !c.ownerUsername || c.ownerUsername === user.username),
+      });
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
@@ -1018,7 +1149,7 @@ async function startServer() {
       // hourly rate — the client cannot influence how much is charged or earned.
       const durationHours = hoursBetween(st, et) || 1;
       const baseTotal = Math.round(durationHours * system.hourlyRate);
-      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode);
+      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, (req as any).authUsername);
       const totalPrice = Math.max(0, baseTotal - discountAmount);
       const pointsEarned = Math.floor(totalPrice / 10000);
 
@@ -1037,6 +1168,7 @@ async function startServer() {
         description: `امتیاز بابت رزرو سانس سیستم ${system.name}`,
         type: "Earned",
         date: "امروز",
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addTransaction(newTx);
 
@@ -1057,7 +1189,10 @@ async function startServer() {
 
       // Record the usage (increments usageCount; deactivates once maxUsageCount is reached)
       if (coupon) {
-        await store.recordCouponUsage(couponCode);
+        const consumed = await store.recordCouponUsage(couponCode);
+        if (!consumed) {
+          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+        }
       }
 
       const systems = await store.listSystems();
@@ -1078,10 +1213,26 @@ async function startServer() {
     }
   });
 
+  // A customer's own bookings and QR check-in codes. Private on purpose: a QR
+  // token is what unlocks a seat, so showing someone else's would let a visitor
+  // walk in on a session they never paid for.
+  //
+  //   • anonymous          → [] (the UI then asks them to sign in)
+  //   • signed-in customer → only rows whose username matches their token
+  //   • admin              → everything, so the front desk can see the floor
+  //
+  // Sample rows carry username: "" and are only ever returned while the club
+  // has no real bookings yet, so a fresh install doesn't look broken.
   app.get("/api/reservations", async (req, res) => {
     try {
-      const reservationLogs = await resolveSampleList(await getActiveDataProvider().listReservationLogs(), SAMPLE_RESERVATION_LOGS);
-      res.json(reservationLogs);
+      const store = getActiveDataProvider();
+      const username = (req as any).authUsername as string | undefined;
+      const all = await resolveTransactionalList(await store.listReservationLogs(), SAMPLE_RESERVATION_LOGS);
+
+      if (!username) return res.json([]);
+      if (await isAdminUsername(username)) return res.json(all);
+
+      res.json(all.filter((r: any) => r.username === username));
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
@@ -1165,6 +1316,7 @@ async function startServer() {
         description: `تمدید ${hours} ساعته ${active.systemName}`,
         type: "Redeemed",
         date: "امروز",
+        username: user.username,
       });
 
       const updatedReservation = await store.getReservationLogById(active.id);
@@ -1400,6 +1552,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           description: `سفارش صوتی ${match.name} از طریق جارویس`,
           type: "Earned",
           date: "امروز",
+          username: user.username !== "Guest" ? user.username : "",
         });
         const orderId = "CF-" + Math.floor(1000 + Math.random() * 9000);
         await store.addCafeOrder({
@@ -1445,6 +1598,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           description: `تمدید ${hours} ساعته ${active.systemName} از طریق جارویس`,
           type: "Redeemed",
           date: "امروز",
+          username: user.username,
         });
         return { reply: `تمدید شد! ${active.systemName} تا ساعت ${newEndTime} تمدید شد و ${pointsNeeded} امتیاز کسر شد. خوش بگذره! ⚡`, newEndTime };
       }
@@ -1503,7 +1657,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         const log = { id: "res-" + Math.random().toString(36).substring(2, 9), systemId: system.id, username: user.username, systemName: system.name, startTime, endTime, totalPrice, date: "امروز", checkedIn: false, timestamp: new Date().toISOString() };
         await store.addReservationLog(log);
-        await store.addTransaction({ id: Math.random().toString(36).substring(2, 9), points: pointsEarned, description: `رزرو ${system.name} از طریق جارویس`, type: "Earned", date: "امروز" });
+        await store.addTransaction({ id: Math.random().toString(36).substring(2, 9), points: pointsEarned, description: `رزرو ${system.name} از طریق جارویس`, type: "Earned", date: "امروز", username: user.username !== "Guest" ? user.username : "" });
         return { reply: `رزرو انجام شد: ${system.name} از ${startTime} تا ${endTime}. ${pointsEarned} امتیاز هم به حسابت اضافه شد.`, reservation: log };
       }
 
@@ -1519,7 +1673,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       case "show_wallet": {
         if (user.username === "Guest") return { reply: "برای دیدن کیف پول و امتیازها باید وارد حساب کاربری بشی." };
         const fresh = await store.getUserByUsername(user.username);
-        const coupons = await resolveSampleList(await store.listCoupons(), SAMPLE_COUPONS);
+        const coupons = await resolveTransactionalList(await store.listCoupons(), SAMPLE_COUPONS);
         const activeCoupons = coupons.filter(c => c.isActive).slice(0, 3).map(c => c.code).join("، ") || "کد فعالی نداری";
         const tx = (await store.listTransactions()).slice(0, 3).map(t => `${t.description}: ${t.points}`).join(" | ");
         return { reply: `امتیاز فعلی شما ${fresh?.loyaltyPoints ?? user.loyaltyPoints} است. کدهای فعال: ${activeCoupons}. آخرین تراکنش‌ها: ${tx || "هنوز تراکنشی ثبت نشده"}` };
@@ -1534,14 +1688,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       }
 
       case "list_tournaments": {
-        const tournaments = await resolveSampleList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
+        const tournaments = await resolveMergedList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
         const list = tournaments.filter(t => t.status !== "Completed").slice(0, 4).map(t => `${t.title} (${t.game})`).join("، ");
         return { reply: list ? `تورنمنت‌های فعال و آینده: ${list}` : "فعلاً تورنمنت فعالی نداریم." };
       }
 
       case "register_tournament": {
         if (user.username === "Guest") return { reply: "برای ثبت‌نام تورنمنت باید وارد حساب کاربری باشی." };
-        const tournaments = await resolveSampleList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
+        const tournaments = await resolveMergedList(await store.listTournaments(), SAMPLE_TOURNAMENTS);
         const needle = String(intent.params.tournamentName || "").toLowerCase();
         const tournament = tournaments.find(t => needle && (t.title.toLowerCase().includes(needle) || needle.includes(t.game.toLowerCase()))) || tournaments.find(t => t.status !== "Completed");
         if (!tournament) return { reply: "تورنمنت مناسبی برای ثبت‌نام پیدا نکردم." };
@@ -1564,7 +1718,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const q = String(intent.params.query || "").toLowerCase();
         const item = items.find(i => i.name.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())) || items[0];
         if (!item || item.stock < 1) return { reply: "این کالا موجود نیست." };
-        const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode);
+        const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode, user.username);
         await store.decrementAccessoryStock(item.id, 1);
         const finalAmount = Math.max(0, item.price - discountAmount);
         const pointsEarned = Math.floor(finalAmount / 10000);
@@ -1817,10 +1971,15 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Server-authoritative coupon validation shared by cafe orders, shop orders,
   // and the standalone /api/discount/validate endpoint. The client only ever
   // sends a coupon *code* — the discount amount is always computed here.
-  async function validateCouponServerSide(amount: number, code?: string) {
+  async function validateCouponServerSide(amount: number, code?: string, username?: string) {
     if (!code) return { discountAmount: 0, coupon: null as any };
     const store = getActiveDataProvider();
     const coupon = await resolveSampleById(() => store.getCouponByCode(code), SAMPLE_COUPONS, code, "code");
+    // مخفی‌کردن کد از لیست کافی نیست: کسی که کد را از جای دیگری ببیند یا حدس بزند باز هم
+    // می‌تواند دستی واردش کند، پس مالکیت هنگام استفاده هم بررسی می‌شود.
+    if (coupon && (coupon as any).ownerUsername && (coupon as any).ownerUsername !== username) {
+      throw Object.assign(new Error("این کد تخفیف متعلق به حساب کاربری شما نیست."), { statusCode: 403 });
+    }
     if (!coupon || !coupon.isActive) {
       throw Object.assign(new Error("کد تخفیف معتبر نیست یا قبلاً استفاده شده است."), { statusCode: 400 });
     }
@@ -1860,7 +2019,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         totalPrice += menuItem.price * orderItem.quantity;
       }
 
-      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode);
+      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
       const pointsEarned = Math.floor(finalAmount / 10000);
 
@@ -1881,6 +2040,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         description: "امتیاز بابت سفارش بوفه کافه گیم‌نت",
         type: "Earned",
         date: "امروز",
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addTransaction(newTx);
 
@@ -1901,7 +2061,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       // Record the usage (increments usageCount; deactivates once maxUsageCount is reached)
       if (coupon) {
-        await store.recordCouponUsage(couponCode);
+        const consumed = await store.recordCouponUsage(couponCode);
+        if (!consumed) {
+          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+        }
       }
 
       const cafeItems = await store.listCafeItems();
@@ -1952,7 +2115,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         totalPrice += catalogItem.price * cartItem.quantity;
       }
 
-      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode);
+      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
       const pointsEarned = Math.floor(finalAmount / 10000);
 
@@ -1972,6 +2135,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         description: "امتیاز خرید موفق لوازم جانبی گیمینگ",
         type: "Earned",
         date: "امروز",
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addTransaction(newTx);
 
@@ -1990,7 +2154,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       // Record the usage (increments usageCount; deactivates once maxUsageCount is reached)
       if (coupon) {
-        await store.recordCouponUsage(couponCode);
+        const consumed = await store.recordCouponUsage(couponCode);
+        if (!consumed) {
+          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+        }
       }
 
       const accessories = await store.listAccessories();
@@ -2011,7 +2178,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Tournaments
   app.get("/api/tournaments", async (req, res) => {
     try {
-      const tournaments = await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS);
+      const tournaments = await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS);
       res.json(tournaments.map(t => ({
         ...t,
         teams: JSON.parse(t.teams),
@@ -2062,7 +2229,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Blog News Articles & Comments
   app.get("/api/articles", async (req, res) => {
     try {
-      const articles = await resolveSampleList(await getActiveDataProvider().listArticles(), SAMPLE_ARTICLES);
+      const articles = await resolveMergedList(await getActiveDataProvider().listArticles(), SAMPLE_ARTICLES);
       res.json(articles.map(a => ({
         ...a,
         comments: JSON.parse(a.comments)
@@ -2115,7 +2282,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { code, total } = req.query;
       const amount = Number(total || 0);
-      const { discountAmount, coupon } = await validateCouponServerSide(amount, String(code));
+      const { discountAmount, coupon } = await validateCouponServerSide(amount, String(code), (req as any).authUsername);
       res.json({ valid: true, discountAmount, coupon });
     } catch (e: any) {
       res.status(e.statusCode || 500).json({ valid: false, error: e.message || String(e) });
@@ -2126,18 +2293,62 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // ADMIN PANEL BACKEND CONTROLLERS
   // =========================================================================
 
+  /** شناسه‌ی یکتا برای یک رکورد تازه‌ی کاتالوگ.
+   *
+   *  قبلاً شناسه از روی **تعداد ردیف‌ها** ساخته می‌شد (`"s" + (count + 1)`). هر بار که
+   *  ادمین رکوردی را حذف می‌کرد، شمارش یکی کم می‌شد و شناسه‌ی بعدی با یک رکورد موجود
+   *  برخورد می‌کرد: ساخت سه ایستگاه، حذف دومی، و افزودن ایستگاه چهارم با
+   *  `UNIQUE constraint failed: systems.id` شکست می‌خورد و از آن به بعد ادمین دیگر
+   *  اصلاً نمی‌توانست ایستگاه اضافه کند.
+   *
+   *  ضمناً پیشوند `a` هم‌زمان برای لوازم جانبی و مقالات استفاده شده بود.
+   *  حالا هر موجودیت پیشوند مخصوص خودش را دارد و یکتایی پیش از درج بررسی می‌شود —
+   *  هم نسبت به دیتابیس و هم نسبت به داده‌ی نمونه (چون شناسه‌های نمونه مثل s1..s5 در
+   *  رزروها و سفارش‌های موجود ارجاع داده شده‌اند). */
+  /** پیام خطای قابل‌فهم برای ادمین به‌جای متن خام موتور دیتابیس.
+   *  ادمین نباید چیزی مثل «SqliteError: UNIQUE constraint failed: systems.id» ببیند. */
+  function adminErrorMessage(e: any): { status: number; message: string } {
+    if (e?.statusCode && e?.message) return { status: e.statusCode, message: e.message };
+    const raw = String(e?.message || e);
+    if (/UNIQUE constraint|duplicate key|E11000/i.test(raw)) {
+      return { status: 409, message: "رکوردی با همین شناسه از قبل وجود دارد. دوباره تلاش کنید." };
+    }
+    if (/NOT NULL constraint|cannot be null/i.test(raw)) {
+      return { status: 400, message: "یکی از فیلدهای الزامی خالی است." };
+    }
+    console.error("[Admin]", raw);
+    return { status: 500, message: "ثبت اطلاعات در پایگاه داده انجام نشد. جزئیات در لاگ سرور ثبت شد." };
+  }
+
+  async function nextEntityId(
+    prefix: string,
+    exists: (id: string) => Promise<boolean>
+  ): Promise<string> {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const id = `${prefix}-${randomBytes(3).toString("hex")}`;
+      if (!(await exists(id))) return id;
+    }
+    throw Object.assign(
+      new Error("ساخت شناسه‌ی یکتا برای این رکورد ممکن نشد. دوباره تلاش کنید."),
+      { statusCode: 500 }
+    );
+  }
+
   // Get general statistics for Admin dashboard
   app.get("/api/admin/stats", async (req, res) => {
     try {
       const store = getActiveDataProvider();
       const mode = await getDataSourceMode();
-      // در حالت نمونه، آمار داشبورد از داده‌های نمونه محاسبه می‌شود تا
-      // پنل مدیریت هم در حالت پیش‌فرض (sample) پر و زنده دیده شود.
-      const useSample = mode === "sample";
-      const cafeOrdersRows = useSample ? [] : await store.listCafeOrders();
-      const shopOrdersRows = useSample ? [] : await store.listShopOrders();
-      const reservationLogsRows = useSample ? SAMPLE_RESERVATION_LOGS : await store.listReservationLogs();
-      const systemsRows = useSample ? SAMPLE_SYSTEMS : await store.listSystems();
+      // سفارش‌ها همیشه مستقیم از دیتابیس خوانده می‌شوند. قبلاً در حالت sample
+      // (که پیش‌فرض است) به‌جای لیست واقعی، آرایه‌ی خالی برگردانده می‌شد؛ نتیجه
+      // این بود که مشتری سفارش می‌داد، سفارش در جدول cafe_orders ثبت می‌شد، ولی
+      // داشبورد ادمین «No active cafe orders» و «کل درآمد: ۰ تومان» نشان می‌داد.
+      // برای سفارش‌ها اصلاً داده‌ی نمونه‌ای وجود ندارد، پس چیزی برای پر کردن
+      // داشبوردِ نصب تازه از دست نمی‌رود.
+      const cafeOrdersRows = await store.listCafeOrders();
+      const shopOrdersRows = await store.listShopOrders();
+      const reservationLogsRows = await resolveTransactionalList(await store.listReservationLogs(), SAMPLE_RESERVATION_LOGS);
+      const systemsRows = await resolveSampleList(await store.listSystems(), SAMPLE_SYSTEMS);
 
       const parsedCafeOrders = cafeOrdersRows.map(o => ({ ...o, items: JSON.parse(o.items) }));
       const parsedShopOrders = shopOrdersRows.map(o => ({ ...o, cart: JSON.parse(o.cart) }));
@@ -2180,7 +2391,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, type, hourlyRate, isActive } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "s" + ((await store.countSystems()) + 1);
+      const nextId = await nextEntityId("sys", async (id) =>
+        Boolean(await store.getSystemById(id)) || SAMPLE_SYSTEMS.some(x => x.id === id));
 
       await store.createSystem({
         id: nextId,
@@ -2194,7 +2406,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listSystems();
       res.json({ success: true, systems: list });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2241,7 +2454,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "c" + ((await store.countCafeItems()) + 1);
+      const nextId = await nextEntityId("cafe", async (id) =>
+        Boolean(await store.getCafeItemById(id)) || SAMPLE_CAFE_ITEMS.some(x => x.id === id));
 
       const finalImageUrl = imageUrl || "/images/home/pizza-480.webp";
       // اولویت: مقدار دستی ادمین ← ساخت خودکار با sharp (پیش‌فرض روشن) ← undefined که
@@ -2263,7 +2477,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listCafeItems();
       res.json({ success: true, cafeItems: list });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2340,7 +2555,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "a" + ((await store.countAccessories()) + 1);
+      const nextId = await nextEntityId("acc", async (id) =>
+        Boolean(await store.getAccessoryById(id)) || SAMPLE_ACCESSORIES.some(x => x.id === id));
 
       const finalImageUrl = imageUrl || "/images/home/gear-shop-480.webp";
       const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "item");
@@ -2359,7 +2575,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listAccessories();
       res.json({ success: true, accessories: list });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2434,7 +2651,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { title, game, registrationFee, startDate, maxTeams, status } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "t" + ((await store.countTournaments()) + 1);
+      const nextId = await nextEntityId("trn", async (id) =>
+        Boolean(await store.getTournamentById(id)) || SAMPLE_TOURNAMENTS.some(x => x.id === id));
 
       const newTour = {
         id: nextId,
@@ -2465,7 +2683,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2489,7 +2708,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { title, content, category, imageUrl, mobileImageUrl, autoGenerateMobile, author, date } = req.body;
       const store = getActiveDataProvider();
-      const nextId = "a" + ((await store.countArticles()) + 1);
+      const nextId = await nextEntityId("art", async (id) =>
+        Boolean(await store.getArticleById(id)) || SAMPLE_ARTICLES.some(x => x.id === id));
 
       const finalImageUrl = imageUrl || "/images/home/esports-480.webp";
       const finalMobileUrl = await resolveAdminMobileImageUrl(mobileImageUrl, autoGenerateMobile !== false, finalImageUrl, "article");
@@ -2535,7 +2755,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      const { status, message } = adminErrorMessage(e);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -3459,6 +3680,44 @@ namespace GameNet.Infrastructure.Migrations
     }
   });
 
+  // The desktop Web Sync secret is admin-only. The public settings endpoint deliberately
+  // excludes it; this endpoint exposes only its status/masked suffix on read, and returns
+  // the full value only immediately after an explicit admin save/generate operation.
+  app.get("/api/admin/sync-settings", async (_req, res) => {
+    try {
+      const value = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
+      const apiKey = value ? String(value) : "";
+      res.json({
+        key: SYNC_API_KEY_SETTING,
+        configured: Boolean(apiKey),
+        masked: apiKey ? `${apiKey.slice(0, 4)}••••${apiKey.slice(-4)}` : "",
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load sync settings" });
+    }
+  });
+
+  app.post("/api/admin/sync-settings", async (req, res) => {
+    try {
+      const requested = req.body?.generate
+        ? randomBytes(32).toString("hex")
+        : String(req.body?.apiKey || "").trim();
+      if (requested.length < 16) {
+        return res.status(400).json({ error: "Sync API key must contain at least 16 characters" });
+      }
+      await getActiveDataProvider().setSetting(SYNC_API_KEY_SETTING, requested);
+      res.json({
+        success: true,
+        key: SYNC_API_KEY_SETTING,
+        apiKey: requested,
+        masked: `${requested.slice(0, 4)}••••${requested.slice(-4)}`,
+      });
+    } catch (err) {
+      console.error("Error saving sync settings:", err);
+      res.status(500).json({ error: "Failed to save sync settings" });
+    }
+  });
+
   app.get("/api/admin/jarvis-ai-providers", async (_req, res) => {
     try {
       const providers = await getJarvisAiProviders(false);
@@ -3760,7 +4019,6 @@ Example format:
 
       // Save custom store settings
       await provider.setSetting("storeName", storeName || "بازینو (Bazino)");
-      await provider.setSetting("activeUsername", adminUsername);
 
       // Seed sample data ONLY if the admin explicitly checked this box —
       // this is the single place sample data ever gets loaded automatically.
@@ -4050,7 +4308,7 @@ Example format:
           indexHtmlTemplate = template;
         }
         const bootstrap = {
-          tournaments: await resolveSampleList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+          tournaments: await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
           assetVersion: ASSET_VERSION,
         };
         // جلوگیری از شکستن HTML توسط دنباله‌هایی مثل "</script>" داخل JSON

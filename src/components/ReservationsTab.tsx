@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GameSystem, DiscountCode } from '../types/gamenet';
 import { Monitor, Cpu, Sparkles, Clock, Check, X, ShieldAlert, CreditCard, QrCode, UserCheck, ScanLine, Smartphone, History, ChevronLeft, ChevronRight } from 'lucide-react';
+import QrCodeImage from './QrCodeImage';
 import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
@@ -145,7 +146,7 @@ export default function ReservationsTab({
         language === 'fa' ? 'لطفاً ابتدا یک سیستم یا صندلی خالی انتخاب کنید.' :
         language === 'en' ? 'Please select an available system or seat first.' :
         language === 'ru' ? 'Пожалуйста, сначала выберите свободную систему или место.' :
-        'Lütfen önce boş bir sistem یا koltuk seçin.',
+        'Lütfen önce boş bir sistem veya koltuk seçin.',
         'error'
       );
       return;
@@ -423,11 +424,11 @@ export default function ReservationsTab({
                   <div key={res.id} className="bg-dark-card/60 rounded-xl p-4 border border-white/5 hover:border-white/10 transition-all flex flex-col sm:flex-row gap-4 items-center relative overflow-hidden">
                     {/* QR Code Graphic Container */}
                     <div className="bg-dark-bg p-2.5 rounded-xl border border-white/10 flex flex-col items-center justify-center relative group shrink-0">
-                      <img loading="lazy" 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=00f0ff&bgcolor=070913&data=${res.id}`} 
+                      <QrCodeImage
+                        value={res.id}
+                        size={112}
                         alt="Reservation QR Token"
-                        className="w-28 h-28 object-contain"
-                        referrerPolicy="no-referrer"
+                        className="w-28 h-28 object-contain rounded"
                       />
                       <span className="text-[10px] font-mono font-bold text-gray-500 mt-1 select-all uppercase">ID: {res.id}</span>
                     </div>
@@ -788,7 +789,7 @@ export default function ReservationsTab({
                     />
                     <button
                       onClick={handleApplyCoupon}
-                      className="px-4 py-2.5 bg-primary hover:bg-primary-hover text-black font-bold rounded-lg text-xs transition-all font-display uppercase tracking-wider cursor-pointer"
+                      className="shrink-0 whitespace-nowrap px-4 py-2.5 bg-primary hover:bg-primary-hover text-black font-bold rounded-lg text-xs transition-all font-display uppercase tracking-wider cursor-pointer"
                     >
                       {t('booking.btnApply', 'اعمال')}
                     </button>

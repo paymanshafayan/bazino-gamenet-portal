@@ -14,6 +14,7 @@ import {
 // HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
 import LandingHero from './components/LandingHero';
 import { clearAuthToken } from './services/authToken';
+import { postJson, errorMessage } from './services/postJson';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
 const HomeTab = lazy(() => import('./components/HomeTab'));
@@ -23,9 +24,7 @@ const CafeTab = lazy(() => import('./components/CafeTab'));
 const ShopTab = lazy(() => import('./components/ShopTab'));
 const TournamentsTab = lazy(() => import('./components/TournamentsTab'));
 const BlogTab = lazy(() => import('./components/BlogTab'));
-const CsharpCodeViewer = lazy(() => import('./components/CsharpCodeViewer'));
 const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
-const FlutterCodeViewer = lazy(() => import('./components/FlutterCodeViewer'));
 
 const AuthModal = lazy(() => import('./components/AuthModal'));
 const InstallPage = lazy(() => import('./components/InstallPage'));
@@ -116,6 +115,7 @@ export default function App() {
   };
 
   const [activeTab, setActiveTab] = useState('home');
+  const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
 
   // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
@@ -358,32 +358,36 @@ export default function App() {
     };
   }, [activeTab, layoutMode, isHomeContentReady]);
 
-  const handleRedeemPoints = async (points: number, couponValue: number, code: string) => {
+  // فقط تعداد امتیاز فرستاده می‌شود. ارزش کوپن و خودِ کد را سرور تعیین می‌کند —
+  // قبلاً هر سه از کلاینت می‌رفتند و می‌شد با ۱ امتیاز کوپن دلخواه ساخت.
+  const handleRedeemPoints = async (points: number) => {
     if (!user) return;
     try {
-      const res = await fetch('/api/loyalty/redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ points, couponValue, code })
-      });
-      if (res.ok) {
-        setUser({ ...user, points: user.loyaltyPoints - points });
-        addNotification(language === 'fa' ? 'کد تخفیف با موفقیت ایجاد شد.' : 'Discount code created.', 'success');
-        const updatedCoupons = await fetch('/api/coupons').then(r => r.json());
-        if(Array.isArray(updatedCoupons)) setActiveCoupons(updatedCoupons);
-      }
+      const data = await postJson('/api/loyalty/redeem', { points });
+      applyServerState(data);
+      if (Array.isArray(data?.activeCoupons)) setActiveCoupons(data.activeCoupons);
+      addNotification(
+        language === 'fa'
+          ? `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString()} تومانی ساخته شد: ${data?.code}`
+          : `A ${Number(data?.couponValue || 0).toLocaleString()} Toman discount code was created: ${data?.code}`,
+        'success'
+      );
     } catch (e) {
-      addNotification('Error redeeming points', 'error');
+      addNotification(errorMessage(e, language === 'fa' ? 'تبدیل امتیاز انجام نشد.' : 'Could not redeem points.'), 'error');
+      throw e;
     }
   };
 
-  const handleAddLoyaltyPoints = async (points: number) => {
+  // description عمداً پاس داده می‌شود: قبلاً امضای این تابع فقط (points) بود،
+  // پس شرحی که کامپوننت‌ها می‌فرستادند دور ریخته می‌شد و ستون description در
+  // جدول transactions null می‌ماند — تاریخچه‌ی امتیازات ردیف‌های بی‌عنوان داشت.
+  const handleAddLoyaltyPoints = async (points: number, description?: string) => {
     if (!user) return;
     try {
       const res = await fetch('/api/user/points', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ points })
+        body: JSON.stringify({ points, description })
       });
       if (res.ok) {
         setUser({ ...user, points: user.loyaltyPoints + points });
@@ -394,12 +398,41 @@ export default function App() {
     }
   };
 
+  // این دو تابع قبلاً فقط یک توست موفقیت نشان می‌دادند و هیچ درخواستی به سرور
+  // نمی‌فرستادند؛ تیم ثبت‌شده و نظر ثبت‌شده با یک refresh ناپدید می‌شدند. حالا
+  // به همان مسیرهای بک‌اند وصل‌اند که از قبل پیاده‌سازی شده بودند.
   const handleRegisterTeam = async (tournamentId: string, team: { name: string; leader: string; members: string[]; }) => {
-    addNotification('Registered successfully', 'success');
+    try {
+      const data = await postJson('/api/tournaments/register', { tournamentId, team });
+      if (Array.isArray(data?.tournaments)) setTournaments(data.tournaments);
+    } catch (e) {
+      addNotification(errorMessage(e, language === 'fa' ? 'ثبت‌نام تیم انجام نشد.' : 'Team registration failed.'), 'error');
+      throw e;
+    }
   };
 
   const handleAddComment = async (articleId: string, comment: { gamerTag: string; content: string; }) => {
-    addNotification('Comment added', 'success');
+    try {
+      const data = await postJson(`/api/articles/${articleId}/comment`, comment);
+      if (Array.isArray(data?.articles)) setArticles(data.articles);
+      addNotification(language === 'fa' ? 'نظر شما ثبت شد.' : 'Your comment has been posted.', 'success');
+    } catch (e) {
+      addNotification(errorMessage(e, language === 'fa' ? 'ثبت نظر انجام نشد.' : 'Could not post the comment.'), 'error');
+      throw e;
+    }
+  };
+
+  // وضعیت تازه‌ای که یک عملیات موفق سرور برمی‌گرداند را روی state سایت می‌نشاند،
+  // تا امتیاز کاربر، تاریخچه‌ی تراکنش‌ها و موجودی انبار بدون refresh به‌روز شوند.
+  const applyServerState = (data: any) => {
+    if (!data) return;
+    if (data.user && data.user.username && data.user.username !== 'Guest') setUser(data.user);
+    if (Array.isArray(data.transactions)) setTransactions(data.transactions);
+    if (Array.isArray(data.cafeItems)) setCafeItems(data.cafeItems);
+    if (Array.isArray(data.accessories)) setAccessories(data.accessories);
+    if (Array.isArray(data.coupons)) setActiveCoupons(data.coupons);
+    if (Array.isArray(data.tournaments)) setTournaments(data.tournaments);
+    if (Array.isArray(data.articles)) setArticles(data.articles);
   };
   
   const handleLogout = () => {
@@ -479,8 +512,8 @@ export default function App() {
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
       {activeTab === 'reservations' && <ReservationsTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
-      {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
-      {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
+      {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
+      {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
       {activeTab === 'tournaments' && <TournamentsTab themeId={themeId} tournaments={tournaments} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification}/>}
       {activeTab === 'blog' && <BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/>}
       {activeTab === 'admin' && (
@@ -494,8 +527,6 @@ export default function App() {
           setLayoutMode={setLayoutMode}
         />
       )}
-      {activeTab === 'csharp' && <CsharpCodeViewer addNotification={addNotification} />}
-      {activeTab === 'flutter' && <FlutterCodeViewer addNotification={addNotification} />}
 
       {activeTab === 'chat' && <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} />}
     </div>
@@ -539,7 +570,28 @@ export default function App() {
     );
   }
 
+  // یک منبع واحد برای ناوبری، تا هدر دسکتاپ و نوار پایین موبایل هرگز از هم جدا نیفتند.
+  // «بلاگ» و «چت» تا امروز هیچ ورودی‌ای در رابط کاربری نداشتند: صفحه‌شان ساخته شده
+  // بود و ادمین می‌توانست مقاله منتشر کند و اتاق گفتگو بسازد، ولی هیچ بازدیدکننده‌ای
+  // راهی برای رسیدن به آن‌ها نداشت.
+  const NAV_TABS = [
+    { id: 'home',         label: language === 'fa' ? 'خانه'     : (language === 'ru' ? 'ГЛАВНАЯ' : (language === 'tr' ? 'ANASAYFA' : 'Home')),      icon: Home },
+    { id: 'reservations', label: language === 'fa' ? 'رزرو'     : (language === 'ru' ? 'БРОНЬ'   : (language === 'tr' ? 'REZERV'   : 'Reserve')),   icon: Monitor },
+    { id: 'cafe',         label: language === 'fa' ? 'کافه'     : (language === 'ru' ? 'КАФЕ'    : (language === 'tr' ? 'KAFE'     : 'Cafe')),      icon: Coffee },
+    { id: 'shop',         label: language === 'fa' ? 'فروشگاه'  : (language === 'ru' ? 'МАГАЗИН' : (language === 'tr' ? 'MAĞAZA'   : 'Shop')),      icon: ShoppingBag },
+    { id: 'tournaments',  label: language === 'fa' ? 'مسابقات'  : (language === 'ru' ? 'АРЕНА'   : (language === 'tr' ? 'ARENA'    : 'Arena')),     icon: Trophy },
+    { id: 'loyalty',      label: language === 'fa' ? 'باشگاه'   : (language === 'ru' ? 'КЛУБ'    : (language === 'tr' ? 'KULÜP'    : 'Club')),      icon: Award },
+    { id: 'blog',         label: language === 'fa' ? 'بلاگ'     : (language === 'ru' ? 'БЛОГ'    : (language === 'tr' ? 'BLOG'     : 'Blog')),      icon: Newspaper },
+    { id: 'chat',         label: language === 'fa' ? 'گفتگو'    : (language === 'ru' ? 'ЧАТ'     : (language === 'tr' ? 'SOHBET'   : 'Chat')),      icon: MessageSquare },
+  ];
+  // روی موبایل هشت آیکون در ۳۹۰ پیکسل جا نمی‌شود (هر کدام کمتر از ۵۰px می‌شد و
+  // هدف لمس بسیار کوچک). پنج تای اول در نوار می‌مانند و بقیه پشت دکمه‌ی «بیشتر».
+  const MOBILE_PRIMARY_TABS = NAV_TABS.slice(0, 5);
+  const MOBILE_MORE_TABS = NAV_TABS.slice(5);
+
   const isAdminView = activeTab === 'admin';
+  // نوار پایین موبایل در پنل ادمین و حالت hub نمایش داده نمی‌شود (مثل هدر).
+  const showMobileNav = !(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin';
   const adminShellVars = isAdminView ? {
     '--primary-color': '#00e5ff',
     '--primary-hover-color': '#67e8f9',
@@ -556,7 +608,7 @@ export default function App() {
 
   return (
     <div 
-      className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} pb-[env(safe-area-inset-bottom,0px)] w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
+      className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} ${showMobileNav ? 'pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'} w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
       style={adminShellVars}
       dir={dir}
     >
@@ -620,14 +672,7 @@ export default function App() {
             </div>
             
             <nav className="hidden md:flex items-center gap-2 h-full">
-              {[
-                { id: 'home', label: language === 'fa' ? 'خانه' : (language === 'ru' ? 'ГЛАВНАЯ' : (language === 'tr' ? 'ANASAYFA' : 'Home')), icon: Home },
-                { id: 'reservations', label: language === 'fa' ? 'رزرو' : (language === 'ru' ? 'БРОНЬ' : (language === 'tr' ? 'REZERV' : 'Reserve')), icon: Monitor },
-                { id: 'cafe', label: language === 'fa' ? 'کافه' : (language === 'ru' ? 'КАФЕ' : (language === 'tr' ? 'KAFE' : 'Cafe')), icon: Coffee },
-                { id: 'shop', label: language === 'fa' ? 'فروشگاه' : (language === 'ru' ? 'МАГАЗИН' : (language === 'tr' ? 'MAĞAZA' : 'Shop')), icon: ShoppingBag },
-                { id: 'tournaments', label: language === 'fa' ? 'مسابقات' : (language === 'ru' ? 'АРЕНА' : (language === 'tr' ? 'ARENA' : 'Arena')), icon: Trophy },
-                { id: 'loyalty', label: language === 'fa' ? 'باشگاه' : (language === 'ru' ? 'КЛУБ' : (language === 'tr' ? 'KULÜP' : 'Club')), icon: Award }
-              ].map(t => (
+              {NAV_TABS.map(t => (
                 <button 
                   key={t.id} 
                   onClick={() => setActiveTab(t.id)}
@@ -793,6 +838,73 @@ export default function App() {
         </div>
       )}
       
+      {/* ──────────────────────────────────────────────────────────────
+          نوار ناوبری پایین — فقط موبایل.
+          هدر سایت `hidden md:flex` است، یعنی زیر ۷۶۸px هیچ منویی وجود نداشت و
+          کاربر موبایل عملاً در صفحه‌ی اصلی حبس می‌شد؛ تنها راه خروج، دکمه‌های
+          CTA داخل صفحه بود و برای کافه/فروشگاه/باشگاه حتی همان هم نبود.
+          ────────────────────────────────────────────────────────────── */}
+      {showMobileNav && (
+        <>
+          {isMobileMoreOpen && (
+            <div
+              className="md:hidden fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
+              onClick={() => setIsMobileMoreOpen(false)}
+            >
+              <div
+                className="absolute bottom-[calc(64px+env(safe-area-inset-bottom,0px))] inset-x-3 rounded-2xl border border-white/10 bg-dark-card p-2 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+              >
+                {MOBILE_MORE_TABS.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setActiveTab(t.id); setIsMobileMoreOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all ${
+                      activeTab === t.id ? 'bg-primary text-black' : 'text-gray-300 hover:bg-white/5'
+                    }`}
+                  >
+                    <t.icon className="w-4 h-4" />
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <nav
+            aria-label={language === 'fa' ? 'ناوبری اصلی' : 'Main navigation'}
+            className="md:hidden fixed bottom-0 inset-x-0 z-[60] h-16 pb-[env(safe-area-inset-bottom,0px)] box-content border-t border-white/10 bg-dark-card/95 backdrop-blur-xl flex items-stretch"
+          >
+            {MOBILE_PRIMARY_TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setActiveTab(t.id); setIsMobileMoreOpen(false); }}
+                aria-current={activeTab === t.id ? 'page' : undefined}
+                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 transition-colors ${
+                  activeTab === t.id ? 'text-primary' : 'text-gray-400'
+                }`}
+              >
+                <t.icon className="w-5 h-5 shrink-0" />
+                <span className="text-[10px] font-bold truncate max-w-full px-1">{t.label}</span>
+              </button>
+            ))}
+            <button
+              onClick={() => setIsMobileMoreOpen(v => !v)}
+              aria-expanded={isMobileMoreOpen}
+              aria-label={language === 'fa' ? 'بیشتر' : 'More'}
+              className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 transition-colors ${
+                isMobileMoreOpen || MOBILE_MORE_TABS.some(t => t.id === activeTab) ? 'text-primary' : 'text-gray-400'
+              }`}
+            >
+              <Menu className="w-5 h-5 shrink-0" />
+              <span className="text-[10px] font-bold truncate max-w-full px-1">{language === 'fa' ? 'بیشتر' : 'More'}</span>
+            </button>
+          </nav>
+        </>
+      )}
+
       <ScrollToTop 
         hidden={activeTab === 'admin' || activeTab === 'hub' || activeTab === 'console_grid'} 
         isRTL={dir === 'rtl'} 

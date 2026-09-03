@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle, CreditCard, DollarSign, Wallet, AlertCircle, Printer, Sparkles, Plus, Minus } from 'lucide-react';
 import { Station, Customer, PaymentMethod, CurrencyCode, Invoice } from '../types';
 import { formatCurrency, calculateBlendedGameCost, applyAmountRounding, CURRENCY_SYMBOLS } from '../utils/formatters';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface CheckoutModalProps {
   station: Station;
@@ -20,6 +21,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   onConfirmCheckout,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const activeSession = station.activeSession;
   if (!activeSession) return null;
 

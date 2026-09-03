@@ -3,6 +3,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { X, Mail, Lock, User, Phone, LogIn, UserPlus, Sparkles, AlertCircle } from 'lucide-react';
 import { UserState } from '../types/gamenet';
 import { setAuthToken } from '../services/authToken';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface Props {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotification }: Props) {
+  useModalDismiss(isOpen, onClose);
   const { language, dir, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   

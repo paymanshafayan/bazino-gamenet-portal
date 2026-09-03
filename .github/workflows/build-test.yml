@@ -119,6 +119,8 @@ jobs:
           cp -r public/. dist/
 
       - name: Boot server & smoke-test APIs
+        env:
+          JWT_SECRET: ci-smoke-test-only-not-a-real-secret
         run: |
           set -euo pipefail
           # بوت سرور در پس‌زمینه

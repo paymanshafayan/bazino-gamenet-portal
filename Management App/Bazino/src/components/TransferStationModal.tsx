@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, ArrowRightLeft, Gamepad2 } from 'lucide-react';
 import { Station } from '../types';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface TransferStationModalProps {
   sourceStation: Station;
@@ -15,6 +16,9 @@ export const TransferStationModal: React.FC<TransferStationModalProps> = ({
   onClose,
   onConfirmTransfer,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   // Available idle target stations
   const availableTargets = allStations.filter(
     (s) => s.id !== sourceStation.id && s.status === 'IDLE'

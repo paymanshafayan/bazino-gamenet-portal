@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Cpu, Radio, Printer, Shield, CheckCircle2, AlertCircle, RefreshCw, Zap, Server, Terminal, Lock, Unlock } from 'lucide-react';
 import { Station } from '../types';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 
 interface HardwareRelayModalProps {
   stations: Station[];
@@ -11,6 +12,9 @@ export const HardwareRelayModal: React.FC<HardwareRelayModalProps> = ({
   stations,
   onClose,
 }) => {
+  // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
+  useModalDismiss(true, onClose);
+
   const [activeTab, setActiveTab] = useState<'relays' | 'printer' | 'pc_agent'>('relays');
   
   // Serial COM Port simulation

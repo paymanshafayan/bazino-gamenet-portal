@@ -220,11 +220,17 @@ class JarvisStateProvider extends ChangeNotifier {
             : appState.language == 'tr'
                 ? 'tr_TR'
                 : 'en_US';
+    // این چهار مقدار قبلاً مستقیم به listen() پاس داده می‌شدند. در speech_to_text 7.x
+    // همه‌شان @Deprecated شده‌اند و باید داخل SpeechListenOptions بروند — چون
+    // `flutter analyze` حتی یک info را هم شکست حساب می‌کند، همین‌ها کل CI را قرمز می‌کردند.
+    // رفتار عوض نمی‌شود: همان locale، همان مدت‌ها، همان partial results.
     await _speech.listen(
-      localeId: localeId,
-      listenFor: const Duration(minutes: 2),
-      pauseFor: const Duration(seconds: 2),
-      partialResults: true,
+      listenOptions: stt.SpeechListenOptions(
+        localeId: localeId,
+        listenFor: const Duration(minutes: 2),
+        pauseFor: const Duration(seconds: 2),
+        partialResults: true,
+      ),
       onSoundLevelChange: (level) {
         _voiceLevel = ((level + 2) / 12).clamp(0.0, 1.0);
         notifyListeners();

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useModalDismiss } from '../utils/useModalDismiss';
 import { 
   X, 
   HelpCircle, 
@@ -37,6 +38,7 @@ interface Props {
 }
 
 export default function VisualHelpGuide({ isOpen, onClose, mode, initialSection, language, dir }: Props) {
+  useModalDismiss(isOpen, onClose);
   const [activeStep, setActiveStep] = useState(0);
   const [selectedHotspot, setSelectedHotspot] = useState<string | null>(null);
 

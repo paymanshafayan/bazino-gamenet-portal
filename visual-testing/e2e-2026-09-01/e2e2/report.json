@@ -1,0 +1,315 @@
+{
+  "base": "http://127.0.0.1:3000",
+  "when": "2026-09-01T20:51:43.832Z",
+  "steps": [
+    {
+      "id": "01",
+      "name": "load-home",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "title": "Bazino Pro | بازینو پرو — گیم‌نت و کلوپ گیمینگ"
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "01-load-home.png"
+    },
+    {
+      "id": "02",
+      "name": "theme-modal-escape-key",
+      "status": "ok",
+      "notes": [
+        "BUG: Escape does not close the theme modal"
+      ],
+      "result": {
+        "openedBefore": true,
+        "closedByEscape": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "02-theme-modal-escape-key.png"
+    },
+    {
+      "id": "03",
+      "name": "theme-apply-gaming-amp",
+      "status": "ok",
+      "notes": [
+        "root class: theme-gaming-amp min-h-[100dvh] pb-[env(safe-area-inset-bottom,0px)] w-full text"
+      ],
+      "result": {
+        "themeClassApplied": true,
+        "cls": "theme-gaming-amp min-h-[100dvh] pb-[env(safe-area-inset-bott"
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "03-theme-apply-gaming-amp.png"
+    },
+    {
+      "id": "04",
+      "name": "theme-restore-dark-gold",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "modalClosed": true
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "04-theme-restore-dark-gold.png"
+    },
+    {
+      "id": "05",
+      "name": "help-guide-modal",
+      "status": "ok",
+      "notes": [
+        "stepped to next slide"
+      ],
+      "result": {
+        "opened": true,
+        "closedByEscape": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "05-help-guide-modal.png"
+    },
+    {
+      "id": "06",
+      "name": "blog-reachability",
+      "status": "ok",
+      "notes": [
+        "header nav entry: 0, home CTA: 0",
+        "BUG: blog tab has no entry point in the UI"
+      ],
+      "result": {
+        "inHeader": 0,
+        "ctaCount": 0,
+        "heading": "تجهیزات اورجینال گیمینگ با گارانتی کلوپ"
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "06-blog-reachability.png"
+    },
+    {
+      "id": "07",
+      "name": "blog-read-article-and-comment",
+      "status": "ok",
+      "notes": [
+        "no \"read more\" button found",
+        "no comment box on blog page"
+      ],
+      "result": {
+        "commentBox": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "07-blog-read-article-and-comment.png"
+    },
+    {
+      "id": "08",
+      "name": "chat-reachability-and-send",
+      "status": "ok",
+      "notes": [
+        "BUG: chat tab has no entry point in the site UI"
+      ],
+      "result": {
+        "reachable": false
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "08-chat-reachability-and-send.png"
+    },
+    {
+      "id": "09",
+      "name": "mobile-navigation-availability",
+      "status": "ok",
+      "notes": [
+        "BUG: header navigation is hidden below md and no bottom/hamburger nav replaces it"
+      ],
+      "result": {
+        "navVisible": false,
+        "visibleButtons": [
+          "Logout",
+          "همین حالا رزرو کن",
+          "مشاهده رزروها",
+          "مشاهده رزروها",
+          "مشاهده رزروها",
+          "مشاهده رزروها",
+          "بستن",
+          "رفتن به صفحه دانلود"
+        ],
+        "scrollW": 390,
+        "innerW": 390
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "09-mobile-navigation-availability.png"
+    },
+    {
+      "id": "10",
+      "name": "mobile-tab-reservations",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "scrollW": 390,
+        "innerW": 390,
+        "h": 5712,
+        "overflow": false
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "10-mobile-tab-reservations.png"
+    },
+    {
+      "id": "11",
+      "name": "mobile-tab-cafe",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "scrollW": 390,
+        "innerW": 390,
+        "h": 5712,
+        "overflow": false
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "11-mobile-tab-cafe.png"
+    },
+    {
+      "id": "12",
+      "name": "mobile-tab-shop",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "scrollW": 390,
+        "innerW": 390,
+        "h": 5712,
+        "overflow": false
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "12-mobile-tab-shop.png"
+    },
+    {
+      "id": "13",
+      "name": "mobile-tab-tournaments",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "scrollW": 390,
+        "innerW": 390,
+        "h": 5712,
+        "overflow": false
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "13-mobile-tab-tournaments.png"
+    },
+    {
+      "id": "14",
+      "name": "mobile-tab-loyalty",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "scrollW": 390,
+        "innerW": 390,
+        "h": 5712,
+        "overflow": false
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "14-mobile-tab-loyalty.png"
+    },
+    {
+      "id": "15",
+      "name": "page/app-download",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "status": 200,
+        "heading": "اپلیکیشن موبایل بازینو را نصب کنید"
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "15-page-app-download.png"
+    },
+    {
+      "id": "16",
+      "name": "page/install",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "status": 200,
+        "heading": "رزرو سیستم‌های گیمینگ فوق پیشرفته"
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "16-page-install.png"
+    },
+    {
+      "id": "17",
+      "name": "admin-login",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "adminBanner": 1
+      },
+      "newConsoleErrors": [
+        "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+      ],
+      "newNetworkFailures": [
+        "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+      ],
+      "screenshot": "17-admin-login.png"
+    },
+    {
+      "id": "18",
+      "name": "admin-panel-open",
+      "status": "ok",
+      "notes": [],
+      "result": {
+        "headingFound": true,
+        "sections": []
+      },
+      "newConsoleErrors": [],
+      "newNetworkFailures": [],
+      "screenshot": "18-admin-panel-open.png"
+    }
+  ],
+  "allConsoleErrors": [
+    "Failed to load resource: net::ERR_CONNECTION_CLOSED"
+  ],
+  "allNetworkFailures": [
+    "FAILED https://api.qrserver.com/v1/create-qr-code/?size=148x148&margin=8&data=http%3A%2F%2F127.0.0.1%3A3000%2Fapp-download"
+  ]
+}

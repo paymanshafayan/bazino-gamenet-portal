@@ -2,19 +2,21 @@ import React, { useState } from 'react';
 import { CafeItem, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Check, X, Sparkles, Coffee, Utensils, Zap } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { postJson, errorMessage, toServerCart } from '../services/postJson';
 
 interface Props {
   themeId?: string;
   cafeItems: CafeItem[];
   activeCoupons: DiscountCode[];
-  onAddLoyaltyPoints: (points: number, desc: string) => void;
+  /** پس از ثبت موفق سفارش، وضعیت تازه‌ی سرور (کاربر، تراکنش‌ها، موجودی منو) را بالا می‌فرستد. */
+  onServerState: (data: any) => void;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 export default function CafeTab({
   cafeItems,
   activeCoupons,
-  onAddLoyaltyPoints,
+  onServerState,
   addNotification,
 }: Props) {
   const { t, dir, language } = useLanguage();
@@ -139,8 +141,13 @@ export default function CafeTab({
     );
   };
 
-  const handleCheckout = () => {
-    if (cart.length === 0) return;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // سفارش واقعاً به بک‌اند فرستاده می‌شود. قیمت، تخفیف، کسر موجودی و امتیاز همه
+  // سمت سرور محاسبه می‌شوند (POST /api/cafe/order)، پس اینجا هیچ عددی به کاربر
+  // وعده داده نمی‌شود مگر اینکه سرور تأییدش کرده باشد.
+  const handleCheckout = async () => {
+    if (cart.length === 0 || isSubmitting) return;
     if (!systemNumber.trim()) {
       addNotification(
         language === 'fa' ? 'لطفاً شماره سیستم یا صندلی خود را وارد کنید.' :
@@ -152,35 +159,41 @@ export default function CafeTab({
       return;
     }
 
-    const subtotal = getSubtotal();
-    const discount = getDiscountAmount();
-    const finalAmount = subtotal - discount;
+    setIsSubmitting(true);
+    try {
+      const data = await postJson('/api/cafe/order', {
+        items: toServerCart(cart),
+        couponCode: appliedCoupon?.code || '',
+        tableNumber: systemNumber,
+      });
 
-    const pointsEarned = Math.floor(finalAmount / 10000);
+      onServerState(data);
 
-    const descMsg = language === 'fa'
-      ? `خرید از بوفه و کافه تحویل روی سیستم ${systemNumber}`
-      : language === 'en'
-      ? `Buffet order delivered to system ${systemNumber}`
-      : language === 'ru'
-      ? `Заказ буфета доставлен на систему ${systemNumber}`
-      : `Büfe siparişi ${systemNumber} nolu sisteme teslim edildi`;
+      const orderId = data?.order?.id ? ` (${data.order.id})` : '';
+      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10000);
+      const successMsg = language === 'fa'
+        ? `سفارش شما ثبت شد${orderId}! بلافاصله پس از آماده‌سازی روی صندلی ${systemNumber} تحویل داده می‌شود. ${pointsEarned} امتیاز به شما تعلق گرفت.`
+        : language === 'en'
+        ? `Your order has been registered${orderId}! It will be delivered to seat ${systemNumber} immediately after preparation. You earned ${pointsEarned} points.`
+        : language === 'ru'
+        ? `Ваш заказ зарегистрирован${orderId}! Он будет доставлен к вашему месту ${systemNumber} сразу после приготовления. Получено ${pointsEarned} баллов.`
+        : `Siparişiniz kaydedildi${orderId}! Hazırlandıktan hemen sonra ${systemNumber} nolu koltuğa teslim edilecektir. ${pointsEarned} puan kazandınız.`;
 
-    onAddLoyaltyPoints(pointsEarned, descMsg);
+      addNotification(successMsg, 'success');
 
-    const successMsg = language === 'fa'
-      ? `سفارش شما ثبت شد! بلافاصله پس از آماده‌سازی روی صندلی ${systemNumber} تحویل داده می‌شود. ${pointsEarned} امتیاز به شما تعلق گرفت.`
-      : language === 'en'
-      ? `Your order has been registered! It will be delivered to seat ${systemNumber} immediately after preparation. You earned ${pointsEarned} points.`
-      : language === 'ru'
-      ? `Ваш заказ зарегистрирован! Он будет доставлен к вашему месту ${systemNumber} сразу после приготовления. Получено ${pointsEarned} баллов.`
-      : `Siparişiniz kaydedildi! Hazırlandıktan hemen sonra ${systemNumber} nolu koltuğa teslim edilecektir. ${pointsEarned} puan kazandınız.`;
-
-    addNotification(successMsg, 'success');
-
-    setCart([]);
-    setAppliedCoupon(null);
-    setCouponCode('');
+      setCart([]);
+      setAppliedCoupon(null);
+      setCouponCode('');
+    } catch (e) {
+      addNotification(errorMessage(e,
+        language === 'fa' ? 'ثبت سفارش انجام نشد. دوباره تلاش کنید.' :
+        language === 'en' ? 'Could not place the order. Please try again.' :
+        language === 'ru' ? 'Не удалось оформить заказ. Попробуйте снова.' :
+        'Sipariş verilemedi. Lütfen tekrar deneyin.'
+      ), 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const subtotal = getSubtotal();
@@ -500,7 +513,8 @@ export default function CafeTab({
               {/* Order button */}
               <button
                 onClick={handleCheckout}
-                className="w-full mt-2 py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 cursor-pointer font-display text-xs"
+                disabled={isSubmitting}
+                className="w-full mt-2 py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 cursor-pointer font-display text-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>{t('cafe.btnOrder', 'ثبت نهایی سفارش بوفه')}</span>

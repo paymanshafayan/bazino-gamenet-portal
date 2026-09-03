@@ -8,7 +8,7 @@ interface Props {
   user: UserState;
   transactions: LoyaltyTx[];
   activeCoupons: DiscountCode[];
-  onRedeemPoints: (points: number, couponValue: number, code: string) => void;
+  onRedeemPoints: (points: number) => void | Promise<void>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -27,32 +27,30 @@ export default function LoyaltyProfileTab({
   const pointsRate = 100; // 1 Point = 100 Tomans
   const couponValue = pointsToRedeem * pointsRate;
 
-  const handleRedeem = () => {
+  const [isRedeeming, setIsRedeeming] = useState(false);
+
+  // کد تخفیف دیگر اینجا ساخته نمی‌شود: مقدار و کد را سرور تعیین می‌کند و پیام موفقیت هم
+  // از همان‌جا می‌آید. `couponValue` بالا فقط برای پیش‌نمایش قبل از تأیید است.
+  const handleRedeem = async () => {
+    if (isRedeeming) return;
     if (user.loyaltyPoints < pointsToRedeem) {
       addNotification(
-        language === 'fa' ? 'امتیاز شما کافی نیست!' : 
-        language === 'en' ? 'Insufficient points!' : 
-        language === 'ru' ? 'Недостаточно баллов!' : 'Puanınız yetersiz!', 
+        language === 'fa' ? 'امتیاز شما کافی نیست!' :
+        language === 'en' ? 'Insufficient points!' :
+        language === 'ru' ? 'Недостаточно баллов!' : 'Puanınız yetersiz!',
         'error'
       );
       return;
     }
-    
-    // Generate a random unique coupon code
-    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const generatedCode = `LOYAL-${randomSuffix}`;
 
-    onRedeemPoints(pointsToRedeem, couponValue, generatedCode);
-    
-    const successMsg = language === 'fa' 
-      ? `با موفقیت ${pointsToRedeem} امتیاز تبدیل به کد تخفیف ${couponValue.toLocaleString()} تومانی شد!`
-      : language === 'en'
-      ? `Successfully converted ${pointsToRedeem} points into a ${couponValue.toLocaleString()} Tomans discount coupon!`
-      : language === 'ru'
-      ? `Успешно обменено ${pointsToRedeem} баллов на купон номиналом ${couponValue.toLocaleString()} томанов!`
-      : `Başarıyla ${pointsToRedeem} puan, ${couponValue.toLocaleString()} Tümenlik indirim kuponuna dönüştürüldü!`;
-
-    addNotification(successMsg, 'success');
+    setIsRedeeming(true);
+    try {
+      await onRedeemPoints(pointsToRedeem);
+    } catch {
+      /* پیام خطای واقعی سرور بالادست نمایش داده شد */
+    } finally {
+      setIsRedeeming(false);
+    }
   };
 
   const handleCopyCode = (code: string) => {
@@ -200,7 +198,7 @@ export default function LoyaltyProfileTab({
 
           <button
             onClick={handleRedeem}
-            disabled={user.loyaltyPoints < pointsToRedeem || user.loyaltyPoints < 100}
+            disabled={isRedeeming || user.loyaltyPoints < pointsToRedeem || user.loyaltyPoints < 100}
             className="w-full py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none font-display text-xs cursor-pointer"
           >
             <ArrowLeftRight className="w-5 h-5" />
@@ -332,13 +330,30 @@ export default function LoyaltyProfileTab({
                     <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
                       <td className={`px-4 py-3.5 font-bold text-gray-200 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{translatedDesc}</td>
                       <td className="px-4 py-3.5 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-block ${
-                          tx.type === 'Earned' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                        }`}>
-                          {tx.type === 'Earned' ? t('loyalty.earned', 'کسب امتیاز') : t('loyalty.redeemed', 'خرج امتیاز')}
-                        </span>
+                        {/* نوع تراکنش با یک شرط دوحالته رندر می‌شد، پس هر نوعی
+                            غیر از 'Earned' — از جمله 'Bonus' — برچسب «خرج امتیاز»
+                            می‌گرفت. ردیف هدیه‌ی خوش‌آمدگویی «خرج امتیاز +100 PTS»
+                            نشان داده می‌شد که با خودش در تناقض بود. حالا علامت
+                            خودِ امتیاز تعیین‌کننده است و 'Bonus' برچسب اختصاصی دارد. */}
+                        {(() => {
+                          const isSpend = tx.points < 0;
+                          const label = tx.type === 'Bonus'
+                            ? t('loyalty.bonus', 'هدیه باشگاه')
+                            : isSpend
+                              ? t('loyalty.redeemed', 'خرج امتیاز')
+                              : t('loyalty.earned', 'کسب امتیاز');
+                          return (
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-block ${
+                              isSpend
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                : tx.type === 'Bonus'
+                                  ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            }`}>
+                              {label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className={`px-4 py-3.5 text-center font-mono font-black ${tx.points > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {tx.points > 0 ? `+${tx.points}` : tx.points} PTS

@@ -1,14 +1,14 @@
 # Flutter CI report
 
-- commit: `6d79e56080ba3cfabfcb8f999a740c66cce58911`
-- branch: `arena/01a05e95-bazino-gamenet-portal`
-- run:    33653069848
-- date:   2026-09-02 16:09 UTC
+- commit: `ea03d969fda1f0477ab813324158d7621514a670`
+- branch: `main`
+- run:    33748394083
+- date:   2026-09-03 11:12 UTC
 
 ## flutter --version
 ```
 Flutter 3.47.2 • channel stable • https://github.com/flutter/flutter.git
-Framework • revision d3b14c8769 (7 days ago) • 2026-08-26 16:07:51 -0700
+Framework • revision d3b14c8769 (8 days ago) • 2026-08-26 16:07:51 -0700
 Engine • hash 1cf1c4773fb941c4c74a7f8bb144a8837596c0f4 (revision a804b26164) (7 days ago) • 2026-08-26 18:46:13.000Z
 Tools • Dart 3.13.2 • DevTools 2.60.0
 ```
@@ -87,11 +87,11 @@ Downloading packages...
 * stream_channel 2.1.4 (was 2.1.4)
 * string_scanner 1.4.1 (was 1.4.1)
 * term_glyph 1.2.2 (was 1.2.2)
-* test_api 0.7.12 (was 0.7.11) (0.7.13 available)
+* test_api 0.7.12 (was 0.7.11) (0.7.14 available)
 * typed_data 1.4.0 (was 1.4.0)
 * vector_math 2.4.2 (was 2.2.0)
 + video_player 2.14.0
-+ video_player_android 2.12.1
++ video_player_android 2.12.2
 + video_player_avfoundation 2.11.1
 + video_player_platform_interface 6.9.0
 + video_player_web 2.4.0
@@ -111,7 +111,7 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 9.6s)
+No issues found! (ran in 8.3s)
 ```
 **exit 0 — OK**
 
@@ -151,7 +151,7 @@ file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14436 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             43.2s
+Compiling lib/main.dart for the Web...                             39.6s
 ✓ Built build/web
 ```
 **exit 0 — OK**

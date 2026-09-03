@@ -69,7 +69,7 @@ export const BUILT_IN_THEMES: ThemeInfo[] = [
   { id: 'cyberpunk-cyan', name: 'Cyberpunk Cyan', type: 'built-in' },
   { id: 'geco-purple', name: 'Geco Purple', type: 'built-in' },
   { id: 'gaming-amp', name: 'Gaming AMP', type: 'built-in' },
-  { id: 'console-grid', name: 'قالب گرید کنسولی (کلاسیک)', type: 'built-in' }
+  { id: 'console-grid', name: 'Console Grid (Classic)', type: 'built-in' }
 ];
 
 /* ---------- کلید ذخیره‌سازی قالب‌های سفارشی ---------- */

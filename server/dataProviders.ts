@@ -46,7 +46,7 @@ export function logDbQuery(provider: string, type: DBLog['type'], command: strin
     provider,
     type,
     command,
-    timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
   };
   dbQueryLogs.unshift(log);
   if (dbQueryLogs.length > 100) dbQueryLogs.pop();

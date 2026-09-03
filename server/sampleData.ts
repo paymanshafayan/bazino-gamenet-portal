@@ -113,9 +113,12 @@ export const SAMPLE_RESERVATION_LOGS: ReservationLogRow[] = [
 
 /* ---------- تنظیمات پیش‌فرض کلوپ (اطلاعات تماس/شبکه‌های اجتماعی) ---------- */
 export const SAMPLE_SETTINGS: SettingRow[] = [
-  { key: 'club_phone', value: '۰۲۱-۲۲۴۴۶۶۸۸' },
+  { key: 'club_phone', value: '+90 539 133 37 47' },
+  { key: 'club_map_url', value: 'https://maps.app.goo.gl/rUohkLWxSmpBTjsKA' },
+  { key: 'club_map_lat', value: '35.2628' },
+  { key: 'club_map_lng', value: '33.9084' },
   { key: 'club_hours', value: '۲۴ ساعته شبانه‌روز (۷ روز هفته)' },
-  { key: 'club_address', value: 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازی نو، طبقه منفی ۱' },
+  { key: 'club_address', value: 'Derviş İzzigil Sokak No.12, İskele adresinde kain Vista Mare Ana Lobi dükkan No.5 olarak tasniflendirilmiş dükkan' },
   {
     key: 'social_media_links',
     value: JSON.stringify([

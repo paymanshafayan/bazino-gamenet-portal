@@ -1377,7 +1377,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
                       {language === 'en' && 'Lounge Location'}
                     </span>
                     <p className="leading-relaxed text-xs">
-                      {siteSettings['club_address'] || (L(language, { fa: 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازی نو، طبقه منفی ۱', en: 'Level -1, BAZINO Plaza, No. 24, Shariati St., Sadr Hwy, Tehran', ru: 'Тегеран, шоссе Садр, ул. Шариати, дом 24, комплекс BAZINO, этаж -1', tr: 'Tahran, Sadr Otoyolu, Şeriati Cad., No. 24, BAZINO Plaza, -1. Kat' }))}
+                      {siteSettings['club_address'] || (L(language, { fa: 'درویش ایزیگیل سوکاک، شماره ۱۲، اسکله (İskele) — لابی اصلی Vista Mare، مغازه شماره ۵', en: 'Derviş İzzigil Sokak No.12, İskele — Vista Mare Main Lobby, Shop No.5', ru: 'Derviş İzzigil Sokak No.12, Искеле — главное лобби Vista Mare, магазин №5', tr: 'Derviş İzzigil Sokak No.12, İskele adresinde kain Vista Mare Ana Lobi dükkan No.5 olarak tasniflendirilmiş dükkan' }))}
                     </p>
                   </div>
                 </div>
@@ -1404,7 +1404,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
                         {language === 'en' && 'Support Phone Line'}
                       </span>
                       <span className="text-white font-mono text-xs font-black" style={{ direction: 'ltr' }}>
-                        {siteSettings['club_phone'] || '۰۲۱-۲۲۴۴۶۶۸۸'}
+                        {siteSettings['club_phone'] || '+90 539 133 37 47'}
                       </span>
                     </div>
                   </div>
@@ -1443,7 +1443,13 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
               
               <iframe
                 title="BAZINO Lounge Location Map"
-                src="https://www.openstreetmap.org/export/embed.html?bbox=51.4285%2C35.7760%2C51.4395%2C35.7860&amp;layer=mapnik&amp;marker=35.7810%2C51.4340"
+                src={(() => {
+                  // مختصات از تنظیمات ادمین (club_map_lat/lng) — پیش‌فرض: Bazino، Vista Mare، اسکله
+                  const lat = parseFloat(siteSettings['club_map_lat'] || '35.2628');
+                  const lng = parseFloat(siteSettings['club_map_lng'] || '33.9084');
+                  const d = 0.005;
+                  return `https://www.openstreetmap.org/export/embed.html?bbox=${(lng - d).toFixed(4)}%2C${(lat - 0.004).toFixed(4)}%2C${(lng + d).toFixed(4)}%2C${(lat + 0.004).toFixed(4)}&layer=mapnik&marker=${lat}%2C${lng}`;
+                })()}
                 className="w-full h-full border-0 rounded-none"
                 style={{
                   filter: 'invert(93%) hue-rotate(185deg) brightness(90%) contrast(100%)',
@@ -1459,8 +1465,15 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
               </div>
               
               <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono notched-clip-sm">
-                <span>Lat: 35.7810° N | Lon: 51.4340° E</span>
+                <span>Lat: {siteSettings['club_map_lat'] || '35.2628'}° N | Lon: {siteSettings['club_map_lng'] || '33.9084'}° E</span>
               </div>
+              <a
+                href={siteSettings['club_map_url'] || 'https://maps.app.goo.gl/rUohkLWxSmpBTjsKA'}
+                target="_blank" rel="noopener noreferrer"
+                className="absolute bottom-4 right-4 z-20 bg-primary text-black px-3 py-1.5 text-[10px] font-black uppercase notched-clip-sm hover:brightness-110 transition"
+              >
+                {L(language, { fa: 'مسیریابی در Google Maps', en: 'Open in Google Maps', ru: 'Открыть в Google Maps', tr: "Google Maps'te aç" })}
+              </a>
             </div>
 
           </div>

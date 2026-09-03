@@ -29,6 +29,7 @@ const { parseThemeZip, buildSampleThemeZip, buildThemeZip, rewriteCssAssetUrls, 
 const { detectRegisteredRegions, KNOWN_REGIONS } = await import('../server/themeStore.ts');
 const { makeThemeStrings, THEME_REGIONS } = await import('../src/themeSdk/sdk.ts');
 const { translations } = await import('../src/utils/translations.ts');
+const routes = await import('../src/utils/routes.ts');
 
 // src/themes/index.ts is browser-coupled (import.meta.glob, `?inline` CSS and an
 // image asset import), so plain Node cannot load it. Vite's SSR loader resolves
@@ -414,6 +415,20 @@ test('ts(): theme strings fall back language → en → first → key', () => {
   assert.equal(makeThemeStrings(strings, 'fa')('b'), 'B-tr');
   assert.equal(makeThemeStrings(strings, 'fa')('zzz', 'fb'), 'fb');
   assert.equal(makeThemeStrings(undefined, 'fa')('zzz'), 'zzz');
+});
+
+test('routes: browser path ↔ tab / admin section mapping', () => {
+  assert.equal(routes.tabFromPath('/'), 'home');
+  assert.equal(routes.tabFromPath('/reservations'), 'reservations');
+  assert.equal(routes.tabFromPath('/admin/themes'), 'admin');
+  assert.equal(routes.tabFromPath('/nope'), 'home');
+  assert.equal(routes.pathFromTab('home'), '/');
+  assert.equal(routes.pathFromTab('cafe'), '/cafe');
+  assert.equal(routes.adminSectionFromPath('/admin'), 'dashboard');
+  assert.equal(routes.adminSectionFromPath('/admin/appSlider'), 'appSlider');
+  assert.equal(routes.adminSectionFromPath('/admin/unknown'), 'dashboard');
+  assert.equal(routes.pathFromAdminSection('dashboard'), '/admin');
+  assert.equal(routes.pathFromAdminSection('themes'), '/admin/themes');
 });
 
 test('parseThemeZip rejects non-zip input instead of throwing', () => {

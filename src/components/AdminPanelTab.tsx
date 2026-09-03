@@ -51,6 +51,28 @@ import {
   type ParsedZipTheme
 } from '../themes/zip';
 import { L, localeOf } from '../utils/i18n';
+import { adminSectionFromPath, pathFromAdminSection, navigateTo, type AdminSection } from '../utils/routes';
+import { Search } from 'lucide-react';
+
+/** نام و کلیدواژه‌های هر بخش پنل — برای عنوان صفحه، هدر بخش و جستجوی سریع */
+export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; ru: string; tr: string; keywords: string }> = {
+  dashboard:         { fa: 'داشبورد و آمار زنده', en: 'Dashboard & Live Stats', ru: 'Дашборд и живая статистика', tr: 'Gösterge Paneli ve Canlı İstatistikler', keywords: 'stats آمار statistics dashboard home' },
+  systems:           { fa: 'مدیریت کلاینت‌ها و سیستم‌ها', en: 'Clients & Systems', ru: 'Клиенты и системы', tr: 'İstemciler ve Sistemler', keywords: 'pc ps5 console کنسول کامپیوتر رزرو reservation station' },
+  cafe:              { fa: 'بوفه و کافه', en: 'Cafe Buffet', ru: 'Кафе-буфет', tr: 'Kafe Büfe', keywords: 'menu منو غذا نوشیدنی food drink' },
+  shop:              { fa: 'فروشگاه لوازم جانبی', en: 'Accessory Shop', ru: 'Магазин аксессуаров', tr: 'Ekipman Mağazası', keywords: 'products محصول کالا mouse headset' },
+  tournaments:       { fa: 'مسابقات و تورنمنت‌ها', en: 'Tournaments', ru: 'Турниры', tr: 'Turnuvalar', keywords: 'match تورنمنت جایزه prize bracket' },
+  blog:              { fa: 'وبلاگ و اخبار', en: 'Blog & News', ru: 'Блог и новости', tr: 'Blog ve Haberler', keywords: 'article مقاله خبر post' },
+  chat:              { fa: 'اتاق‌های گفتگوی زنده', en: 'Live Chat Rooms', ru: 'Живые чат-комнаты', tr: 'Canlı Sohbet Odaları', keywords: 'room پیام گفتگو message' },
+  messages:          { fa: 'پیام‌ها و اعلان‌ها', en: 'Messages & Notifications', ru: 'Сообщения и уведомления', tr: 'Mesajlar ve Bildirimler', keywords: 'notification ایمیل تماس contact inbox' },
+  migrations:        { fa: 'مهاجرت‌های دیتابیس (EF Core)', en: 'Database Migrations', ru: 'Миграции БД', tr: 'Veritabanı Geçişleri', keywords: 'ef core sql schema جدول' },
+  themes:            { fa: 'مدیریت قالب‌ها', en: 'Themes', ru: 'Темы', tr: 'Tema Yönetimi', keywords: 'theme zip css تم پوسته ظاهر skin color رنگ' },
+  appSlider:         { fa: 'اسلایدر صفحه اصلی و اپ', en: 'Home & App Slider', ru: 'Слайдер главной и приложения', tr: 'Ana Sayfa ve Uygulama Slaytı', keywords: 'slider hero banner بنر اسلاید تصویر' },
+  mobileAppDownload: { fa: 'دانلود اپلیکیشن موبایل', en: 'Mobile App Download', ru: 'Загрузка мобильного приложения', tr: 'Mobil Uygulama İndirme', keywords: 'apk android ios اپ موبایل' },
+  customization:     { fa: 'سفارشی‌سازی سایت و اطلاعات کلوپ', en: 'Site Customization & Club Info', ru: 'Настройка сайта и данные клуба', tr: 'Site Özelleştirme ve Kulüp Bilgileri', keywords: 'settings تنظیمات آدرس تلفن logo address phone hours layout' },
+  dbLogs:            { fa: 'لاگ‌های دیتابیس', en: 'Database Logs', ru: 'Логи БД', tr: 'Veritabanı Günlükleri', keywords: 'log گزارش خطا error query' },
+  apiKeys:           { fa: 'کلیدهای API و اتصال‌ها', en: 'API Keys & Integrations', ru: 'API-ключи и интеграции', tr: 'API Anahtarları ve Entegrasyonlar', keywords: 'token jarvis web sync کلید اتصال integration' },
+  presentation:      { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum', keywords: 'slides معرفی pitch' },
+};
 
 const PresentationTab = React.lazy(() => import('./PresentationTab'));
 
@@ -77,7 +99,43 @@ export default function AdminPanelTab({
   setLayoutMode
 }: Props) {
   const { language, dir } = useLanguage();
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'systems' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'chat' | 'migrations' | 'messages' | 'themes' | 'appSlider' | 'mobileAppDownload' | 'customization' | 'dbLogs' | 'apiKeys' | 'presentation'>('dashboard');
+  // بخش فعال از آدرس مرورگر خوانده می‌شود (/admin/<section>) تا رفرش همان بخش را باز کند
+  const [activeSubTab, setActiveSubTabState] = useState<AdminSection>(() => adminSectionFromPath(window.location.pathname));
+  const setActiveSubTab = (sec: AdminSection) => {
+    setActiveSubTabState(sec);
+    navigateTo(pathFromAdminSection(sec));
+  };
+  useEffect(() => {
+    // اولین ورود از طریق دکمه (آدرس هنوز /admin نیست) → آدرس را بدون افزودن به تاریخچه اصلاح کن
+    if (!window.location.pathname.startsWith('/admin')) navigateTo(pathFromAdminSection(activeSubTab), true);
+    const onPop = () => setActiveSubTabState(adminSectionFromPath(window.location.pathname));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  // عنوان تب مرورگر = نام بخش فعال
+  useEffect(() => {
+    const prev = document.title;
+    const name = L(language, ADMIN_SECTION_META[activeSubTab]);
+    document.title = `${name} | ${L(language, { fa: 'پنل مدیریت بازینو', en: 'Bazino Admin', ru: 'Админ Bazino', tr: 'Bazino Yönetim' })}`;
+    return () => { document.title = prev; };
+  }, [activeSubTab, language]);
+  // جستجوی سریع بخش‌ها
+  const [sectionQuery, setSectionQuery] = useState('');
+  const [isSectionSearchOpen, setIsSectionSearchOpen] = useState(false);
+  const sectionSearchRef = useRef<HTMLDivElement | null>(null);
+  const sectionMatches = (() => {
+    const q = sectionQuery.trim().toLowerCase();
+    if (!q) return [] as AdminSection[];
+    return (Object.keys(ADMIN_SECTION_META) as AdminSection[]).filter((k) => {
+      const m = ADMIN_SECTION_META[k];
+      return [k, m.fa, m.en, m.ru, m.tr, m.keywords].join(' ').toLowerCase().includes(q);
+    });
+  })();
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => { if (sectionSearchRef.current && !sectionSearchRef.current.contains(e.target as Node)) setIsSectionSearchOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
   const [isLocalHelpOpen, setIsLocalHelpOpen] = useState(false);
   const themeUploadPanelRef = useRef<HTMLDivElement | null>(null);
   
@@ -1615,6 +1673,54 @@ export default function AdminPanelTab({
 
         {/* Admin Center Control Panel Workspace */}
         <div className="lg:col-span-9 flex flex-col gap-6">
+
+          {/* Section header: عنوان بخش فعال + جستجوی سریع بخش‌ها */}
+          <div className="bg-dark-card border border-white/10 px-5 py-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0" data-testid="admin-section-header">
+            <div className="min-w-0">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">
+                {L(language, { fa: 'پنل مدیریت', en: 'Admin Panel', ru: 'Панель управления', tr: 'Yönetim Paneli' })} <span className="text-gray-600">/</span> <span className="text-primary/80" dir="ltr">{pathFromAdminSection(activeSubTab)}</span>
+              </p>
+              <h2 className="text-lg md:text-xl font-black text-white font-display mt-1 truncate" data-testid="admin-section-title">
+                {L(language, ADMIN_SECTION_META[activeSubTab])}
+              </h2>
+            </div>
+            <div className="relative w-full md:w-80 shrink-0" ref={sectionSearchRef}>
+              <Search className={`w-4 h-4 text-gray-500 absolute top-1/2 -translate-y-1/2 ${dir === 'rtl' ? 'right-3' : 'left-3'}`} />
+              <input
+                type="search"
+                value={sectionQuery}
+                onChange={(e) => { setSectionQuery(e.target.value); setIsSectionSearchOpen(true); }}
+                onFocus={() => setIsSectionSearchOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && sectionMatches[0]) { setActiveSubTab(sectionMatches[0]); setSectionQuery(''); setIsSectionSearchOpen(false); }
+                  if (e.key === 'Escape') setIsSectionSearchOpen(false);
+                }}
+                placeholder={L(language, { fa: 'جستجوی سریع بخش‌ها… (مثلاً قالب، اسلایدر)', en: 'Quick find a section… (e.g. themes, slider)', ru: 'Быстрый поиск раздела… (темы, слайдер)', tr: 'Bölüm ara… (tema, slayt)' })}
+                aria-label={L(language, { fa: 'جستجوی بخش‌های پنل', en: 'Search admin sections', ru: 'Поиск разделов', tr: 'Bölüm ara' })}
+                data-testid="admin-section-search"
+                className={`w-full bg-black/40 border border-white/10 focus:border-primary/60 rounded-xl py-2.5 text-xs text-white placeholder:text-gray-600 outline-none transition-colors ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
+              />
+              {isSectionSearchOpen && sectionQuery.trim() && (
+                <ul className="absolute z-40 mt-2 w-full bg-[#0d1020] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto" role="listbox" data-testid="admin-section-results">
+                  {sectionMatches.length === 0 && (
+                    <li className="px-4 py-3 text-xs text-gray-500">{L(language, { fa: 'بخشی پیدا نشد', en: 'No section found', ru: 'Раздел не найден', tr: 'Bölüm bulunamadı' })}</li>
+                  )}
+                  {sectionMatches.map((k) => (
+                    <li key={k} role="option">
+                      <a
+                        href={pathFromAdminSection(k)}
+                        onClick={(e) => { e.preventDefault(); setActiveSubTab(k); setSectionQuery(''); setIsSectionSearchOpen(false); }}
+                        className={`flex items-center justify-between gap-3 px-4 py-2.5 text-xs hover:bg-primary/10 transition-colors ${activeSubTab === k ? 'text-primary' : 'text-gray-200'}`}
+                      >
+                        <span className="font-bold">{L(language, ADMIN_SECTION_META[k])}</span>
+                        <span className="text-[10px] text-gray-500 font-mono" dir="ltr">{pathFromAdminSection(k)}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
           
           {/* Quick Context-Aware Section Guide Bar */}
           <div className="bg-[#121424] border border-white/10 p-4 rounded-2xl flex items-center justify-between gap-4 animate-fade-in shrink-0">
@@ -4035,8 +4141,8 @@ export default function AdminPanelTab({
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'تلفن پشتیبانی کلوپ', en: 'Support Phone line', ru: 'Телефон поддержки клуба', tr: 'Kulüp Destek Telefonu' })}</label>
                     <input 
                       type="text" 
-                      placeholder={L(language, { fa: '۰۲۱-۲۲۴۴۶۶۸۸', en: '021-22446688', ru: '021-22446688', tr: '021-22446688' })}
-                      value={siteSettings['club_phone'] || '۰۲۱-۲۲۴۴۶۶۸۸'}
+                      placeholder="+90 539 133 37 47"
+                      value={siteSettings['club_phone'] || '+90 539 133 37 47'}
                       onChange={(e) => handleSaveSetting('club_phone', e.target.value)}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#10B981] font-mono font-bold"
                     />
@@ -4057,11 +4163,31 @@ export default function AdminPanelTab({
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'آدرس فیزیکی کلوپ', en: 'Lounge Physical Address', ru: 'Физический адрес клуба', tr: 'Kulübün Fiziksel Adresi' })}</label>
                     <input 
                       type="text" 
-                      placeholder={L(language, { fa: 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازی نو، طبقه منفی ۱', en: 'Tehran, Sadr Hwy, Shariati St, No. 24, Bazino Plaza, Floor -1', ru: 'Тегеран, шоссе Садр, ул. Шариати, д. 24, ТЦ Bazino, этаж -1', tr: 'Tahran, Sadr Otoyolu, Şeriati Cad., No. 24, Bazino Plaza, -1. Kat' })}
-                      value={siteSettings['club_address'] || (L(language, { fa: 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازی نو، طبقه منفی ۱', en: 'Level -1, BAZINO Plaza, No. 24, Shariati St., Sadr Hwy, Tehran', ru: 'Тегеран, шоссе Садр, ул. Шариати, дом 24, комплекс BAZINO, этаж -1', tr: 'Tahran, Sadr Otoyolu, Şeriati Cad., No. 24, BAZINO Plaza, -1. Kat' }))}
+                      placeholder="Derviş İzzigil Sokak No.12, İskele — Vista Mare Ana Lobi, dükkan No.5"
+                      value={siteSettings['club_address'] || (L(language, { fa: 'درویش ایزیگیل سوکاک، شماره ۱۲، اسکله (İskele) — لابی اصلی Vista Mare، مغازه شماره ۵', en: 'Derviş İzzigil Sokak No.12, İskele — Vista Mare Main Lobby, Shop No.5', ru: 'Derviş İzzigil Sokak No.12, Искеле — главное лобби Vista Mare, магазин №5', tr: 'Derviş İzzigil Sokak No.12, İskele adresinde kain Vista Mare Ana Lobi dükkan No.5 olarak tasniflendirilmiş dükkan' }))}
                       onChange={(e) => handleSaveSetting('club_address', e.target.value)}
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#10B981] font-bold"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'لینک Google Maps', en: 'Google Maps link', ru: 'Ссылка Google Maps', tr: 'Google Maps bağlantısı' })}</label>
+                    <input type="url" dir="ltr" placeholder="https://maps.app.goo.gl/rUohkLWxSmpBTjsKA"
+                      value={siteSettings['club_map_url'] || 'https://maps.app.goo.gl/rUohkLWxSmpBTjsKA'}
+                      onChange={(e) => handleSaveSetting('club_map_url', e.target.value)}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#10B981] font-mono" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'عرض جغرافیایی نقشه (Lat)', en: 'Map latitude', ru: 'Широта', tr: 'Enlem (Lat)' })}</label>
+                      <input type="text" dir="ltr" placeholder="35.2628" value={siteSettings['club_map_lat'] || '35.2628'} onChange={(e) => handleSaveSetting('club_map_lat', e.target.value)}
+                        className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#10B981] font-mono" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'طول جغرافیایی نقشه (Lng)', en: 'Map longitude', ru: 'Долгота', tr: 'Boylam (Lng)' })}</label>
+                      <input type="text" dir="ltr" placeholder="33.9084" value={siteSettings['club_map_lng'] || '33.9084'} onChange={(e) => handleSaveSetting('club_map_lng', e.target.value)}
+                        className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#10B981] font-mono" />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -49,6 +49,7 @@ import {
   Sparkles, Home, Instagram, Send, Youtube, Twitter, Facebook, Settings, ChevronDown,
   Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight, Palette
 } from 'lucide-react';
+import { tabFromPath, pathFromTab } from './utils/routes';
 
 /* ────────────────────────────────────────────────────────────────
    THEME BOOTSTRAP (یک‌بار قبل از اولین رندر)
@@ -126,9 +127,19 @@ export default function App() {
     });
   };
 
-  const [activeTab, setActiveTab] = useState('home');
+  // مسیر مرورگر ↔ تب: /reservations، /admin، /admin/themes … (رفرش صفحه همان تب را باز می‌کند)
+  const [activeTab, setActiveTabState] = useState(() => tabFromPath(window.location.pathname));
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(tab);
+    const target = pathFromTab(tab);
+    const cur = window.location.pathname;
+    // زیرمسیر ادمین (/admin/<section>) را خودِ پنل مدیریت می‌نویسد
+    if (tab === 'admin' && cur.startsWith('/admin')) return;
+    if (cur !== target) window.history.pushState({}, '', target);
+    setCurrentPath(target);
+  }, []);
 
   // هر بار پنل ادمین قالبی نصب/حذف می‌کند، این شمارنده بالا می‌رود تا لیست سروری
   // (و installedAt جدید برای cache-busting) دوباره از سرور خوانده شود.
@@ -258,7 +269,10 @@ export default function App() {
   }, [layoutMode]);
 
   useEffect(() => {
-    const onPopState = () => setCurrentPath(window.location.pathname);
+    const onPopState = () => {
+      setCurrentPath(window.location.pathname);
+      setActiveTabState(tabFromPath(window.location.pathname));
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -270,8 +284,6 @@ export default function App() {
   };
 
   const backToHomeFromDownload = () => {
-    window.history.pushState({}, '', '/');
-    setCurrentPath('/');
     setActiveTab('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

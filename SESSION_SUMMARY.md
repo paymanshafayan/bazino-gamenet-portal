@@ -885,3 +885,9 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - قالب نمونه (`themeZipCore.ts`): SDK v2 با hero+footer، strings ۴زبانه، tokens.
 - مستندات: `src/themes/README.md` بازنویسی (regions، توکن‌ها، قرارداد RTL/فونت، strings)، بخش قالب در README.
 - تأیید بصری در Chromium واقعی (`r1…r7`, `b-*.png`)؛ تست‌ها ۲۵۸/۲۵۸.
+
+## ۱۴۰۵/۰۶/۱۳ — روتینگ آدرس، عنوان/جستجوی پنل، آدرس و نقشه‌ی واقعی
+- `src/utils/routes.ts` + `App.tsx`/`AdminPanelTab.tsx`: آدرس مرورگر = صفحه‌ی فعلی؛ رفرش/Back درست؛ `<base href="/">`.
+- پنل: هدر بخش (نام + مسیر)، `document.title`، جستجوی سریع بخش‌ها با نتایج لینکی.
+- آدرس/تلفن/نقشه‌ی واقعی İskele (Vista Mare) + فیلدهای Google Maps/Lat/Lng در سفارشی‌سازی.
+- `public/images/real/` برای تصاویر واقعی. تست‌ها ۲۵۹/۲۵۹.

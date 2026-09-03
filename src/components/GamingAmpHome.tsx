@@ -421,7 +421,7 @@ export default function GamingAmpHome({
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 uppercase tracking-widest mb-1 font-bold">LOCATION</div>
-                    <div className="font-mono text-base text-white">Tehran, Iran - BAZINO HQ</div>
+                    <div className="font-mono text-base text-white">İskele, North Cyprus — Vista Mare, Shop No.5</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-6 group">

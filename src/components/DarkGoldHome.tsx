@@ -944,8 +944,7 @@ export default function DarkGoldHome({
                     {language === 'en' && 'Lounge Location'}
                   </span>
                   <p className="leading-relaxed text-xs font-semibold">
-                    {language === 'fa' && 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازینو، طبقه منفی ۱'}
-                    {language === 'en' && 'Level -1, BAZINO Plaza, No. 24, Shariati St., Sadr Hwy, Tehran, Iran'}
+                    {L(language, { fa: 'درویش ایزیگیل سوکاک، شماره ۱۲، اسکله (İskele) — لابی اصلی Vista Mare، مغازه شماره ۵', en: 'Derviş İzzigil Sokak No.12, İskele — Vista Mare Main Lobby, Shop No.5', ru: 'Derviş İzzigil Sokak No.12, Искеле — главное лобби Vista Mare, магазин №5', tr: 'Derviş İzzigil Sokak No.12, İskele adresinde kain Vista Mare Ana Lobi dükkan No.5 olarak tasniflendirilmiş dükkan' })}
                   </p>
                 </div>
               </div>
@@ -973,7 +972,7 @@ export default function DarkGoldHome({
                       {language === 'en' && 'Support Phone Line'}
                     </span>
                     <span className="text-white font-mono text-xs font-black" style={{ direction: 'ltr' }}>
-                      ۰۲۱-۲۲۴۴۶۶۸۸
+                      +90 539 133 37 47
                     </span>
                   </div>
                 </div>
@@ -989,7 +988,7 @@ export default function DarkGoldHome({
             
             <iframe
               title="Bazino Lounge Location Map"
-              src="https://www.openstreetmap.org/export/embed.html?bbox=51.4285%2C35.7760%2C51.4395%2C35.7860&amp;layer=mapnik&amp;marker=35.7810%2C51.4340"
+              src="https://www.openstreetmap.org/export/embed.html?bbox=33.9034%2C35.2588%2C33.9134%2C35.2668&amp;layer=mapnik&amp;marker=35.2628%2C33.9084"
               className="w-full h-full border-0 rounded-2xl"
               style={{
                 filter: 'invert(93%) hue-rotate(185deg) brightness(90%) contrast(100%)',
@@ -1005,7 +1004,7 @@ export default function DarkGoldHome({
             </div>
             
             <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono rounded-md">
-              <span>Lat: 35.7810° N | Lon: 51.4340° E</span>
+              <span>Lat: 35.2628° N | Lon: 33.9084° E</span>
             </div>
           </div>
 

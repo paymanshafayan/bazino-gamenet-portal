@@ -3,6 +3,7 @@
 // are injected directly into the environment and no .env file is present). `dotenv`
 // was already an installed dependency but was never actually imported anywhere.
 import "dotenv/config";
+import geoip from "geoip-lite";
 import express from "express";
 import compression from "compression";
 import { formidable } from "formidable";
@@ -420,6 +421,33 @@ async function resolveAdminMobileImageUrl(
   if (manual) return manual;
   if (autoGenerate === false) return undefined;
   return generateMobileImageVariant(imageUrl, kind);
+}
+
+// ── GeoIP → زبان ────────────────────────────────────────────────────────────
+type SiteLang = "fa" | "en" | "ru" | "tr";
+const COUNTRY_TO_LANG: Record<string, SiteLang> = {
+  IR: "fa",
+  TR: "tr",
+  CY: "tr", // قبرس (شامل قبرس شمالی — کد ISO مستقلی ندارد)
+  RU: "ru",
+};
+function getVisitorIp(req: express.Request): string {
+  const cf = req.headers["cf-connecting-ip"];
+  if (typeof cf === "string" && cf) return cf.trim();
+  const xff = req.headers["x-forwarded-for"];
+  const first = Array.isArray(xff) ? xff[0] : xff;
+  if (first) return first.split(",")[0].trim();
+  return (req.ip || req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+}
+function detectVisitorLanguage(req: express.Request): { country: string | null; lang: SiteLang } {
+  let country: string | null = null;
+  const cfCountry = req.headers["cf-ipcountry"];
+  if (typeof cfCountry === "string" && /^[A-Z]{2}$/i.test(cfCountry)) country = cfCountry.toUpperCase();
+  if (!country) {
+    const ip = getVisitorIp(req);
+    if (ip) country = geoip.lookup(ip)?.country ?? null;
+  }
+  return { country, lang: (country && COUNTRY_TO_LANG[country]) || "en" };
 }
 
 async function startServer() {
@@ -2862,6 +2890,18 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  // GEO → LANGUAGE — انتخاب زبان پیش‌فرض بر اساس کشور IP بازدیدکننده
+  //   IR → fa · TR / CY (قبرس؛ قبرس شمالی کد ISO جداگانه ندارد و CY برمی‌گردد) → tr
+  //   RU → ru · بقیه → en
+  //   منبع کشور: هدر CF-IPCountry (Cloudflare) و در نبود آن، geoip-lite آفلاین.
+  // ═══════════════════════════════════════════════════════════════════
+  app.get("/api/geo/lang", (req, res) => {
+    const { country, lang } = detectVisitorLanguage(req);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ country, lang });
+  });
+
   // Themes Management Endpoints
   app.get("/api/themes", async (req, res) => {
     try {
@@ -4313,6 +4353,8 @@ Example format:
         const bootstrap = {
           tournaments: await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
           assetVersion: ASSET_VERSION,
+          // زبان پیشنهادی بر اساس کشور IP — بدون رفت‌وبرگشت اضافه در اولین رندر
+          lang: detectVisitorLanguage(req).lang,
         };
         // جلوگیری از شکستن HTML توسط دنباله‌هایی مثل "</script>" داخل JSON
         const json = JSON.stringify(bootstrap).replace(/</g, "\\u003c");

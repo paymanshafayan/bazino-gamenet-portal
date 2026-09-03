@@ -14,6 +14,7 @@ import {
 // HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
 import LandingHero from './components/LandingHero';
 import { clearAuthToken } from './services/authToken';
+import { LanguageMenu, LanguageRow } from './components/LanguageMenu';
 import { postJson, errorMessage } from './services/postJson';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
@@ -716,6 +717,7 @@ export default function App() {
                <button onClick={() => setIsThemeModalOpen(true)} className="p-2 text-white bg-white/5 rounded-full hover:bg-white/10">
                  <Palette className="w-4 h-4"/>
                </button>
+               <LanguageMenu language={language} setLanguage={setLanguage} open={langDropdownOpen} setOpen={setLangDropdownOpen} />
             </div>
           </header>
       )}
@@ -881,6 +883,7 @@ export default function App() {
                     <span>{t.label}</span>
                   </button>
                 ))}
+                <LanguageRow language={language} setLanguage={setLanguage} />
               </div>
             </div>
           )}

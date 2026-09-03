@@ -837,17 +837,12 @@ export default function AdminPanelTab({
         return;
       }
 
-      try {
-        // Parse-only check, not execution. Prevents installing a ZIP whose theme.js
-        // would later break homepage rendering or fail to register the home component.
-        // eslint-disable-next-line no-new-func
-        new Function(result.componentJs);
-      } catch (syntaxErr: any) {
-        const msg = language === 'fa' ? `theme.js خطای syntax دارد: ${syntaxErr?.message || syntaxErr}` : `theme.js has a syntax error: ${syntaxErr?.message || syntaxErr}`;
-        setZipError(msg);
-        addNotification(msg, 'error');
-        return;
-      }
+      // IMPORTANT: do not use `new Function`/`eval` to syntax-check theme.js here.
+      // The app ships with CSP `script-src 'self' 'unsafe-inline'` (no `'unsafe-eval'`),
+      // so evaluating the uploaded theme source in the browser is blocked and every
+      // valid ZIP appears to be a "syntax error". The authoritative syntax check is
+      // performed by the server during install (server/themeStore.ts), where Node is
+      // not subject to the browser CSP.
       if (!/BazinoThemeSDK/.test(result.componentJs) || !/\.registerComponent\s*\(\s*['"]home['"]/.test(result.componentJs)) {
         const msg = language === 'fa'
           ? "theme.js باید کامپوننت صفحه اصلی را با BazinoThemeSDK.registerComponent('home', ...) ثبت کند"

@@ -913,8 +913,15 @@ export default function AdminPanelTab({
           : `Theme performance check: ${fixedCount} automatic fixes and ${warningCount} items needing review.`, 'info');
       }
 
-      // فعال‌سازی فوری
+      // فعال‌سازی فوری در همین مرورگر
       if (setThemeId) setThemeId(serverTheme.id);
+      // فعال‌سازی سراسری روی سرور تا بازدیدکنندگان دیگر هم قالب نصب‌شده را ببینند.
+      // خطای این مرحله نباید نصب موفق را خراب کند.
+      fetch('/api/admin/themes/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ themeId: serverTheme.id }),
+      }).catch(err => console.warn('[Themes] Failed to set server-wide active theme:', err));
 
       setZipParsed(null);
       setZipFileBytes(null);

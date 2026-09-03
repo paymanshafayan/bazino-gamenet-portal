@@ -90,11 +90,15 @@ export default function App() {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [themeId, setThemeId] = useState(() => {
-    const saved = getStoredThemeId();
-    const known = [...BUILT_IN_THEMES, ...loadCustomThemes()];
-    return known.some(t => t.id === saved) ? saved : 'dark-gold';
-  });
+  // مقدار ذخیره‌شده را «بدون اعتبارسنجی» برمی‌داریم: قالب‌های سروری (نصب‌شده با
+  // ZIP) در localStorage نیستند و بعداً با /api/themes می‌رسند. اگر همین‌جا به
+  // dark-gold برگردیم، useEffect پایین بلافاصله انتخاب کاربر را در localStorage
+  // بازنویسی می‌کند و بعد از هر رفرش قالب به پیش‌فرض برمی‌گردد. اعتبارسنجی
+  // نهایی بعد از دریافت لیست سرور انجام می‌شود.
+  const [themeId, setThemeId] = useState(() => getStoredThemeId() || 'dark-gold');
+  const hasStoredThemeChoice = useRef<boolean>((() => {
+    try { return !!localStorage.getItem('themeId'); } catch { return false; }
+  })());
   const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
   const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
     ...BUILT_IN_THEMES,
@@ -122,9 +126,8 @@ export default function App() {
   useEffect(() => {
     fetch('/api/themes')
       .then(r => r.json())
-      .then((data: { serverThemes?: any[] }) => {
-        if (!data.serverThemes || data.serverThemes.length === 0) return;
-        const serverThemes: ThemeInfo[] = data.serverThemes.map(t => ({
+      .then((data: { serverThemes?: any[]; activeThemeId?: string }) => {
+        const serverThemes: ThemeInfo[] = (data.serverThemes || []).map(t => ({
           id: t.id,
           name: t.name,
           type: 'custom',
@@ -140,6 +143,15 @@ export default function App() {
         setAvailableThemesState(prev => {
           const existing = new Set(prev.map(t => t.id));
           const merged = [...prev, ...serverThemes.filter(t => !existing.has(t.id))];
+          // حالا که لیست کامل (داخلی + محلی + سروری) را داریم، قالب فعال را
+          // اعتبارسنجی می‌کنیم. اگر کاربر انتخابی نداشته، قالب فعال سراسری سرور
+          // اعمال می‌شود؛ اگر id ناشناخته بود، به پیش‌فرض برمی‌گردیم.
+          setThemeId(current => {
+            const knownIds = new Set(merged.map(t => t.id));
+            const serverActive = data.activeThemeId;
+            if (!hasStoredThemeChoice.current && serverActive && knownIds.has(serverActive)) return serverActive;
+            return knownIds.has(current) ? current : 'dark-gold';
+          });
           // اگر قالب فعال یک قالب سروری است، استایلش الان بارگذاری می‌شود
           // (useEffect پایین با تغییر availableThemes دوباره اجرا می‌شود)
           return merged;

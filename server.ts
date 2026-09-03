@@ -3012,7 +3012,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const { themeId } = req.body;
       const store = getActiveDataProvider();
       const themes = await store.listThemes();
-      const themeExists = themes.some(t => t.id === themeId);
+      // قالب‌های نصب‌شده با ZIP (پوشه‌ی سروری) هم قابل فعال‌سازی سراسری هستند
+      const themeExists =
+        themes.some(t => t.id === themeId) ||
+        listInstalledThemes().some(t => t.id === themeId);
 
       if (!themeExists) {
         return res.status(404).json({ error: "تم یافت نشد." });

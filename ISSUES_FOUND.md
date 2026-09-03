@@ -382,3 +382,8 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 - با `sharp` (trim حاشیه‌ی سیاه واتساپ + برش هوشمند) همه‌ی سایزهای responsive بازتولید شد: `esports-*` (هرو/LCP/اسلاید ادمین ۱)، `rpg-openworld-*`, `sports-console-*`, `moba-strategy-*`, `pc-arena-*`, ۴ تصویر جدید `lounge-*` (کارت‌های ژانر/سالن) و ۲ اسلاید موبایل. جدول نگاشت در `public/images/real/README.md`.
 - تصاویر کافه/فروشگاه/آیتم‌ها همچنان نمونه‌اند (عکس واقعی موجود نیست).
 - تأیید بصری دسکتاپ + موبایل در Chromium واقعی (`h1/h2/hm.png`).
+
+## ۱۴۰۵/۰۶/۱۳ — آماده‌سازی درگاه PayTR (فقط مستندسازی، بدون تغییر کد)
+- `docs/payments/PAYTR.md`: چک‌لیست ۱۸ موردی الزامات سایت برای تأیید سانال پوز + وضعیت فعلی هر مورد + مدارک شرکتی + معماری پیشنهادی + ریسک KKTC.
+- `docs/payments/paytr-api-reference.md`: مرجع فنی iFrame API (گام ۱/۲، فرمول‌های HMAC، کدهای خطا، کارت‌های تست، İade، Durum Sorgu، اسکلت Node).
+- کمبودهای شناسایی‌شده در سایت: هیچ صفحه‌ی قانونی (Mesafeli Satış، Ön Bilgilendirme، KVKK/Gizlilik، İptal-İade، Teslimat) وجود ندارد؛ لوگوی Visa/Mastercard/Troy/PayTR نیست؛ صفحه‌ی İletişim مستقل با نام قانونی/ایمیل دامنه‌ای/شماره مالیاتی نیست؛ واحد پول «تومان» است؛ صفحات success/fail و Bildirim URL وجود ندارد. (ثبت به‌عنوان E.65 تا E.69 — پیاده‌سازی در انتظار تأیید کاربر.)

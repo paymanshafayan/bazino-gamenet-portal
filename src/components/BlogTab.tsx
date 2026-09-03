@@ -72,7 +72,7 @@ export default function BlogTab({
           </button>
 
           {/* Article Header */}
-          <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-[#0d122b] border border-white/10 mb-6">
+          <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-card-2 border border-white/10 mb-6">
             <img loading="lazy" 
               src={selectedArticle.imageUrl} 
               alt={selectedArticle.title} 
@@ -151,7 +151,7 @@ export default function BlogTab({
                 </p>
               ) : (
                 selectedArticle.comments.map((comment) => (
-                  <div key={comment.id} className="bg-[#0d122b] p-4 rounded-lg border border-white/5 flex flex-col gap-2">
+                  <div key={comment.id} className="bg-card-2 p-4 rounded-lg border border-white/5 flex flex-col gap-2">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-bold text-primary font-mono">@{comment.gamerTag}</span>
                       <span className="text-gray-500 font-bold font-mono">{comment.date}</span>
@@ -163,7 +163,7 @@ export default function BlogTab({
             </div>
 
             {/* Comment Form */}
-            <form onSubmit={handlePostComment} className="bg-[#0f1326] p-6 rounded-xl border border-white/10 flex flex-col gap-4">
+            <form onSubmit={handlePostComment} className="bg-card-3 p-6 rounded-xl border border-white/10 flex flex-col gap-4">
               <h4 className="text-sm font-bold text-white flex items-center gap-1.5 font-display uppercase tracking-wide">
                 <Sparkles className="w-4 h-4 text-primary" />
                 <span>
@@ -188,7 +188,7 @@ export default function BlogTab({
                     placeholder="Gamer_Tag"
                     value={commentGamerTag}
                     onChange={(e) => setCommentGamerTag(e.target.value)}
-                    className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
+                    className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -207,7 +207,7 @@ export default function BlogTab({
                       }
                       value={commentContent}
                       onChange={(e) => setCommentContent(e.target.value)}
-                      className="flex-1 bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
+                      className="flex-1 bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
                     />
                     <button
                       type="submit"
@@ -235,7 +235,7 @@ export default function BlogTab({
                 className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all cursor-pointer uppercase tracking-wider border ${
                   activeCategory === cat
                     ? 'bg-primary text-black border-primary shadow-[0_0_15px_rgba(0,240,255,0.25)]'
-                    : 'text-gray-400 hover:text-white bg-[#0f1326] hover:bg-white/5 border-white/10'
+                    : 'text-gray-400 hover:text-white bg-card-3 hover:bg-white/5 border-white/10'
                 }`}
               >
                 {cat === 'All' && (L(language, { fa: 'همه خبرها', en: 'All News', ru: 'Все новости', tr: 'Tüm Haberler' }))}
@@ -253,7 +253,7 @@ export default function BlogTab({
                 key={article.id}
                 className="rounded-2xl border border-white/10 bg-dark-card overflow-hidden flex flex-col group hover:border-primary/50 hover:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all duration-300"
               >
-                <div className="relative aspect-[16/9] w-full bg-[#0d122b] overflow-hidden">
+                <div className="relative aspect-[16/9] w-full bg-card-2 overflow-hidden">
                   <img loading="lazy" 
                     src={article.imageUrl} 
                     alt={article.title} 

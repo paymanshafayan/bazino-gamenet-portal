@@ -293,7 +293,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
   };
 
   return (
-    <div className="bg-[#0f132a] border border-white/10 rounded-3xl overflow-hidden min-h-[600px] flex flex-col lg:flex-row h-[calc(100vh-220px)]" dir={dir}>
+    <div className="bg-card-3 border border-white/10 rounded-3xl overflow-hidden min-h-[600px] flex flex-col lg:flex-row h-[calc(100vh-220px)]" dir={dir}>
       
       {/* Side list of rooms */}
       <div className={`w-full lg:w-80 border-r lg:border-r-0 lg:border-l border-white/10 flex flex-col shrink-0 ${isMobileSidebarOpen ? 'flex' : 'hidden lg:flex'}`}>

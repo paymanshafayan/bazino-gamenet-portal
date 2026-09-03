@@ -3104,7 +3104,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/admin/app-sliders", async (req, res) => {
     try {
-      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr } = req.body;
       if (!imageUrl || !target) {
         return res.status(400).json(apiError(req, "SLIDE_FIELDS_REQUIRED"));
       }
@@ -3119,7 +3119,11 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         titleFa: titleFa || "",
         titleEn: titleEn || "",
         titleRu: titleRu || "",
-        titleTr: titleTr || ""
+        titleTr: titleTr || "",
+        descFa: typeof descFa === "string" ? descFa : "",
+        descEn: typeof descEn === "string" ? descEn : "",
+        descRu: typeof descRu === "string" ? descRu : "",
+        descTr: typeof descTr === "string" ? descTr : "",
       };
 
       await store.createSlider(newSlide);
@@ -3134,7 +3138,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/app-sliders/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr } = req.body;
       const store = getActiveDataProvider();
       const slide = await store.getSliderById(id);
 
@@ -3153,6 +3157,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           titleEn: titleEn !== undefined ? titleEn : slide.titleEn,
           titleRu: titleRu !== undefined ? titleRu : (slide.titleRu || ""),
           titleTr: titleTr !== undefined ? titleTr : (slide.titleTr || ""),
+          descFa: descFa !== undefined ? descFa : (slide.descFa || ""),
+          descEn: descEn !== undefined ? descEn : (slide.descEn || ""),
+          descRu: descRu !== undefined ? descRu : (slide.descRu || ""),
+          descTr: descTr !== undefined ? descTr : (slide.descTr || ""),
         });
 
         const list = await store.listSliders();

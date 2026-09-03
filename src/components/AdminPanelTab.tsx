@@ -153,6 +153,7 @@ export default function AdminPanelTab({
   const [newSlideTitleEn, setNewSlideTitleEn] = useState('');
   const [newSlideTitleRu, setNewSlideTitleRu] = useState('');
   const [newSlideTitleTr, setNewSlideTitleTr] = useState('');
+  const [newSlideDesc, setNewSlideDesc] = useState<{ fa: string; en: string; ru: string; tr: string }>({ fa: '', en: '', ru: '', tr: '' });
   const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
 
   // Section Editor states
@@ -654,6 +655,7 @@ export default function AdminPanelTab({
           titleEn: newSlideTitleEn,
           titleRu: newSlideTitleRu,
           titleTr: newSlideTitleTr,
+          descFa: newSlideDesc.fa, descEn: newSlideDesc.en, descRu: newSlideDesc.ru, descTr: newSlideDesc.tr,
         }),
       }).then(r => r.json());
 
@@ -668,6 +670,8 @@ export default function AdminPanelTab({
         setNewSlideTitleEn('');
         setNewSlideTitleRu('');
         setNewSlideTitleTr('');
+        setNewSlideDesc({ fa: '', en: '', ru: '', tr: '' });
+    setNewSlideDesc({ fa: '', en: '', ru: '', tr: '' });
       } else {
         addNotification(res.error || 'Failed', 'error');
       }
@@ -717,6 +721,7 @@ export default function AdminPanelTab({
           titleEn: newSlideTitleEn,
           titleRu: newSlideTitleRu,
           titleTr: newSlideTitleTr,
+          descFa: newSlideDesc.fa, descEn: newSlideDesc.en, descRu: newSlideDesc.ru, descTr: newSlideDesc.tr,
         }),
       }).then(r => r.json());
 
@@ -731,6 +736,8 @@ export default function AdminPanelTab({
         setNewSlideTitleEn('');
         setNewSlideTitleRu('');
         setNewSlideTitleTr('');
+        setNewSlideDesc({ fa: '', en: '', ru: '', tr: '' });
+    setNewSlideDesc({ fa: '', en: '', ru: '', tr: '' });
         setNewSlideTarget('reserve');
       } else {
         addNotification(res.error || 'Failed', 'error');
@@ -751,6 +758,7 @@ export default function AdminPanelTab({
     setNewSlideTitleEn(slide.titleEn || '');
     setNewSlideTitleRu(slide.titleRu || '');
     setNewSlideTitleTr(slide.titleTr || '');
+    setNewSlideDesc({ fa: slide.descFa || '', en: slide.descEn || '', ru: slide.descRu || '', tr: slide.descTr || '' });
     addNotification(L(language, { fa: 'اطلاعات اسلاید جهت ویرایش بارگذاری شد', en: 'Slide info loaded for editing', ru: 'Данные слайда загружены для редактирования', tr: 'Slayt bilgileri düzenleme için yüklendi' }), 'info');
   };
 
@@ -763,6 +771,7 @@ export default function AdminPanelTab({
     setNewSlideTitleEn('');
     setNewSlideTitleRu('');
     setNewSlideTitleTr('');
+    setNewSlideDesc({ fa: '', en: '', ru: '', tr: '' });
     setNewSlideTarget('reserve');
   };
 
@@ -852,11 +861,14 @@ export default function AdminPanelTab({
       // valid ZIP appears to be a "syntax error". The authoritative syntax check is
       // performed by the server during install (server/themeStore.ts), where Node is
       // not subject to the browser CSP.
-      if (!/BazinoThemeSDK/.test(result.componentJs) || !/\.registerComponent\s*\(\s*['"]home['"]/.test(result.componentJs)) {
-        const msg = L(language, { fa: "theme.js باید کامپوننت صفحه اصلی را با BazinoThemeSDK.registerComponent('home', ...) ثبت کند", en: "theme.js must register the homepage component with BazinoThemeSDK.registerComponent('home', ...)", ru: "theme.js должен регистрировать компонент главной страницы через BazinoThemeSDK.registerComponent('home', ...)", tr: "theme.js ana sayfa bileşenini BazinoThemeSDK.registerComponent('home', ...) ile kaydetmelidir" });
-        setZipError(msg);
-        addNotification(msg, 'error');
-        return;
+      if (result.componentJs && result.componentJs.trim()) {
+        const regions = Array.from(result.componentJs.matchAll(/\.registerComponent\s*\(\s*['"]([a-zA-Z0-9_.-]+)['"]/g)).map(m => m[1]);
+        if (!/BazinoThemeSDK/.test(result.componentJs) || regions.length === 0) {
+          const msg = L(language, { fa: "theme.js باید حداقل یک بخش را با BazinoThemeSDK.registerComponent('<region>', ...) ثبت کند (مثلاً 'hero' یا 'home')", en: "theme.js must register at least one region with BazinoThemeSDK.registerComponent('<region>', ...) (e.g. 'hero' or 'home')", ru: "theme.js должен регистрировать хотя бы одну область через BazinoThemeSDK.registerComponent('<region>', ...) (например 'hero' или 'home')", tr: "theme.js en az bir bölgeyi BazinoThemeSDK.registerComponent('<region>', ...) ile kaydetmelidir (ör. 'hero' veya 'home')" });
+          setZipError(msg);
+          addNotification(msg, 'error');
+          return;
+        }
       }
 
       const assetCount = Object.keys(result.assets).length;
@@ -903,6 +915,11 @@ export default function AdminPanelTab({
         assetFiles: data.theme.assetFiles,
         installedAt: data.theme.installedAt,
         assetsBase: data.theme.cssUrl ? data.theme.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
+        hasComponentJs: data.theme.hasComponentJs !== false,
+        regions: data.theme.regions,
+        strings: data.theme.strings,
+        tokens: data.theme.tokens,
+        author: data.theme.author,
       };
 
       // کش CSS نسخه‌ی قبلی (در صورت به‌روزرسانی) باید دور ریخته شود
@@ -992,6 +1009,8 @@ export default function AdminPanelTab({
    * ولی فقط مرورگر خودش عوض شده بود. */
   const handleActivateTheme = async (theme: ThemeInfo) => {
     if (setThemeId) setThemeId(theme.id);
+    // انتخاب ادمین = پیش‌فرض سایت؛ انتخاب شخصی قبلی همین مرورگر لغو می‌شود
+    try { localStorage.removeItem('themeChoice'); } catch { /* ignore */ }
     if (theme.kind === 'colors' || theme.kind === 'zip') {
       // قالب فقط در localStorage همین مرورگر وجود دارد → نمی‌تواند پیش‌فرض سراسری باشد
       addNotification(L(language, { fa: 'این قالب فقط در همین مرورگر ذخیره شده و به‌عنوان پیش‌فرض سایت قابل انتخاب نیست؛ آن را به‌صورت ZIP روی سرور نصب کنید.', en: 'This theme exists only in this browser and cannot be the site default; install it on the server as a ZIP.', ru: 'Эта тема хранится только в этом браузере и не может быть темой сайта по умолчанию; установите её на сервер как ZIP.', tr: 'Bu tema yalnızca bu tarayıcıda kayıtlı ve site varsayılanı olamaz; sunucuya ZIP olarak yükleyin.' }), 'info');
@@ -1814,7 +1833,7 @@ export default function AdminPanelTab({
                 <div>
                   <h3 className="text-xl font-black uppercase mb-1">{L(language, { fa: 'مدیریت قالب‌ها', en: 'Theme Management', ru: 'Управление темами', tr: 'Tema Yönetimi' })}</h3>
                   <p className="text-gray-400 text-sm">
-                    {L(language, { fa: 'قالب را با فایل ZIP نصب کنید (فقط فایل CSS کافی است؛ theme.json اختیاری است) یا با رنگ‌ها قالب بسازید.', en: 'Install themes from ZIP packages (CSS file is enough; theme.json optional) or build with colors.', ru: 'Устанавливайте темы из ZIP (достаточно CSS-файла; theme.json необязателен) или создавайте по цветам.', tr: 'Temaları ZIP dosyasıyla yükleyin (yalnızca CSS yeterli; theme.json isteğe bağlı) veya renklerle oluşturun.' })}
+                    {L(language, { fa: 'قالب را با فایل ZIP نصب کنید: theme.css (اجباری) + theme.json (رنگ‌ها، tokens، strings چهارزبانه) + theme.js (اختیاری — بخش‌های اختصاصی مثل header/hero/footer یا کل صفحه‌ی اصلی). بخش‌هایی که قالب ندهد، پیش‌فرض سایت رندر می‌شود.', en: 'Install themes from ZIP: theme.css (required) + theme.json (colors, tokens, 4-language strings) + theme.js (optional — custom regions such as header/hero/footer or the whole home). Regions the theme does not provide fall back to the site defaults.', ru: 'Устанавливайте темы из ZIP: theme.css (обязательно) + theme.json (цвета, токены, строки на 4 языках) + theme.js (необязательно — свои области header/hero/footer или вся главная). Не заданные области берутся из сайта.', tr: 'Temaları ZIP ile yükleyin: theme.css (zorunlu) + theme.json (renkler, token, 4 dilli metinler) + theme.js (isteğe bağlı — header/hero/footer gibi özel bölgeler ya da tüm ana sayfa). Tema vermeyen bölgeler site varsayılanıyla çizilir.' })}
                   </p>
                   <p className="text-[10px] text-gray-500 font-mono mt-1">
                     {L(language, { fa: 'هر قالب یک فایل CSS مستقل است و تمام صفحات سایت را پوشش می‌دهد', en: 'Each theme is a standalone CSS file covering every page of the site', ru: 'Каждая тема — отдельный CSS-файл, покрывающий все страницы сайта', tr: 'Her tema bağımsız bir CSS dosyasıdır ve sitenin tüm sayfalarını kapsar' })}
@@ -2022,6 +2041,21 @@ export default function AdminPanelTab({
                               <span className="block text-[10px] text-gray-500 font-bold uppercase">{L(language, { fa: 'نسخه', en: 'Version', ru: 'Версия', tr: 'Sürüm' })}</span>
                               <span className="text-white font-mono font-bold">{zipParsed.meta.version || '—'}</span>
                             </div>
+                            <div className="col-span-2 md:col-span-4">
+                              <span className="block text-[10px] text-gray-500 font-bold uppercase">{L(language, { fa: 'بخش‌های اختصاصی (theme.js)', en: 'Custom regions (theme.js)', ru: 'Свои области (theme.js)', tr: 'Özel bölgeler (theme.js)' })}</span>
+                              {(() => {
+                                const regions = zipParsed.componentJs ? Array.from(zipParsed.componentJs.matchAll(/\.registerComponent\s*\(\s*['"]([a-zA-Z0-9_.-]+)['"]/g)).map(m => m[1]) : [];
+                                const langs = zipParsed.meta.strings ? Object.keys(zipParsed.meta.strings) : [];
+                                return (
+                                  <span className="flex flex-wrap gap-1 mt-1">
+                                    {regions.length === 0 && <span className="text-gray-400 text-[10px]">{L(language, { fa: 'فقط CSS — همه‌ی بخش‌ها از پیش‌فرض سایت (رنگ‌ها/توکن‌ها اعمال می‌شود)', en: 'CSS-only — all regions use the site defaults (colors/tokens applied)', ru: 'Только CSS — все области берутся из сайта (цвета/токены применяются)', tr: 'Yalnızca CSS — tüm bölgeler site varsayılanı (renk/token uygulanır)' })}</span>}
+                                    {regions.map(r => <span key={r} className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold" dir="ltr">{r}</span>)}
+                                    {langs.length > 0 && <span className="px-1.5 py-0.5 rounded bg-white/5 text-gray-300 border border-white/10 text-[10px] font-mono" dir="ltr">strings: {langs.join('/')}</span>}
+                                    {zipParsed.meta.tokens && <span className="px-1.5 py-0.5 rounded bg-white/5 text-gray-300 border border-white/10 text-[10px] font-mono" dir="ltr">tokens: {Object.keys(zipParsed.meta.tokens).length}</span>}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             <div>
                               <span className="block text-[10px] text-gray-500 font-bold uppercase">CSS / Assets</span>
                               <span className="text-white font-mono font-bold">{(zipParsed.css.length / 1024).toFixed(1)}KB{Object.keys(zipParsed.assets).length > 0 ? ` + ${Object.keys(zipParsed.assets).length}` : ''}</span>
@@ -2196,6 +2230,11 @@ export default function AdminPanelTab({
                                 v{theme.version}
                               </span>
                             )}
+                            {theme.kind === 'server' && (theme.regions && theme.regions.length > 0 ? theme.regions.map(r => (
+                              <span key={r} className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold" dir="ltr" title={L(language, { fa: 'بخش اختصاصی قالب', en: 'Theme-provided region', ru: 'Область темы', tr: 'Temaya özel bölge' })}>{r}</span>
+                            )) : (
+                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10 text-[10px] font-mono">CSS-only</span>
+                            ))}
                           </div>
                           {theme.description && (
                             <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed line-clamp-2">{theme.description}</p>
@@ -3534,6 +3573,22 @@ export default function AdminPanelTab({
                       className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary font-bold"
                     />
                   </div>
+
+                  {(['fa', 'en', 'ru', 'tr'] as const).map((lng) => (
+                    <div key={`slide-desc-${lng}`}>
+                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">
+                        {L(language, { fa: 'توضیح اسلاید', en: 'Slide description', ru: 'Описание слайда', tr: 'Slayt açıklaması' })} ({lng.toUpperCase()})
+                        <span className="text-gray-600 font-normal ms-1">{L(language, { fa: '(اختیاری — در هرو سایت و قالب‌ها نمایش داده می‌شود)', en: '(optional — shown in site hero and themes)', ru: '(необязательно — показывается в hero сайта и темах)', tr: '(isteğe bağlı — site hero ve temalarda gösterilir)' })}</span>
+                      </label>
+                      <input
+                        type="text"
+                        dir={lng === 'fa' ? 'rtl' : 'ltr'}
+                        value={newSlideDesc[lng]}
+                        onChange={(e) => setNewSlideDesc(d => ({ ...d, [lng]: e.target.value }))}
+                        className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  ))}
 
                   <div className="md:col-span-2 flex items-center gap-4">
                     <div className="flex-1">

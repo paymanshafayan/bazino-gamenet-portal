@@ -63,6 +63,66 @@ export interface ThemeInfo {
   componentJs?: string;
   /** زمان نصب روی سرور (ms) — برای cache-busting فایل‌های css/js بعد از نصب نسخه‌ی جدید */
   installedAt?: number;
+  /** آیا theme.js دارد (بخش‌های اختصاصی)؟ false = قالب CSS-only */
+  hasComponentJs?: boolean;
+  /** بخش‌هایی (regions) که theme.js قالب ثبت می‌کند */
+  regions?: string[];
+  /** رشته‌های چندزبانه‌ی قالب (theme.json.strings) */
+  strings?: Record<string, Record<string, string>>;
+  /** توکن‌های طراحی (theme.json.tokens) → متغیرهای --bz-* */
+  tokens?: Record<string, string>;
+  author?: string;
+}
+
+/* ---------- توکن‌های طراحی ----------
+ * هر قالب می‌تواند در theme.json.tokens مقادیری بدهد که به متغیرهای CSS
+ * `--bz-<token>` روی <body> تزریق می‌شوند. کدهای سایت از این متغیرها
+ * (با fallback) استفاده می‌کنند تا قالب‌های CSS-only هم کل ظاهر را عوض کنند. */
+export const THEME_TOKEN_DEFAULTS: Record<string, string> = {
+  primary: '#ffb800',
+  'primary-hover': '#e09900',
+  accent: '#ff3b30',
+  bg: '#07080a',
+  card: '#12141c',
+  'card-2': '#0d122b',
+  'card-3': '#0f1326',
+  surface: '#0a0e21',
+  'surface-2': '#050608',
+  border: 'rgba(255,255,255,0.1)',
+  text: '#f3f4f6',
+  muted: '#9ca3af',
+  success: '#10B981',
+  info: '#1bc2ca',
+  violet: '#A855F7',
+  radius: '1rem',
+  'font-sans': '"Vazirmatn", ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif',
+  'font-display': '"Orbitron", "Vazirmatn", ui-sans-serif, system-ui, sans-serif',
+};
+
+/** نگاشت colors قدیمی (primary/bg/card) + tokens قالب → توکن‌های نهایی */
+export function resolveThemeTokens(theme: Pick<ThemeInfo, 'colors' | 'tokens' | 'type'> | undefined): Record<string, string> {
+  // قالب‌های سیستمی رنگ‌هایشان را در CSS خودشان (--dark-card-color و ...) تعریف می‌کنند؛
+  // برای آن‌ها توکن رنگی تزریق نمی‌کنیم تا fallback زنجیره‌ای index.css کار کند.
+  const out: Record<string, string> = theme?.type === 'built-in' && !theme.tokens ? {} : { ...THEME_TOKEN_DEFAULTS };
+  if (theme?.colors) {
+    if (theme.colors.primary) { out.primary = theme.colors.primary; out['primary-hover'] = shadeHex(theme.colors.primary, -12); }
+    if (theme.colors.bg) { out.bg = theme.colors.bg; out['surface-2'] = theme.colors.bg; }
+    if (theme.colors.card) { out.card = theme.colors.card; out['card-2'] = theme.colors.card; out['card-3'] = theme.colors.card; out.surface = theme.colors.card; }
+  }
+  if (theme?.tokens) Object.assign(out, theme.tokens);
+  return out;
+}
+
+/** تزریق توکن‌ها روی <body> به‌صورت --bz-<token> */
+export function applyThemeTokens(tokens: Record<string, string>): void {
+  if (typeof document === 'undefined') return;
+  const style = document.body.style;
+  // پاک‌سازی توکن‌های قبلی
+  for (let i = style.length - 1; i >= 0; i--) {
+    const name = style[i];
+    if (name.startsWith('--bz-')) style.removeProperty(name);
+  }
+  for (const [k, v] of Object.entries(tokens)) style.setProperty(`--bz-${k}`, v);
 }
 
 /* ---------- قالب‌های سیستمی ---------- */

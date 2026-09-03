@@ -79,11 +79,19 @@ npx tsx scripts/test-theme-sdk.mts             # تست SDK کامپوننت ق�
 ├── server/              ← provider های دیتابیس، داده نمونه، ذخیره‌ساز قالب
 ├── src/                 ← فرانت‌اند React
 │   ├── themes/          ← موتور قالب‌بندی (CSS مجزای هر قالب + فرمت ZIP)
-│   └── themeSdk/        ← SDK کامپوننت قالب (theme.js)
+│   └── themeSdk/        ← SDK کامپوننت قالب v2 (theme.js — regions: header/hero/home.*/footer/mobileNav)
 ├── flutter_app/         ← اپلیکیشن موبایل Flutter (پروژه مستقل)
 ├── Management App/      ← اپ دسکتاپ مدیریت (پروژه مستقل)
 └── public/              ← فایل‌های استاتیک (لوگو و ...)
 ```
+
+## 🎨 قالب‌ها (خلاصه — جزئیات در `src/themes/README.md`)
+
+- پکیج ZIP: `theme.json` + `theme.css` اجباری، `theme.js` اختیاری (قالب فقط-CSS معتبر است).
+- `theme.js` با SDK v2 می‌تواند هر **بخش** سایت را جداگانه جایگزین کند: `header`, `hero`, `home.*`, `footer`, `mobileNav` (یا `home` کل صفحه — قرارداد v1، همچنان پشتیبانی می‌شود).
+- رنگ/فونت از طریق متغیرهای CSS روی `body[data-theme]` (`--primary-color`, `--bz-*`) به همه‌ی کلاس‌های سایت (هدر، دکمه‌ها، بج‌ها) می‌رسد.
+- متن‌های قالب چهارزبانه در `theme.json.strings` (`props.ts('key')`)؛ اسلایدهای ادمین هم چهارزبانه (عنوان + توضیح) و در `props.slides` در دسترس‌اند.
+- فونت تیتر باید برای فارسی/روسی fallback داشته باشد (Orbitron حروف فارسی ندارد).
 
 ## 📜 مجوز
 

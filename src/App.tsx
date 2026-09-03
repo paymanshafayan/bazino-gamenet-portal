@@ -7,8 +7,14 @@ import {
   loadCustomThemes,
   loadThemeStylesheet,
   saveCustomThemes,
+  resolveThemeTokens,
+  applyThemeTokens,
   type ThemeInfo
 } from './themes';
+import { ThemeRegionProvider, type ThemeRegionBase } from './themeSdk/ThemeRegion';
+import ThemeRegion from './themeSdk/ThemeRegion';
+import { useThemeScript } from './themeSdk/useThemeScript';
+import type { ThemeSlide } from './themeSdk/sdk';
 // تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند. HomeTab هم شامل چندین
 // بخش/دادهٔ پایین صفحه است؛ Hero سبکِ LandingHero بلافاصله paint می‌شود و خود
 // HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
@@ -128,6 +134,15 @@ export default function App() {
   // (و installedAt جدید برای cache-busting) دوباره از سرور خوانده شود.
   const [themeStoreVersion, setThemeStoreVersion] = useState(0);
   const refreshServerThemes = useCallback(() => setThemeStoreVersion(v => v + 1), []);
+  const [serverActiveThemeId, setServerActiveThemeId] = useState<string>('dark-gold');
+  /** انتخاب شخصی کاربر از ThemeSelector (بر قالب پیش‌فرض سایت غالب است) */
+  const chooseThemePersonally = useCallback((id: string) => {
+    try {
+      if (id === serverActiveThemeId) localStorage.removeItem('themeChoice');
+      else localStorage.setItem('themeChoice', 'personal');
+    } catch { /* private mode */ }
+    setThemeId(id);
+  }, [serverActiveThemeId]);
 
   // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
   useEffect(() => {
@@ -147,7 +162,13 @@ export default function App() {
           assetFiles: t.assetFiles,
           assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
           installedAt: t.installedAt,
+          hasComponentJs: t.hasComponentJs !== false,
+          regions: t.regions,
+          strings: t.strings,
+          tokens: t.tokens,
+          author: t.author,
         }));
+        setServerActiveThemeId(data.activeThemeId || 'dark-gold');
         setAvailableThemesState(prev => {
           // قالب‌های سروری همیشه از پاسخ تازه‌ی سرور جایگزین می‌شوند (نسخه/installedAt جدید)؛
           // قالب‌های داخلی و محلی حفظ می‌شوند.
@@ -159,7 +180,12 @@ export default function App() {
           setThemeId(current => {
             const knownIds = new Set(merged.map(t => t.id));
             const serverActive = data.activeThemeId;
-            if (!hasStoredThemeChoice.current && serverActive && knownIds.has(serverActive)) return serverActive;
+            // «قالب پیش‌فرض سایت» (انتخاب ادمین) برای همه اعمال می‌شود، مگر اینکه کاربر
+            // خودش آگاهانه قالب دیگری را از ThemeSelector انتخاب کرده باشد
+            // (themeChoice=personal). انتخاب‌های قدیمی/ضمنی localStorage دیگر
+            // انتخاب سراسری ادمین را بلوکه نمی‌کنند.
+            const personal = (() => { try { return localStorage.getItem('themeChoice') === 'personal'; } catch { return false; } })();
+            if (serverActive && knownIds.has(serverActive) && (!personal || !hasStoredThemeChoice.current)) return serverActive;
             if (knownIds.has(current)) return current;
             // قالب ذخیره‌شده‌ی کاربر دیگر روی سرور وجود ندارد (حذف شده یا فایل‌سیستم سرور
             // موقتی بوده). به‌جای سقوط بی‌صدا، هشدار بده تا علت دیده شود.
@@ -197,7 +223,35 @@ export default function App() {
   useEffect(() => {
     const theme = availableThemes.find(t => t.id === themeId) ?? BUILT_IN_THEMES[0];
     loadThemeStylesheet(theme);
+    applyThemeTokens(resolveThemeTokens(theme));
   }, [themeId, availableThemes]);
+
+  // قالب فعال + theme.js آن (بخش‌های اختصاصی) — یک‌بار در سطح App بارگذاری می‌شود
+  const activeTheme = useMemo(() => availableThemes.find(t => t.id === themeId) ?? BUILT_IN_THEMES[0], [availableThemes, themeId]);
+  const themeScriptSource = useMemo(() => (
+    activeTheme.kind === 'server' && activeTheme.cssUrl
+      ? { cssUrl: activeTheme.cssUrl, installedAt: activeTheme.installedAt, hasComponentJs: activeTheme.hasComponentJs !== false }
+      : null
+  ), [activeTheme]);
+  const themeScript = useThemeScript(themeScriptSource);
+  const [themeSlides, setThemeSlides] = useState<ThemeSlide[]>([]);
+  useEffect(() => {
+    // اسلایدهای ادمین (چهارزبانه) برای بخش‌های قالب — کم‌اولویت
+    const timer = window.setTimeout(() => {
+      fetch('/api/app-sliders', BG_FETCH).then(r => r.json()).then((rows: any[]) => {
+        if (!Array.isArray(rows)) return;
+        setThemeSlides(rows.map((s, i) => ({
+          id: s.id || `slide-${i}`,
+          imageUrl: s.imageUrl,
+          mobileImageUrl: s.mobileImageUrl,
+          target: s.target || 'reservations',
+          title: { fa: s.titleFa || s.titleEn || '', en: s.titleEn || s.titleFa || '', ru: s.titleRu || s.titleEn || s.titleFa || '', tr: s.titleTr || s.titleEn || s.titleFa || '' },
+          desc: { fa: s.descFa || '', en: s.descEn || '', ru: s.descRu || s.descEn || '', tr: s.descTr || s.descEn || '' },
+        })));
+      }).catch(() => {});
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('layoutMode', layoutMode);
@@ -543,12 +597,6 @@ export default function App() {
               themeId={themeId}
               tournaments={tournaments}
               onNavigate={setActiveTab}
-              themeComponent={(() => {
-                const th = availableThemes.find(x => x.id === themeId);
-                return th && th.kind === 'server' && th.cssUrl
-                  ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets'), installedAt: th.installedAt }
-                  : null;
-              })()}
             />
           </Suspense>
         )
@@ -650,7 +698,24 @@ export default function App() {
     '--theme-card-border': 'rgba(255,255,255,0.10)',
   } as React.CSSProperties : undefined;
 
+  // داده‌های مشترک همه‌ی بخش‌های قالب (Partial Views)
+  const themeRegionBase: ThemeRegionBase = {
+    language, dir, t,
+    themeId: themeId || 'dark-gold',
+    strings: activeTheme.strings,
+    tokens: resolveThemeTokens(activeTheme),
+    slides: themeSlides,
+    onNavigate: (tab: string) => setActiveTab(tab),
+    activeTab,
+    user: user ? { username: user.username, points: (user as any).points, role: user.role } : null,
+    settings: {},
+    logoUrl: '/logo.png',
+    assetsBase: activeTheme.assetsBase || '',
+    ready: themeScript.ready,
+  };
+
   return (
+    <ThemeRegionProvider value={themeRegionBase}>
     <div 
       className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} ${showMobileNav ? 'pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'} w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
       style={adminShellVars}
@@ -685,8 +750,8 @@ export default function App() {
           here was the single largest CLS source (score 1.0). Fixed ambient lighting is
           also the intended visual for these subtle blurred glows. */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-[#A855F7]/5 rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-[#06B6D4]/5 rounded-full blur-[150px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-violet-token/5 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-info-token/5 rounded-full blur-[150px]" />
       </div>
       
       {/* Toast Notifications Layer */}
@@ -709,6 +774,7 @@ export default function App() {
       </div>
 
       {!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin' && (
+        <ThemeRegion name="header" className="sticky top-0 z-40 w-full" fallback={
         <header className="site-header h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
                <img src={bazinoLogo} alt="Bazino Pro" width="40" height="40" className="brand-logo-guard h-10 w-auto" />
@@ -751,6 +817,7 @@ export default function App() {
                <LanguageMenu language={language} setLanguage={setLanguage} open={langDropdownOpen} setOpen={setLangDropdownOpen} />
             </div>
           </header>
+        } />
       )}
 
       {activeTab === 'admin' && (
@@ -822,7 +889,8 @@ export default function App() {
             onClose={() => setIsThemeModalOpen(false)}
             availableThemes={availableThemes}
             themeId={themeId}
-            setThemeId={setThemeId}
+            setThemeId={chooseThemePersonally}
+            siteDefaultThemeId={serverActiveThemeId}
             language={language}
           />
         )}
@@ -888,7 +956,7 @@ export default function App() {
           CTA داخل صفحه بود و برای کافه/فروشگاه/باشگاه حتی همان هم نبود.
           ────────────────────────────────────────────────────────────── */}
       {showMobileNav && (
-        <>
+        <ThemeRegion name="mobileNav" fallback={<>
           {isMobileMoreOpen && (
             <div
               className="md:hidden fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
@@ -946,7 +1014,11 @@ export default function App() {
               <span className="text-[10px] font-bold truncate max-w-full px-1">{L(language, { fa: 'بیشتر', en: 'More', ru: 'Ещё', tr: 'Daha Fazla' })}</span>
             </button>
           </nav>
-        </>
+        </>} />
+      )}
+
+      {activeTab !== 'admin' && !(layoutMode === 'hub' && activeTab === 'home') && (
+        <ThemeRegion name="footer" fallback={null} className="w-full" />
       )}
 
       <ScrollToTop 
@@ -954,5 +1026,6 @@ export default function App() {
         isRTL={dir === 'rtl'} 
       />
     </div>
+    </ThemeRegionProvider>
   );
 }

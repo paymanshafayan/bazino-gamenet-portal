@@ -72,6 +72,30 @@ export interface InstalledThemeInfo {
   assetFiles: string[];
   cssUrl: string;
   installedAt: number;
+  /** آیا theme.js دارد (بخش‌های اختصاصی) یا CSS-only است */
+  hasComponentJs: boolean;
+  /** بخش‌هایی که theme.js ثبت می‌کند (از theme.json.regions یا تحلیل استاتیک theme.js) */
+  regions: string[];
+  /** رشته‌های چندزبانه‌ی قالب */
+  strings?: Record<string, Record<string, string>>;
+  /** توکن‌های طراحی */
+  tokens?: Record<string, string>;
+  author?: string;
+}
+
+/** بخش‌های شناخته‌شده‌ی سایت (باید با src/themeSdk/sdk.ts THEME_REGIONS یکی باشد) */
+export const KNOWN_REGIONS = [
+  "home", "header", "hero", "home.genres", "home.lounges", "home.results",
+  "home.tournaments", "home.pricing", "home.staff", "home.location", "footer", "mobileNav",
+];
+
+/** استخراج نام بخش‌هایی که theme.js با registerComponent('<name>') ثبت می‌کند */
+export function detectRegisteredRegions(componentJs: string): string[] {
+  const out = new Set<string>();
+  const re = /\.registerComponent\s*\(\s*['"]([a-zA-Z0-9_.-]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(componentJs || ""))) out.add(m[1]);
+  return Array.from(out);
 }
 
 export function listInstalledThemes(): InstalledThemeInfo[] {
@@ -98,16 +122,28 @@ export function listInstalledThemes(): InstalledThemeInfo[] {
       assetFiles = listFilesRecursive(assetsDir).map(f => f.split(path.sep).join("/"));
     }
 
+    const jsPath = path.join(dir, "theme.js");
+    const hasComponentJs = fs.existsSync(jsPath) && fs.statSync(jsPath).size > 0;
+    let regions: string[] = Array.isArray(meta.regions) ? meta.regions.filter((r: unknown) => typeof r === "string") : [];
+    if (hasComponentJs && regions.length === 0) {
+      try { regions = detectRegisteredRegions(fs.readFileSync(jsPath, "utf8")); } catch { /* ignore */ }
+    }
+
     themes.push({
       id: item.name,
       name: (meta.name as string) || item.name,
       version: meta.version as string | undefined,
       description: meta.description as string | undefined,
+      author: typeof meta.author === "string" ? meta.author : undefined,
       colors: meta.colors as any,
       hasAssets: assetFiles.length > 0,
       assetFiles,
       cssUrl: `/api/themes/${encodeURIComponent(item.name)}/theme.css`,
-      installedAt: fs.statSync(cssPath).mtimeMs,
+      installedAt: Math.max(fs.statSync(cssPath).mtimeMs, fs.existsSync(jsonPath) ? fs.statSync(jsonPath).mtimeMs : 0),
+      hasComponentJs,
+      regions,
+      strings: meta.strings && typeof meta.strings === "object" ? meta.strings : undefined,
+      tokens: meta.tokens && typeof meta.tokens === "object" ? meta.tokens : undefined,
     });
   }
   return themes;
@@ -127,6 +163,8 @@ function listFilesRecursive(dir: string): string[] {
  *  نصب قالب از ZIP — استخراج به پوشه اختصاصی قالب
  * ═══════════════════════════════════════════════════════════════ */
 function validateThemeComponentJs(componentJs: string): string | null {
+  // theme.js اختیاری است — قالب CSS-only معتبر است
+  if (!componentJs || !componentJs.trim()) return null;
   try {
     // Parse-only syntax validation; does not execute uploaded code.
     // Runtime execution remains sandboxed to the browser, but invalid syntax or a
@@ -136,8 +174,16 @@ function validateThemeComponentJs(componentJs: string): string | null {
   } catch (e: any) {
     return `theme.js خطای syntax دارد: ${e?.message || String(e)}`;
   }
-  if (!/BazinoThemeSDK/.test(componentJs) || !/\.registerComponent\s*\(\s*['"]home['"]/.test(componentJs)) {
-    return "theme.js باید کامپوننت صفحه اصلی را با window.BazinoThemeSDK.registerComponent('home', ...) ثبت کند";
+  if (!/BazinoThemeSDK/.test(componentJs)) {
+    return "theme.js باید بخش‌های قالب را با window.BazinoThemeSDK.registerComponent('<region>', ...) ثبت کند";
+  }
+  const regions = detectRegisteredRegions(componentJs);
+  if (regions.length === 0) {
+    return "theme.js هیچ بخشی (region) ثبت نمی‌کند — حداقل یکی از: " + KNOWN_REGIONS.join(", ");
+  }
+  const unknown = regions.filter(r => !KNOWN_REGIONS.includes(r));
+  if (unknown.length) {
+    return `theme.js بخش‌های ناشناخته ثبت می‌کند: ${unknown.join(", ")} — بخش‌های مجاز: ${KNOWN_REGIONS.join(", ")}`;
   }
   return null;
 }
@@ -190,15 +236,22 @@ export async function installThemeZip(buffer: Uint8Array, fallbackName?: string,
     id,
     version: optimized.meta.version || "1.0.0",
     description: optimized.meta.description || "",
+    author: typeof optimized.meta.author === "string" ? optimized.meta.author : undefined,
     colors: optimized.meta.colors || undefined,
+    tokens: optimized.meta.tokens || undefined,
+    strings: optimized.meta.strings || undefined,
+    regions: detectRegisteredRegions(optimized.componentJs),
+    sdkVersion: 2,
   };
   fs.writeFileSync(path.join(dir, "theme.json"), JSON.stringify(meta, null, 2), "utf8");
 
   // theme.css
   fs.writeFileSync(path.join(dir, "theme.css"), optimized.css, "utf8");
 
-  // theme.js (کامپوننت صفحه اصلی قالب — اجباری؛ parseThemeZip بدون آن خطا می‌دهد)
-  fs.writeFileSync(path.join(dir, "theme.js"), optimized.componentJs, "utf8");
+  // theme.js (اختیاری — بخش‌های اختصاصی قالب)
+  if (optimized.componentJs && optimized.componentJs.trim()) {
+    fs.writeFileSync(path.join(dir, "theme.js"), optimized.componentJs, "utf8");
+  }
 
   // assets/
   const assetNames = Object.keys(optimized.assets);
@@ -310,9 +363,9 @@ export function exportThemeZip(id: string): Uint8Array | null {
     }
   }
 
-  // theme.js هم باید در خروجی باشد (اجباری) — از پوشه قالب خوانده می‌شود
+  // theme.js (اختیاری) — اگر باشد در خروجی هم می‌آید
   const jsPath = path.join(dir, "theme.js");
-  let componentJs = "// theme.js missing\n";
+  let componentJs = "";
   if (fs.existsSync(jsPath)) {
     componentJs = fs.readFileSync(jsPath, "utf8");
   }

@@ -875,3 +875,13 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - server.ts: نصب = فعال‌سازی سراسری، DELETE ریست activeThemeId، `GET /api/admin/storage-status`.
 - کلاینت: بدون fallback بی‌صدا، کش نسخه‌دار، دکمه‌ی «انتخاب به‌عنوان قالب سایت» سراسری، کارت زیرساخت و «حالت به‌روزرسانی» در پنل.
 - تست: ۲۵۱/۲۵۱ + فلو UI در Chromium واقعی (`browser-test/t2-*.png`). Railway واقعی تست‌نشده.
+
+## ۱۴۰۵/۰۶/۱۲ — سیستم قالب v2: بخش‌ها (regions)، توکن‌ها، رشته‌های ۴زبانه، اسلایدر ۴زبانه
+
+- `src/themeSdk/sdk.ts` v2 (`THEME_REGIONS`, `ThemeComponentProps` با `ts/tokens/slides/region`), `ThemeRegion.tsx` (fallback به پیش‌فرض)، `App.tsx`/`HomeTab.tsx` بخش‌بندی شدند؛ قالب `home` نسخه ۱ بدون تغییر کار می‌کند.
+- `server/themeStore.ts`: `detectRegisteredRegions`, `KNOWN_REGIONS`, strings/tokens/regions در `/api/themes`؛ `theme.js` اختیاری؛ region ناشناخته → 400.
+- `src/index.css`: پل توکن `body[data-theme]` → کلاس‌های Tailwind (E.51 — دلیل واقعی «هدر عوض نمی‌شد»).
+- پنل ادمین: توضیح اسلاید در ۴ زبان، بج regions/CSS-only روی کارت قالب، پیش‌نمایش ZIP.
+- قالب نمونه (`themeZipCore.ts`): SDK v2 با hero+footer، strings ۴زبانه، tokens.
+- مستندات: `src/themes/README.md` بازنویسی (regions، توکن‌ها، قرارداد RTL/فونت، strings)، بخش قالب در README.
+- تأیید بصری در Chromium واقعی (`r1…r7`, `b-*.png`)؛ تست‌ها ۲۵۸/۲۵۸.

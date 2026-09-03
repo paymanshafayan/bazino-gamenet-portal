@@ -24,8 +24,10 @@ const {
 const { getResponsiveSrcSet } = await import('../src/components/PerformanceGuards.tsx');
 const { sanitizeThemeId, stripCssComments, extractIdFromCss, hasNewFormat, extractColorsFromCss } =
   await import('../src/themes/themeCssUtils.ts');
-const { parseThemeZip, buildSampleThemeZip, rewriteCssAssetUrls, isZipParseError } =
+const { parseThemeZip, buildSampleThemeZip, buildThemeZip, rewriteCssAssetUrls, isZipParseError, normalizeThemeStrings } =
   await import('../src/themes/themeZipCore.ts');
+const { detectRegisteredRegions, KNOWN_REGIONS } = await import('../server/themeStore.ts');
+const { makeThemeStrings, THEME_REGIONS } = await import('../src/themeSdk/sdk.ts');
 const { translations } = await import('../src/utils/translations.ts');
 
 // src/themes/index.ts is browser-coupled (import.meta.glob, `?inline` CSS and an
@@ -377,6 +379,41 @@ test('the generated sample theme ZIP parses back correctly', () => {
   assert.ok(theme.meta?.id, 'missing meta.id');
   assert.ok(theme.css.length > 0, 'missing css');
   assert.ok(Object.keys(theme.assets).length > 0, 'missing assets');
+});
+
+test('sample theme is region-based (SDK v2): hero + footer, 4-language strings, tokens', () => {
+  const theme = parseThemeZip(buildSampleThemeZip(), 'sample.zip') as any;
+  assert.deepEqual(detectRegisteredRegions(theme.componentJs).sort(), ['footer', 'hero']);
+  assert.deepEqual(Object.keys(theme.meta.strings).sort(), ['en', 'fa', 'ru', 'tr']);
+  for (const lang of ['fa', 'en', 'ru', 'tr']) assert.ok(theme.meta.strings[lang].title, `strings.${lang}.title missing`);
+  assert.ok(theme.meta.tokens && theme.meta.tokens['card-2'], 'tokens missing');
+});
+
+test('CSS-only theme (no theme.js) is a valid package', () => {
+  const sample = parseThemeZip(buildSampleThemeZip(), 'x') as any;
+  const zip = buildThemeZip(sample.css, { id: 'neon-storm', name: 'CSS only' }, {});
+  const parsed = parseThemeZip(zip, 'css-only.zip');
+  assert.ok(!isZipParseError(parsed), `css-only package rejected: ${JSON.stringify(parsed)}`);
+  assert.equal((parsed as any).componentJs, '');
+});
+
+test('region contract: server KNOWN_REGIONS === client THEME_REGIONS', () => {
+  assert.deepEqual([...KNOWN_REGIONS].sort(), [...THEME_REGIONS].sort());
+});
+
+test('detectRegisteredRegions finds every registerComponent call', () => {
+  const js = "SDK.registerComponent('hero', {}); window.BazinoThemeSDK.registerComponent(\"home.pricing\", function(){});";
+  assert.deepEqual(detectRegisteredRegions(js).sort(), ['hero', 'home.pricing']);
+});
+
+test('ts(): theme strings fall back language → en → first → key', () => {
+  const strings = normalizeThemeStrings({ en: { a: 'A-en' }, tr: { a: 'A-tr', b: 'B-tr' }, junk: 5 });
+  assert.deepEqual(Object.keys(strings!).sort(), ['en', 'tr']);
+  assert.equal(makeThemeStrings(strings, 'tr')('a'), 'A-tr');
+  assert.equal(makeThemeStrings(strings, 'fa')('a'), 'A-en');
+  assert.equal(makeThemeStrings(strings, 'fa')('b'), 'B-tr');
+  assert.equal(makeThemeStrings(strings, 'fa')('zzz', 'fb'), 'fb');
+  assert.equal(makeThemeStrings(undefined, 'fa')('zzz'), 'zzz');
 });
 
 test('parseThemeZip rejects non-zip input instead of throwing', () => {

@@ -169,7 +169,7 @@ export default function ShopTab({
                 className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all cursor-pointer uppercase tracking-wider border ${
                   selectedCategory === cat
                     ? 'bg-primary text-black border-primary shadow-[0_0_15px_rgba(0,240,255,0.25)]'
-                    : 'text-gray-400 hover:text-white bg-[#0f1326] hover:bg-white/5 border-white/10'
+                    : 'text-gray-400 hover:text-white bg-card-3 hover:bg-white/5 border-white/10'
                 }`}
               >
                 {cat === 'All' && (L(language, { fa: 'همه محصولات', en: 'All Products', ru: 'Все товары', tr: 'Tüm Ürünler' }))}
@@ -219,7 +219,7 @@ export default function ShopTab({
                 className="rounded-2xl border border-white/10 bg-dark-card overflow-hidden flex flex-col group hover:border-primary/50 hover:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all duration-300"
               >
                 {/* Product Image */}
-                <div className="relative aspect-video w-full bg-[#0d122b] overflow-hidden">
+                <div className="relative aspect-video w-full bg-card-2 overflow-hidden">
                   <img loading="lazy" 
                     src={accessory.imageUrl} 
                     alt={translatedName}
@@ -307,8 +307,8 @@ export default function ShopTab({
                   }
 
                   return (
-                    <div key={item.item.id} className="flex gap-3 bg-[#0d122b] p-2.5 rounded-xl border border-white/5 relative group">
-                      <div className="w-12 h-12 bg-[#0f1326] rounded overflow-hidden shrink-0">
+                    <div key={item.item.id} className="flex gap-3 bg-card-2 p-2.5 rounded-xl border border-white/5 relative group">
+                      <div className="w-12 h-12 bg-card-3 rounded overflow-hidden shrink-0">
                         <img loading="lazy" src={item.item.imageUrl} alt={mappedItemName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       
@@ -320,7 +320,7 @@ export default function ShopTab({
                           </span>
 
                           {/* Qty actions */}
-                          <div className="flex items-center gap-1.5 bg-[#0f1326] rounded border border-white/10 px-1 py-0.5">
+                          <div className="flex items-center gap-1.5 bg-card-3 rounded border border-white/10 px-1 py-0.5">
                             <button 
                               onClick={() => updateQty(item.item.id, -1)}
                               className="text-gray-400 hover:text-white px-1.5 text-xs font-bold cursor-pointer"
@@ -371,7 +371,7 @@ export default function ShopTab({
                       placeholder={t('booking.promoLabel', 'کد تخفیف')}
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
-                      className="flex-1 px-3.5 py-2.5 bg-[#0d122b] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
+                      className="flex-1 px-3.5 py-2.5 bg-card-2 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
                     <button
                       onClick={handleApplyCoupon}

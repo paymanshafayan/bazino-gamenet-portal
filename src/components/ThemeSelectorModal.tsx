@@ -24,6 +24,8 @@ interface ThemeSelectorModalProps {
   availableThemes: ThemeInfo[];
   themeId: string;
   setThemeId: (id: string) => void;
+  /** قالب پیش‌فرض سایت (انتخاب ادمین) — برای نمایش نشان «پیش‌فرض سایت» */
+  siteDefaultThemeId?: string;
   language: 'fa' | 'en';
 }
 
@@ -33,6 +35,7 @@ export default function ThemeSelectorModal({
   availableThemes,
   themeId,
   setThemeId,
+  siteDefaultThemeId,
   language
 }: ThemeSelectorModalProps) {
   useModalDismiss(isOpen, onClose);
@@ -112,7 +115,7 @@ export default function ThemeSelectorModal({
           >
             {/* Ambient background accent glows */}
             <div className="absolute top-0 right-1/4 w-72 h-72 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-0 left-1/4 w-72 h-72 bg-[#A855F7]/10 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-0 left-1/4 w-72 h-72 bg-violet-token/10 rounded-full blur-[100px] pointer-events-none" />
 
             {/* Header row */}
             <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/5 relative z-10 shrink-0">
@@ -143,6 +146,7 @@ export default function ThemeSelectorModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto p-2 pr-1 scrollbar-thin scrollbar-thumb-slate-800 relative z-10 flex-grow">
               {availableThemes.map((theme, index) => {
                 const isActive = themeId === theme.id;
+                const isSiteDefault = siteDefaultThemeId === theme.id;
                 const cardAnim = getThrowAnimation(index);
                 
                 return (
@@ -171,7 +175,9 @@ export default function ThemeSelectorModal({
                         <h4 className="font-bold text-sm text-white group-hover:text-primary transition-colors">
                           {theme.name}
                         </h4>
+ 
                         <span className="text-[10px] uppercase font-mono tracking-widest text-gray-500">
+                          {isSiteDefault && <span className="text-primary/80 me-1">{L(language, { fa: 'پیش‌فرض سایت ·', en: 'SITE DEFAULT ·', ru: 'ПО УМОЛЧАНИЮ ·', tr: 'SİTE VARSAYILANI ·' })}</span>}
                           {theme.type === 'built-in' 
                             ? (L(language, { fa: 'سیستمی', en: 'BUILT-IN', ru: 'ВСТРОЕННЫЕ', tr: 'YERLEŞİK' })) 
                             : (L(language, { fa: 'پوسته سفارشی', en: 'CUSTOM', ru: 'ПОЛЬЗОВАТЕЛЬСКИЕ', tr: 'ÖZEL' }))}

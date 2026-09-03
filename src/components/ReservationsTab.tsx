@@ -446,7 +446,7 @@ export default function ReservationsTab({
                           <button
                             onClick={() => handleSimulateCheckIn(res.id)}
                             disabled={scanningId !== null}
-                            className="w-full py-2 bg-[#A855F7]/10 hover:bg-[#A855F7] text-[#A855F7] hover:text-white border border-[#A855F7]/20 hover:border-[#A855F7] rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            className="w-full py-2 bg-violet-token/10 hover:bg-violet-token text-violet-token hover:text-white border border-violet-token/20 hover:border-violet-token rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
                           >
                             <ScanLine className="w-3.5 h-3.5" />
                             <span>
@@ -472,12 +472,12 @@ export default function ReservationsTab({
 
         {/* Booking History View */}
         <div className="rounded-2xl border border-white/10 bg-dark-card p-6 mt-6 relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#A855F7]/5 blur-3xl pointer-events-none"></div>
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-violet-token/5 blur-3xl pointer-events-none"></div>
           
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-white/5 pb-4">
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
-                <History className="w-5 h-5 text-[#A855F7]" />
+                <History className="w-5 h-5 text-violet-token" />
                 <span>
                   {language === 'fa' && 'تاریخچه رزروهای شما'}
                   {language === 'en' && 'Your Booking History'}
@@ -622,7 +622,7 @@ export default function ReservationsTab({
 
       {/* Dynamic Cyberpunk Scanner Simulation Overlay */}
       {showScannerSim && (
-        <div className="fixed inset-0 bg-[#070913]/90 backdrop-blur-md z-[9999] flex items-center justify-center font-sans">
+        <div className="fixed inset-0 bg-surface-2/90 backdrop-blur-md z-[9999] flex items-center justify-center font-sans">
           <div className="max-w-md w-full mx-4 bg-dark-card border-2 border-primary/40 rounded-2xl p-6 relative overflow-hidden shadow-[0_0_50px_rgba(0,240,255,0.15)] animate-fade-in">
             <div className="absolute top-0 left-0 w-full h-1 bg-primary/20">
               <div className="h-full bg-primary animate-pulse" style={{ width: '100%' }}></div>
@@ -651,7 +651,7 @@ export default function ReservationsTab({
                 <p className="text-gray-400">{"[CONNECTING] Connecting to FrontDesk Scanner..."}</p>
                 <p className="animate-pulse">{"[SCANNING] Initializing optical sensor laser sweeps..."}</p>
                 <p className="text-primary">{"[INFO] Capturing raw QR matrix codes..."}</p>
-                <p className="text-[#A855F7] animate-pulse">{"[DB] Querying secure reservation records database..."}</p>
+                <p className="text-violet-token animate-pulse">{"[DB] Querying secure reservation records database..."}</p>
                 <p className="text-white">{"[SUCCESS] Verification successful! Seat activated."}</p>
               </div>
 
@@ -698,7 +698,7 @@ export default function ReservationsTab({
             <div className="flex flex-col gap-4">
               
               {/* Selected info card */}
-              <div className="bg-[#0d122b] p-4 rounded-xl border border-white/5">
+              <div className="bg-card-2 p-4 rounded-xl border border-white/5">
                 <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide font-mono">{t('booking.selectedSys', 'سیستم انتخاب شده:')}</span>
                 <h4 className="text-white text-sm font-bold mt-1 font-display">{selectedSystem.name}</h4>
                 <div className="flex justify-between items-center text-xs text-primary font-bold mt-2 pt-2 border-t border-white/5 font-mono">
@@ -756,7 +756,7 @@ export default function ReservationsTab({
                       placeholder={t('booking.promoLabel', 'کد تخفیف (در صورت وجود):')}
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
-                      className="flex-1 px-3.5 py-2.5 bg-[#0d122b] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
+                      className="flex-1 px-3.5 py-2.5 bg-card-2 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
                     <button
                       onClick={handleApplyCoupon}

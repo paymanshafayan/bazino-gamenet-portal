@@ -1440,6 +1440,48 @@ test('delete active theme → folder removed AND site default reset to dark-gold
   assert.equal((await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).status, 404);
 });
 
+test('theme.js registering an unknown region is rejected; CSS-only package installs and reports regions=[]', async () => {
+  const bad = themeZipMod.buildThemeZip(parsedV1.css, { ...parsedV1.meta, id: THEME_ID }, {}, "window.BazinoThemeSDK.registerComponent('sidebar', { render: function () { return null; } });");
+  const r1 = await installTheme(bad, '&replace=1');
+  const b1: any = await r1.json();
+  assert.equal(r1.status, 400, JSON.stringify(b1));
+  assert.match(String(b1.error), /sidebar/);
+
+  const cssOnly = themeZipMod.buildThemeZip(parsedV1.css, { ...parsedV1.meta, id: THEME_ID, tokens: { 'card-2': '#123456' } }, {});
+  const r2 = await installTheme(cssOnly, '&replace=1');
+  const b2: any = await r2.json();
+  assert.equal(r2.status, 200, JSON.stringify(b2));
+  assert.equal(b2.theme.hasComponentJs, false);
+  assert.deepEqual(b2.theme.regions, []);
+  assert.equal(b2.theme.tokens['card-2'], '#123456');
+  assert.equal((await fetch(`${BASE}/api/themes/${THEME_ID}/theme.js`)).status, 404);
+
+  // نسخه‌ی region-based (hero+footer) دوباره نصب می‌شود و بخش‌ها + strings در /api/themes گزارش می‌شوند
+  const r3 = await installTheme(themeV2, '&replace=1');
+  assert.equal(r3.status, 200);
+  const list: any = await getJson(`${BASE}/api/themes`);
+  const t = list.serverThemes.find((x: any) => x.id === THEME_ID);
+  assert.deepEqual([...t.regions].sort(), ['footer', 'hero']);
+  assert.deepEqual(Object.keys(t.strings).sort(), ['en', 'fa', 'ru', 'tr']);
+  assert.equal(t.hasComponentJs, true);
+  await fetch(`${BASE}/api/admin/themes/${THEME_ID}`, { method: 'DELETE', headers: adminAuth() });
+});
+
+test('app-sliders persist 4-language descriptions', async () => {
+  const create = await fetch(`${BASE}/api/admin/app-sliders`, { method: 'POST', headers: { ...adminAuth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageUrl: '/images/home/esports-1600.webp', autoGenerateMobile: false, target: 'reservations', titleFa: 'ف', titleEn: 'E', titleRu: 'Р', titleTr: 'T', descFa: 'توضیح', descEn: 'desc', descRu: 'опис', descTr: 'açık' }) });
+  const body: any = await create.json();
+  assert.equal(create.status, 200, JSON.stringify(body));
+  const slide = body.appSliders.find((s: any) => s.titleEn === 'E');
+  assert.equal(slide.descRu, 'опис');
+  assert.equal(slide.descTr, 'açık');
+  const pub: any = await getJson(`${BASE}/api/app-sliders`);
+  // در حالت داده‌ی نمونه (sample) لیست عمومی ممکن است نمونه باشد؛ در حالت db باید رکورد واقعی با desc بیاید
+  const found = pub.find((s: any) => s.id === slide.id);
+  if (found) assert.equal(found.descFa, 'توضیح');
+  await fetch(`${BASE}/api/admin/app-sliders/${slide.id}`, { method: 'DELETE', headers: adminAuth() });
+});
+
 test('storage-status reports the persistent data dir', async () => {
   const res = await fetch(`${BASE}/api/admin/storage-status`, { headers: adminAuth() });
   const body: any = await res.json();

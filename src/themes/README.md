@@ -8,38 +8,75 @@
 
 ---
 
-## ✅ ساختار استاندارد و اجباری قالب (فرمت واحد)
+## ✅ ساختار استاندارد قالب (فرمت واحد — نسخه ۲)
 
-هر قالب یک پکیج `ZIP` با **سه فایل اصلی اجباری** است. بدون هر کدام، قالب **نصب نمی‌شود** و خطای واضح می‌گیرید:
+هر قالب یک پکیج `ZIP` است. **`theme.json` و `theme.css` اجباری‌اند**؛ `theme.js` از نسخه ۲ **اختیاری** است
+(قالب «فقط CSS» هم معتبر است و با توکن‌ها/متغیرهای CSS کل سایت را رنگ‌آمیزی می‌کند).
 
 ```
 theme.zip
-├── theme.json   ← ⭐ اجباری — متادیتای قالب (نام، id، نسخه، توضیح، رنگ‌ها)
+├── theme.json   ← ⭐ اجباری — متادیتا + tokens + strings (چهارزبانه) + regions
 ├── theme.css    ← ⭐ اجباری — استایل کامل قالب (پوشش تمام صفحات)
-├── theme.js     ← ⭐ اجباری — کامپوننت صفحه اصلی قالب (با SDK ثبت می‌شود)
-└── assets/      ← اختیاری — فایل‌های مورد نیاز قالب (تصویر، ویدئو، فونت، آیکون)
-    ├── banner.jpg
-    └── ...
+├── theme.js     ← ⬜ اختیاری — جایگزینی «بخش‌ها»ی سایت (hero، header، footer، …) با SDK
+└── assets/      ← اختیاری — تصویر، ویدئو، فونت، آیکون (در CSS با `url('assets/...')`)
 ```
 
 | فایل | وضعیت | نقش |
 |---|---|---|
-| `theme.json` | ⭐ **اجباری** | نام قالب، شناسه (id)، نسخه، توضیح و رنگ‌ها — **سایت نام قالب را از همین‌جا می‌خواند** |
-| `theme.css` | ⭐ **اجباری** | استایل کامل همه صفحات (فرمت جدید: `body[data-theme='...']` + قوانین `.theme-...`) |
-| `theme.js` | ⭐ **اجباری** | کامپوننت صفحه اصلی قالب — با `window.BazinoThemeSDK.registerComponent('home', ...)` |
-| `assets/` | ⬜ اختیاری | فایل‌های مورد نیاز (در CSS با مسیر نسبی `url('assets/...')`) |
+| `theme.json` | ⭐ **اجباری** | `id`, `name`, `version`, `colors` + جدید: `sdkVersion: 2`, `tokens`, `strings`, `regions` |
+| `theme.css` | ⭐ **اجباری** | `body[data-theme='<id>']{ --primary-color: …; --bz-card-2: …; }` + قوانین `.theme-<id> …` |
+| `theme.js` | ⬜ اختیاری | `window.BazinoThemeSDK.registerComponent('<region>', …)` — هر بخشی که ثبت نشود، پیش‌فرض سایت رندر می‌شود |
+| `assets/` | ⬜ اختیاری | مسیرهای نسبی هنگام سرو به `/api/themes/<id>/assets/...` بازنویسی می‌شوند |
 
-### چرا `theme.js` اجباری است؟
+### 🧩 بخش‌ها (regions) — «Partial View» برای قالب
 
-صفحه اصلی یک قالب فقط با تغییر رنگ/استایل ساخته نمی‌شود؛ چیدمان، بخش‌ها و تعاملات آن
-باید توسط **کامپوننت خود قالب** رندر شود (دقیقاً مثل قالب‌های سیستمی `GecoPurpleHome.tsx`
-و `GamingAmpHome.tsx`). بنابراین:
+قالب می‌تواند هر یک از بخش‌های زیر را جایگزین کند (بقیه دست‌نخورده می‌مانند):
 
-- `theme.js` کامپوننت صفحه اصلی را می‌سازد — بدون آن قالب «ناقص» است و نصب نمی‌شود.
-- اگر `theme.js` بارگذاری نشود یا کامپوننت ثبت نکند، سایت **خطای واضح** نشان می‌دهد
-  (به‌جای سقوط بی‌صدا به پیش‌فرض) تا مشکل فوراً دیده شود.
+| region | چه چیزی را جایگزین می‌کند |
+|---|---|
+| `header` | هدر/ناوبری بالای همه‌ی صفحات |
+| `hero` | اسلایدر/هرو بالای صفحه‌ی اصلی (اسلایدهای ادمین در `props.slides`) |
+| `home.genres`, `home.lounges`, `home.results`, `home.tournaments`, `home.pricing`, `home.staff`, `home.location` | بخش‌های مستقل صفحه‌ی اصلی |
+| `footer` | فوتر همه‌ی صفحات |
+| `mobileNav` | نوار ناوبری پایین موبایل |
+| `home` | **کل** صفحه‌ی اصلی (قرارداد نسخه ۱ — همچنان پشتیبانی می‌شود؛ اگر ثبت شود، `hero` و `home.*` نادیده گرفته می‌شوند) |
 
----
+- نام‌های ناشناخته (مثلاً `sidebar`) هنگام نصب با خطای واضح **رد** می‌شوند.
+- سرور بخش‌های ثبت‌شده را از `theme.js` تشخیص می‌دهد و در پنل ادمین به‌صورت بج (`hero footer` / `CSS-only`) نشان می‌دهد.
+
+### 🎨 توکن‌های طراحی و قرارداد رنگ/فونت
+
+هر قالب با تنظیم متغیرهای CSS روی `body[data-theme='<id>']` (یا `theme.json.tokens` که به `--bz-<key>` تبدیل می‌شود) **کل** کلاس‌های سایت را عوض می‌کند — از جمله هدر، دکمه‌ها و بج‌ها که با کلاس‌های Tailwind (`text-primary`, `bg-dark-card`, …) ساخته شده‌اند:
+
+| متغیر | کاربرد |
+|---|---|
+| `--primary-color`, `--secondary-color`, `--accent-color` | رنگ اصلی/ثانویه/تأکیدی — `text-primary`, `bg-primary`, `border-primary` … |
+| `--dark-bg-color`, `--dark-card-color` | پس‌زمینه صفحه و کارت‌ها |
+| `--bz-card-2`, `--bz-card-3`, `--bz-surface`, `--bz-surface-2` | سطوح ثانویه |
+| `--bz-text`, `--bz-muted`, `--bz-success`, `--bz-info`, `--bz-violet`, `--bz-border` | متن، متن کم‌رنگ، وضعیت‌ها |
+| `--bz-font-sans`, `--bz-font-display` | فونت متن و فونت تیتر |
+
+**قرارداد RTL/فونت:** سایت چهار زبان (fa/en/ru/tr) و دو جهت دارد. فونت تیتر قالب **باید** برای فارسی/روسی fallback داشته باشد
+(مثلاً `"Orbitron", "Vazirmatn", sans-serif`) — فونت‌هایی مثل Orbitron حروف فارسی ندارند و تیتر ناپدید می‌شود.
+از `dir`/`props.dir` برای margin/padding جهت‌دار استفاده کنید (یا `margin-inline-start`).
+
+### 🌐 رشته‌های چهارزبانه‌ی قالب (`strings`)
+
+```json
+{
+  "id": "neon-storm", "name": "Neon Storm", "version": "2.0.0", "sdkVersion": 2,
+  "tokens": { "card-2": "#0a1a12", "font-display": "\"Orbitron\", \"Vazirmatn\", sans-serif" },
+  "strings": {
+    "fa": { "title": "طوفان نئون", "cta": "رزرو کن" },
+    "en": { "title": "Neon Storm", "cta": "Book now" },
+    "ru": { "title": "Неоновый шторм", "cta": "Забронировать" },
+    "tr": { "title": "Neon Fırtına", "cta": "Rezervasyon yap" }
+  },
+  "regions": ["hero", "footer"]
+}
+```
+در `theme.js`: `props.ts('cta')` → رشته‌ی زبان فعلی، با fallback `en` → اولین زبان موجود → خودِ کلید.
+اسلایدهای پنل ادمین هم چهارزبانه‌اند: `props.slides[i].title[language]` / `.desc[language]`.
 
 ## 🔄 جریان بارگذاری قالب (نام قالب → کامپوننت)
 
@@ -99,11 +136,15 @@ theme.zip
 | ۱۱ | **تماس، آدرس و نقشه** | ⬜ اختیاری | اطلاعات تماس، شبکه‌های اجتماعی، نقشه | `settings` |
 | ۱۲ | **CTA های ناوبری** | ⬜ اختیاری | دکمه‌های رفتن به رزرو/کافه/فروشگاه/مسابقات | `onNavigate` |
 
-### قرارداد داده (props) — نسخه 1 (SDK)
+### قرارداد داده (props) — نسخه ۲ (سازگار با نسخه ۱)
 
 | prop | توضیح |
 |---|---|
-| `language`, `dir`, `t` | زبان فعلی (fa/en/ru/tr)، جهت (rtl/ltr)، تابع ترجمه |
+| `language`, `dir`, `t` | زبان فعلی (fa/en/ru/tr)، جهت (rtl/ltr)، تابع ترجمه سایت |
+| `ts(key, fallback?)` | رشته‌های خود قالب از `theme.json.strings` (جدید در v2) |
+| `tokens` | توکن‌های طراحی قالب (جدید در v2) |
+| `slides` | اسلایدهای ادمین، نرمال‌شده و چهارزبانه: `{id, imageUrl, mobileImageUrl, target, title{fa,en,ru,tr}, desc{…}}` (جدید در v2) |
+| `region`, `activeTab`, `user` | نام بخش در حال رندر، تب فعال، کاربر واردشده (جدید در v2) |
 | `onNavigate(tab)` | رفتن به تب (reservations, cafe, shop, tournaments, blog, loyalty, chat) |
 | `featuredGames` | اسلایدهای اصلی (array با title/desc/imageUrl به‌صورت چندزبانه) |
 | `gameGenres`, `matchHistory`, `pricingPackages`, `loungeSections`, `staffTeam` | بخش‌های محتوایی هوم |
@@ -137,7 +178,7 @@ src/themes/
 themes/<theme-id>/
 ├── theme.json        ← متادیتای نرمال‌شده (نام قالب از همین‌جا)
 ├── theme.css         ← استایل کامل قالب
-├── theme.js          ← کامپوننت صفحه اصلی (اجباری)
+├── theme.js          ← بخش‌های قالب با SDK v2 (اختیاری)
 └── assets/           ← فایل‌های مورد نیاز قالب
 ```
 
@@ -178,7 +219,30 @@ body[data-theme='neon-storm'] { --primary-color: #00ff88; --dark-bg-color: #0407
 /* ... تمام صفحات را پوشش دهید ... */
 ```
 
-### گام ۴: theme.js (اجباری — کامپوننت صفحه اصلی با SDK)
+### گام ۴: theme.js (اختیاری — جایگزینی بخش‌ها با SDK v2)
+```js
+(function () {
+  var SDK = window.BazinoThemeSDK;
+  if (!SDK) return;
+  var R = SDK.React;
+
+  // فقط هرو را عوض می‌کنیم؛ هدر/فوتر/بقیه صفحه پیش‌فرض می‌مانند
+  SDK.registerComponent('hero', {
+    apiVersion: 2,
+    render: function (p) {
+      var s = p.slides[0];
+      return R.createElement('section', { className: 'my-hero', dir: p.dir },
+        R.createElement('h1', null, s ? s.title[p.language] : p.ts('title')),
+        R.createElement('button', { onClick: function () { p.onNavigate(s ? s.target : 'reservations'); } }, p.ts('cta'))
+      );
+    }
+  });
+
+  SDK.registerComponent('footer', { render: function (p) { return R.createElement('footer', null, p.settings.club_name); } });
+})();
+```
+
+#### حالت نسخه ۱ — کل صفحه‌ی اصلی (همچنان معتبر)
 ```js
 (function () {
   var SDK = window.BazinoThemeSDK;

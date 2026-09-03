@@ -393,7 +393,7 @@ export default function TournamentsTab({
             <select
               value={selectedTournamentId}
               onChange={(e) => setSelectedTournamentId(e.target.value)}
-              className="bg-[#0d122b] border border-white/10 rounded-lg px-4 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold font-mono cursor-pointer"
+              className="bg-card-2 border border-white/10 rounded-lg px-4 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold font-mono cursor-pointer"
             >
               {tournaments.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -433,7 +433,7 @@ export default function TournamentsTab({
                     {L(language, { fa: 'یک‌چهارم نهایی', en: 'Quarterfinals', ru: 'Четвертьфинал', tr: 'Çeyrek Final' })}
                   </div>
                   {selectedTournament.bracket.round1.map((match) => (
-                  <div key={match.id} className="bg-[#0d122b] rounded-lg border border-white/10 p-3.5 flex flex-col gap-2 relative">
+                  <div key={match.id} className="bg-card-2 rounded-lg border border-white/10 p-3.5 flex flex-col gap-2 relative">
                     <div className="flex justify-between items-center text-xs font-bold">
                       <span className={`font-bold font-display ${match.winner === match.teamA ? 'text-primary' : 'text-gray-300'}`}>{match.teamA}</span>
                       <span className="text-gray-500 font-mono">{match.scoreA ?? '-'}</span>
@@ -453,7 +453,7 @@ export default function TournamentsTab({
                   {L(language, { fa: 'نیمه نهایی', en: 'Semifinals', ru: 'Полуфинал', tr: 'Yarı Final' })}
                 </div>
                 {selectedTournament.bracket.semis.map((match) => (
-                  <div key={match.id} className="bg-[#0d122b] rounded-lg border border-primary/20 p-3.5 flex flex-col gap-2 relative shadow-[0_0_15px_rgba(0,240,255,0.02)]">
+                  <div key={match.id} className="bg-card-2 rounded-lg border border-primary/20 p-3.5 flex flex-col gap-2 relative shadow-[0_0_15px_rgba(0,240,255,0.02)]">
                     <div className="flex justify-between items-center text-xs font-bold">
                       <span className={`font-bold font-display ${match.winner === match.teamA ? 'text-primary' : 'text-gray-300'}`}>{match.teamA}</span>
                       <span className="text-gray-500 font-mono">{match.scoreA ?? '-'}</span>
@@ -562,7 +562,7 @@ export default function TournamentsTab({
                 </div>
 
                 {/* Quick Filters */}
-                <div className="flex gap-2 bg-[#0d122b] p-1 rounded-lg border border-white/5 self-start">
+                <div className="flex gap-2 bg-card-2 p-1 rounded-lg border border-white/5 self-start">
                   <button
                     onClick={() => setCalendarFilter('all')}
                     className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
@@ -814,7 +814,7 @@ export default function TournamentsTab({
           ) : (
             <form onSubmit={handleRegister} className="flex flex-col gap-4">
               
-              <div className="bg-[#0d122b] p-4 rounded-xl border border-white/5">
+              <div className="bg-card-2 p-4 rounded-xl border border-white/5">
                 <span className="text-[10px] text-gray-400 font-bold uppercase font-mono">{L(language, { fa: 'تورنمنت انتخاب شده:', en: 'Selected Tournament:', ru: 'Выбранный турнир:', tr: 'Seçilen Turnuva:' })}</span>
                 <h4 className="text-white text-xs font-bold mt-1 font-display">{selectedTournament?.title}</h4>
                 <div className="flex justify-between items-center text-xs text-primary font-bold mt-2 pt-2 border-t border-white/5 font-mono">
@@ -832,7 +832,7 @@ export default function TournamentsTab({
                   placeholder="e.g. Persis Esports"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
-                  className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
+                  className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
                 />
               </div>
 
@@ -845,7 +845,7 @@ export default function TournamentsTab({
                   placeholder="e.g. Sina_Gamer"
                   value={leaderName}
                   onChange={(e) => setLeaderName(e.target.value)}
-                  className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
+                  className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
                 />
               </div>
 
@@ -858,7 +858,7 @@ export default function TournamentsTab({
                     placeholder="Gamertag"
                     value={memberInput}
                     onChange={(e) => setMemberInput(e.target.value)}
-                    className="flex-1 bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium font-mono"
+                    className="flex-1 bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium font-mono"
                   />
                   <button
                     type="button"
@@ -871,7 +871,7 @@ export default function TournamentsTab({
 
                 {/* Render current members list */}
                 {members.length > 0 && (
-                  <div className="flex flex-col gap-2 mt-2 bg-[#0d122b] p-3 rounded-lg border border-white/5">
+                  <div className="flex flex-col gap-2 mt-2 bg-card-2 p-3 rounded-lg border border-white/5">
                     {members.map((m, idx) => (
                       <div key={idx} className="flex justify-between items-center text-xs text-gray-300 font-bold font-mono">
                         <span>{idx + 1}. {m}</span>
@@ -917,7 +917,7 @@ export default function TournamentsTab({
 
               <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
                 {(selectedTournament.teams ?? []).map((t, idx) => (
-                  <div key={idx} className="bg-[#0d122b] p-3 rounded-lg border border-white/5 flex flex-col gap-1.5 text-xs">
+                  <div key={idx} className="bg-card-2 p-3 rounded-lg border border-white/5 flex flex-col gap-1.5 text-xs">
                     <div className="flex justify-between font-bold text-gray-200">
                       <span className="font-display text-primary">{t.name}</span>
                       <span className="text-[10px] text-gray-500 font-mono">Leader: {t.leader}</span>

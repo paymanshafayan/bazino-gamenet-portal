@@ -4,12 +4,12 @@
  *  (بدون وابستگی به Vite/مرورگر — قابل استفاده در کلاینت و سرور)
  * ═══════════════════════════════════════════════════════════════════
  *
- *  فرمت استاندارد پکیج قالب (فایل .zip) — همه فایل‌های اصلی اجباری‌اند:
+ *  فرمت استاندارد پکیج قالب (فایل .zip):
  *  ─────────────────────────────────────
  *    theme.zip
- *    ├── theme.json        ← اجباری — متادیتای قالب (نام، id، نسخه، ...)
+ *    ├── theme.json        ← توصیه‌شده — متادیتا (نام، id، نسخه، colors، tokens، strings، regions)
  *    ├── theme.css         ← اجباری — استایل کامل قالب
- *    ├── theme.js          ← اجباری — کامپوننت صفحه اصلی قالب (با SDK)
+ *    ├── theme.js          ← اختیاری — بخش‌های (regions) اختصاصی قالب با SDK: header/hero/…/home
  *    └── assets/           ← اختیاری — فایل‌های مورد نیاز قالب
  *        ├── logo.png          تصویر، ویدئو، فونت، آیکون و ...
  *        ├── banner.jpg
@@ -20,10 +20,10 @@
  *      src: url('assets/font.woff2');
  *  هنگام سرو شدن، این مسیرها به آدرس واقعی فایل قالب تبدیل می‌شوند.
  *
- *  کامپوننت قالب (theme.js) با SDK ثبت می‌شود:
- *      window.BazinoThemeSDK.registerComponent('home', factory)
- *  و همان props استاندارد قالب‌های سیستمی (GecoPurpleHome و ...) را
- *  دریافت می‌کند — برای جزئیات به src/themeSdk/sdk.ts مراجعه کنید.
+ *  کامپوننت‌های قالب (theme.js) با SDK برای هر بخش ثبت می‌شوند (Partial View):
+ *      window.BazinoThemeSDK.registerComponent('hero', { render(props) {...} })
+ *  هر بخشی که ثبت نشود با پیاده‌سازی پیش‌فرض سایت رندر می‌شود.
+ *  برای جزئیات به src/themeSdk/sdk.ts و src/themes/README.md مراجعه کنید.
  *
  *  این ماژول فقط از fflate استفاده می‌کند (هیچ import مرورگر/ویتی ندارد).
  * ═══════════════════════════════════════════════════════════════════
@@ -52,12 +52,25 @@ export interface ThemeColorConfig {
   card: string;
 }
 
+/** رشته‌های چندزبانه‌ی خود قالب: strings.<lang>.<key> */
+export type ThemeStrings = Record<string, Record<string, string>>;
+
 export interface ZipThemeMeta {
   name?: string;
   id?: string;
   version?: string;
   description?: string;
+  author?: string;
   colors?: ThemeColorConfig;
+  /** توکن‌های طراحی اضافه (به متغیرهای --bz-* نگاشت می‌شوند) */
+  tokens?: Record<string, string>;
+  /** رشته‌های چندزبانه‌ی قالب (fa/en/ru/tr) */
+  strings?: ThemeStrings;
+  /** بخش‌هایی که theme.js ثبت می‌کند (اعلامی — برای نمایش در پنل) */
+  regions?: string[];
+  /** حداقل نسخه‌ی SDK مورد نیاز */
+  sdkVersion?: number;
+  [extra: string]: unknown;
 }
 
 /** نتیجه پارس موفق ZIP */
@@ -66,7 +79,7 @@ export interface ParsedZipTheme {
   css: string;
   /** فایل‌های داخل پوشه assets (مسیر نسبی ← بایت) */
   assets: Record<string, Uint8Array>;
-  /** کامپوننت قالب (theme.js) — اجباری، با SDK ثبت می‌شود */
+  /** کامپوننت(های) قالب (theme.js) — اختیاری؛ با SDK بخش‌ها را ثبت می‌کند. رشته‌ی خالی = قالب CSS-only */
   componentJs: string;
   /** سایر فایل‌های نادیده‌گرفته‌شده (خارج از assets و خارج از theme.json/css/js) */
   ignoredFiles: string[];
@@ -164,18 +177,13 @@ export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZi
   const assets: Record<string, Uint8Array> = {};
   const ignoredFiles: string[] = [];
   const jsKey = findEntry(entries, ['theme.js']);
-  let componentJs: string | undefined;
-  if (!jsKey) {
-    return { error: 'فایل کامپوننت قالب (theme.js) داخل ZIP پیدا نشد — این فایل اجباری است و صفحه اصلی قالب را می‌سازد', code: 'no-js' };
-  }
-  try {
-    const js = strFromU8(files[jsKey]);
-    if (js.trim().length === 0) {
-      return { error: 'فایل theme.js خالی است — باید کامپوننت صفحه اصلی را با SDK ثبت کند', code: 'empty-js' };
+  let componentJs = '';
+  if (jsKey) {
+    try {
+      componentJs = strFromU8(files[jsKey]);
+    } catch (e) {
+      return { error: 'فایل theme.js قابل خواندن نیست', code: 'no-js' };
     }
-    componentJs = js;
-  } catch (e) {
-    return { error: 'فایل theme.js قابل خواندن نیست', code: 'no-js' };
   }
   const knownKeys = new Set([jsonKey, cssKey, jsKey, 'theme.json', 'theme.css', 'theme.js'].filter(Boolean));
   for (const raw of Object.keys(files)) {
@@ -214,13 +222,46 @@ export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZi
     colors = extractColorsFromCss(css);
   }
 
+  /* ۶) رشته‌های چندزبانه، توکن‌ها و بخش‌ها (اختیاری) */
+  const strings = normalizeThemeStrings(meta.strings);
+  const tokens = normalizeTokens(meta.tokens);
+  const regions = Array.isArray(meta.regions) ? meta.regions.filter((r): r is string => typeof r === 'string') : undefined;
+
   return {
-    meta: { ...meta, id, name, colors, version: typeof meta.version === 'string' ? meta.version : undefined, description: typeof meta.description === 'string' ? meta.description : undefined },
+    meta: {
+      ...meta, id, name, colors,
+      version: typeof meta.version === 'string' ? meta.version : undefined,
+      description: typeof meta.description === 'string' ? meta.description : undefined,
+      strings, tokens, regions,
+    },
     css,
     assets,
     componentJs,
     ignoredFiles
   };
+}
+
+export function normalizeThemeStrings(raw: unknown): ThemeStrings | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: ThemeStrings = {};
+  for (const [lang, table] of Object.entries(raw as Record<string, unknown>)) {
+    if (!table || typeof table !== 'object') continue;
+    const clean: Record<string, string> = {};
+    for (const [k, v] of Object.entries(table as Record<string, unknown>)) {
+      if (typeof v === 'string') clean[k] = v;
+    }
+    if (Object.keys(clean).length) out[lang] = clean;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+export function normalizeTokens(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === 'string' && /^[a-zA-Z][a-zA-Z0-9-]*$/.test(k) && v.length < 200 && !/[;{}<>]/.test(v)) out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -230,14 +271,14 @@ export function buildThemeZip(
   css: string,
   meta: ZipThemeMeta,
   assets: Record<string, Uint8Array> = {},
-  componentJs: string
+  componentJs?: string
 ): Uint8Array {
   const zippable: Zippable = {
     'theme.json': strToU8(JSON.stringify(meta, null, 2)),
     'theme.css': strToU8(css),
-    // theme.js اجباری است — بدون آن پکیج معتبر نیست (طبق فرمت واحد قالب)
-    'theme.js': strToU8(componentJs),
   };
+  // theme.js اختیاری است — قالب CSS-only هم معتبر است
+  if (componentJs && componentJs.trim()) zippable['theme.js'] = strToU8(componentJs);
   for (const [rel, bytes] of Object.entries(assets)) {
     if (!rel || rel.includes('..')) continue;
     zippable[`assets/${rel}`] = bytes;
@@ -322,14 +363,11 @@ body[data-theme='neon-storm'] {
   --theme-btn-radius: 0.5rem;
 }
 
-/* پس‌زمینه از فایل داخل پوشه assets خوانده می‌شود */
+/* پس‌زمینه‌ی کل سایت (بنر assets/banner.svg فقط در هرو استفاده می‌شود) */
 body[data-theme='neon-storm'],
 body[data-theme='neon-storm'] .app-bg-main {
   background-color: #04070c;
-  background-image: url('assets/banner.svg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-image: radial-gradient(ellipse at top, rgba(0, 255, 136, 0.10), transparent 55%), linear-gradient(180deg, #04070c, #070d16);
   background-attachment: fixed;
 }
 
@@ -429,102 +467,97 @@ body[data-theme='neon-storm'] ::selection {
   opacity: 1 !important;
   filter: none !important;
 }
+
+/* ---------- بخش‌های اختصاصی قالب (theme.js: hero + footer) ---------- */
+.theme-neon-storm .neon-kicker {
+  display: inline-block; font-family: var(--font-mono, monospace); font-size: 11px; letter-spacing: .3em;
+  text-transform: uppercase; color: #00ff88; border: 1px solid rgba(0,255,136,.4); padding: 4px 10px; border-radius: 999px;
+}
+.theme-neon-storm .neon-hero h1 { font-family: var(--font-display); text-shadow: 0 0 24px rgba(0,255,136,.35); }
+.theme-neon-storm .neon-btn { padding: 12px 24px; font-weight: 900; text-transform: uppercase; font-size: 12px; border-radius: 6px; cursor: pointer; }
+.theme-neon-storm .neon-btn-primary { background: #00ff88; color: #04070c; }
+.theme-neon-storm .neon-btn-ghost { border: 1px solid #00ff88; color: #00ff88; background: transparent; }
+.theme-neon-storm .neon-footer {
+  display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap;
+  padding: 28px 16px; margin-top: 48px; border-top: 1px solid rgba(0,255,136,.25); color: #9ca3af; font-size: 12px;
+  /* فایل assets با مسیر نسبی — هنگام سرو به /api/themes/<id>/assets/... بازنویسی می‌شود */
+  background: url('assets/banner.svg') center/cover no-repeat, #04070c;
+  background-blend-mode: luminosity;
+}
 `;
 }
 
 /* ---------- کامپوننت نمونه (theme.js) برای قالب نمونه ----------
- * قالب‌ها می‌توانند یک فایل theme.js اختیاری داشته باشند که با SDK
- * (window.BazinoThemeSDK) یک کامپوننت صفحه اصلی اختصاصی ثبت می‌کند —
- * دقیقاً مثل قالب‌های سیستمی GecoPurpleHome / GamingAmpHome. */
+ * نمونه‌ی رسمی «بخش‌محور» (Partial View): فقط hero و footer را جایگزین می‌کند؛
+ * هدر، ژانرها، مسابقات، قیمت‌ها و ... از پیش‌فرض سایت می‌آیند و با theme.css
+ * رنگ می‌گیرند. متن‌ها از theme.json.strings (fa/en/ru/tr) با props.ts() خوانده می‌شوند. */
 export function generateSampleThemeJs(): string {
-  return `/* BAZINO THEME COMPONENT — sample (Neon Storm) */
-/* با SDK ثبت می‌شود: window.BazinoThemeSDK.registerComponent('home', factory) */
+  return `/* BAZINO THEME COMPONENTS — sample (Neon Storm) — SDK v2 (regions) */
 (function () {
   var SDK = window.BazinoThemeSDK;
   if (!SDK || !SDK.registerComponent) {
-    console.warn('[BazinoThemeSDK] SDK not found — component skipped.');
+    console.warn('[BazinoThemeSDK] SDK not found — components skipped.');
     return;
   }
+  var R = SDK.React;
+  var h = R.createElement;
 
-  SDK.registerComponent('home', function () {
-    return {
-      apiVersion: 1,
-      render: function (props) {
-        var R = SDK.React;
-        if (!R) return null;
+  function pick(map, lang) {
+    if (!map) return '';
+    if (typeof map === 'string') return map;
+    return map[lang] || map.en || map.fa || '';
+  }
 
-        var fa = props.language === 'fa';
-        var featured = (props.featuredGames || []).slice(0, 3);
-        var tours = (props.tournaments || []).slice(0, 3);
-
-        return R.createElement('div', { dir: props.dir, className: 'bazino-sample-theme-root w-full' },
-          /* Hero */
-          R.createElement('section', { className: 'relative w-full overflow-hidden', style: { background: "url('" + props.assetsBase + "/banner.svg') center/cover no-repeat #04070c", minHeight: '420px' } },
-            R.createElement('div', { className: 'absolute inset-0', style: { background: 'linear-gradient(90deg, rgba(4,7,12,0.9), rgba(4,7,12,0.35) 60%, transparent)' } }),
-            R.createElement('div', { className: 'relative z-10 max-w-6xl mx-auto px-6 py-24 text-white' },
-              R.createElement('h1', { className: 'text-3xl md:text-5xl font-black font-mono' },
-                fa ? 'نئون استورم — قالب نمونه' : 'NEON STORM — Sample Theme'),
-              R.createElement('p', { className: 'mt-3 text-gray-300 max-w-xl' },
-                fa
-                  ? 'این صفحه اصلی توسط کامپوننت قالب (theme.js) ساخته شده است — دقیقاً مثل GecoPurpleHome.'
-                  : 'This homepage is rendered by the theme component (theme.js) — just like GecoPurpleHome.'),
-              R.createElement('div', { className: 'mt-6 flex gap-3 flex-wrap' },
-                R.createElement('button', {
-                  onClick: function () { props.onNavigate('reservations'); },
-                  className: 'px-6 py-3 font-black uppercase text-xs rounded bg-[#00ff88] text-black cursor-pointer'
-                }, fa ? 'رزرو سیستم' : 'Reserve System'),
-                R.createElement('button', {
-                  onClick: function () { props.onNavigate('tournaments'); },
-                  className: 'px-6 py-3 font-black uppercase text-xs rounded border border-[#00ff88] text-[#00ff88] cursor-pointer'
-                }, fa ? 'مسابقات' : 'Tournaments')
-              )
-            )
-          ),
-
-          /* Featured games from the same data contract as built-in themes */
-          R.createElement('section', { className: 'max-w-6xl mx-auto px-6 py-10' },
-            R.createElement('h2', { className: 'text-white font-black text-xl mb-5 font-mono' },
-              fa ? 'بازی‌های ویژه' : 'FEATURED GAMES'),
-            R.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
-              featured.map(function (game, i) {
-                return R.createElement('div', { key: i, className: 'rounded-lg overflow-hidden border border-white/10 bg-[#0b1220]' },
-                  R.createElement('img', { src: game.imageUrl || game.image, className: 'w-full h-36 object-cover', referrerPolicy: 'no-referrer' }),
-                  R.createElement('div', { className: 'p-3' },
-                    R.createElement('h3', { className: 'text-white text-sm font-bold' },
-                      game.title ? (game.title[props.language] || game.title.en || game.title.fa) : ''),
-                    R.createElement('p', { className: 'text-gray-400 text-xs mt-1 line-clamp-2' },
-                      game.desc ? (game.desc[props.language] || game.desc.en || '') : '')
-                  )
-                );
-              })
-            )
-          ),
-
-          /* Tournaments + logo from the mother site */
-          R.createElement('section', { className: 'max-w-6xl mx-auto px-6 pb-12' },
-            R.createElement('div', { className: 'flex items-center gap-3 mb-5' },
-              R.createElement('img', { src: props.logoUrl, alt: 'BAZINO', className: 'h-8 w-auto opacity-80' }),
-              R.createElement('h2', { className: 'text-white font-black text-xl font-mono' },
-                fa ? 'مسابقات فعال' : 'ACTIVE TOURNAMENTS')
-            ),
-            R.createElement('div', { className: 'flex flex-col gap-3' },
-              tours.map(function (t, i) {
-                return R.createElement('div', { key: i, className: 'flex items-center justify-between p-3 rounded border border-white/10 bg-[#0b1220]' },
-                  R.createElement('span', { className: 'text-white text-sm font-bold' }, t.title),
-                  R.createElement('span', { className: 'text-[#00ff88] text-xs font-mono font-bold' },
-                    t.registrationFee ? t.registrationFee.toLocaleString() + ' ' + (fa ? 'تومان' : 'T') : '')
-                );
-              })
-            )
+  /* ---- بخش HERO: از اسلایدهای ادمین (props.slides) استفاده می‌کند؛ اگر خالی بود، داده‌ی نمونه‌ی سایت (featuredGames) ---- */
+  SDK.registerComponent('hero', {
+    apiVersion: 2,
+    render: function (props) {
+      var ts = props.ts;
+      var lang = props.language;
+      var slides = (props.slides && props.slides.length) ? props.slides : (props.featuredGames || []);
+      var first = slides[0] || {};
+      var img = first.imageUrl || first.image || (props.assetsBase + '/banner.svg');
+      return h('section', { className: 'neon-hero relative w-full overflow-hidden', dir: props.dir,
+          style: { background: "url('" + img + "') center/cover no-repeat #04070c", minHeight: '440px' } },
+        h('div', { className: 'absolute inset-0', style: { background: 'linear-gradient(90deg, rgba(4,7,12,0.92), rgba(4,7,12,0.4) 60%, transparent)' } }),
+        h('div', { className: 'relative z-10 max-w-6xl mx-auto px-6 py-24 text-white' },
+          h('span', { className: 'neon-kicker' }, ts('kicker')),
+          h('h1', { className: 'text-3xl md:text-5xl font-black mt-2' }, pick(first.title, lang) || ts('title')),
+          h('p', { className: 'mt-3 text-gray-300 max-w-xl' }, pick(first.desc, lang) || ts('subtitle')),
+          h('div', { className: 'mt-6 flex gap-3 flex-wrap' },
+            h('button', { onClick: function () { props.onNavigate(first.target || 'reservations'); }, className: 'neon-btn neon-btn-primary' }, ts('cta')),
+            h('button', { onClick: function () { props.onNavigate('tournaments'); }, className: 'neon-btn neon-btn-ghost' }, ts('tournaments'))
           )
-        );
-      }
-    };
+        )
+      );
+    }
   });
 
-  console.log('[BazinoThemeSDK] sample theme component registered.');
+  /* ---- بخش FOOTER ---- */
+  SDK.registerComponent('footer', {
+    apiVersion: 2,
+    render: function (props) {
+      return h('footer', { className: 'neon-footer', dir: props.dir },
+        h('img', { src: props.logoUrl, alt: 'BAZINO', className: 'h-8 w-auto opacity-80' }),
+        h('span', null, props.ts('footer')),
+        h('span', { className: 'font-mono text-xs opacity-60', dir: 'ltr' }, 'theme: ' + props.themeId)
+      );
+    }
+  });
+
+  console.log('[BazinoThemeSDK] sample theme regions registered:', SDK.listRegisteredComponents());
 })();
 `;
+}
+
+/** رشته‌های چهارزبانه‌ی قالب نمونه (theme.json.strings) */
+export function generateSampleThemeStrings(): ThemeStrings {
+  return {
+    fa: { kicker: 'قالب نمونه — بخش‌محور', title: 'نئون استورم', subtitle: 'این هرو توسط theme.js قالب ساخته شده؛ بقیه‌ی بخش‌ها پیش‌فرض سایت هستند و با theme.css رنگ گرفته‌اند.', cta: 'رزرو سیستم', tournaments: 'مسابقات', footer: 'ساخته‌شده با موتور قالب بازینو' },
+    en: { kicker: 'Sample theme — region based', title: 'NEON STORM', subtitle: 'This hero is rendered by the theme\'s theme.js; every other region is the site default, restyled by theme.css.', cta: 'Reserve a rig', tournaments: 'Tournaments', footer: 'Built with the Bazino theme engine' },
+    ru: { kicker: 'Пример темы — по областям', title: 'NEON STORM', subtitle: 'Этот hero рисует theme.js темы; остальные области — стандартные, перекрашенные через theme.css.', cta: 'Забронировать', tournaments: 'Турниры', footer: 'Создано на движке тем Bazino' },
+    tr: { kicker: 'Örnek tema — bölge tabanlı', title: 'NEON STORM', subtitle: 'Bu hero temanın theme.js dosyasıyla çizilir; diğer bölgeler site varsayılanıdır ve theme.css ile renklenir.', cta: 'Sistem rezerve et', tournaments: 'Turnuvalar', footer: 'Bazino tema motoruyla üretildi' },
+  };
 }
 
 /* ---------- ساخت فایل ZIP نمونه (شامل assets + کامپوننت) ---------- */
@@ -533,8 +566,12 @@ export function buildSampleThemeZip(): Uint8Array {
     name: 'Neon Storm',
     id: 'neon-storm',
     version: '1.0.0',
-    description: 'قالب نمونه نئونی سبز — فرمت جدید پکیج قالب بازینو (شامل پوشه assets و کامپوننت theme.js)',
+    description: 'قالب نمونه نئونی سبز — پکیج بخش‌محور بازینو (theme.css + theme.json[strings/tokens] + theme.js[hero, footer] + assets/)',
     colors: { primary: '#00ff88', bg: '#04070c', card: '#0b1220' },
+    tokens: { 'card-2': '#0b1220', 'card-3': '#0d1628', surface: '#081018', 'surface-2': '#04070c', success: '#00ff88', info: '#00d8ff' },
+    strings: generateSampleThemeStrings(),
+    regions: ['hero', 'footer'],
+    sdkVersion: 2,
   };
   return buildThemeZip(generateSampleThemeCss(), meta, generateSampleAssets(), generateSampleThemeJs());
 }

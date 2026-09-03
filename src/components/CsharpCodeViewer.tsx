@@ -279,7 +279,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
       )}
 
       {/* Code panel with syntax highlight look */}
-      <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-[#0d122b] p-5 font-mono text-xs leading-relaxed text-slate-300 ltr-code text-left" style={{ direction: 'ltr' }}>
+      <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-card-2 p-5 font-mono text-xs leading-relaxed text-slate-300 ltr-code text-left" style={{ direction: 'ltr' }}>
         <div className="absolute top-3 right-3 text-slate-500 select-none text-[10px] bg-black/40 px-2.5 py-1 rounded-full border border-white/5 font-bold uppercase tracking-wider">
           {architecture === 'mvc' ? 'C# / Razor engine' : 'C# / Entity Framework'}
         </div>
@@ -301,7 +301,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
         <p className="text-xs text-gray-300 font-medium">
           {L(language, { fa: 'برای اجرای پروژه کلاینت MVC طراحی شده، به فولدر پروژه بروید و دستور زیر را اجرا کنید. این دستور کلاینت را در پورت پیش‌فرض وب باز خواهد کرد:', en: 'To execute the MVC client-side web application, navigate to the MVC project folder in your terminal and run:', ru: 'Чтобы запустить MVC-клиент, перейдите в папку проекта в терминале и выполните команду ниже. Клиент откроется на стандартном веб-порту:', tr: 'MVC istemci projesini çalıştırmak için terminalde proje klasörüne gidin ve aşağıdaki komutu çalıştırın. İstemci varsayılan web portunda açılacaktır:' })}
         </p>
-        <pre className="bg-black/60 p-3 rounded-xl mt-2.5 text-xs font-mono text-[#06B6D4] text-left" style={{ direction: 'ltr' }}>
+        <pre className="bg-black/60 p-3 rounded-xl mt-2.5 text-xs font-mono text-info-token text-left" style={{ direction: 'ltr' }}>
           dotnet run --project server/GameNet.MVC/GameNet.MVC.csproj
         </pre>
       </div>

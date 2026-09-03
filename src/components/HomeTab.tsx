@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, startTrans
 import { Tournament } from '../types/gamenet';
 import InitialAvatar from './InitialAvatar';
 import { useLanguage } from '../context/LanguageContext';
-import { hasComponent, mountComponent, unmountComponent, unregisterComponent } from '../themeSdk/sdk';
+import ThemeRegion, { useHasThemeComponent, useThemeRegionBase } from '../themeSdk/ThemeRegion';
+import type { ThemeComponentProps } from '../themeSdk/sdk';
 import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 import { vimg } from '../utils/assetVersion';
 
@@ -43,12 +44,9 @@ interface Props {
   themeId?: string;
   tournaments: Tournament[];
   onNavigate: (tab: 'loyalty' | 'reservations' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'csharp') => void;
-  /** قالب‌های دارای کامپوننت اختصاصی (theme.js) — اطلاعات از App می‌آید */
-  themeComponent?: { cssUrl: string; assetsBase: string; installedAt?: number } | null;
 }
 
-export default function HomeTab({ tournaments, onNavigate, themeId, themeComponent,
-}: Props) {
+export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
   const { language, dir, t } = useLanguage();
 
   const [activeBanner, setActiveBanner] = useState(0);
@@ -59,46 +57,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [appSliders, setAppSliders] = useState<any[]>([]);
-  const themeComponentHostRef = useRef<HTMLDivElement | null>(null);
-  const [themeComponentVersion, setThemeComponentVersion] = useState(0);
-  // بارگذاری theme.js قالب — برای قالب‌های نصب‌شده (server themes) اجباری است:
-  // صفحه اصلی قالب بدون کامپوننتش معنی ندارد، پس اگر بارگذاری/ثبت نشد، یک پیام
-  // خطای واضح در کنسول و یک placeholder با پیام خطا نمایش می‌دهیم (به‌جای سکوت).
-  const themeComponentKey = themeComponent ? `${themeComponent.cssUrl}@${themeComponent.installedAt || 0}` : '';
-  useEffect(() => {
-    if (!themeComponent) {
-      // قالب فعال دیگر کامپوننت سروری ندارد (حذف شد یا به قالب داخلی برگشتیم) →
-      // کامپوننت قبلی نباید در رجیستری بماند.
-      unregisterComponent('home');
-      return;
-    }
-    let cancelled = false;
-    // نسخه‌ی قبلی (مثلاً v1 همین قالب) را پاک کن تا theme.js جدید ثبت شود
-    unregisterComponent('home');
-    const script = document.createElement('script');
-    const base = themeComponent.cssUrl.replace(/\/theme\.css$/, '/theme.js');
-    script.src = themeComponent.installedAt ? `${base}?v=${Math.floor(themeComponent.installedAt)}` : base;
-    script.async = true;
-    script.onload = () => {
-      if (cancelled) return;
-      // ثبت نشدن کامپوننت یعنی theme.js اجرا شد ولی SDK.registerComponent صدا زده نشد
-      if (!hasComponent('home')) {
-        console.error('[ThemeSDK] theme.js loaded but did not register a home component:', script.src);
-      }
-      setThemeComponentVersion(v => v + 1);
-    };
-    script.onerror = () => {
-      console.error('[ThemeSDK] Failed to load theme.js (اجباری برای این قالب):', script.src);
-      setThemeComponentVersion(v => v + 1); // برای نمایش حالت خطا
-    };
-    document.body.appendChild(script);
-    return () => {
-      cancelled = true;
-      if (script.parentNode) script.parentNode.removeChild(script);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [themeComponentKey]);
-
+  // بخش‌های قالب (ThemeRegion): theme.js قالب فعال در App بارگذاری می‌شود؛ اینجا
+  // فقط بخش‌های صفحه‌ی اصلی را با fallback پیش‌فرض رندر می‌کنیم.
+  const regionBase = useThemeRegionBase();
+  const hasWholeHome = useHasThemeComponent('home');
 
   const getSocialLinks = () => {
     try {
@@ -554,16 +516,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     ? appSliders.map((slide, idx) => ({
         id: `custom-slide-${slide.id || idx}`,
         title: {
-          fa: slide.titleFa || '',
-          en: slide.titleEn || '',
-          ru: slide.titleEn || '',
-          tr: slide.titleEn || ''
+          fa: slide.titleFa || slide.titleEn || '',
+          en: slide.titleEn || slide.titleFa || '',
+          ru: slide.titleRu || slide.titleEn || slide.titleFa || '',
+          tr: slide.titleTr || slide.titleEn || slide.titleFa || ''
         },
         desc: {
-          fa: slide.titleFa ? `${slide.titleFa} - اسلاید ویژه کلوپ` : '',
-          en: slide.titleEn ? `${slide.titleEn} - Club Featured` : '',
-          ru: slide.titleEn ? `${slide.titleEn} - Club Featured` : '',
-          tr: slide.titleEn ? `${slide.titleEn} - Club Featured` : ''
+          fa: slide.descFa || (slide.titleFa ? `${slide.titleFa} - اسلاید ویژه کلوپ` : ''),
+          en: slide.descEn || (slide.titleEn ? `${slide.titleEn} - Club Featured` : ''),
+          ru: slide.descRu || slide.descEn || ((slide.titleRu || slide.titleEn) ? `${slide.titleRu || slide.titleEn} — Клуб рекомендует` : ''),
+          tr: slide.descTr || slide.descEn || ((slide.titleTr || slide.titleEn) ? `${slide.titleTr || slide.titleEn} - Kulüp Özel` : '')
         },
         image: slide.imageUrl,
         imageUrl: slide.imageUrl,
@@ -578,33 +540,18 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     : featuredGames;
   const activeGame = activeBanners[activeBanner] ?? activeBanners[0];
 
-  // mount کامپوننت قالب وقتی ثبت شد
-  useEffect(() => {
-    if (!themeComponent || !themeComponentHostRef.current) return;
-    if (!hasComponent('home')) return;
-
-    const mounted = mountComponent('home', themeComponentHostRef.current, {
-      language,
-      dir,
-      t,
-      onNavigate: onNavigate as any,
-      featuredGames: activeBanners,
-      gameGenres,
-      matchHistory,
-      pricingPackages,
-      loungeSections,
-      staffTeam,
-      tournaments,
-      settings: siteSettings,
-      logoUrl: '/logo.png',
-      assetsBase: themeComponent.assetsBase,
-      themeId: themeId || 'dark-gold',
-    });
-    if (!mounted) return;
-    // پاک‌سازی هنگام تغییر
-    return () => { unmountComponent('home'); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [themeComponentVersion, themeComponent, language, dir, tournaments, activeBanners, siteSettings]);
+  // props مشترک همه‌ی بخش‌های صفحه‌ی اصلی (به کامپوننت‌های قالب داده می‌شود)
+  const regionProps: Partial<ThemeComponentProps> = {
+    featuredGames: activeBanners,
+    gameGenres,
+    matchHistory,
+    pricingPackages,
+    loungeSections,
+    staffTeam,
+    tournaments,
+    settings: siteSettings,
+    themeId: themeId || 'dark-gold',
+  };
 
   // Helper to translate text dynamically
   const getLocText = (obj: any) => {
@@ -682,27 +629,18 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     return siteSettings[customKey] || defaultVal;
   };
 
-  // قالب‌های دارای کامپوننت اختصاصی (theme.js نصب‌شده با ZIP):
-  // کامپوننت قالب در یک هاست رندر می‌شود تا چیدمان کاملاً اختصاصی
-  // داشته باشد — دقیقاً مثل قالب‌های سیستمی Geco/GamingAmp.
-  // برای قالب‌های نصب‌شده، theme.js اجباری است؛ اگر بارگذاری شد ولی
-  // کامپوننت ثبت نشد (یا load خطا داد) به‌جای سقوط بی‌صدا به پیش‌فرض،
-  // یک پیام خطا نمایش می‌دهیم تا مشکل فوراً دیده شود.
-  if (themeComponent) {
-    if (hasComponent('home')) {
-      return (
-        <div className="w-full animate-fade-in" dir={dir}>
-          <div ref={themeComponentHostRef} className="w-full" />
-        </div>
-      );
-    }
+  // قالب‌هایی که «کل صفحه‌ی اصلی» را با theme.js می‌سازند (region: home — قرارداد v1):
+  // به‌جای بخش‌های پیش‌فرض، کامپوننت قالب رندر می‌شود.
+  if (hasWholeHome) {
     return (
       <div className="w-full animate-fade-in" dir={dir}>
-        <div className="min-h-[300px] flex items-center justify-center p-8 bg-red-950/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
-          {L(language, { fa: '⚠️ کامپوننت صفحه اصلی این قالب (theme.js) بارگذاری نشد یا خطا داد. لطفاً قالب را دوباره نصب کنید.', en: '⚠️ This theme\'s home component (theme.js) failed to load or did not register. Please re-install the theme.', ru: '⚠️ Компонент главной страницы этой темы (theme.js) не загрузился или не зарегистрировался. Переустановите тему.', tr: '⚠️ Bu temanın ana sayfa bileşeni (theme.js) yüklenemedi veya kayıt olmadı. Lütfen temayı yeniden yükleyin.' })}
-        </div>
+        <ThemeRegion name="home" props={regionProps} fallback={null} className="w-full" />
       </div>
     );
+  }
+  // قالب سروری با theme.js که هنوز بارگذاری نشده → تا مشخص شدن بخش‌ها placeholder (بدون فلش قالب پیش‌فرض)
+  if (regionBase && !regionBase.ready) {
+    return <div className="w-full min-h-[600px]" aria-hidden="true" />;
   }
 
   if (themeId === 'geco-purple') {
@@ -760,7 +698,8 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     <div className="space-y-16 animate-fade-in" dir={dir}>
       
       {/* 1. HERO GAME SLIDER (FULL WIDTH, SLANTED & MOBIRISE GAMINGAMP STYLED) */}
-      <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#050608] shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
+      <ThemeRegion name="hero" props={regionProps} fallback={<>
+      <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-surface-2 shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
         {activeGame && (
           <div key={activeGame.id} className="absolute inset-0 w-full h-full z-10">
             {/* Soft lightweight overlay removed to keep images bright as per user request */}
@@ -839,8 +778,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
           ))}
         </div>
       </section>
+      </>} />
 
       {/* 2. CHOOSE YOUR STORY / GAME GENRES (NEW SIGNATURE MOBIRISE SECTION) */}
+      <ThemeRegion name="home.genres" props={regionProps} fallback={<>
       {isSectionEnabled('genres') && (
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
@@ -863,7 +804,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             {gameGenres.map((genre) => (
               <div
                 key={genre.id}
-                className="group relative h-96 overflow-hidden rounded-none notched-clip border border-white/10 hover:border-primary hover:shadow-[0_0_30px_rgba(255,184,0,0.2)] bg-[#0d0e15] transition-all duration-300"
+                className="group relative h-96 overflow-hidden rounded-none notched-clip border border-white/10 hover:border-primary hover:shadow-[0_0_30px_rgba(255,184,0,0.2)] bg-dark-card transition-all duration-300"
               >
                 {/* Image banner */}
                 <img loading="lazy"
@@ -914,8 +855,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
           </div>
         </section>
       )}
+      </>} />
 
       {/* 3. LOUNGE SECTIONS INTRO (SLANTED CYBER FRAMING) */}
+      <ThemeRegion name="home.lounges" props={regionProps} fallback={<>
       {isSectionEnabled('services') && (
         <DeferredSection minHeight={520} render={() => (
         <section className="space-y-8">
@@ -942,7 +885,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 className="group rounded-none notched-clip border border-white/10 hover:border-primary bg-dark-card flex flex-col justify-between hover:shadow-[0_0_30px_rgba(255,184,0,0.15)] hover:-translate-y-1 transition-all duration-300"
               >
                 {/* Card Image */}
-                <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden border-b border-white/10">
+                <div className="relative aspect-[16/10] w-full bg-surface-2 overflow-hidden border-b border-white/10">
                   <img loading="lazy"
                     src={sect.imageUrl}
                     srcSet={getResponsiveSrcSet(sect.imageUrl, [320, 480, 640])}
@@ -986,8 +929,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         </section>
         )} />
       )}
+      </>} />
 
       {/* 4. MATCH RESULTS BOARD (NEW SIGNATURE MOBIRISE SECTION) */}
+      <ThemeRegion name="home.results" props={regionProps} fallback={<>
       {isSectionEnabled('matches') && (
         <DeferredSection minHeight={390} render={() => (
         <section className="space-y-8">
@@ -1008,7 +953,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
 
           {/* Scoreboard table / list */}
           <div className="bg-dark-card border border-white/10 rounded-none notched-clip overflow-hidden">
-            <div className="p-5 border-b border-white/10 bg-[#0d0e15] flex items-center justify-between">
+            <div className="p-5 border-b border-white/10 bg-dark-card flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sword className="w-5 h-5 text-primary" />
                 <span className="text-xs font-bold font-display uppercase text-white">Esports Arena Matches</span>
@@ -1080,8 +1025,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         </section>
         )} />
       )}
+      </>} />
 
       {/* 5. TOURNAMENTS CAROUSEL (SLANTED DESIGN) */}
+      <ThemeRegion name="home.tournaments" props={regionProps} fallback={<>
       {isSectionEnabled('tournaments') && (
         <DeferredSection
           minHeight={520}
@@ -1142,7 +1089,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 snap-center rounded-none notched-clip border border-white/10 bg-dark-card overflow-hidden flex flex-col justify-between group hover:border-primary hover:shadow-[0_0_25px_rgba(255,184,0,0.15)] transition-all duration-300"
                 >
                   {/* Image and status badge */}
-                  <div className="relative aspect-[16/10] w-full bg-[#050608] overflow-hidden">
+                  <div className="relative aspect-[16/10] w-full bg-surface-2 overflow-hidden">
                     <img loading="lazy"
                       src={getTournamentImage(tournament.game)}
                       srcSet={getResponsiveSrcSet(getTournamentImage(tournament.game), [320, 480, 640, 960])}
@@ -1234,8 +1181,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       </section>
         )} />
       )}
+      </>} />
 
       {/* 6. LOUNGE PASSES & PRICING PLANS (NEW SIGNATURE MOBIRISE SECTION) */}
+      <ThemeRegion name="home.pricing" props={regionProps} fallback={<>
       {isSectionEnabled('pricing') && (
         <DeferredSection minHeight={560} render={() => (
         <section className="space-y-8">
@@ -1272,7 +1221,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               )}
 
               {/* Package Header */}
-              <div className="p-6 border-b border-white/15 bg-[#0d0e15]">
+              <div className="p-6 border-b border-white/15 bg-dark-card">
                 <h3 className="text-md font-black text-white font-display uppercase">{getLocText(pack.title)}</h3>
                 <p className="text-gray-400 text-xs mt-1.5 font-bold">{getLocText(pack.duration)}</p>
                 <div className="mt-4 flex items-baseline gap-1">
@@ -1309,8 +1258,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       </section>
         )} />
       )}
+      </>} />
 
       {/* 7. MEET THE COACHES & EXPERTS (NEW SIGNATURE MOBIRISE SECTION) */}
+      <ThemeRegion name="home.staff" props={regionProps} fallback={<>
       {isSectionEnabled('coaches') && (
         <DeferredSection minHeight={500} render={() => (
         <section className="space-y-8">
@@ -1393,8 +1344,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       </section>
         )} />
       )}
+      </>} />
 
       {/* 8. ADDRESS, CONSOLE TICKETING & DARK-THEMED OSM LOCATION MAP */}
+      <ThemeRegion name="home.location" props={regionProps} fallback={<>
       {isSectionEnabled('address') && (
         <DeferredSection minHeight={500} render={() => (
         <section className="w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 bg-dark-card px-6 md:px-16 lg:px-24 xl:px-32 py-12 md:py-16 border-t-4 border-primary rounded-none shadow-[0_-10px_50px_rgba(0,0,0,0.3)]">
@@ -1484,7 +1437,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
             </div>
 
             {/* Interactive OSM Map (CYBERPUNK INVERT FILTER) */}
-            <div className="lg:col-span-7 h-[320px] md:h-[370px] w-full rounded-none notched-clip border border-white/10 relative bg-[#050608] group">
+            <div className="lg:col-span-7 h-[320px] md:h-[370px] w-full rounded-none notched-clip border border-white/10 relative bg-surface-2 group">
               {/* Map border glowing */}
               <div className="absolute inset-0 border border-primary/20 pointer-events-none z-10 rounded-none" />
               
@@ -1514,6 +1467,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         </section>
         )} />
       )}
+      </>} />
 
     </div>
   );

@@ -112,7 +112,7 @@ export default function LoyaltyProfileTab({
                 {(user.loyaltyPoints % 1000)} / 1000 {t('loyalty.pointsToSilver', 'امتیاز تا نقره‌ای')}
               </span>
             </div>
-            <div className="w-full bg-[#0d122b] rounded-full h-2 overflow-hidden border border-white/5">
+            <div className="w-full bg-card-2 rounded-full h-2 overflow-hidden border border-white/5">
               <div 
                 className="bg-primary h-2 rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,240,255,0.6)]"
                 style={{ width: `${Math.min(100, ((user.loyaltyPoints % 1000) / 1000) * 100)}%` }}
@@ -165,7 +165,7 @@ export default function LoyaltyProfileTab({
               value={pointsToRedeem}
               onChange={(e) => setPointsToRedeem(Number(e.target.value))}
               disabled={user.loyaltyPoints < 100}
-              className="w-full h-1.5 bg-[#0d122b] rounded-lg appearance-none cursor-pointer accent-primary"
+              className="w-full h-1.5 bg-card-2 rounded-lg appearance-none cursor-pointer accent-primary"
             />
             <div className="flex justify-between text-[10px] text-gray-500 font-bold font-mono">
               <span>100 PTS</span>
@@ -174,7 +174,7 @@ export default function LoyaltyProfileTab({
           </div>
 
           {/* Exchange review */}
-          <div className="bg-[#0d122b] border border-white/5 rounded-xl p-4 mb-6">
+          <div className="bg-card-2 border border-white/5 rounded-xl p-4 mb-6">
             <div className="flex justify-between text-xs text-gray-400 mb-2.5">
               <span>{t('loyalty.couponValue', 'ارزش کد تخفیف:')}</span>
               <span className="text-primary font-bold font-mono">+{couponValue.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
@@ -223,7 +223,7 @@ export default function LoyaltyProfileTab({
               {activeCoupons.map((coupon) => (
                 <div 
                   key={coupon.code}
-                  className="rounded-xl border border-white/10 bg-[#0f1326] hover:border-primary p-5 relative overflow-hidden flex flex-col justify-between transition-all group"
+                  className="rounded-xl border border-white/10 bg-card-3 hover:border-primary p-5 relative overflow-hidden flex flex-col justify-between transition-all group"
                 >
                   <div className="absolute -top-12 -right-12 w-24 h-24 bg-primary/5 blur-2xl pointer-events-none group-hover:bg-primary/10 transition-all"></div>
                   <div className="flex justify-between items-start gap-2 relative z-10">
@@ -297,7 +297,7 @@ export default function LoyaltyProfileTab({
 
           <div className="overflow-x-auto mt-4">
             <table className="w-full text-sm text-gray-400">
-              <thead className="text-xs text-gray-400 uppercase bg-[#0d122b] border-b border-white/10 font-mono font-bold">
+              <thead className="text-xs text-gray-400 uppercase bg-card-2 border-b border-white/10 font-mono font-bold">
                 <tr>
                   <th scope="col" className={`px-4 py-3 ${dir === 'rtl' ? 'text-right rounded-r-lg' : 'text-left rounded-l-lg'}`}>{t('loyalty.tableDesc', 'شرح تراکنش وفاداری')}</th>
                   <th scope="col" className="px-4 py-3 text-center">{t('loyalty.tableType', 'نوع تراکنش')}</th>

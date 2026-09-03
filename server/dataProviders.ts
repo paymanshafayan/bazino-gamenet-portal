@@ -95,7 +95,7 @@ export interface TournamentRow { id: string; title: string; titleFa?: string; ti
 export interface ArticleRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; content: string; contentFa?: string; contentEn?: string; contentRu?: string; contentTr?: string; category: string; imageUrl: string; mobileImageUrl?: string; author: string; authorFa?: string; authorEn?: string; authorRu?: string; authorTr?: string; date: string; comments: string; }
 export interface UserMessageRow { id: string; sender: string; recipient: string; title: string; body: string; date: string; isRead: boolean; type: string; }
 export interface ThemeRow { id: string; name: string; nameEn: string; primaryColor: string; primaryHover: string; darkBg: string; darkCard: string; accentRed: string; }
-export interface SliderRow { id: string; imageUrl: string; mobileImageUrl?: string; target: string; titleFa: string; titleEn: string; titleRu: string; titleTr: string; }
+export interface SliderRow { id: string; imageUrl: string; mobileImageUrl?: string; target: string; titleFa: string; titleEn: string; titleRu: string; titleTr: string; descFa?: string; descEn?: string; descRu?: string; descTr?: string; }
 export interface SettingRow { key: string; value: string; }
 
 export interface AdminSeedInput { username: string; password: string; email: string; phone: string; }
@@ -307,7 +307,7 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS articles (id TEXT PRIMARY KEY, title TEXT, content TEXT, category TEXT, imageUrl TEXT, mobileImageUrl TEXT, author TEXT, date TEXT, comments TEXT);
       CREATE TABLE IF NOT EXISTS user_messages (id TEXT PRIMARY KEY, sender TEXT, recipient TEXT, title TEXT, body TEXT, date TEXT, isRead INTEGER DEFAULT 0, type TEXT);
       CREATE TABLE IF NOT EXISTS themes (id TEXT PRIMARY KEY, name TEXT, nameEn TEXT, primaryColor TEXT, primaryHover TEXT, darkBg TEXT, darkCard TEXT, accentRed TEXT);
-      CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, mobileImageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT);
+      CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, mobileImageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT, descFa TEXT, descEn TEXT, descRu TEXT, descTr TEXT);
     `);
     logDbQuery(this.name, 'SQL', 'CREATE TABLE IF NOT EXISTS ... (17 tables verified)');
     this.addMissingColumns();
@@ -323,6 +323,10 @@ export class SqliteStore implements IDataStore {
       { table: 'accessories', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'articles', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'app_sliders', column: 'mobileImageUrl', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descFa', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descEn', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descRu', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descTr', type: 'TEXT' },
       // مالکیت: تراکنش امتیاز و کد تخفیف شخصی به یک کاربر تعلق دارند.
       { table: 'transactions', column: 'username', type: "TEXT NOT NULL DEFAULT ''" },
       { table: 'active_coupons', column: 'ownerUsername', type: "TEXT NOT NULL DEFAULT ''" },
@@ -586,15 +590,15 @@ export class SqliteStore implements IDataStore {
   async listSliders() { return this.db.prepare(`SELECT * FROM app_sliders`).all() as SliderRow[]; }
   async getSliderById(id: string) { return this.db.prepare(`SELECT * FROM app_sliders WHERE id = ?`).get(id) as SliderRow | undefined; }
   async createSlider(s: SliderRow) {
-    this.db.prepare(`INSERT INTO app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(s.id, s.imageUrl, s.mobileImageUrl ?? null, s.target, s.titleFa, s.titleEn, s.titleRu, s.titleTr);
+    this.db.prepare(`INSERT INTO app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(s.id, s.imageUrl, s.mobileImageUrl ?? null, s.target, s.titleFa, s.titleEn, s.titleRu, s.titleTr, s.descFa ?? '', s.descEn ?? '', s.descRu ?? '', s.descTr ?? '');
   }
   async updateSlider(id: string, f: Partial<SliderRow>) {
     const current = await this.getSliderById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    this.db.prepare(`UPDATE app_sliders SET imageUrl=?, mobileImageUrl=?, target=?, titleFa=?, titleEn=?, titleRu=?, titleTr=? WHERE id=?`)
-      .run(m.imageUrl, m.mobileImageUrl ?? null, m.target, m.titleFa, m.titleEn, m.titleRu, m.titleTr, id);
+    this.db.prepare(`UPDATE app_sliders SET imageUrl=?, mobileImageUrl=?, target=?, titleFa=?, titleEn=?, titleRu=?, titleTr=?, descFa=?, descEn=?, descRu=?, descTr=? WHERE id=?`)
+      .run(m.imageUrl, m.mobileImageUrl ?? null, m.target, m.titleFa, m.titleEn, m.titleRu, m.titleTr, m.descFa ?? '', m.descEn ?? '', m.descRu ?? '', m.descTr ?? '', id);
   }
   async deleteSlider(id: string) { this.db.prepare(`DELETE FROM app_sliders WHERE id = ?`).run(id); }
 
@@ -705,6 +709,10 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.accessories','mobileImageUrl') IS NULL ALTER TABLE dbo.accessories ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.articles','mobileImageUrl') IS NULL ALTER TABLE dbo.articles ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.app_sliders','mobileImageUrl') IS NULL ALTER TABLE dbo.app_sliders ADD mobileImageUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descFa') IS NULL ALTER TABLE dbo.app_sliders ADD descFa NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descEn') IS NULL ALTER TABLE dbo.app_sliders ADD descEn NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descRu') IS NULL ALTER TABLE dbo.app_sliders ADD descRu NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descTr') IS NULL ALTER TABLE dbo.app_sliders ADD descTr NVARCHAR(1000) NULL;
       IF COL_LENGTH('dbo.transactions','username') IS NULL ALTER TABLE dbo.transactions ADD username NVARCHAR(100) NOT NULL DEFAULT '';
       IF COL_LENGTH('dbo.active_coupons','ownerUsername') IS NULL ALTER TABLE dbo.active_coupons ADD ownerUsername NVARCHAR(100) NOT NULL DEFAULT '';
     `);
@@ -1012,7 +1020,8 @@ export class SqlServerStore implements IDataStore {
   async createSlider(s: SliderRow) {
     await this.r().input('id', this.sql.NVarChar, s.id).input('img', this.sql.NVarChar, s.imageUrl).input('mimg', this.sql.NVarChar, s.mobileImageUrl ?? null).input('t', this.sql.NVarChar, s.target)
       .input('fa', this.sql.NVarChar, s.titleFa).input('en', this.sql.NVarChar, s.titleEn).input('ru', this.sql.NVarChar, s.titleRu).input('tr', this.sql.NVarChar, s.titleTr)
-      .query(`INSERT INTO dbo.app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (@id, @img, @mimg, @t, @fa, @en, @ru, @tr)`);
+      .input('dfa', this.sql.NVarChar, s.descFa ?? '').input('den', this.sql.NVarChar, s.descEn ?? '').input('dru', this.sql.NVarChar, s.descRu ?? '').input('dtr', this.sql.NVarChar, s.descTr ?? '')
+      .query(`INSERT INTO dbo.app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr) VALUES (@id, @img, @mimg, @t, @fa, @en, @ru, @tr, @dfa, @den, @dru, @dtr)`);
   }
   async updateSlider(id: string, f: Partial<SliderRow>) {
     const current = await this.getSliderById(id);
@@ -1020,7 +1029,8 @@ export class SqlServerStore implements IDataStore {
     const m = { ...current, ...f };
     await this.r().input('id', this.sql.NVarChar, id).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('t', this.sql.NVarChar, m.target)
       .input('fa', this.sql.NVarChar, m.titleFa).input('en', this.sql.NVarChar, m.titleEn).input('ru', this.sql.NVarChar, m.titleRu).input('tr', this.sql.NVarChar, m.titleTr)
-      .query(`UPDATE dbo.app_sliders SET imageUrl=@img, mobileImageUrl=@mimg, target=@t, titleFa=@fa, titleEn=@en, titleRu=@ru, titleTr=@tr WHERE id=@id`);
+      .input('dfa', this.sql.NVarChar, m.descFa ?? '').input('den', this.sql.NVarChar, m.descEn ?? '').input('dru', this.sql.NVarChar, m.descRu ?? '').input('dtr', this.sql.NVarChar, m.descTr ?? '')
+      .query(`UPDATE dbo.app_sliders SET imageUrl=@img, mobileImageUrl=@mimg, target=@t, titleFa=@fa, titleEn=@en, titleRu=@ru, titleTr=@tr, descFa=@dfa, descEn=@den, descRu=@dru, descTr=@dtr WHERE id=@id`);
   }
   async deleteSlider(id: string) { await this.r().input('id', this.sql.NVarChar, id).query(`DELETE FROM dbo.app_sliders WHERE id = @id`); }
 

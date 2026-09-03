@@ -233,3 +233,7 @@ $ NODE_ENV=production JWT_SECRET=ci PORT=3457 node dist/server.cjs
 ## نتیجه‌ی اصلاح دور سوم — ۱۴۰۵/۰۶/۱۲
 
 اجرای CI نشان داد هر سه runner در `Prepare the server bundle` متوقف شدند. علت محتمل، اجرای `npx @electron/rebuild` از داخل bundle و تشخیص مبهم Electron در مسیر والد بود. اسکریپت اصلاح شد تا CLI محلی `@electron/rebuild` و نسخه‌ی Electron نصب‌شده را با مسیر صریح اجرا کند و جزئیات خطا را نیز گزارش دهد. در صورت شکست نصب npm، bundle ناقص قبل از fallback حذف می‌شود.
+
+## نتیجه‌ی اصلاح دور چهارم — ۱۴۰۵/۰۶/۱۲
+
+لاگ کامل run `33723462882` علت قطعی را نشان داد: پکیج `@electron/rebuild@3.7.1` فایل `bin.js` ندارد؛ CLI واقعی در `lib/cli.js` است. resolve قبلی به `@electron/rebuild/bin.js` در هر سه سیستم‌عامل شکست می‌خورد. اسکریپت اکنون `lib/main.js` پکیج را resolve کرده و CLI هم‌مسیر آن (`lib/cli.js`) را صریح اجرا می‌کند. بررسی محلی با همان نسخه‌ی `3.7.1` موفق شد و آماده‌سازی bundle محلی نیز موفق بود.

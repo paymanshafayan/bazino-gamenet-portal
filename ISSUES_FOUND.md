@@ -311,3 +311,10 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 
 - بعد از اصلاح metadata و build script، هر سه runner build اصلی را با موفقیت رد کردند اما در `Prepare the server bundle` متوقف شدند.
 - اجرای `electron-rebuild` از داخل `server-bundle` به‌جای مسیر صریح desktop-app مبهم بود؛ CLI و نسخه Electron اکنون صریحاً resolve و اجرا می‌شوند.
+
+## ۱۴۰۵/۰۶/۱۲ — خطای قطعی electron-rebuild در run 33723462882
+
+- هر سه runner در `Prepare the server bundle` شکست خوردند.
+- پیام مشترک: `Cannot find module '@electron/rebuild/bin.js'`.
+- در `@electron/rebuild@3.7.1` مسیر درست CLI برابر `lib/cli.js` است، نه `bin.js` در ریشه‌ی package.
+- اصلاح resolve به مسیر CLI واقعی انجام شد.

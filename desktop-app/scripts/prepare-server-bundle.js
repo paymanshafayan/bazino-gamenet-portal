@@ -138,7 +138,11 @@ function main() {
       // Resolve the rebuild CLI from desktop-app explicitly. Running `npx` from the
       // server bundle is ambiguous on Windows and may select a freshly downloaded CLI
       // that cannot discover the Electron package in its parent directory.
-      const rebuildBin = require.resolve('@electron/rebuild/bin.js', { paths: [DESKTOP_APP_DIR] });
+      const rebuildMain = require.resolve('@electron/rebuild', { paths: [DESKTOP_APP_DIR] });
+      const rebuildBin = path.join(path.dirname(rebuildMain), 'cli.js');
+      if (!fs.existsSync(rebuildBin)) {
+        throw new Error(`فایل CLI بازسازی Electron پیدا نشد: ${rebuildBin}`);
+      }
       const electronPackage = JSON.parse(
         fs.readFileSync(path.join(DESKTOP_APP_DIR, 'node_modules', 'electron', 'package.json'), 'utf8')
       );

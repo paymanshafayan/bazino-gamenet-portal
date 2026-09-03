@@ -229,3 +229,7 @@ $ NODE_ENV=production JWT_SECRET=ci PORT=3457 node dist/server.cjs
 - `npm test`: **241/241 سبز**.
 
 فایل workflow عمداً توسط agent تغییر داده نشد؛ طبق محدودیت GitHub App، اصلاح diagnostics باید توسط مالک workflow اعمال شود. برای اجرای مجدد، push تغییرات desktop-app کافی است. خطای `JWT_SECRET` در workflow جداگانه‌ی build-test همچنان نیازمند اضافه‌شدن secret موقت CI در همان workflow است.
+
+## نتیجه‌ی اصلاح دور سوم — ۱۴۰۵/۰۶/۱۲
+
+اجرای CI نشان داد هر سه runner در `Prepare the server bundle` متوقف شدند. علت محتمل، اجرای `npx @electron/rebuild` از داخل bundle و تشخیص مبهم Electron در مسیر والد بود. اسکریپت اصلاح شد تا CLI محلی `@electron/rebuild` و نسخه‌ی Electron نصب‌شده را با مسیر صریح اجرا کند و جزئیات خطا را نیز گزارش دهد. در صورت شکست نصب npm، bundle ناقص قبل از fallback حذف می‌شود.

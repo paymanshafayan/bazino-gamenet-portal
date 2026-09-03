@@ -22,7 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..', '..'); // project root (desktop-app is one level under it)
 const DESKTOP_APP_DIR = path.join(__dirname, '..');
@@ -106,6 +106,7 @@ function main() {
       );
     }
     console.log('📦 Copying the root project\'s node_modules as an offline fallback...');
+    if (fs.existsSync(bundleModules)) fs.rmSync(bundleModules, { recursive: true, force: true });
     copyRecursive(rootModules, bundleModules, { excludeBuildTools: true });
   }
 
@@ -134,11 +135,23 @@ function main() {
     console.log('   اسکریپت را دوباره اجرا کنید، وگرنه اپ پکیج‌شده موقع اجرا کرش می‌کند.');
   } else {
     try {
-      execSync('npx --yes @electron/rebuild --module-dir .', { cwd: BUNDLE_DIR, stdio: 'inherit' });
+      // Resolve the rebuild CLI from desktop-app explicitly. Running `npx` from the
+      // server bundle is ambiguous on Windows and may select a freshly downloaded CLI
+      // that cannot discover the Electron package in its parent directory.
+      const rebuildBin = require.resolve('@electron/rebuild/bin.js', { paths: [DESKTOP_APP_DIR] });
+      const electronPackage = JSON.parse(
+        fs.readFileSync(path.join(DESKTOP_APP_DIR, 'node_modules', 'electron', 'package.json'), 'utf8')
+      );
+      execFileSync(process.execPath, [
+        rebuildBin,
+        '--module-dir', BUNDLE_DIR,
+        '--electron-version', electronPackage.version,
+      ], { cwd: DESKTOP_APP_DIR, stdio: 'inherit' });
     } catch (e) {
       fail(
         'electron-rebuild شکست خورد. بدون این مرحله، ماژول‌های native مثل better-sqlite3 با ' +
-        'نسخه‌ی Node.js داخل Electron سازگار نیستن و اپ پکیج‌شده موقع اجرا کرش می‌کنه.'
+        'نسخه‌ی Node.js داخل Electron سازگار نیستن و اپ پکیج‌شده موقع اجرا کرش می‌کنه.\n' +
+        `   جزئیات: ${e.message}`
       );
     }
   }

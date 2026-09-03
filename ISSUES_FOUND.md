@@ -306,3 +306,8 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 - خطای Windows در `npm run build` ناشی از استفاده از single quote در `cd 'Management App/Bazino'` بود؛ به `npm --prefix "Management App/Bazino"` اصلاح شد.
 - خطای Linux ناشی از نبود metadata لازم برای target `deb` بود؛ homepage، author email و maintainer اضافه شد.
 - bundle ساز اکنون در CI وابستگی‌های production-only نصب می‌کند و فقط در صورت شکست نصب، fallback آفلاین دارد.
+
+## ۱۴۰۵/۰۶/۱۲ — تشخیص دور سوم CI
+
+- بعد از اصلاح metadata و build script، هر سه runner build اصلی را با موفقیت رد کردند اما در `Prepare the server bundle` متوقف شدند.
+- اجرای `electron-rebuild` از داخل `server-bundle` به‌جای مسیر صریح desktop-app مبهم بود؛ CLI و نسخه Electron اکنون صریحاً resolve و اجرا می‌شوند.

@@ -48,6 +48,7 @@ import {
 } from "./server/themeStore";
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
+import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 
 /* ═══════════════════════════════════════════════════════════════════
    DATA SOURCE MODE — «منبع داده سایت و اپلیکیشن»
@@ -516,7 +517,7 @@ async function startServer() {
             room,
             username,
             message: text,
-            timestamp: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })
+            timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
           };
 
           await getActiveDataProvider().addChatMessage(newMsg);
@@ -750,7 +751,7 @@ async function startServer() {
   // acting as "Guest" would make no sense (e.g. checking "my" reservation).
   function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     if (!(req as any).authUsername) {
-      return res.status(401).json({ error: "برای این عملیات باید وارد حساب کاربری خود شوید." });
+      return res.status(401).json(apiError(req, "AUTH_REQUIRED"));
     }
     next();
   }
@@ -764,11 +765,11 @@ async function startServer() {
     try {
       const username = (req as any).authUsername;
       if (!username) {
-        return res.status(401).json({ error: "برای دسترسی به این بخش باید با حساب مدیر وارد شوید." });
+        return res.status(401).json(apiError(req, "ADMIN_LOGIN_REQUIRED"));
       }
       const row = await getActiveDataProvider().getUserByUsername(username);
       if (!row || (row.role || "gamer") !== "admin") {
-        return res.status(403).json({ error: "این عملیات فقط برای مدیر سیستم مجاز است." });
+        return res.status(403).json(apiError(req, "ADMIN_ONLY"));
       }
       next();
     } catch (err) {
@@ -790,13 +791,13 @@ async function startServer() {
     try {
       const { username, email, password, phone } = req.body;
       if (!username || !email || !password) {
-        return res.status(400).json({ error: "لطفاً تمامی فیلدهای ضروری را پر کنید." });
+        return res.status(400).json(apiError(req, "FILL_REQUIRED_FIELDS"));
       }
 
       const store = getActiveDataProvider();
       const exists = await store.getUserByUsername(username);
       if (exists) {
-        return res.status(400).json({ error: "این نام کاربری قبلاً توسط گیمر دیگری ثبت شده است." });
+        return res.status(400).json(apiError(req, "USERNAME_TAKEN"));
       }
 
       // createUser hashes the password internally (bcrypt) before storing it
@@ -835,14 +836,14 @@ async function startServer() {
     try {
       const { username, password } = req.body;
       if (!username || !password) {
-        return res.status(400).json({ error: "لطفاً نام کاربری و کلمه عبور را وارد کنید." });
+        return res.status(400).json(apiError(req, "ENTER_CREDENTIALS"));
       }
 
       const store = getActiveDataProvider();
       // verifyLogin compares the given password against the stored bcrypt hash
       const found = await store.verifyLogin(username, password);
       if (!found) {
-        return res.status(400).json({ error: "نام کاربری یا کلمه عبور اشتباه است." });
+        return res.status(400).json(apiError(req, "BAD_CREDENTIALS"));
       }
 
       // NOTE: deliberately does NOT write a server-wide "activeUsername" setting.
@@ -869,12 +870,12 @@ async function startServer() {
   app.get("/api/auth/me", async (req, res) => {
     const authUsername = (req as any).authUsername;
     if (!authUsername) {
-      return res.status(401).json({ error: "توکن نامعتبر یا منقضی شده است." });
+      return res.status(401).json(apiError(req, "TOKEN_INVALID"));
     }
     const store = getActiveDataProvider();
     const row = await store.getUserByUsername(authUsername);
     if (!row) {
-      return res.status(401).json({ error: "کاربر یافت نشد." });
+      return res.status(401).json(apiError(req, "USER_NOT_FOUND"));
     }
     res.json({
       success: true,
@@ -906,7 +907,7 @@ async function startServer() {
     try {
       const { name } = req.body;
       if (!name) {
-        return res.status(400).json({ error: "نام اتاق گفتگو الزامی است." });
+        return res.status(400).json(apiError(req, "ROOM_NAME_REQUIRED"));
       }
       const store = getActiveDataProvider();
       await store.createChatRoom(name);
@@ -943,7 +944,7 @@ async function startServer() {
     try {
       const { room, username, message } = req.body;
       if (!room || !username || !message) {
-        return res.status(400).json({ error: "اطلاعات پیام ناقص است." });
+        return res.status(400).json(apiError(req, "MESSAGE_INCOMPLETE"));
       }
 
       const newMsg = {
@@ -951,7 +952,7 @@ async function startServer() {
         room,
         username,
         message,
-        timestamp: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })
+        timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       };
 
       await getActiveDataProvider().addChatMessage(newMsg);
@@ -1066,10 +1067,10 @@ async function startServer() {
 
       const points = Math.floor(Number(req.body?.points));
       if (!Number.isFinite(points) || points < MIN_REDEEM_POINTS) {
-        return res.status(400).json({ error: `حداقل امتیاز قابل تبدیل ${MIN_REDEEM_POINTS} امتیاز است.` });
+        return res.status(400).json(apiError(req, "MIN_REDEEM_POINTS", { min: MIN_REDEEM_POINTS }));
       }
       if (user.loyaltyPoints < points) {
-        return res.status(400).json({ error: "امتیاز کافی ندارید" });
+        return res.status(400).json(apiError(req, "NOT_ENOUGH_POINTS"));
       }
 
       const couponValue = points * POINTS_TO_TOMAN;
@@ -1081,7 +1082,7 @@ async function startServer() {
         if (!(await store.getCouponByCode(candidate))) { code = candidate; break; }
       }
       if (!code) {
-        return res.status(500).json({ error: "تولید کد تخفیف ناموفق بود. دوباره تلاش کنید." });
+        return res.status(500).json(apiError(req, "COUPON_GENERATION_FAILED"));
       }
 
       await store.addLoyaltyPointsToUser(user.username, -points);
@@ -1170,7 +1171,7 @@ async function startServer() {
       // Business rule: never allow two paid reservations to overlap on the same system/date
       const overlapping = await store.hasOverlappingReservation(systemId, reservationDate, st, et);
       if (overlapping) {
-        return res.status(409).json({ error: "این سیستم در بازه زمانی انتخابی شما قبلاً رزرو شده است. لطفاً بازه دیگری انتخاب کنید." });
+        return res.status(409).json(apiError(req, "SLOT_TAKEN"));
       }
 
       // Price and points are always computed server-side from the system's real
@@ -1219,7 +1220,7 @@ async function startServer() {
       if (coupon) {
         const consumed = await store.recordCouponUsage(couponCode);
         if (!consumed) {
-          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+          return res.status(409).json(apiError(req, "COUPON_RACE"));
         }
       }
 
@@ -1313,25 +1314,25 @@ async function startServer() {
       const store = getActiveDataProvider();
       const user = await getCurrentUser(req);
       if (user.username === "Guest") {
-        return res.status(401).json({ error: "برای تمدید رزرو باید وارد حساب کاربری خود شوید." });
+        return res.status(401).json(apiError(req, "EXTEND_LOGIN_REQUIRED"));
       }
 
       const hours = Math.max(1, Math.min(4, Number(req.body?.hours) || 1));
       const active = await store.getActiveReservationForUser(user.username);
       if (!active) {
-        return res.status(404).json({ error: "در حال حاضر هیچ رزرو فعالی برای شما یافت نشد." });
+        return res.status(404).json(apiError(req, "NO_ACTIVE_RESERVATION"));
       }
 
       const pointsNeeded = hours * 50;
       const freshUser = await store.getUserByUsername(user.username);
       if (!freshUser || freshUser.loyaltyPoints < pointsNeeded) {
-        return res.status(400).json({ error: `امتیاز باشگاه کافی نیست. تمدید ${hours} ساعت به ${pointsNeeded} امتیاز نیاز دارد.` });
+        return res.status(400).json(apiError(req, "EXTEND_NOT_ENOUGH_POINTS", { hours, points: pointsNeeded }));
       }
 
       const newEndTime = addHoursToTimeString(active.endTime, hours);
       const overlapping = await store.hasOverlappingReservation(active.systemId, active.date, active.endTime, newEndTime);
       if (overlapping) {
-        return res.status(409).json({ error: "بلافاصله بعد از پایان رزرو فعلی شما، این سیستم برای کاربر دیگری رزرو شده است." });
+        return res.status(409).json(apiError(req, "EXTEND_SLOT_TAKEN"));
       }
 
       const system = await store.getSystemById(active.systemId);
@@ -1359,7 +1360,7 @@ async function startServer() {
     try {
       const { message } = req.body;
       if (!message || !message.trim()) {
-        return res.status(400).json({ error: "متن درخواست نمی‌تواند خالی باشد." });
+        return res.status(400).json(apiError(req, "PROMPT_EMPTY"));
       }
       const store = getActiveDataProvider();
       const user = await getCurrentUser(req);
@@ -1661,7 +1662,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           room: roomMatch,
           username: user.username,
           message: `🎙️ ${intent.params.message || ""}`,
-          timestamp: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
         };
         await store.addChatMessage(chatMsg);
         return { reply: `پیامت با موفقیت توی اتاق «${roomMatch}» فرستاده شد. 🔫`, chatMsg };
@@ -1780,7 +1781,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { command, language } = req.body;
       if (!command || !String(command).trim()) {
-        return res.status(400).json({ error: "دستور نمی‌تواند خالی باشد." });
+        return res.status(400).json(apiError(req, "COMMAND_EMPTY"));
       }
 
       const store = getActiveDataProvider();
@@ -1968,10 +1969,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           `رزرو ${reservationId} روی سایت با وضعیت ${newStatus} ثبت نهایی شد.`,
           1
         );
-        res.json({ success: true, message: `رزرو ${reservationId} در سایت ثبت نهایی شد.` });
+        res.json({ success: true, message: t(req, "RESERVATION_FINALIZED", { id: reservationId }) });
       } else {
         logSyncEvent("RESERVATION_UPDATE", "WARNING", `وضعیت نامعتبر برای رزرو ${reservationId}: ${newStatus}`, 0);
-        res.status(400).json({ success: false, message: "وضعیت نامعتبر" });
+        res.status(400).json({ success: false, message: t(req, "INVALID_STATUS"), code: "INVALID_STATUS" });
       }
     } catch (e) {
       logSyncEvent("RESERVATION_UPDATE", "ERROR", `به‌روزرسانی رزرو ناموفق: ${String(e)}`, 0);
@@ -2030,7 +2031,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const store = getActiveDataProvider();
 
       if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: "سبد خرید خالی است." });
+        return res.status(400).json(apiError(req, "CART_EMPTY"));
       }
 
       // Price is always computed server-side from the real menu prices/stock —
@@ -2039,10 +2040,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       for (const orderItem of items) {
         const menuItem = await resolveSampleById(() => store.getCafeItemById(orderItem.item.id), SAMPLE_CAFE_ITEMS, orderItem.item.id);
         if (!menuItem) {
-          return res.status(404).json({ error: `آیتم منو یافت نشد: ${orderItem.item?.id}` });
+          return res.status(404).json(apiError(req, "MENU_ITEM_NOT_FOUND", { id: String(orderItem.item?.id) }));
         }
         if (menuItem.inventory < orderItem.quantity) {
-          return res.status(400).json({ error: `موجودی «${menuItem.name}» کافی نیست.` });
+          return res.status(400).json(apiError(req, "OUT_OF_STOCK", { name: menuItem.name }));
         }
         totalPrice += menuItem.price * orderItem.quantity;
       }
@@ -2091,7 +2092,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       if (coupon) {
         const consumed = await store.recordCouponUsage(couponCode);
         if (!consumed) {
-          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+          return res.status(409).json(apiError(req, "COUPON_RACE"));
         }
       }
 
@@ -2126,7 +2127,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const store = getActiveDataProvider();
 
       if (!Array.isArray(cart) || cart.length === 0) {
-        return res.status(400).json({ error: "سبد خرید خالی است." });
+        return res.status(400).json(apiError(req, "CART_EMPTY"));
       }
 
       // Price is always computed server-side from the real catalog prices/stock —
@@ -2135,10 +2136,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       for (const cartItem of cart) {
         const catalogItem = await resolveSampleById(() => store.getAccessoryById(cartItem.item.id), SAMPLE_ACCESSORIES, cartItem.item.id);
         if (!catalogItem) {
-          return res.status(404).json({ error: `کالا یافت نشد: ${cartItem.item?.id}` });
+          return res.status(404).json(apiError(req, "PRODUCT_NOT_FOUND", { id: String(cartItem.item?.id) }));
         }
         if (catalogItem.stock < cartItem.quantity) {
-          return res.status(400).json({ error: `موجودی «${catalogItem.name}» کافی نیست.` });
+          return res.status(400).json(apiError(req, "OUT_OF_STOCK", { name: catalogItem.name }));
         }
         totalPrice += catalogItem.price * cartItem.quantity;
       }
@@ -2184,7 +2185,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       if (coupon) {
         const consumed = await store.recordCouponUsage(couponCode);
         if (!consumed) {
-          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+          return res.status(409).json(apiError(req, "COUPON_RACE"));
         }
       }
 
@@ -2335,17 +2336,17 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
    *  رزروها و سفارش‌های موجود ارجاع داده شده‌اند). */
   /** پیام خطای قابل‌فهم برای ادمین به‌جای متن خام موتور دیتابیس.
    *  ادمین نباید چیزی مثل «SqliteError: UNIQUE constraint failed: systems.id» ببیند. */
-  function adminErrorMessage(e: any): { status: number; message: string } {
+  function adminErrorMessage(e: any, req?: express.Request): { status: number; message: string; code?: string } {
     if (e?.statusCode && e?.message) return { status: e.statusCode, message: e.message };
     const raw = String(e?.message || e);
     if (/UNIQUE constraint|duplicate key|E11000/i.test(raw)) {
-      return { status: 409, message: "رکوردی با همین شناسه از قبل وجود دارد. دوباره تلاش کنید." };
+      return { status: 409, message: apiMessage(req ? requestLang(req) : "fa", "DUPLICATE_RECORD"), code: "DUPLICATE_RECORD" };
     }
     if (/NOT NULL constraint|cannot be null/i.test(raw)) {
-      return { status: 400, message: "یکی از فیلدهای الزامی خالی است." };
+      return { status: 400, message: apiMessage(req ? requestLang(req) : "fa", "REQUIRED_FIELD_EMPTY"), code: "REQUIRED_FIELD_EMPTY" };
     }
     console.error("[Admin]", raw);
-    return { status: 500, message: "ثبت اطلاعات در پایگاه داده انجام نشد. جزئیات در لاگ سرور ثبت شد." };
+    return { status: 500, message: apiMessage(req ? requestLang(req) : "fa", "DB_WRITE_FAILED"), code: "DB_WRITE_FAILED" };
   }
 
   async function nextEntityId(
@@ -2434,8 +2435,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listSystems();
       res.json({ success: true, systems: list });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2505,8 +2506,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listCafeItems();
       res.json({ success: true, cafeItems: list });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2603,8 +2604,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listAccessories();
       res.json({ success: true, accessories: list });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2711,8 +2712,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2783,8 +2784,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2831,7 +2832,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { recipient, title, body, sendAsNotification } = req.body;
       if (!recipient || !title || !body) {
-        return res.status(400).json({ error: "اطلاعات پیام ناقص است." });
+        return res.status(400).json(apiError(req, "MESSAGE_INCOMPLETE"));
       }
 
       const newMsg = {
@@ -2929,7 +2930,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       try {
         const buffer = req.body as Buffer | undefined;
         if (!buffer || buffer.length === 0) {
-          return res.status(400).json({ error: "فایل ZIP ارسال نشده است" });
+          return res.status(400).json(apiError(req, "ZIP_MISSING"));
         }
         const fallbackName = (req.query.name as string) || undefined;
         const result = await installThemeZip(new Uint8Array(buffer), fallbackName);
@@ -3022,7 +3023,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed } = req.body;
       if (!name || !primaryColor || !darkBg || !darkCard) {
-        return res.status(400).json({ error: "اطلاعات تم ناقص است." });
+        return res.status(400).json(apiError(req, "THEME_INCOMPLETE"));
       }
       const store = getActiveDataProvider();
       const newTheme = {
@@ -3058,7 +3059,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         listInstalledThemes().some(t => t.id === themeId);
 
       if (!themeExists) {
-        return res.status(404).json({ error: "تم یافت نشد." });
+        return res.status(404).json(apiError(req, "THEME_NOT_FOUND"));
       }
 
       await store.setSetting("activeThemeId", themeId);
@@ -3082,7 +3083,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
       if (!imageUrl || !target) {
-        return res.status(400).json({ error: "آدرس تصویر و بخش هدف الزامی هستند." });
+        return res.status(400).json(apiError(req, "SLIDE_FIELDS_REQUIRED"));
       }
       const store = getActiveDataProvider();
       // اسلایدر اپ عمودی است (کادر Expanded + BoxFit.cover)؛ واریانت موبایل ۳:۴ ساخته می‌شود
@@ -3134,7 +3135,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const list = await store.listSliders();
         res.json({ success: true, appSliders: list });
       } else {
-        res.status(404).json({ error: "اسلاید پیدا نشد." });
+        res.status(404).json(apiError(req, "SLIDE_NOT_FOUND"));
       }
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -3197,15 +3198,15 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
-  app.get("/api/mobile-app/download", async (_req, res) => {
+  app.get("/api/mobile-app/download", async (req, res) => {
     const apkPath = getMobileAppApkPath();
     if (!fs.existsSync(apkPath)) {
-      return res.status(404).json({ error: "فایل APK هنوز توسط مدیر آپلود نشده است." });
+      return res.status(404).json(apiError(req, "APK_NOT_UPLOADED"));
     }
     res.download(apkPath, MOBILE_APP_APK_FILE_NAME, (err) => {
       if (err) {
         console.error("Error downloading mobile APK:", err);
-        if (!res.headersSent) res.status(500).json({ error: "خطا در دانلود فایل APK" });
+        if (!res.headersSent) res.status(500).json(apiError(req, "APK_DOWNLOAD_FAILED"));
       }
     });
   });
@@ -3230,7 +3231,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       res.send(buffer);
     } catch (e) {
       console.error("Mobile app QR generation failed:", e);
-      res.status(502).json({ error: "خطا در ساخت QR Code دانلود اپلیکیشن" });
+      res.status(502).json(apiError(req, "QR_FAILED"));
     }
   });
 
@@ -3875,7 +3876,7 @@ namespace GameNet.Infrastructure.Migrations
   app.post("/api/admin/reset-database", async (req, res) => {
     try {
       await getActiveDataProvider().seedSampleData();
-      res.json({ success: true, message: "دیتای نمونه با موفقیت بارگذاری شد." });
+      res.json({ success: true, message: t(req, "SAMPLE_LOADED") });
     } catch (err) {
       console.error("Error seeding sample data:", err);
       res.status(500).json({ error: "Failed to load sample data" });
@@ -3887,7 +3888,7 @@ namespace GameNet.Infrastructure.Migrations
   app.post("/api/admin/clear-database", async (req, res) => {
     try {
       await getActiveDataProvider().purgeSampleData();
-      res.json({ success: true, message: "دیتای نمونه با موفقیت حذف شد." });
+      res.json({ success: true, message: t(req, "SAMPLE_REMOVED") });
     } catch (err) {
       console.error("Error clearing sample data:", err);
       res.status(500).json({ error: "Failed to purge sample data" });
@@ -4027,7 +4028,7 @@ Example format:
       } = req.body;
 
       if (!adminEmail || !adminUsername || !adminPassword) {
-        return res.status(400).json({ error: "اطلاعات حساب مدیر کل الزامی است." });
+        return res.status(400).json(apiError(req, "ADMIN_ACCOUNT_REQUIRED"));
       }
 
       let provider;
@@ -4092,13 +4093,13 @@ Example format:
       // freshly installed site with an admin panel they can't call.
       res.json({
         success: true,
-        message: "نصب با موفقیت انجام شد.",
+        message: t(req, "INSTALL_OK"),
         token: signAuthToken(adminUsername),
         user: { username: adminUsername, email: adminEmail || "", phone: "", loyaltyPoints: 1000, role: "admin" }
       });
     } catch (err: any) {
       console.error("Installation failure:", err);
-      res.status(500).json({ error: `خطا در فرآیند نصب: ${err.message}` });
+      res.status(500).json(apiError(req, "INSTALL_FAILED", { detail: err.message }));
     }
   });
 
@@ -4155,25 +4156,25 @@ Example format:
   app.get("/api/desktop/download/:platform", (req, res) => {
     const platform = desktopPlatforms[req.params.platform];
     if (!platform) {
-      return res.status(400).json({ error: "پلتفرم نامعتبر است" });
+      return res.status(400).json(apiError(req, "INVALID_PLATFORM"));
     }
     const platformDir = path.join(desktopBuildsDir, platform.dir);
     if (!fs.existsSync(platformDir)) {
       return res.status(404).json({
-        error: `نسخه‌ی دسکتاپ برای ${platform.label} هنوز build نشده است.`,
+        ...apiError(req, "DESKTOP_NOT_BUILT", { platform: platform.label }),
         hint: "راهنما: desktop-app/README.md — دستور 'npm run dist' را روی یک دستگاه واقعی همان سیستم‌عامل اجرا کنید و خروجی را در desktop-builds/" + platform.dir + "/ قرار دهید."
       });
     }
     const files = fs.readdirSync(platformDir).filter(f => !f.startsWith("."));
     if (files.length === 0) {
-      return res.status(404).json({ error: `فایلی برای ${platform.label} پیدا نشد.` });
+      return res.status(404).json(apiError(req, "DESKTOP_FILE_NOT_FOUND", { platform: platform.label }));
     }
     // If multiple files exist (e.g. both nsis installer + portable exe), prefer the first one alphabetically.
     const fileName = files.sort()[0];
     res.download(path.join(platformDir, fileName), fileName, (err) => {
       if (err) {
         console.error("Error downloading desktop build:", err);
-        if (!res.headersSent) res.status(500).json({ error: "خطا در دانلود فایل" });
+        if (!res.headersSent) res.status(500).json(apiError(req, "FILE_DOWNLOAD_FAILED"));
       }
     });
   });
@@ -4350,8 +4351,15 @@ Example format:
           }
           indexHtmlTemplate = template;
         }
+        // همان شکلی که /api/tournaments برمی‌گرداند (teams/bracket به‌صورت شیء، نه رشته‌ی JSON)
+        // وگرنه TournamentsTab در production روی `.teams.map` کرش می‌کند.
+        const rawTournaments = await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS);
+        const parseJson = (v: unknown, fallback: unknown) => {
+          if (typeof v !== "string") return v ?? fallback;
+          try { return JSON.parse(v); } catch { return fallback; }
+        };
         const bootstrap = {
-          tournaments: await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+          tournaments: rawTournaments.map(t => ({ ...t, teams: parseJson(t.teams, []), bracket: parseJson(t.bracket, {}) })),
           assetVersion: ASSET_VERSION,
           // زبان پیشنهادی بر اساس کشور IP — بدون رفت‌وبرگشت اضافه در اولین رندر
           lang: detectVisitorLanguage(req).lang,

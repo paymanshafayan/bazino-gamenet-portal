@@ -430,6 +430,50 @@ test('Persian strings actually contain Persian/Arabic script', () => {
   assert.deepEqual(suspicious, [], `fa values without Persian script: ${suspicious.join(', ')}`);
 });
 
+
+test('API messages: every code covers all four languages and interpolates', async () => {
+  const { apiMessage, requestLang } = await import('../server/apiMessages.ts');
+  const mod: any = await import('../server/apiMessages.ts');
+  // Reach the dictionary through apiMessage for every key we can discover.
+  const keys = Object.keys((mod as any).M ?? {});
+  const known = ['BAD_CREDENTIALS', 'OUT_OF_STOCK', 'SLOT_TAKEN', 'MIN_REDEEM_POINTS', 'ADMIN_ONLY'] as const;
+  for (const key of keys.length ? keys : known) {
+    for (const lang of LANGS) {
+      const txt = apiMessage(lang, key as any, { min: 100, name: 'X', id: '1', hours: 2, points: 40, platform: 'P', detail: 'D' });
+      assert.ok(txt && txt.trim(), `${key}.${lang} empty`);
+      assert.ok(!/\{\w+\}/.test(txt), `${key}.${lang} left a placeholder: ${txt}`);
+      if (lang !== 'fa') assert.ok(!/[\u0600-\u06FF]/.test(txt), `${key}.${lang} contains Persian: ${txt}`);
+    }
+  }
+  assert.equal(apiMessage('tr', 'MIN_REDEEM_POINTS', { min: 100 }), 'Dönüştürülebilecek en az puan 100 puandır.');
+  const mk = (h: Record<string, string>) => ({ headers: h }) as any;
+  assert.equal(requestLang(mk({ 'x-lang': 'ru' })), 'ru');
+  assert.equal(requestLang(mk({ 'accept-language': 'tr-TR,tr;q=0.9' })), 'tr');
+  assert.equal(requestLang(mk({ 'accept-language': 'de-DE' })), 'fa');
+  assert.equal(requestLang(mk({})), 'fa');
+});
+
+test('server.ts sends no raw Persian error strings (all go through apiMessages)', () => {
+  const src = read('server.ts');
+  const offenders = src.split('\n')
+    .map((l, i) => [i + 1, l] as const)
+    .filter(([, l]) => /\b(error|message)\s*:\s*[`'"][^`'"]*[\u0600-\u06FF]/.test(l))
+    .map(([n, l]) => `${n}: ${l.trim().slice(0, 80)}`);
+  assert.deepEqual(offenders, [], `raw Persian API messages:\n${offenders.join('\n')}`);
+});
+
+test('customer-facing components have no fa/en-only ternaries left', () => {
+  const dir = path.join(ROOT, 'src/components');
+  const offenders: string[] = [];
+  for (const f of readdirSync(dir).filter(f => f.endsWith('.tsx'))) {
+    const src = read(`src/components/${f}`);
+    const re = /language\s*===\s*'fa'\s*\?\s*(?!'rtl'|'ltr'|'right'|'left'|"rtl"|"ltr")[`'"][^`'"\n]*[\u0600-\u06FF]/g;
+    const hits = src.match(re)?.length ?? 0;
+    if (hits) offenders.push(`${f} (${hits})`);
+  }
+  assert.deepEqual(offenders, [], `bilingual-only ternaries remain in: ${offenders.join(', ')}`);
+});
+
 /* ═══════════════════════════════════════════════════════════════════════
    8. Data provider SQL shape
    ═══════════════════════════════════════════════════════════════════════ */

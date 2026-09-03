@@ -244,7 +244,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
         ru: 'Захватывающие бои 5 на 5',
         tr: 'Nefes kesen 5v5 FPS düelloları'
       },
-      imageUrl: vimg('/images/home/esports-960.webp'),
+      imageUrl: vimg('/images/home/lounge-wall-800.webp'),
       tag: 'FPS AREA',
       games: 'CS2, Valorant, Apex Legends'
     },
@@ -262,7 +262,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
         ru: 'Глубокие сюжеты и графика',
         tr: 'Sürükleyici hikayeler ve grafikler'
       },
-      imageUrl: vimg('/images/home/rpg-openworld-960.webp'),
+      imageUrl: vimg('/images/home/lounge-row-800.webp'),
       tag: 'RTX ULTRA',
       games: 'Cyberpunk, Elden Ring, Witcher 3'
     },
@@ -280,7 +280,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
         ru: 'Быстрые тактики и игра в клане',
         tr: 'Hızlı taktikler ve takım oyunu'
       },
-      imageUrl: vimg('/images/home/moba-strategy-960.webp'),
+      imageUrl: vimg('/images/home/lounge-sofa-800.webp'),
       tag: 'TACTICAL ZONE',
       games: 'Dota 2, League of Legends, SC2'
     },
@@ -429,7 +429,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
         tr: 'Yeni nesil Intel Core i9, RTX 5080 grafik kartları, ASUS ROG 360Hz monitörler ve birinci sınıf Razer kulaklıklar ile donatılmıştır. Sınırsız güçle oyna!'
       },
       icon: <Gamepad2 className="w-6 h-6 text-primary" />,
-      imageUrl: vimg('/images/home/pc-arena-1200.webp'),
+      imageUrl: vimg('/images/home/lounge-entrance-1200.webp'),
       color: 'border-primary/20 hover:border-primary hover:shadow-[0_0_20px_rgba(255,184,0,0.15)]',
       btnText: {
         fa: 'رزرو آنلاین سیستم',

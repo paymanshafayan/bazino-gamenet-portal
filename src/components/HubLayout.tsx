@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, Coffee, ShoppingBag, Trophy, Award, MessageSquare, Settings, User, LogIn, LogOut, Gamepad2, X, FileText } from 'lucide-react';
 import { UserState } from '../types/gamenet';
 import { useLanguage } from '../context/LanguageContext';
+import { L } from '../utils/i18n';
 
 interface HubLayoutProps {
   activeTab: string;
@@ -27,12 +28,12 @@ export default function HubLayout({
   
   // Map our app tabs to the hub buttons
   const hubButtons = [
-    { id: 'systems', icon: Monitor, label: language === 'fa' ? 'رزرو' : 'RESERVE', color: '#00FFCC', x: -160, y: -160, delay: 0.1 },
-    { id: 'cafe', icon: Coffee, label: language === 'fa' ? 'کافه' : 'CAFE', color: '#FFD700', x: 160, y: -120, delay: 0.2 },
-    { id: 'shop', icon: ShoppingBag, label: language === 'fa' ? 'فروشگاه' : 'SHOP', color: '#00FFCC', x: -180, y: 80, delay: 0.3 },
-    { id: 'tournaments', icon: Trophy, label: language === 'fa' ? 'مسابقات' : 'ARENA', color: '#9D00FF', x: 160, y: 120, delay: 0.4 },
-    { id: 'loyalty', icon: Award, label: language === 'fa' ? 'جوایز' : 'LOYALTY', color: '#FFD700', x: 0, y: 220, delay: 0.5 },
-    { id: 'blog', icon: FileText, label: language === 'fa' ? 'مجله' : 'BLOG', color: '#FF2A2A', x: -260, y: -40, delay: 0.6 },
+    { id: 'systems', icon: Monitor, label: L(language, { fa: 'رزرو', en: 'RESERVE', ru: 'БРОНЬ', tr: 'REZERV' }), color: '#00FFCC', x: -160, y: -160, delay: 0.1 },
+    { id: 'cafe', icon: Coffee, label: L(language, { fa: 'کافه', en: 'CAFE', ru: 'КАФЕ', tr: 'KAFE' }), color: '#FFD700', x: 160, y: -120, delay: 0.2 },
+    { id: 'shop', icon: ShoppingBag, label: L(language, { fa: 'فروشگاه', en: 'SHOP', ru: 'МАГАЗИН', tr: 'MAĞAZA' }), color: '#00FFCC', x: -180, y: 80, delay: 0.3 },
+    { id: 'tournaments', icon: Trophy, label: L(language, { fa: 'مسابقات', en: 'ARENA', ru: 'АРЕНА', tr: 'ARENA' }), color: '#9D00FF', x: 160, y: 120, delay: 0.4 },
+    { id: 'loyalty', icon: Award, label: L(language, { fa: 'جوایز', en: 'LOYALTY', ru: 'БОНУСЫ', tr: 'SADAKAT' }), color: '#FFD700', x: 0, y: 220, delay: 0.5 },
+    { id: 'blog', icon: FileText, label: L(language, { fa: 'مجله', en: 'BLOG', ru: 'БЛОГ', tr: 'BLOG' }), color: '#FF2A2A', x: -260, y: -40, delay: 0.6 },
   ];
 
   const handleClosePanel = () => {
@@ -66,7 +67,7 @@ export default function HubLayout({
           onClick={() => setLayoutMode('standard')}
           className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-white hover:bg-white/10 hover:text-primary transition-all backdrop-blur-sm flex items-center gap-2"
         >
-          {language === 'fa' ? 'نسخه استاندارد' : 'Standard UI'}
+          {L(language, { fa: 'نسخه استاندارد', en: 'Standard UI', ru: 'Стандартный интерфейс', tr: 'Standart Arayüz' })}
         </button>
       </div>
 
@@ -78,7 +79,7 @@ export default function HubLayout({
             className="px-6 py-2 bg-primary/20 border border-primary text-primary rounded-full text-xs font-bold hover:bg-primary hover:text-black transition-all shadow-[0_0_15px_rgba(0,255,204,0.3)] flex items-center gap-2"
           >
             <LogIn className="w-4 h-4" />
-            {language === 'fa' ? 'ورود' : 'LOGIN'}
+            {L(language, { fa: 'ورود', en: 'LOGIN', ru: 'ВОЙТИ', tr: 'GİRİŞ' })}
           </button>
         ) : (
           <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2">

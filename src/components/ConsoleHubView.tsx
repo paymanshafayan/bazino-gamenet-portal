@@ -13,6 +13,7 @@ import tournaments400 from '../assets/images/console-hub/tournaments-400.webp';
 import tournaments800 from '../assets/images/console-hub/tournaments-800.webp';
 import loyalty400 from '../assets/images/console-hub/loyalty-400.webp';
 import loyalty800 from '../assets/images/console-hub/loyalty-800.webp';
+import { L } from '../utils/i18n';
 
 interface Props {
   themeId?: string;
@@ -74,7 +75,7 @@ export default function ConsoleHubView({
               className="flex items-center gap-2 px-2 py-0.5 rounded bg-white hover:bg-slate-100 transition-colors text-[10px] font-semibold text-slate-800 cursor-pointer border border-slate-200/50 shadow-sm"
             >
               <ArrowLeft className="w-3 h-3" />
-              <span>{language === 'fa' ? 'بازگشت' : 'Back'}</span>
+              <span>{L(language, { fa: 'بازگشت', en: 'Back', ru: 'Назад', tr: 'Geri' })}</span>
             </button>
           )}
         </div>

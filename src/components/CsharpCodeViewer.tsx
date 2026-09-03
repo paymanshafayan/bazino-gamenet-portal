@@ -17,6 +17,7 @@ import {
 } from '../data/csharpMvcCode';
 import { Copy, Check, Code, Database, Cpu, FileJson, FolderTree, Settings, Eye, LayoutGrid } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { L } from '../utils/i18n';
 
 interface Props {
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -54,13 +55,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
   const handleCopy = () => {
     navigator.clipboard.writeText(getActiveCode());
     setCopied(true);
-    const successMsg = language === 'fa'
-      ? 'کد سی‌شارپ با موفقیت در کلیپ‌بورد کپی شد!'
-      : language === 'en'
-      ? 'C# source code copied to clipboard successfully!'
-      : language === 'ru'
-      ? 'C# исходный код успешно скопирован в буфер обмена!'
-      : 'C# kaynak kodu başarıyla panoya kopyalandı!';
+    const successMsg = L(language, { fa: 'کد سی‌شارپ با موفقیت در کلیپ‌بورد کپی شد!', en: 'C# source code copied to clipboard successfully!', ru: 'C# исходный код успешно скопирован в буфер обмена!', tr: 'C# kaynak kodu panoya kopyalandı!' });
     addNotification(successMsg, 'success');
     setTimeout(() => setCopied(false), 2000);
   };
@@ -125,9 +120,9 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
       <div className="flex justify-between items-center mb-4">
         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
           {architecture === 'mvc' ? (
-            language === 'fa' ? 'فریم‌ورک کلاینت: ASP.NET Core 9.0 Razor Views' : 'Client-side Framework: Razor Pages/MVC'
+            L(language, { fa: 'فریم‌ورک کلاینت: ASP.NET Core 9.0 Razor Views', en: 'Client-side Framework: Razor Pages/MVC', ru: 'Клиентский фреймворк: ASP.NET Core 9.0 Razor Views', tr: 'İstemci Çatısı: ASP.NET Core 9.0 Razor Views' })
           ) : (
-            language === 'fa' ? 'فریم‌ورک سرور: .NET 9.0 RESTful Web API' : 'Server-side Framework: .NET 9.0 Web API'
+            L(language, { fa: 'فریم‌ورک سرور: .NET 9.0 RESTful Web API', en: 'Server-side Framework: .NET 9.0 Web API', ru: 'Серверный фреймворк: .NET 9.0 RESTful Web API', tr: 'Sunucu Çatısı: .NET 9.0 RESTful Web API' })
           )}
         </span>
 
@@ -136,7 +131,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primary/20 text-xs text-white font-bold transition-all cursor-pointer"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-primary" />}
-          <span>{copied ? (language === 'fa' ? 'کپی شد!' : 'Copied!') : (language === 'fa' ? 'کپی کد این بخش' : 'Copy code')}</span>
+          <span>{copied ? (L(language, { fa: 'کپی شد!', en: 'Copied!', ru: 'Скопировано!', tr: 'Kopyalandı!' })) : (L(language, { fa: 'کپی کد این بخش', en: 'Copy code', ru: 'Копировать код', tr: 'Kodu kopyala' }))}</span>
         </button>
       </div>
 
@@ -153,7 +148,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <FolderTree className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'ساختار پروژه MVC' : 'Project Structure'}</span>
+            <span>{L(language, { fa: 'ساختار پروژه MVC', en: 'Project Structure', ru: 'Структура MVC-проекта', tr: 'MVC Proje Yapısı' })}</span>
           </button>
           <button
             onClick={() => setActiveMvcTab('viewmodels')}
@@ -164,7 +159,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <FileJson className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'مدل‌های نمایش (ViewModels)' : 'ViewModels'}</span>
+            <span>{L(language, { fa: 'مدل‌های نمایش (ViewModels)', en: 'ViewModels', ru: 'ViewModels', tr: 'Görünüm Modelleri (ViewModels)' })}</span>
           </button>
           <button
             onClick={() => setActiveMvcTab('mvcControllers')}
@@ -175,7 +170,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <Code className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'کنترلرهای MVC' : 'MVC Controllers'}</span>
+            <span>{L(language, { fa: 'کنترلرهای MVC', en: 'MVC Controllers', ru: 'MVC-контроллеры', tr: 'MVC Denetleyicileri' })}</span>
           </button>
           <button
             onClick={() => setActiveMvcTab('layout')}
@@ -186,7 +181,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'قالب کلی (Layout)' : 'Layout Template'}</span>
+            <span>{L(language, { fa: 'قالب کلی (Layout)', en: 'Layout Template', ru: 'Шаблон Layout', tr: 'Genel Şablon (Layout)' })}</span>
           </button>
           <button
             onClick={() => setActiveMvcTab('views')}
@@ -197,7 +192,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'صفحات نمایش (Razor Views)' : 'Razor Views'}</span>
+            <span>{L(language, { fa: 'صفحات نمایش (Razor Views)', en: 'Razor Views', ru: 'Razor Views', tr: 'Razor Görünümleri' })}</span>
           </button>
           <button
             onClick={() => setActiveMvcTab('mvcProgram')}
@@ -208,7 +203,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <Settings className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'پیکربندی (Program.cs)' : 'Program.cs'}</span>
+            <span>{L(language, { fa: 'پیکربندی (Program.cs)', en: 'Program.cs', ru: 'Конфигурация (Program.cs)', tr: 'Yapılandırma (Program.cs)' })}</span>
           </button>
         </div>
       ) : (
@@ -223,7 +218,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <FolderTree className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'ساختار پروژه (.sln)' : 'Project Structure'}</span>
+            <span>{L(language, { fa: 'ساختار پروژه (.sln)', en: 'Project Structure', ru: 'Структура проекта (.sln)', tr: 'Proje Yapısı (.sln)' })}</span>
           </button>
           <button
             onClick={() => setActiveApiTab('models')}
@@ -234,7 +229,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <FileJson className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'کلاس‌های مدل (Entities)' : 'Domain Entities'}</span>
+            <span>{L(language, { fa: 'کلاس‌های مدل (Entities)', en: 'Domain Entities', ru: 'Классы моделей (Entities)', tr: 'Model Sınıfları (Entities)' })}</span>
           </button>
           <button
             onClick={() => setActiveApiTab('dbcontext')}
@@ -245,7 +240,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <Database className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'دیتابیس (DbContext)' : 'DbContext'}</span>
+            <span>{L(language, { fa: 'دیتابیس (DbContext)', en: 'DbContext', ru: 'База данных (DbContext)', tr: 'Veritabanı (DbContext)' })}</span>
           </button>
           <button
             onClick={() => setActiveApiTab('services')}
@@ -256,7 +251,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'سرویس‌ها (Services)' : 'Domain Services'}</span>
+            <span>{L(language, { fa: 'سرویس‌ها (Services)', en: 'Domain Services', ru: 'Сервисы', tr: 'Servisler' })}</span>
           </button>
           <button
             onClick={() => setActiveApiTab('controllers')}
@@ -267,7 +262,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <Code className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'کنترلرهای API' : 'WebAPI Controllers'}</span>
+            <span>{L(language, { fa: 'کنترلرهای API', en: 'WebAPI Controllers', ru: 'API-контроллеры', tr: 'API Denetleyicileri' })}</span>
           </button>
           <button
             onClick={() => setActiveApiTab('program')}
@@ -278,7 +273,7 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
             }`}
           >
             <Settings className="w-3.5 h-3.5" />
-            <span>{language === 'fa' ? 'تنظیمات استارتاپ' : 'Startup.cs'}</span>
+            <span>{L(language, { fa: 'تنظیمات استارتاپ', en: 'Startup.cs', ru: 'Настройки запуска', tr: 'Başlangıç Ayarları' })}</span>
           </button>
         </div>
       )}
@@ -301,12 +296,10 @@ export default function CsharpCodeViewer({ addNotification }: Props) {
       {/* Tip Box */}
       <div className="mt-4 p-4 rounded-2xl bg-primary/5 border border-primary/20 text-xs leading-relaxed text-cyan-300">
         <p className="font-bold mb-1 flex items-center gap-2 text-white">
-          <span>{language === 'fa' ? '💡 راهنمای اجرای کلاینت MVC در VS Code:' : '💡 Running the MVC App in VS Code:'}</span>
+          <span>{L(language, { fa: '💡 راهنمای اجرای کلاینت MVC در VS Code:', en: '💡 Running the MVC App in VS Code:', ru: '💡 Запуск MVC-клиента в VS Code:', tr: '💡 MVC istemcisini VS Code’da çalıştırma:' })}</span>
         </p>
         <p className="text-xs text-gray-300 font-medium">
-          {language === 'fa' 
-            ? 'برای اجرای پروژه کلاینت MVC طراحی شده، به فولدر پروژه بروید و دستور زیر را اجرا کنید. این دستور کلاینت را در پورت پیش‌فرض وب باز خواهد کرد:' 
-            : 'To execute the MVC client-side web application, navigate to the MVC project folder in your terminal and run:'}
+          {L(language, { fa: 'برای اجرای پروژه کلاینت MVC طراحی شده، به فولدر پروژه بروید و دستور زیر را اجرا کنید. این دستور کلاینت را در پورت پیش‌فرض وب باز خواهد کرد:', en: 'To execute the MVC client-side web application, navigate to the MVC project folder in your terminal and run:', ru: 'Чтобы запустить MVC-клиент, перейдите в папку проекта в терминале и выполните команду ниже. Клиент откроется на стандартном веб-порту:', tr: 'MVC istemci projesini çalıştırmak için terminalde proje klasörüne gidin ve aşağıdaki komutu çalıştırın. İstemci varsayılan web portunda açılacaktır:' })}
         </p>
         <pre className="bg-black/60 p-3 rounded-xl mt-2.5 text-xs font-mono text-[#06B6D4] text-left" style={{ direction: 'ltr' }}>
           dotnet run --project server/GameNet.MVC/GameNet.MVC.csproj

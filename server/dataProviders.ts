@@ -84,7 +84,7 @@ export interface TransactionRow { id: string; points: number; description: strin
 /** ownerUsername: رشته‌ی خالی = کد تبلیغاتی عمومی؛ نام کاربری = کد شخصیِ حاصل از تبدیل امتیاز
  *  که فقط خودِ آن کاربر باید ببیند و خرج کند. */
 export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; ownerUsername?: string; }
-export interface SystemRow { id: string; name: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
+export interface SystemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
 export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; }
 export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; }
 export interface CafeOrderRow { id: string; items: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; tableNumber: string; date: string; status: string; }

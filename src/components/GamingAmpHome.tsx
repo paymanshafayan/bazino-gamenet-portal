@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MapPin, Phone, Mail, Youtube, Facebook, Twit
 import { useLanguage } from '../context/LanguageContext';
 import { DeferredSection, getResponsiveSrcSet } from './PerformanceGuards';
 import { vimg } from '../utils/assetVersion';
+import { L, localeOf } from '../utils/i18n';
 
 
 export default function GamingAmpHome({ 
@@ -118,7 +119,7 @@ export default function GamingAmpHome({
           <section className="space-y-12 relative">
             <div className="absolute top-0 right-0 text-[150px] font-black text-white/5 uppercase select-none pointer-events-none -mt-20 -mr-10">SPOTLIGHT</div>
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-16 text-white relative inline-block w-full">
-              <span className="relative z-10">{language === 'fa' ? 'در کانون توجه' : 'IN THE SPOTLIGHT'}</span>
+              <span className="relative z-10">{L(language, { fa: 'در کانون توجه', en: 'IN THE SPOTLIGHT', ru: 'В ЦЕНТРЕ ВНИМАНИЯ', tr: 'SPOT IŞIĞINDA' })}</span>
             </h2>
             
             {spotlightGames.map((game: any, index: number) => (
@@ -134,7 +135,7 @@ export default function GamingAmpHome({
                     onClick={() => onNavigate('reservations')}
                     className="self-start border-2 border-[#00d8ff] text-[#00d8ff] px-8 py-3 rounded-sm text-xs font-black tracking-[0.2em] hover:bg-[#00d8ff] hover:text-black transition-colors uppercase"
                   >
-                    {language === 'fa' ? 'بازی کنید' : 'PLAY NOW'}
+                    {L(language, { fa: 'بازی کنید', en: 'PLAY NOW', ru: 'ИГРАТЬ', tr: 'ŞİMDİ OYNA' })}
                   </button>
                 </div>
                 <div className="w-full md:w-1/2 relative group">
@@ -156,7 +157,7 @@ export default function GamingAmpHome({
                  <div className="w-full md:w-1/2 space-y-6">
                    <div className="flex items-center gap-4 mb-2">
                      <div className="p-3 bg-[#00d8ff]/10 rounded-lg text-[#00d8ff]">{zone.icon}</div>
-                     <span className="text-[#00d8ff] text-sm font-bold uppercase tracking-widest">{language === 'fa' ? 'بخش‌های کلوپ' : 'ELITE ZONES'}</span>
+                     <span className="text-[#00d8ff] text-sm font-bold uppercase tracking-widest">{L(language, { fa: 'بخش‌های کلوپ', en: 'ELITE ZONES', ru: 'ЗОНЫ КЛУБА', tr: 'ELİT BÖLGELER' })}</span>
                    </div>
                    <h2 className="text-4xl font-black uppercase tracking-wide">{getLocText(zone.title)}</h2>
                    <p className="text-gray-300 text-sm md:text-base leading-loose font-mono bg-white/5 p-6 rounded-lg border-l-2 border-[#00d8ff]">
@@ -184,7 +185,7 @@ export default function GamingAmpHome({
           <DeferredSection minHeight={620} render={() => (
           <section className="relative w-full py-16">
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-12 text-white">
-              {language === 'fa' ? 'تورنمنت‌های فعال' : 'ACTIVE TOURNAMENTS'}
+              {L(language, { fa: 'تورنمنت‌های فعال', en: 'ACTIVE TOURNAMENTS', ru: 'АКТИВНЫЕ ТУРНИРЫ', tr: 'AKTİF TURNUVALAR' })}
             </h2>
             <div className="relative bg-[#161622] rounded-xl overflow-hidden border border-[#00d8ff]/20 shadow-[0_0_30px_rgba(0,216,255,0.1)]">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#00d8ff] to-purple-500"></div>
@@ -203,7 +204,7 @@ export default function GamingAmpHome({
                     onClick={() => onNavigate('tournaments')}
                     className="self-start bg-[#00d8ff] text-black px-8 py-3 rounded-sm text-sm font-black tracking-widest hover:bg-white transition-colors uppercase"
                   >
-                    {language === 'fa' ? 'ثبت‌نام در براکت' : 'JOIN BRACKET'}
+                    {L(language, { fa: 'ثبت‌نام در براکت', en: 'JOIN BRACKET', ru: 'ВСТУПИТЬ В СЕТКУ', tr: 'TABLOYA KATIL' })}
                   </button>
                 </div>
                 <div className="w-full md:w-1/2 aspect-video md:aspect-auto min-h-[300px] relative bg-black">
@@ -222,12 +223,12 @@ export default function GamingAmpHome({
           <section className="grid md:grid-cols-2 gap-16 py-12 bg-[#161622] p-8 md:p-12 rounded-2xl border border-white/5">
             <div>
               <div className="flex justify-between items-baseline mb-4">
-                <span className="text-[#00d8ff] text-sm font-black tracking-widest uppercase">{language === 'fa' ? 'آرنای زنده' : 'LIVE ARENA'}</span>
+                <span className="text-[#00d8ff] text-sm font-black tracking-widest uppercase">{L(language, { fa: 'آرنای زنده', en: 'LIVE ARENA', ru: 'ЖИВАЯ АРЕНА', tr: 'CANLI ARENA' })}</span>
                 <span className="text-gray-500 text-xs font-mono">SYS_STATUS: ONLINE</span>
               </div>
               <h2 className="text-4xl font-black mb-6 uppercase tracking-wide">MATCH RESULTS</h2>
               <p className="text-gray-300 text-sm leading-loose mb-8 font-mono">
-                {language === 'fa' ? 'نتایج لحظه‌ای رقابت‌های کلن‌ها و تیم‌های حرفه‌ای در بازینو. تاریخ‌سازی در جریان است.' : 'Real-time results of clan battles and pro teams at BAZINO. History is being made right now.'}
+                {L(language, { fa: 'نتایج لحظه‌ای رقابت‌های کلن‌ها و تیم‌های حرفه‌ای در بازینو. تاریخ‌سازی در جریان است.', en: 'Real-time results of clan battles and pro teams at BAZINO. History is being made right now.', ru: 'Результаты клановых битв и профессиональных команд в BAZINO в реальном времени. История творится прямо сейчас.', tr: 'BAZINO’da klan savaşları ve profesyonel takımların gerçek zamanlı sonuçları. Tarih şu anda yazılıyor.' })}
               </p>
               <div className="flex gap-2">
                 {[1,2,3,4,5].map(i => (
@@ -262,19 +263,19 @@ export default function GamingAmpHome({
           <DeferredSection minHeight={620} render={() => (
           <section className="py-16">
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-16 text-white">
-              {language === 'fa' ? 'تعرفه‌های اشتراک' : 'LOUNGE PASSES'}
+              {L(language, { fa: 'تعرفه‌های اشتراک', en: 'LOUNGE PASSES', ru: 'АБОНЕМЕНТЫ', tr: 'SALON PASLARI' })}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {pricingPackages.map((pkg: any, i: number) => (
                 <div key={pkg.id} className={`bg-[#161622] p-10 flex flex-col items-center justify-center rounded-xl border relative transition-transform hover:-translate-y-2 ${pkg.popular ? 'border-[#00d8ff] shadow-[0_0_30px_rgba(0,216,255,0.15)]' : 'border-white/10'}`}>
                   {pkg.popular && (
                     <div className="absolute top-0 right-0 bg-[#00d8ff] text-black text-[10px] font-black px-4 py-1 rounded-bl-lg uppercase tracking-wider">
-                      {language === 'fa' ? 'پیشنهاد ویژه' : 'MOST POPULAR'}
+                      {L(language, { fa: 'پیشنهاد ویژه', en: 'MOST POPULAR', ru: 'САМЫЙ ПОПУЛЯРНЫЙ', tr: 'EN POPÜLER' })}
                     </div>
                   )}
                   <h3 className="text-xl font-bold mb-2 uppercase text-center">{getLocText(pkg.title)}</h3>
                   <div className="text-[#00d8ff] font-black text-4xl my-6 flex items-baseline gap-1">
-                    {pkg.price.toLocaleString()} <span className="text-sm text-gray-400 font-normal">{language === 'fa' ? 'تومان' : 'IRR'}</span>
+                    {pkg.price.toLocaleString(localeOf(language))} <span className="text-sm text-gray-400 font-normal">{L(language, { fa: 'تومان', en: 'IRR', ru: 'туманов', tr: 'Toman' })}</span>
                   </div>
                   <span className="text-xs text-gray-400 uppercase tracking-widest text-center mb-8 bg-white/5 px-4 py-2 rounded-full w-full">{getLocText(pkg.duration)}</span>
                   
@@ -287,7 +288,7 @@ export default function GamingAmpHome({
                     ))}
                   </div>
                   <button className={`w-full py-3 rounded-sm text-sm font-black tracking-widest uppercase transition-colors ${pkg.popular ? 'bg-[#00d8ff] text-black hover:bg-white' : 'bg-white/10 text-white hover:bg-[#00d8ff] hover:text-black'}`}>
-                    {language === 'fa' ? 'خرید پکیج' : 'BUY PASS'}
+                    {L(language, { fa: 'خرید پکیج', en: 'BUY PASS', ru: 'КУПИТЬ', tr: 'PASS AL' })}
                   </button>
                 </div>
               ))}
@@ -304,7 +305,7 @@ export default function GamingAmpHome({
               <Trophy className="w-full h-full" />
             </div>
             <div className="flex justify-between items-center mb-12 relative z-10">
-               <span className="text-[#00d8ff] text-sm font-black uppercase tracking-widest">{language === 'fa' ? 'اساتید و مربیان' : 'MEET OUR EXPERTS'}</span>
+               <span className="text-[#00d8ff] text-sm font-black uppercase tracking-widest">{L(language, { fa: 'اساتید و مربیان', en: 'MEET OUR EXPERTS', ru: 'НАШИ ЭКСПЕРТЫ', tr: 'UZMANLARIMIZ' })}</span>
             </div>
             <div className="grid md:grid-cols-3 gap-8 relative z-10">
                {staffTeam.slice(0,3).map((coach: any, idx: number) => (
@@ -357,17 +358,17 @@ export default function GamingAmpHome({
           <div className="bg-[#161622] p-8 md:p-16 rounded-2xl border border-white/5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#00d8ff]/5 rounded-full blur-3xl"></div>
             <h2 className="text-center text-3xl font-black uppercase tracking-[0.2em] mb-12 relative z-10">
-              {language === 'fa' ? 'ارتباط با ما' : 'CONTACT FORM'}
+              {L(language, { fa: 'ارتباط با ما', en: 'CONTACT FORM', ru: 'ФОРМА СВЯЗИ', tr: 'İLETİŞİM FORMU' })}
             </h2>
             <div className="relative z-10 space-y-6">
               <div className="flex flex-col md:flex-row gap-6">
-                <input type="text" placeholder={language === 'fa' ? 'نام و نام خانوادگی' : 'Full Name'} className="w-full md:w-1/2 bg-[#111119] border border-white/10 rounded-sm px-6 py-4 text-sm focus:outline-none focus:border-[#00d8ff] transition-colors text-white font-mono" />
-                <input type="email" placeholder={language === 'fa' ? 'آدرس ایمیل' : 'E-mail Address'} className="w-full md:w-1/2 bg-[#111119] border border-white/10 rounded-sm px-6 py-4 text-sm focus:outline-none focus:border-[#00d8ff] transition-colors text-white font-mono" />
+                <input type="text" placeholder={L(language, { fa: 'نام و نام خانوادگی', en: 'Full Name', ru: 'Полное имя', tr: 'Ad Soyad' })} className="w-full md:w-1/2 bg-[#111119] border border-white/10 rounded-sm px-6 py-4 text-sm focus:outline-none focus:border-[#00d8ff] transition-colors text-white font-mono" />
+                <input type="email" placeholder={L(language, { fa: 'آدرس ایمیل', en: 'E-mail Address', ru: 'Адрес электронной почты', tr: 'E-posta Adresi' })} className="w-full md:w-1/2 bg-[#111119] border border-white/10 rounded-sm px-6 py-4 text-sm focus:outline-none focus:border-[#00d8ff] transition-colors text-white font-mono" />
               </div>
-              <textarea placeholder={language === 'fa' ? 'پیام شما...' : 'Message...'} rows={6} className="w-full bg-[#111119] border border-white/10 rounded-sm px-6 py-4 text-sm focus:outline-none focus:border-[#00d8ff] transition-colors text-white font-mono resize-none"></textarea>
+              <textarea placeholder={L(language, { fa: 'پیام شما...', en: 'Message...', ru: 'Сообщение...', tr: 'Mesajınız...' })} rows={6} className="w-full bg-[#111119] border border-white/10 rounded-sm px-6 py-4 text-sm focus:outline-none focus:border-[#00d8ff] transition-colors text-white font-mono resize-none"></textarea>
               <div className="text-center pt-4">
                 <button className="bg-[#00d8ff] text-black font-black tracking-[0.2em] px-16 py-4 rounded-sm text-sm hover:bg-white transition-colors uppercase inline-flex items-center gap-3">
-                  {language === 'fa' ? 'ارسال پیام' : 'SEND MESSAGE'}
+                  {L(language, { fa: 'ارسال پیام', en: 'SEND MESSAGE', ru: 'ОТПРАВИТЬ', tr: 'MESAJ GÖNDER' })}
                   <Send className="w-4 h-4" />
                 </button>
               </div>
@@ -400,7 +401,7 @@ export default function GamingAmpHome({
               <div>
                 <h3 className="text-4xl font-black uppercase tracking-wide mb-4">CONTACT INFO</h3>
                 <p className="text-gray-400 text-sm font-mono leading-relaxed max-w-md">
-                  {language === 'fa' ? 'برای هماهنگی بوت‌کمپ، رزرو گروهی و یا پشتیبانی با ما در تماس باشید.' : 'Get in touch for clan bootcamps, group reservations, or 24/7 technical support.'}
+                  {L(language, { fa: 'برای هماهنگی بوت‌کمپ، رزرو گروهی و یا پشتیبانی با ما در تماس باشید.', en: 'Get in touch for clan bootcamps, group reservations, or 24/7 technical support.', ru: 'Свяжитесь с нами для организации буткемпа, группового бронирования или техподдержки 24/7.', tr: 'Bootcamp, grup rezervasyonu veya 7/24 teknik destek için bizimle iletişime geçin.' })}
                 </p>
               </div>
               

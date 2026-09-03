@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Check, Palette, Sparkles } from 'lucide-react';
 import ThemeScreenshot from './ThemeScreenshot';
 import { useModalDismiss } from '../utils/useModalDismiss';
+import { L } from '../utils/i18n';
 
 interface ThemeColorConfig {
   primary: string;
@@ -121,11 +122,11 @@ export default function ThemeSelectorModal({
                 </div>
                 <div>
                   <h3 className="text-xl font-black uppercase tracking-wider font-display flex items-center gap-2">
-                    {language === 'fa' ? 'انتخاب قالب بصری کلوپ' : 'CLUB THEME ENGINE'}
+                    {L(language, { fa: 'انتخاب قالب بصری کلوپ', en: 'CLUB THEME ENGINE', ru: 'ВЫБОР ТЕМЫ КЛУБА', tr: 'KULÜP TEMA MOTORU' })}
                     <Sparkles className="w-4 h-4 text-primary animate-pulse" />
                   </h3>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {language === 'fa' ? 'قالب مورد علاقه خود را انتخاب کنید و تغییرات آن را به صورت آنی مشاهده نمایید.' : 'Switch themes instantly with real-time viewport generators.'}
+                    {L(language, { fa: 'قالب مورد علاقه خود را انتخاب کنید و تغییرات آن را به صورت آنی مشاهده نمایید.', en: 'Switch themes instantly with real-time viewport generators.', ru: 'Переключайте темы мгновенно и смотрите изменения в реальном времени.', tr: 'Temaları anında değiştirin ve değişiklikleri gerçek zamanlı görün.' })}
                   </p>
                 </div>
               </div>
@@ -172,8 +173,8 @@ export default function ThemeSelectorModal({
                         </h4>
                         <span className="text-[10px] uppercase font-mono tracking-widest text-gray-500">
                           {theme.type === 'built-in' 
-                            ? (language === 'fa' ? 'سیستمی' : 'BUILT-IN') 
-                            : (language === 'fa' ? 'پوسته سفارشی' : 'CUSTOM')}
+                            ? (L(language, { fa: 'سیستمی', en: 'BUILT-IN', ru: 'ВСТРОЕННЫЕ', tr: 'YERLEŞİK' })) 
+                            : (L(language, { fa: 'پوسته سفارشی', en: 'CUSTOM', ru: 'ПОЛЬЗОВАТЕЛЬСКИЕ', tr: 'ÖZEL' }))}
                         </span>
                       </div>
                       
@@ -198,8 +199,8 @@ export default function ThemeSelectorModal({
                         isActive ? 'text-primary' : 'text-gray-400 group-hover:text-white'
                       }`}>
                         {isActive 
-                          ? (language === 'fa' ? 'قالب فعال' : 'ACTIVE THEME') 
-                          : (language === 'fa' ? 'کلیک برای انتخاب' : 'CLICK TO SELECT')}
+                          ? (L(language, { fa: 'قالب فعال', en: 'ACTIVE THEME', ru: 'АКТИВНАЯ ТЕМА', tr: 'AKTİF TEMA' })) 
+                          : (L(language, { fa: 'کلیک برای انتخاب', en: 'CLICK TO SELECT', ru: 'НАЖМИТЕ ДЛЯ ВЫБОРА', tr: 'SEÇMEK İÇİN TIKLAYIN' }))}
                       </span>
                     </div>
 
@@ -216,10 +217,10 @@ export default function ThemeSelectorModal({
             <div className="mt-8 pt-4 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center text-gray-500 text-[10px] uppercase font-bold tracking-widest relative z-10">
               <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                {language === 'fa' ? 'موتور پویا و تمام‌انیمیشنی کلوپ بازینو' : 'POWERED BY BAZINO ANIMATION ENGINE'}
+                {L(language, { fa: 'موتور پویا و تمام‌انیمیشنی کلوپ بازینو', en: 'POWERED BY BAZINO ANIMATION ENGINE', ru: 'НА ДВИЖКЕ АНИМАЦИЙ BAZINO', tr: 'BAZINO ANİMASYON MOTORU İLE' })}
               </span>
               <span className="mt-2 sm:mt-0">
-                {language === 'fa' ? `${availableThemes.length} قالب آماده گیمینگ و سایبرپانک بارگذاری شده` : `${availableThemes.length} READY GAMING THEMES INSTALLED`}
+                {L(language, { fa: `${availableThemes.length} قالب آماده گیمینگ و سایبرپانک بارگذاری شده`, en: `${availableThemes.length} READY GAMING THEMES INSTALLED`, ru: `${availableThemes.length} ГОТОВЫХ ИГРОВЫХ ТЕМ УСТАНОВЛЕНО`, tr: `${availableThemes.length} HAZIR OYUN TEMASI YÜKLÜ` })}
               </span>
             </div>
           </motion.div>

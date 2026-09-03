@@ -21,6 +21,10 @@ export interface LoyaltyTx {
 export interface GameSystem {
   id: string;
   name: string;
+  nameFa?: string;
+  nameEn?: string;
+  nameRu?: string;
+  nameTr?: string;
   type: 'PC' | 'PS5' | 'Xbox';
   hourlyRate: number; // in Tomans
   isActive: boolean;

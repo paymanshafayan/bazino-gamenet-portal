@@ -37,6 +37,7 @@ import {
   Zap,
   Award
 } from 'lucide-react';
+import { L, localeOf, formatJalaliForLanguage } from '../utils/i18n';
 
 interface Props {
   themeId?: string;
@@ -98,9 +99,9 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
       console.error('Failed to parse social links on home:', e);
     }
     return [
-      { id: '1', name: language === 'fa' ? 'اینستاگرام کلوپ' : 'Instagram', platform: 'instagram', url: 'https://instagram.com/bazino' },
-      { id: '2', name: language === 'fa' ? 'کانال تلگرام' : 'Telegram', platform: 'telegram', url: 'https://t.me/bazino' },
-      { id: '3', name: language === 'fa' ? 'یوتیوب کلوپ' : 'Youtube', platform: 'youtube', url: 'https://youtube.com/bazino' }
+      { id: '1', name: L(language, { fa: 'اینستاگرام کلوپ', en: 'Instagram', ru: 'Instagram клуба', tr: 'Kulüp Instagram' }), platform: 'instagram', url: 'https://instagram.com/bazino' },
+      { id: '2', name: L(language, { fa: 'کانال تلگرام', en: 'Telegram', ru: 'Telegram-канал', tr: 'Telegram Kanalı' }), platform: 'telegram', url: 'https://t.me/bazino' },
+      { id: '3', name: L(language, { fa: 'یوتیوب کلوپ', en: 'Youtube', ru: 'YouTube клуба', tr: 'Kulüp YouTube' }), platform: 'youtube', url: 'https://youtube.com/bazino' }
     ];
   };
 
@@ -688,9 +689,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
     return (
       <div className="w-full animate-fade-in" dir={dir}>
         <div className="min-h-[300px] flex items-center justify-center p-8 bg-red-950/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
-          {language === 'fa'
-            ? '⚠️ کامپوننت صفحه اصلی این قالب (theme.js) بارگذاری نشد یا خطا داد. لطفاً قالب را دوباره نصب کنید.'
-            : '⚠️ This theme\'s home component (theme.js) failed to load or did not register. Please re-install the theme.'}
+          {L(language, { fa: '⚠️ کامپوننت صفحه اصلی این قالب (theme.js) بارگذاری نشد یا خطا داد. لطفاً قالب را دوباره نصب کنید.', en: '⚠️ This theme\'s home component (theme.js) failed to load or did not register. Please re-install the theme.', ru: '⚠️ Компонент главной страницы этой темы (theme.js) не загрузился или не зарегистрировался. Переустановите тему.', tr: '⚠️ Bu temanın ana sayfa bileşeni (theme.js) yüklenemedi veya kayıt olmadı. Lütfen temayı yeniden yükleyin.' })}
         </div>
       </div>
     );
@@ -836,16 +835,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-              {language === 'fa' ? 'ژانرهای محبوب کلوپ' : 'CHOOSE YOUR GAME'}
+              {L(language, { fa: 'ژانرهای محبوب کلوپ', en: 'CHOOSE YOUR GAME', ru: 'ВЫБЕРИ СВОЮ ИГРУ', tr: 'OYUNUNU SEÇ' })}
             </span>
             <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
               <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(255,184,0,0.8)]"></span>
               <span>
-                {getSectionTitle('genres', language === 'fa' ? 'داستان نبرد خود را انتخاب کنید' : 'Choose Your Story & Universe')}
+                {getSectionTitle('genres', L(language, { fa: 'داستان نبرد خود را انتخاب کنید', en: 'Choose Your Story & Universe', ru: 'Выберите свою историю и вселенную', tr: 'Hikayeni ve Evrenini Seç' }))}
               </span>
             </h2>
             <p className="text-gray-400 text-sm max-w-2xl font-medium">
-              {getSectionDesc('genres', language === 'fa' ? 'محبوب‌ترین دسته‌بندی بازی‌ها مجهز به کانفیگ اختصاصی و ریگ‌های پرقدرت گیمینگ آماده اجرای حماسی‌ترین نبردهای شماست.' : 'Immerse yourself in world-class gaming experiences customized for the most popular competitive and open-world titles.')}
+              {getSectionDesc('genres', L(language, { fa: 'محبوب‌ترین دسته‌بندی بازی‌ها مجهز به کانفیگ اختصاصی و ریگ‌های پرقدرت گیمینگ آماده اجرای حماسی‌ترین نبردهای شماست.', en: 'Immerse yourself in world-class gaming experiences customized for the most popular competitive and open-world titles.', ru: 'Погрузитесь в игровой опыт мирового класса на мощных ригах с индивидуальными конфигурациями для самых популярных соревновательных и open-world тайтлов.', tr: 'En popüler rekabetçi ve açık dünya oyunları için özel yapılandırılmış güçlü sistemlerde dünya standartlarında bir oyun deneyimi.' }))}
             </p>
           </div>
 
@@ -886,7 +885,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   </p>
                   <div className="pt-2 border-t border-white/10 mt-1">
                     <span className="block text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">
-                      {language === 'fa' ? 'بازی‌های شاخص:' : 'Featured Games:'}
+                      {L(language, { fa: 'بازی‌های شاخص:', en: 'Featured Games:', ru: 'Ключевые игры:', tr: 'Öne Çıkan Oyunlar:' })}
                     </span>
                     <span className="text-[10px] text-primary font-bold">
                       {genre.games}
@@ -897,7 +896,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                     onClick={() => onNavigate('reservations')}
                     className="mt-4 w-full py-2 bg-primary/10 hover:bg-primary border border-primary/30 hover:border-primary text-primary hover:text-black font-black text-[10px] notched-clip-sm transition-all duration-300 font-display uppercase tracking-wider cursor-pointer"
                   >
-                    {language === 'fa' ? 'مشاهده رزروها' : 'Launch Session'}
+                    {L(language, { fa: 'مشاهده رزروها', en: 'Launch Session', ru: 'Начать сессию', tr: 'Seansı Başlat' })}
                   </button>
                 </div>
               </div>
@@ -912,16 +911,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-              {language === 'fa' ? 'سالن‌ها و سرویس‌های ویژه' : 'PREMIUM SERVICES'}
+              {L(language, { fa: 'سالن‌ها و سرویس‌های ویژه', en: 'PREMIUM SERVICES', ru: 'ПРЕМИУМ-УСЛУГИ', tr: 'PREMIUM HİZMETLER' })}
             </span>
             <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
               <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(255,184,0,0.8)]"></span>
               <span>
-                {getSectionTitle('services', language === 'fa' ? 'کلوپ‌های تخصصی و خدمات بازی نو' : 'BAZINO Elite Zones & Services')}
+                {getSectionTitle('services', L(language, { fa: 'کلوپ‌های تخصصی و خدمات بازی نو', en: 'BAZINO Elite Zones & Services', ru: 'Элитные зоны и услуги BAZINO', tr: 'BAZINO Elit Bölgeler ve Hizmetler' }))}
               </span>
             </h2>
             <p className="text-gray-400 text-sm max-w-2xl font-medium">
-              {getSectionDesc('services', language === 'fa' ? 'مجموعه ما با ادغام پیشرفته‌ترین سخت‌افزارها، بوفه هوشمند لحظه‌ای و فروشگاه تجهیزات، بی‌نظیرترین کلوپ بازی منطقه است.' : 'Explore our integrated ecosystem of state-of-the-art gaming zones, real-time buffet ordering, and accessories shop.')}
+              {getSectionDesc('services', L(language, { fa: 'مجموعه ما با ادغام پیشرفته‌ترین سخت‌افزارها، بوفه هوشمند لحظه‌ای و فروشگاه تجهیزات، بی‌نظیرترین کلوپ بازی منطقه است.', en: 'Explore our integrated ecosystem of state-of-the-art gaming zones, real-time buffet ordering, and accessories shop.', ru: 'Единая экосистема: современные игровые зоны, заказ из буфета в реальном времени и магазин аксессуаров.', tr: 'Son teknoloji oyun bölgeleri, gerçek zamanlı büfe siparişi ve aksesuar mağazasından oluşan entegre ekosistemimizi keşfedin.' }))}
             </p>
           </div>
 
@@ -984,16 +983,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-              {language === 'fa' ? 'نتایج نبردهای سایبری کلوپ' : 'LIVE ARENA MATCHBOARD'}
+              {L(language, { fa: 'نتایج نبردهای سایبری کلوپ', en: 'LIVE ARENA MATCHBOARD', ru: 'ЖИВОЕ ТАБЛО АРЕНЫ', tr: 'CANLI ARENA SKOR TABLOSU' })}
             </span>
             <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
               <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(255,184,0,0.8)]"></span>
               <span>
-                {getSectionTitle('matches', language === 'fa' ? 'جدول زنده مسابقات و نبردها' : 'Live Matches & Tournament Scoreboard')}
+                {getSectionTitle('matches', L(language, { fa: 'جدول زنده مسابقات و نبردها', en: 'Live Matches & Tournament Scoreboard', ru: 'Живые матчи и турнирная таблица', tr: 'Canlı Maçlar ve Turnuva Skor Tablosu' }))}
               </span>
             </h2>
             <p className="text-gray-400 text-sm max-w-2xl font-medium">
-              {getSectionDesc('matches', language === 'fa' ? 'مستندات نبردهای داغ کلن‌های کلوپ بازی نو. بازی‌ها را زنده دنبال کنید یا رقیب بطلبید!' : 'Track live scores, scheduled challenges, and finished esports clashes of our local gaming guilds.')}
+              {getSectionDesc('matches', L(language, { fa: 'مستندات نبردهای داغ کلن‌های کلوپ بازی نو. بازی‌ها را زنده دنبال کنید یا رقیب بطلبید!', en: 'Track live scores, scheduled challenges, and finished esports clashes of our local gaming guilds.', ru: 'Следите за живыми счетами, запланированными вызовами и завершёнными битвами наших локальных гильдий.', tr: 'Yerel oyun topluluklarımızın canlı skorlarını, planlanan meydan okumalarını ve tamamlanan espor mücadelelerini takip edin.' }))}
             </p>
           </div>
 
@@ -1044,17 +1043,17 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                     {match.status === 'Live' && (
                       <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase notched-clip-sm">
                         <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                        <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
+                        <span>{L(language, { fa: 'در حال پخش زنده', en: 'LIVE', ru: 'В ЭФИРЕ', tr: 'CANLI' })}</span>
                       </span>
                     )}
                     {match.status === 'Finished' && (
                       <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[10px] font-black uppercase notched-clip-sm">
-                        {language === 'fa' ? 'پایان یافته' : 'Finished'}
+                        {L(language, { fa: 'پایان یافته', en: 'Finished', ru: 'Завершён', tr: 'Tamamlandı' })}
                       </span>
                     )}
                     {match.status === 'Scheduled' && (
                       <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase notched-clip-sm">
-                        {language === 'fa' ? 'برنامه‌ریزی شده' : 'Scheduled'}
+                        {L(language, { fa: 'برنامه‌ریزی شده', en: 'Scheduled', ru: 'Запланирован', tr: 'Planlandı' })}
                       </span>
                     )}
                     <button 
@@ -1082,16 +1081,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex flex-col gap-1.5">
               <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-                {language === 'fa' ? 'مسابقات بزرگ قهرمانی' : 'CHAMPIONSHIP BRACKETS'}
+                {L(language, { fa: 'مسابقات بزرگ قهرمانی', en: 'CHAMPIONSHIP BRACKETS', ru: 'ЧЕМПИОНСКИЕ СЕТКИ', tr: 'ŞAMPİYONA TABLOLARI' })}
               </span>
               <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
                 <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(255,184,0,0.8)]"></span>
                 <span>
-                  {getSectionTitle('tournaments', language === 'fa' ? 'تورنمنت‌های فعال و ثبت‌نام سریع' : 'Active Tournaments & Fast Brackets')}
+                  {getSectionTitle('tournaments', L(language, { fa: 'تورنمنت‌های فعال و ثبت‌نام سریع', en: 'Active Tournaments & Fast Brackets', ru: 'Активные турниры и быстрая регистрация', tr: 'Aktif Turnuvalar ve Hızlı Kayıt' }))}
                 </span>
               </h2>
               <p className="text-gray-400 text-sm max-w-2xl font-medium">
-                {getSectionDesc('tournaments', language === 'fa' ? 'همراه تیمی خود ثبت‌نام کنید، حریفان را در براکت‌های آنلاین حذف کنید و جوایز نقدی کلوپ وفاداری را از آن خود سازید.' : 'Challenge elite local squads, win massive cash prize pools and bonus loyalty rewards, and climb to legendary status.')}
+                {getSectionDesc('tournaments', L(language, { fa: 'همراه تیمی خود ثبت‌نام کنید، حریفان را در براکت‌های آنلاین حذف کنید و جوایز نقدی کلوپ وفاداری را از آن خود سازید.', en: 'Challenge elite local squads, win massive cash prize pools and bonus loyalty rewards, and climb to legendary status.', ru: 'Бросьте вызов лучшим местным командам, выигрывайте крупные призовые фонды и бонусы лояльности, поднимайтесь к легендарному статусу.', tr: 'Elit yerel takımlara meydan okuyun, büyük nakit ödül havuzları ve bonus sadakat ödülleri kazanın, efsane statüsüne yükselin.' }))}
               </p>
             </div>
 
@@ -1154,9 +1153,9 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                         ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                         : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
                     }`}>
-                      {tournament.status === 'Active' && (language === 'fa' ? 'در حال برگزاری' : language === 'en' ? 'Active' : language === 'ru' ? 'Идет' : 'Devam Ediyor')}
-                      {tournament.status === 'Upcoming' && (language === 'fa' ? 'ثبت‌نام باز است' : language === 'en' ? 'Upcoming' : language === 'ru' ? 'Скоро' : 'Yaklaşan')}
-                      {tournament.status === 'Completed' && (language === 'fa' ? 'پایان یافته' : language === 'en' ? 'Completed' : language === 'ru' ? 'Завершен' : 'Tamamlandı')}
+                      {tournament.status === 'Active' && (L(language, { fa: 'در حال برگزاری', en: 'Active', ru: 'Идет', tr: 'Devam Ediyor' }))}
+                      {tournament.status === 'Upcoming' && (L(language, { fa: 'ثبت‌نام باز است', en: 'Upcoming', ru: 'Скоро', tr: 'Kayıt Açık' }))}
+                      {tournament.status === 'Completed' && (L(language, { fa: 'پایان یافته', en: 'Completed', ru: 'Завершен', tr: 'Tamamlandı' }))}
                     </span>
 
                     {/* Game badge */}
@@ -1181,7 +1180,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                             {language === 'tr' && 'Giriş Ücreti'}
                           </span>
                           <span className="font-mono text-primary font-black text-xs">
-                            {tournament.registrationFee.toLocaleString()} {language === 'fa' ? 'تومان' : 'Tümen'}
+                            {tournament.registrationFee.toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}
                           </span>
                         </div>
                         <div className="space-y-1">
@@ -1192,7 +1191,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                             {language === 'tr' && 'Kapasite'}
                           </span>
                           <span className="font-mono font-bold text-white text-xs">
-                            {tournament.registeredTeamsCount} / {tournament.maxTeams} {language === 'fa' ? 'تیم' : 'Teams'}
+                            {tournament.registeredTeamsCount} / {tournament.maxTeams} {L(language, { fa: 'تیم', en: 'Teams', ru: 'команд', tr: 'Takım' })}
                           </span>
                         </div>
                       </div>
@@ -1200,10 +1199,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                       <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">
                         <Calendar className="w-3.5 h-3.5 text-primary" />
                         <span>
-                          {language === 'fa' && `تاریخ شروع: ${tournament.startDate}`}
-                          {language === 'en' && `Start Date: ${tournament.startDate}`}
-                          {language === 'ru' && `Старт: ${tournament.startDate}`}
-                          {language === 'tr' && `Başlangıç: ${tournament.startDate}`}
+                          {L(language, { fa: 'تاریخ شروع:', en: 'Start Date:', ru: 'Старт:', tr: 'Başlangıç:' })} {formatJalaliForLanguage(tournament.startDate, language)}
                         </span>
                       </div>
                     </div>
@@ -1235,15 +1231,15 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         <section className="space-y-8">
           <div className="flex flex-col gap-2 text-center items-center">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-              {language === 'fa' ? 'پیشنهادهای ویژه ساعات بازی' : 'CHOOSE YOUR ARENA PASS'}
+              {L(language, { fa: 'پیشنهادهای ویژه ساعات بازی', en: 'CHOOSE YOUR ARENA PASS', ru: 'ВЫБЕРИ СВОЙ АБОНЕМЕНТ', tr: 'ARENA PASINI SEÇ' })}
             </span>
             <h2 className="text-3xl font-black text-white flex items-center gap-3 justify-center font-display uppercase tracking-tight">
               <span>
-                {getSectionTitle('pricing', language === 'fa' ? 'بسته‌های زمانی و کارتهای عضویت' : 'Lounge passes & Pricing Tickets')}
+                {getSectionTitle('pricing', L(language, { fa: 'بسته‌های زمانی و کارتهای عضویت', en: 'Lounge passes & Pricing Tickets', ru: 'Абонементы и тарифы', tr: 'Salon Pasları ve Fiyatlandırma' }))}
               </span>
             </h2>
             <p className="text-gray-400 text-sm max-w-xl font-medium">
-              {getSectionDesc('pricing', language === 'fa' ? 'با خرید پکیج‌های بهینه، تا ۵۰ درصد هزینه بر ساعت بازی خود را کاهش دهید و ردبول رایگان و امتیاز کلوپ وفاداری جایزه بگیرید.' : 'Get up to 50% discount per hour by choosing our high-value passes packed with energy drinks and loyalty boosters.')}
+              {getSectionDesc('pricing', L(language, { fa: 'با خرید پکیج‌های بهینه، تا ۵۰ درصد هزینه بر ساعت بازی خود را کاهش دهید و ردبول رایگان و امتیاز کلوپ وفاداری جایزه بگیرید.', en: 'Get up to 50% discount per hour by choosing our high-value passes packed with energy drinks and loyalty boosters.', ru: 'Экономьте до 50% в час с выгодными абонементами, включающими энергетики и бонусы лояльности.', tr: 'Enerji içecekleri ve sadakat bonusları içeren avantajlı paketlerle saatlik ücrette %50’ye varan indirim kazanın.' }))}
             </p>
           </div>
 
@@ -1261,7 +1257,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               {/* Popular Tag */}
               {pack.popular && (
                 <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 notched-clip-sm uppercase tracking-widest font-display">
-                  {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
+                  {L(language, { fa: 'محبوب‌ترین پیشنهاد', en: 'RECOMMENDED', ru: 'РЕКОМЕНДУЕМ', tr: 'ÖNERİLEN' })}
                 </span>
               )}
 
@@ -1270,8 +1266,8 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 <h3 className="text-md font-black text-white font-display uppercase">{getLocText(pack.title)}</h3>
                 <p className="text-gray-400 text-xs mt-1.5 font-bold">{getLocText(pack.duration)}</p>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-primary font-mono">{pack.price.toLocaleString()}</span>
-                  <span className="text-xs text-gray-500 font-bold">{language === 'fa' ? 'تومان' : 'Tümen'}</span>
+                  <span className="text-3xl font-black text-primary font-mono">{pack.price.toLocaleString(localeOf(language))}</span>
+                  <span className="text-xs text-gray-500 font-bold">{L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}</span>
                 </div>
               </div>
 
@@ -1294,7 +1290,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                       : 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
                   }`}
                 >
-                  {language === 'fa' ? 'شارژ حساب و خرید پکیج' : 'Purchase Pass Ticket'}
+                  {L(language, { fa: 'شارژ حساب و خرید پکیج', en: 'Purchase Pass Ticket', ru: 'Купить абонемент', tr: 'Pass Satın Al' })}
                 </button>
               </div>
             </div>
@@ -1310,16 +1306,16 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
         <section className="space-y-8">
           <div className="flex flex-col gap-2">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-              {language === 'fa' ? 'مربیان و اساتید ورزش الکترونیک' : 'MEET OUR EXPERT COACHES'}
+              {L(language, { fa: 'مربیان و اساتید ورزش الکترونیک', en: 'MEET OUR EXPERT COACHES', ru: 'НАШИ ТРЕНЕРЫ', tr: 'UZMAN KOÇLARIMIZ' })}
             </span>
             <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
               <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(255,184,0,0.8)]"></span>
               <span>
-                {getSectionTitle('coaches', language === 'fa' ? 'مربیان حرفه‌ای و پرسنل کلوپ' : 'Meet Our Pro Gaming Coaches & Staff')}
+                {getSectionTitle('coaches', L(language, { fa: 'مربیان حرفه‌ای و پرسنل کلوپ', en: 'Meet Our Pro Gaming Coaches & Staff', ru: 'Профессиональные тренеры и персонал клуба', tr: 'Profesyonel Oyun Koçlarımız ve Ekibimiz' }))}
               </span>
             </h2>
             <p className="text-gray-400 text-sm max-w-2xl font-medium">
-              {getSectionDesc('coaches', language === 'fa' ? 'گروه مربیان برتر و سازمان‌دهندگان سالن بازی نو آماده هدایت شما برای پیروزی در تورنمنت‌ها و ساختن کلن‌های حرفه‌ای هستند.' : 'Our elite instructors and staff are dedicated to helping you optimize your gaming gear, build clan structures, and dominate.')}
+              {getSectionDesc('coaches', L(language, { fa: 'گروه مربیان برتر و سازمان‌دهندگان سالن بازی نو آماده هدایت شما برای پیروزی در تورنمنت‌ها و ساختن کلن‌های حرفه‌ای هستند.', en: 'Our elite instructors and staff are dedicated to helping you optimize your gaming gear, build clan structures, and dominate.', ru: 'Наши элитные инструкторы и персонал помогут настроить ваше оборудование, построить клан и побеждать.', tr: 'Elit eğitmenlerimiz ve ekibimiz, ekipmanınızı optimize etmenize, klan yapınızı kurmanıza ve rakiplerinize üstünlük sağlamanıza yardımcı olur.' }))}
             </p>
           </div>
 
@@ -1364,7 +1360,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
               {/* Specialty */}
               <div className="w-full pt-3.5 border-t border-white/10 flex flex-col items-center gap-1.5">
                 <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">
-                  {language === 'fa' ? 'حوزه تخصصی:' : 'Core Specialty:'}
+                  {L(language, { fa: 'حوزه تخصصی:', en: 'Core Specialty:', ru: 'Специализация:', tr: 'Uzmanlık Alanı:' })}
                 </span>
                 <span className="text-xs text-gray-300 font-black">{staff.specialty}</span>
               </div>
@@ -1401,10 +1397,10 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                   BAZINO HQ Command
                 </span>
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white font-display uppercase tracking-tight">
-                  {getSectionTitle('address', language === 'fa' ? 'نشانی و راه‌های ارتباطی با ما' : 'Our Location & Contact Command')}
+                  {getSectionTitle('address', L(language, { fa: 'نشانی و راه‌های ارتباطی با ما', en: 'Our Location & Contact Command', ru: 'Наш адрес и контакты', tr: 'Konumumuz ve İletişim' }))}
                 </h2>
                 <p className="text-gray-400 text-xs sm:text-sm leading-relaxed font-semibold">
-                  {getSectionDesc('address', language === 'fa' ? 'بازی نو مکانی ایده‌آل برای گردهمایی گیمرهای حرفه‌ای و برگزاری پرشورترین تورنمنت‌ها با تجهیزاتی کلاس جهانی است.' : 'Visit our high-tech lounge anytime to play with absolute low latency, order premium snacks straight to your desk, and enjoy absolute comfort.')}
+                  {getSectionDesc('address', L(language, { fa: 'بازی نو مکانی ایده‌آل برای گردهمایی گیمرهای حرفه‌ای و برگزاری پرشورترین تورنمنت‌ها با تجهیزاتی کلاس جهانی است.', en: 'Visit our high-tech lounge anytime to play with absolute low latency, order premium snacks straight to your desk, and enjoy absolute comfort.', ru: 'Приходите в наш высокотехнологичный лаунж в любое время: минимальная задержка, закуски прямо к столу и полный комфорт.', tr: 'Yüksek teknolojili salonumuza dilediğiniz zaman gelin: en düşük gecikme, masanıza kadar premium atıştırmalıklar ve tam konfor.' }))}
                 </p>
               </div>
 
@@ -1418,7 +1414,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                       {language === 'en' && 'Lounge Location'}
                     </span>
                     <p className="leading-relaxed text-xs">
-                      {siteSettings['club_address'] || (language === 'fa' ? 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازی نو، طبقه منفی ۱' : 'Level -1, BAZINO Plaza, No. 24, Shariati St., Sadr Hwy, Tehran')}
+                      {siteSettings['club_address'] || (L(language, { fa: 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازی نو، طبقه منفی ۱', en: 'Level -1, BAZINO Plaza, No. 24, Shariati St., Sadr Hwy, Tehran', ru: 'Тегеран, шоссе Садр, ул. Шариати, дом 24, комплекс BAZINO, этаж -1', tr: 'Tahran, Sadr Otoyolu, Şeriati Cad., No. 24, BAZINO Plaza, -1. Kat' }))}
                     </p>
                   </div>
                 </div>
@@ -1432,7 +1428,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                         {language === 'en' && 'Operational Hours'}
                       </span>
                       <span className="text-white text-xs font-black">
-                        {siteSettings['club_hours'] || (language === 'fa' ? '۲۴ ساعته شبانه‌روز (۷ روز هفته)' : 'Open 24/7 (Non-stop)')}
+                        {siteSettings['club_hours'] || (L(language, { fa: '۲۴ ساعته شبانه‌روز (۷ روز هفته)', en: 'Open 24/7 (Non-stop)', ru: 'Круглосуточно (7 дней в неделю)', tr: '7/24 Açık (Kesintisiz)' }))}
                       </span>
                     </div>
                   </div>
@@ -1454,7 +1450,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId, themeCompone
                 {/* Dynamic Club Social Links Bar */}
                 <div className="mt-6 pt-5 border-t border-white/10 space-y-3">
                   <span className="block font-bold text-gray-500 text-[10px] uppercase font-mono tracking-widest">
-                    {language === 'fa' ? 'شبکه‌های اجتماعی و ارتباطی کلوپ' : 'CLUB SOCIAL CHANNELS'}
+                    {L(language, { fa: 'شبکه‌های اجتماعی و ارتباطی کلوپ', en: 'CLUB SOCIAL CHANNELS', ru: 'СОЦСЕТИ КЛУБА', tr: 'KULÜP SOSYAL KANALLARI' })}
                   </span>
                   <div className="flex flex-wrap gap-2.5">
                     {getSocialLinks().map((item: any) => (

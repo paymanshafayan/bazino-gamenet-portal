@@ -3,6 +3,7 @@ import { CafeItem, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Check, X, Sparkles, Coffee, Utensils, Zap } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { postJson, errorMessage, toServerCart } from '../services/postJson';
+import { L, localeOf } from '../utils/i18n';
 
 interface Props {
   themeId?: string;
@@ -36,13 +37,7 @@ export default function CafeTab({
     const existing = cart.find(c => c.item.id === item.id);
     if (existing) {
       if (existing.qty >= item.inventory) {
-        const errorStock = language === 'fa'
-          ? `موجودی کافه (${item.inventory}) کافی نیست.`
-          : language === 'en'
-          ? `Buffet stock (${item.inventory}) is insufficient.`
-          : language === 'ru'
-          ? `Недостаточно в буфете (${item.inventory} шт.).`
-          : `Yetersiz stok (${item.inventory} adet).`;
+        const errorStock = L(language, { fa: `موجودی کافه (${item.inventory}) کافی نیست.`, en: `Buffet stock (${item.inventory}) is insufficient.`, ru: `Недостаточно в буфете (${item.inventory} шт.).`, tr: `Büfe stoğu (${item.inventory}) yetersiz.` });
         addNotification(errorStock, 'error');
         return;
       }
@@ -51,13 +46,7 @@ export default function CafeTab({
       setCart([...cart, { item, qty: 1 }]);
     }
 
-    const successAdd = language === 'fa'
-      ? `${item.name} به سفارش کافه اضافه شد.`
-      : language === 'en'
-      ? `${item.name} added to buffet order.`
-      : language === 'ru'
-      ? `${item.name} добавлен в заказ.`
-      : `${item.name} siparişe eklendi.`;
+    const successAdd = L(language, { fa: `${item.name} به سفارش کافه اضافه شد.`, en: `${item.name} added to buffet order.`, ru: `${item.name} добавлен в заказ.`, tr: `${item.name} büfe siparişine eklendi.` });
 
     addNotification(successAdd, 'success');
   };
@@ -71,13 +60,7 @@ export default function CafeTab({
       setCart(cart.filter(c => c.item.id !== id));
     } else {
       if (newQty > current.item.inventory) {
-        const maxStock = language === 'fa'
-          ? `حداکثر موجودی بوفه (${current.item.inventory}) است.`
-          : language === 'en'
-          ? `Maximum buffet stock limit is (${current.item.inventory}).`
-          : language === 'ru'
-          ? `Достигнут лимит наличия (${current.item.inventory} шт.).`
-          : `Maksimum büfe stoğu (${current.item.inventory}) adettir.`;
+        const maxStock = L(language, { fa: `حداکثر موجودی بوفه (${current.item.inventory}) است.`, en: `Maximum buffet stock limit is (${current.item.inventory}).`, ru: `Достигнут лимит наличия (${current.item.inventory} шт.).`, tr: `Maksimum büfe stoğu (${current.item.inventory}).` });
         addNotification(maxStock, 'error');
         return;
       }
@@ -109,10 +92,7 @@ export default function CafeTab({
     const found = activeCoupons.find(c => c.code.toUpperCase() === couponCode.trim().toUpperCase());
     if (!found) {
       addNotification(
-        language === 'fa' ? 'کد تخفیف معتبر نیست یا منقضی شده است.' :
-        language === 'en' ? 'Discount code is invalid or expired.' :
-        language === 'ru' ? 'Промокод недействителен или истек.' :
-        'İndirim kodu geçersiz veya süresi dolmuş.',
+        L(language, { fa: 'کد تخفیف معتبر نیست یا منقضی شده است.', en: 'Discount code is invalid or expired.', ru: 'Промокод недействителен или истек.', tr: 'İndirim kodu geçersiz veya süresi dolmuş.' }),
         'error'
       );
       return;
@@ -120,23 +100,14 @@ export default function CafeTab({
 
     const subtotal = getSubtotal();
     if (subtotal < found.minOrder) {
-      const errorMin = language === 'fa'
-        ? `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString()} تومان است.`
-        : language === 'en'
-        ? `Minimum order value to apply this code is ${found.minOrder.toLocaleString()} Tomans.`
-        : language === 'ru'
-        ? `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString()} томанов.`
-        : `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString()} Tümen'dir.`;
+      const errorMin = L(language, { fa: `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString(localeOf(language))} تومان است.`, en: `Minimum order value to apply this code is ${found.minOrder.toLocaleString(localeOf(language))} Tomans.`, ru: `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString(localeOf(language))} томанов.`, tr: `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString(localeOf(language))} Toman.` });
       addNotification(errorMin, 'error');
       return;
     }
 
     setAppliedCoupon(found);
     addNotification(
-      language === 'fa' ? 'تخفیف بوفه با موفقیت اعمال شد!' :
-      language === 'en' ? 'Buffet discount applied successfully!' :
-      language === 'ru' ? 'Скидка на буфет успешно применена!' :
-      'Büfe indirimi başarıyla uygulandı!',
+      L(language, { fa: 'تخفیف بوفه با موفقیت اعمال شد!', en: 'Buffet discount applied successfully!', ru: 'Скидка на буфет успешно применена!', tr: 'Büfe indirimi başarıyla uygulandı!' }),
       'success'
     );
   };
@@ -150,10 +121,7 @@ export default function CafeTab({
     if (cart.length === 0 || isSubmitting) return;
     if (!systemNumber.trim()) {
       addNotification(
-        language === 'fa' ? 'لطفاً شماره سیستم یا صندلی خود را وارد کنید.' :
-        language === 'en' ? 'Please enter your system or seat number.' :
-        language === 'ru' ? 'Пожалуйста, введите номер места или системы.' :
-        'Lütfen sistem veya koltuk numaranızı girin.',
+        L(language, { fa: 'لطفاً شماره سیستم یا صندلی خود را وارد کنید.', en: 'Please enter your system or seat number.', ru: 'Пожалуйста, введите номер места или системы.', tr: 'Lütfen sistem veya koltuk numaranızı girin.' }),
         'error'
       );
       return;
@@ -171,13 +139,7 @@ export default function CafeTab({
 
       const orderId = data?.order?.id ? ` (${data.order.id})` : '';
       const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10000);
-      const successMsg = language === 'fa'
-        ? `سفارش شما ثبت شد${orderId}! بلافاصله پس از آماده‌سازی روی صندلی ${systemNumber} تحویل داده می‌شود. ${pointsEarned} امتیاز به شما تعلق گرفت.`
-        : language === 'en'
-        ? `Your order has been registered${orderId}! It will be delivered to seat ${systemNumber} immediately after preparation. You earned ${pointsEarned} points.`
-        : language === 'ru'
-        ? `Ваш заказ зарегистрирован${orderId}! Он будет доставлен к вашему месту ${systemNumber} сразу после приготовления. Получено ${pointsEarned} баллов.`
-        : `Siparişiniz kaydedildi${orderId}! Hazırlandıktan hemen sonra ${systemNumber} nolu koltuğa teslim edilecektir. ${pointsEarned} puan kazandınız.`;
+      const successMsg = L(language, { fa: `سفارش شما ثبت شد${orderId}! بلافاصله پس از آماده‌سازی روی صندلی ${systemNumber} تحویل داده می‌شود. ${pointsEarned} امتیاز به شما تعلق گرفت.`, en: `Your order has been registered${orderId}! It will be delivered to seat ${systemNumber} immediately after preparation. You earned ${pointsEarned} points.`, ru: `Ваш заказ зарегистрирован${orderId}! Он будет доставлен к вашему месту ${systemNumber} сразу после приготовления. Получено ${pointsEarned} баллов.`, tr: `Siparişiniz alındı${orderId}! Hazırlanır hazırlanmaz ${systemNumber} numaralı koltuğa teslim edilecek. ${pointsEarned} puan kazandınız.` });
 
       addNotification(successMsg, 'success');
 
@@ -186,10 +148,7 @@ export default function CafeTab({
       setCouponCode('');
     } catch (e) {
       addNotification(errorMessage(e,
-        language === 'fa' ? 'ثبت سفارش انجام نشد. دوباره تلاش کنید.' :
-        language === 'en' ? 'Could not place the order. Please try again.' :
-        language === 'ru' ? 'Не удалось оформить заказ. Попробуйте снова.' :
-        'Sipariş verilemedi. Lütfen tekrar deneyin.'
+        L(language, { fa: 'ثبت سفارش انجام نشد. دوباره تلاش کنید.', en: 'Could not place the order. Please try again.', ru: 'Не удалось оформить заказ. Попробуйте снова.', tr: 'Sipariş verilemedi. Lütfen tekrar deneyin.' })
       ), 'error');
     } finally {
       setIsSubmitting(false);
@@ -223,10 +182,10 @@ export default function CafeTab({
                 {cat === 'Drinks' && <Coffee className="w-3.5 h-3.5" />}
                 {cat === 'Foods' && <Utensils className="w-3.5 h-3.5" />}
                 {cat === 'Snacks' && <Zap className="w-3.5 h-3.5" />}
-                {cat === 'All' && (language === 'fa' ? 'منوی کامل' : language === 'en' ? 'Full Menu' : language === 'ru' ? 'Полное меню' : 'Tüm Menü')}
-                {cat === 'Drinks' && (language === 'fa' ? 'نوشیدنی‌ها' : language === 'en' ? 'Drinks & Soda' : language === 'ru' ? 'Напитки' : 'İçecekler')}
-                {cat === 'Foods' && (language === 'fa' ? 'غذاهای گرم' : language === 'en' ? 'Hot Dishes' : language === 'ru' ? 'Горячие блюда' : 'Sıcak Yemekler')}
-                {cat === 'Snacks' && (language === 'fa' ? 'اسنک و تنقلات' : language === 'en' ? 'Snacks & Chips' : language === 'ru' ? 'Закуски и чипсы' : 'Atıştırmalıklar')}
+                {cat === 'All' && (L(language, { fa: 'منوی کامل', en: 'Full Menu', ru: 'Полное меню', tr: 'Tüm Menü' }))}
+                {cat === 'Drinks' && (L(language, { fa: 'نوشیدنی‌ها', en: 'Drinks & Soda', ru: 'Напитки', tr: 'İçecekler' }))}
+                {cat === 'Foods' && (L(language, { fa: 'غذاهای گرم', en: 'Hot Dishes', ru: 'Горячие блюда', tr: 'Sıcak Yemekler' }))}
+                {cat === 'Snacks' && (L(language, { fa: 'اسنک و تنقلات', en: 'Snacks & Chips', ru: 'Закуски и чипсы', tr: 'Atıştırmalıklar' }))}
               </button>
             ))}
           </div>
@@ -279,9 +238,9 @@ export default function CafeTab({
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-3 right-3 px-2.5 py-1 rounded bg-black/80 text-[10px] text-gray-300 font-bold border border-white/10 font-mono uppercase tracking-wide">
-                    {item.category === 'Drinks' && (language === 'fa' ? 'نوشیدنی' : language === 'en' ? 'Drinks' : language === 'ru' ? 'Напиток' : 'İçecek')}
-                    {item.category === 'Foods' && (language === 'fa' ? 'غذای گرم' : language === 'en' ? 'Hot Dish' : language === 'ru' ? 'Горячее блюдо' : 'Yemek')}
-                    {item.category === 'Snacks' && (language === 'fa' ? 'تنقلات' : language === 'en' ? 'Snack' : language === 'ru' ? 'Закуска' : 'Atıştırmalık')}
+                    {item.category === 'Drinks' && (L(language, { fa: 'نوشیدنی', en: 'Drinks', ru: 'Напиток', tr: 'İçecek' }))}
+                    {item.category === 'Foods' && (L(language, { fa: 'غذای گرم', en: 'Hot Dish', ru: 'Горячее блюдо', tr: 'Sıcak Yemek' }))}
+                    {item.category === 'Snacks' && (L(language, { fa: 'تنقلات', en: 'Snack', ru: 'Закуска', tr: 'Atıştırmalık' }))}
                   </div>
                 </div>
 
@@ -304,9 +263,9 @@ export default function CafeTab({
                   <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-gray-500 block font-bold font-mono uppercase">
-                        {language === 'fa' ? 'قیمت:' : 'Price:'}
+                        {L(language, { fa: 'قیمت:', en: 'Price:', ru: 'Цена:', tr: 'Fiyat:' })}
                       </span>
-                      <strong className="text-primary font-black font-mono text-lg">{item.price.toLocaleString()}</strong>
+                      <strong className="text-primary font-black font-mono text-lg">{item.price.toLocaleString(localeOf(language))}</strong>
                       <span className="text-gray-400 text-[10px] mr-1 font-bold">{t('common.currency', 'تومان')}</span>
                     </div>
 
@@ -360,18 +319,18 @@ export default function CafeTab({
                   onChange={(e) => setSystemNumber(e.target.value)}
                   className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-primary font-bold cursor-pointer font-mono"
                 >
-                  <option value="Seat #01">{language === 'fa' ? 'سیستم شماره ۱ (PC Standard)' : 'System #1 (PC Standard)'}</option>
-                  <option value="Seat #02">{language === 'fa' ? 'سیستم شماره ۲ (PC Standard)' : 'System #2 (PC Standard)'}</option>
-                  <option value="Seat #03">{language === 'fa' ? 'سیستم شماره ۳ (PC Standard)' : 'System #3 (PC Standard)'}</option>
-                  <option value="Seat #04">{language === 'fa' ? 'سیستم شماره ۴ (PC Standard)' : 'System #4 (PC Standard)'}</option>
-                  <option value="Seat #05">{language === 'fa' ? 'سیستم شماره ۵ (PC VIP)' : 'System #5 (PC VIP)'}</option>
-                  <option value="Seat #06">{language === 'fa' ? 'سیستم شماره ۶ (PC VIP)' : 'System #6 (PC VIP)'}</option>
-                  <option value="Seat #07">{language === 'fa' ? 'سیستم شماره ۷ (PC VIP)' : 'System #7 (PC VIP)'}</option>
-                  <option value="Seat #08">{language === 'fa' ? 'سیستم شماره ۸ (PS5 #1)' : 'System #8 (PS5 #1)'}</option>
-                  <option value="Seat #09">{language === 'fa' ? 'سیستم شماره ۹ (PS5 #2)' : 'System #9 (PS5 #2)'}</option>
-                  <option value="Seat #10">{language === 'fa' ? 'سیستم شماره ۱۰ (Xbox Series)' : 'System #10 (Xbox Series)'}</option>
-                  <option value="Table VIP #1">{language === 'fa' ? 'میز استراحت VIP ۱' : 'Relax Lounge Table #1'}</option>
-                  <option value="Table VIP #2">{language === 'fa' ? 'میز استراحت VIP ۲' : 'Relax Lounge Table #2'}</option>
+                  <option value="Seat #01">{L(language, { fa: 'سیستم شماره ۱ (PC Standard)', en: 'System #1 (PC Standard)', ru: 'Система №1 (PC Standard)', tr: 'Sistem No.1 (PC Standard)' })}</option>
+                  <option value="Seat #02">{L(language, { fa: 'سیستم شماره ۲ (PC Standard)', en: 'System #2 (PC Standard)', ru: 'Система №2 (PC Standard)', tr: 'Sistem No.2 (PC Standard)' })}</option>
+                  <option value="Seat #03">{L(language, { fa: 'سیستم شماره ۳ (PC Standard)', en: 'System #3 (PC Standard)', ru: 'Система №3 (PC Standard)', tr: 'Sistem No.3 (PC Standard)' })}</option>
+                  <option value="Seat #04">{L(language, { fa: 'سیستم شماره ۴ (PC Standard)', en: 'System #4 (PC Standard)', ru: 'Система №4 (PC Standard)', tr: 'Sistem No.4 (PC Standard)' })}</option>
+                  <option value="Seat #05">{L(language, { fa: 'سیستم شماره ۵ (PC VIP)', en: 'System #5 (PC VIP)', ru: 'Система №5 (PC VIP)', tr: 'Sistem No.5 (PC VIP)' })}</option>
+                  <option value="Seat #06">{L(language, { fa: 'سیستم شماره ۶ (PC VIP)', en: 'System #6 (PC VIP)', ru: 'Система №6 (PC VIP)', tr: 'Sistem No.6 (PC VIP)' })}</option>
+                  <option value="Seat #07">{L(language, { fa: 'سیستم شماره ۷ (PC VIP)', en: 'System #7 (PC VIP)', ru: 'Система №7 (PC VIP)', tr: 'Sistem No.7 (PC VIP)' })}</option>
+                  <option value="Seat #08">{L(language, { fa: 'سیستم شماره ۸ (PS5 #1)', en: 'System #8 (PS5 #1)', ru: 'Система №8 (PS5 #1)', tr: 'Sistem No.8 (PS5 #1)' })}</option>
+                  <option value="Seat #09">{L(language, { fa: 'سیستم شماره ۹ (PS5 #2)', en: 'System #9 (PS5 #2)', ru: 'Система №9 (PS5 #2)', tr: 'Sistem No.9 (PS5 #2)' })}</option>
+                  <option value="Seat #10">{L(language, { fa: 'سیستم شماره ۱۰ (Xbox Series)', en: 'System #10 (Xbox Series)', ru: 'Система №10 (Xbox Series)', tr: 'Sistem No.10 (Xbox Series)' })}</option>
+                  <option value="Table VIP #1">{L(language, { fa: 'میز استراحت VIP ۱', en: 'Relax Lounge Table #1', ru: 'VIP-стол отдыха №1', tr: 'VIP Dinlenme Masası 1' })}</option>
+                  <option value="Table VIP #2">{L(language, { fa: 'میز استراحت VIP ۲', en: 'Relax Lounge Table #2', ru: 'VIP-стол отдыха №2', tr: 'VIP Dinlenme Masası 2' })}</option>
                 </select>
               </div>
 
@@ -400,7 +359,7 @@ export default function CafeTab({
                         <h4 className="text-white text-xs font-bold truncate font-display">{mappedItemName}</h4>
                         <div className="flex items-center justify-between mt-1 font-mono">
                           <span className="text-primary font-bold text-xs">
-                            {(item.item.price * item.qty).toLocaleString()} {t('common.currency', 'تومان')}
+                            {(item.item.price * item.qty).toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}
                           </span>
 
                           {/* Qty actions */}
@@ -439,7 +398,7 @@ export default function CafeTab({
                   <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg text-xs font-mono">
                     <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
                       <Check className="w-4 h-4 animate-pulse" />
-                      <span>{language === 'fa' ? 'اعمال شد:' : 'Applied:'} {appliedCoupon.code}</span>
+                      <span>{L(language, { fa: 'اعمال شد:', en: 'Applied:', ru: 'Применено:', tr: 'Uygulandı:' })} {appliedCoupon.code}</span>
                     </div>
                     <button 
                       onClick={() => setAppliedCoupon(null)}
@@ -476,7 +435,7 @@ export default function CafeTab({
                     {language === 'ru' && 'Подитог товаров:'}
                     {language === 'tr' && 'Yiyecekler Toplamı:'}
                   </span>
-                  <span className="text-gray-200">{subtotal.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
                 </div>
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-400 font-bold">
@@ -486,12 +445,12 @@ export default function CafeTab({
                       {language === 'ru' && 'Сумма скидки:'}
                       {language === 'tr' && 'İndirim Tutarı:'}
                     </span>
-                    <span>-{discount.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                    <span>-{discount.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-white/5 pt-2.5 text-sm font-black text-white font-sans">
                   <span>{t('booking.totalPrice', 'مبلغ قابل پرداخت:')}</span>
-                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'تومان')}</span>
                 </div>
 
                 {/* Loyalty points display */}

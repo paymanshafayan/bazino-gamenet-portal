@@ -4,6 +4,7 @@ import { X, Mail, Lock, User, Phone, LogIn, UserPlus, Sparkles, AlertCircle } fr
 import { UserState } from '../types/gamenet';
 import { setAuthToken } from '../services/authToken';
 import { useModalDismiss } from '../utils/useModalDismiss';
+import { L } from '../utils/i18n';
 
 interface Props {
   isOpen: boolean;
@@ -55,8 +56,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
 
       onAuthSuccess(data.user);
       const msg = activeTab === 'login'
-        ? (language === 'fa' ? `خوش آمدید، @${data.user.username}!` : `Welcome back, @${data.user.username}!`)
-        : (language === 'fa' ? 'ثبت‌نام موفقیت‌آمیز بود! ۱۰۰ امتیاز هدیه به شما تعلق گرفت.' : 'Registration successful! 100 bonus points earned.');
+        ? (L(language, { fa: `خوش آمدید، @${data.user.username}!`, en: `Welcome back, @${data.user.username}!`, ru: `С возвращением, @${data.user.username}!`, tr: `Tekrar hoş geldin, @${data.user.username}!` }))
+        : (L(language, { fa: 'ثبت‌نام موفقیت‌آمیز بود! ۱۰۰ امتیاز هدیه به شما تعلق گرفت.', en: 'Registration successful! 100 bonus points earned.', ru: 'Регистрация успешна! Вам начислено 100 бонусных баллов.', tr: 'Kayıt başarılı! 100 bonus puan kazandınız.' }));
       
       addNotification(msg, 'success');
       onClose();
@@ -100,13 +101,13 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           </div>
           <h3 className="text-xl font-black text-white font-display">
             {activeTab === 'login' 
-              ? (language === 'fa' ? 'ورود به گیم‌نت بازینو' : 'Login to BAZINO')
-              : (language === 'fa' ? 'عضویت در باشگاه مشتریان' : 'Join Loyalty Arena')}
+              ? (L(language, { fa: 'ورود به گیم‌نت بازینو', en: 'Login to BAZINO', ru: 'Вход в BAZINO', tr: 'BAZINO Girişi' }))
+              : (L(language, { fa: 'عضویت در باشگاه مشتریان', en: 'Join Loyalty Arena', ru: 'Вступить в клуб лояльности', tr: 'Sadakat Kulübüne Katıl' }))}
           </h3>
           <p className="text-gray-400 text-xs">
             {activeTab === 'login'
-              ? (language === 'fa' ? 'وارد حساب خود شوید تا از امتیازات خود استفاده کنید.' : 'Access your gaming profile & reservations.')
-              : (language === 'fa' ? 'با ثبت‌نام اولیه ۱۰۰ امتیاز هدیه بلافاصله دریافت کنید!' : 'Register to get 100 free bonus points instantly.')}
+              ? (L(language, { fa: 'وارد حساب خود شوید تا از امتیازات خود استفاده کنید.', en: 'Access your gaming profile & reservations.', ru: 'Войдите, чтобы использовать свои баллы и бронирования.', tr: 'Puanlarınızı ve rezervasyonlarınızı kullanmak için giriş yapın.' }))
+              : (L(language, { fa: 'با ثبت‌نام اولیه ۱۰۰ امتیاز هدیه بلافاصله دریافت کنید!', en: 'Register to get 100 free bonus points instantly.', ru: 'Зарегистрируйтесь и сразу получите 100 бонусных баллов!', tr: 'Kayıt olun, anında 100 bonus puan kazanın!' }))}
           </p>
         </div>
 
@@ -121,7 +122,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
             }`}
           >
             <LogIn className="w-4 h-4" />
-            <span>{language === 'fa' ? 'ورود گیمر' : 'Login'}</span>
+            <span>{L(language, { fa: 'ورود گیمر', en: 'Login', ru: 'Вход', tr: 'Giriş' })}</span>
           </button>
           <button
             onClick={() => { setActiveTab('register'); setErrorMsg(''); }}
@@ -132,7 +133,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
             }`}
           >
             <UserPlus className="w-4 h-4" />
-            <span>{language === 'fa' ? 'ثبت‌نام جدید' : 'Register'}</span>
+            <span>{L(language, { fa: 'ثبت‌نام جدید', en: 'Register', ru: 'Регистрация', tr: 'Kayıt Ol' })}</span>
           </button>
         </div>
 
@@ -149,7 +150,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           {/* Username */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
-              {language === 'fa' ? 'نام کاربری (گیمر تگ)' : 'Gamertag / Username'}
+              {L(language, { fa: 'نام کاربری (گیمر تگ)', en: 'Gamertag / Username', ru: 'Геймертег / Имя пользователя', tr: 'Oyuncu Adı / Kullanıcı Adı' })}
             </label>
             <div className="relative">
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-500" />
@@ -168,7 +169,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           {activeTab === 'register' && (
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
-                {language === 'fa' ? 'آدرس ایمیل' : 'Email Address'}
+                {L(language, { fa: 'آدرس ایمیل', en: 'Email Address', ru: 'Адрес электронной почты', tr: 'E-posta Adresi' })}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-500" />
@@ -188,7 +189,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           {activeTab === 'register' && (
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
-                {language === 'fa' ? 'شماره تماس (اختیاری)' : 'Phone Number (Optional)'}
+                {L(language, { fa: 'شماره تماس (اختیاری)', en: 'Phone Number (Optional)', ru: 'Номер телефона (необязательно)', tr: 'Telefon Numarası (İsteğe bağlı)' })}
               </label>
               <div className="relative">
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-500" />
@@ -206,7 +207,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           {/* Password */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
-              {language === 'fa' ? 'کلمه عبور' : 'Password'}
+              {L(language, { fa: 'کلمه عبور', en: 'Password', ru: 'Пароль', tr: 'Şifre' })}
             </label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-500" />
@@ -234,8 +235,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
                 {activeTab === 'login' ? <LogIn className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
                 <span>
                   {activeTab === 'login'
-                    ? (language === 'fa' ? 'ورود به کابین گیمینگ' : 'Login Now')
-                    : (language === 'fa' ? 'ایجاد حساب کاربری' : 'Register Profile')}
+                    ? (L(language, { fa: 'ورود به کابین گیمینگ', en: 'Login Now', ru: 'Войти', tr: 'Şimdi Giriş Yap' }))
+                    : (L(language, { fa: 'ایجاد حساب کاربری', en: 'Register Profile', ru: 'Создать профиль', tr: 'Profil Oluştur' }))}
                 </span>
               </>
             )}
@@ -247,9 +248,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, addNotificat
           <div className="mt-5 p-3 rounded-xl bg-primary/5 border border-primary/15 text-[10px] text-primary flex items-start gap-2">
             <Sparkles className="w-4 h-4 shrink-0 mt-0.5 animate-pulse" />
             <p className="leading-relaxed font-bold">
-              {language === 'fa' 
-                ? 'با عضویت در باشگاه مشتریان بازینو، از هر سفارش کافه، رزرو سیستم و خرید کالا امتیاز نقدی دریافت کرده و آن را به تخفیف‌های طلایی تبدیل کنید!'
-                : 'As a golden member, earn cashback loyalty points on all lounge bookings, cafeteria snacks, and premium shop orders!'}
+              {L(language, { fa: 'با عضویت در باشگاه مشتریان بازینو، از هر سفارش کافه، رزرو سیستم و خرید کالا امتیاز نقدی دریافت کرده و آن را به تخفیف‌های طلایی تبدیل کنید!', en: 'As a golden member, earn cashback loyalty points on all lounge bookings, cafeteria snacks, and premium shop orders!', ru: 'Как участник клуба BAZINO вы получаете кэшбэк-баллы за каждое бронирование, заказ в кафе и покупку в магазине — обменивайте их на золотые скидки!', tr: 'BAZINO sadakat kulübü üyesi olarak her rezervasyon, kafe siparişi ve mağaza alışverişinde puan kazanın ve altın indirimlere dönüştürün!' })}
             </p>
           </div>
         )}

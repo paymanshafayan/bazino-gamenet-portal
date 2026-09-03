@@ -35,6 +35,7 @@ import {
   Grid
 } from 'lucide-react';
 import { vimg } from '../utils/assetVersion';
+import { L, localeOf, formatJalaliForLanguage } from '../utils/i18n';
 
 interface Props {
   themeId?: string;
@@ -123,7 +124,7 @@ export default function ConsoleGridClassic({
     e.preventDefault();
     if (!newMessage.trim()) return;
     if (!user) {
-      addNotification(language === 'fa' ? 'لطفاً ابتدا وارد حساب کاربری خود شوید' : 'Please login to chat', 'error');
+      addNotification(L(language, { fa: 'لطفاً ابتدا وارد حساب کاربری خود شوید', en: 'Please login to chat', ru: 'Сначала войдите в аккаунт', tr: 'Lütfen önce giriş yapın' }), 'error');
       onOpenAuth();
       return;
     }
@@ -152,7 +153,7 @@ export default function ConsoleGridClassic({
   const handleQuickReserve = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      addNotification(language === 'fa' ? 'لطفاً ابتدا وارد حساب کاربری خود شوید' : 'Please login to reserve', 'error');
+      addNotification(L(language, { fa: 'لطفاً ابتدا وارد حساب کاربری خود شوید', en: 'Please login to reserve', ru: 'Сначала войдите в аккаунт', tr: 'Lütfen önce giriş yapın' }), 'error');
       onOpenAuth();
       return;
     }
@@ -185,9 +186,7 @@ export default function ConsoleGridClassic({
 
       if (res.ok) {
         addNotification(
-          language === 'fa' 
-            ? `سیستم ${selectedSystem.name} با موفقیت رزرو شد. +${points} امتیاز وفاداری!` 
-            : `System ${selectedSystem.name} reserved. +${points} loyalty points!`,
+          L(language, { fa: `سیستم ${selectedSystem.name} با موفقیت رزرو شد. +${points} امتیاز وفاداری!`, en: `System ${selectedSystem.name} reserved. +${points} loyalty points!`, ru: `Система ${selectedSystem.name} забронирована. +${points} баллов лояльности!`, tr: `${selectedSystem.name} sistemi rezerve edildi. +${points} sadakat puanı!` }),
           'success'
         );
         setSelectedSystem(null);
@@ -202,7 +201,7 @@ export default function ConsoleGridClassic({
   // Cafe Order
   const handleCafeOrderSubmit = async () => {
     if (!user) {
-      addNotification(language === 'fa' ? 'لطفاً ابتدا وارد حساب کاربری خود شوید' : 'Please login to order', 'error');
+      addNotification(L(language, { fa: 'لطفاً ابتدا وارد حساب کاربری خود شوید', en: 'Please login to order', ru: 'Сначала войдите в аккаунт', tr: 'Lütfen önce giriş yapın' }), 'error');
       onOpenAuth();
       return;
     }
@@ -215,7 +214,7 @@ export default function ConsoleGridClassic({
       });
 
     if (orderItems.length === 0) {
-      addNotification(language === 'fa' ? 'سبد خرید شما خالی است!' : 'Your cart is empty!', 'error');
+      addNotification(L(language, { fa: 'سبد خرید شما خالی است!', en: 'Your cart is empty!', ru: 'Ваша корзина пуста!', tr: 'Sepetiniz boş!' }), 'error');
       return;
     }
 
@@ -250,9 +249,7 @@ export default function ConsoleGridClassic({
 
       if (res.ok) {
         addNotification(
-          language === 'fa' 
-            ? `سفارش کافه شما با موفقیت ثبت شد و به میز ${cafeTable} ارسال خواهد شد. +${pointsEarned} امتیاز وفاداری!` 
-            : `Cafe order placed for seat ${cafeTable}! +${pointsEarned} loyalty points!`,
+          L(language, { fa: `سفارش کافه شما با موفقیت ثبت شد و به میز ${cafeTable} ارسال خواهد شد. +${pointsEarned} امتیاز وفاداری!`, en: `Cafe order placed for seat ${cafeTable}! +${pointsEarned} loyalty points!`, ru: `Заказ из кафе оформлен и будет доставлен к месту ${cafeTable}. +${pointsEarned} баллов лояльности!`, tr: `Kafe siparişiniz alındı ve ${cafeTable} numaralı masaya gönderilecek. +${pointsEarned} sadakat puanı!` }),
           'success'
         );
         setCafeCart({});
@@ -267,7 +264,7 @@ export default function ConsoleGridClassic({
   // Shop Order
   const handleShopOrderSubmit = async () => {
     if (!user) {
-      addNotification(language === 'fa' ? 'لطفاً ابتدا وارد حساب کاربری خود شوید' : 'Please login to order', 'error');
+      addNotification(L(language, { fa: 'لطفاً ابتدا وارد حساب کاربری خود شوید', en: 'Please login to order', ru: 'Сначала войдите в аккаунт', tr: 'Lütfen önce giriş yapın' }), 'error');
       onOpenAuth();
       return;
     }
@@ -280,7 +277,7 @@ export default function ConsoleGridClassic({
       });
 
     if (cartItems.length === 0) {
-      addNotification(language === 'fa' ? 'سبد خرید قطعات شما خالی است!' : 'Gamer shop cart is empty!', 'error');
+      addNotification(L(language, { fa: 'سبد خرید قطعات شما خالی است!', en: 'Gamer shop cart is empty!', ru: 'Корзина магазина пуста!', tr: 'Mağaza sepetiniz boş!' }), 'error');
       return;
     }
 
@@ -314,9 +311,7 @@ export default function ConsoleGridClassic({
 
       if (res.ok) {
         addNotification(
-          language === 'fa'
-            ? `خرید قطعات گیمینگ شما با موفقیت ثبت شد. مامور سالن به زودی سفارش را تحویل می‌دهد. +${pointsEarned} امتیاز!`
-            : `Hardware purchase completed successfully! Delivered soon. +${pointsEarned} points!`,
+          L(language, { fa: `خرید قطعات گیمینگ شما با موفقیت ثبت شد. مامور سالن به زودی سفارش را تحویل می‌دهد. +${pointsEarned} امتیاز!`, en: `Hardware purchase completed successfully! Delivered soon. +${pointsEarned} points!`, ru: `Покупка оборудования оформлена! Скоро доставим. +${pointsEarned} баллов!`, tr: `Donanım siparişiniz alındı! Yakında teslim edilecek. +${pointsEarned} puan!` }),
           'success'
         );
         setShopCart({});
@@ -332,13 +327,13 @@ export default function ConsoleGridClassic({
   const handleRegisterTournament = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      addNotification(language === 'fa' ? 'لطفاً ابتدا وارد حساب کاربری خود شوید' : 'Please login to register', 'error');
+      addNotification(L(language, { fa: 'لطفاً ابتدا وارد حساب کاربری خود شوید', en: 'Please login to register', ru: 'Сначала войдите в аккаунт', tr: 'Lütfen önce giriş yapın' }), 'error');
       onOpenAuth();
       return;
     }
     if (!selectedTournament) return;
     if (!teamName.trim() || !teamLeader.trim()) {
-      addNotification(language === 'fa' ? 'لطفاً نام تیم و سرگروه را وارد کنید' : 'Please enter team name & leader', 'error');
+      addNotification(L(language, { fa: 'لطفاً نام تیم و سرگروه را وارد کنید', en: 'Please enter team name & leader', ru: 'Введите название команды и капитана', tr: 'Lütfen takım adı ve kaptanı girin' }), 'error');
       return;
     }
 
@@ -358,9 +353,7 @@ export default function ConsoleGridClassic({
 
       if (res.ok) {
         addNotification(
-          language === 'fa'
-            ? `تیم "${teamName}" با موفقیت در تورنمنت ${selectedTournament.title} ثبت نام شد!`
-            : `Team "${teamName}" successfully registered in ${selectedTournament.title}!`,
+          L(language, { fa: `تیم "${teamName}" با موفقیت در تورنمنت ${selectedTournament.title} ثبت نام شد!`, en: `Team "${teamName}" successfully registered in ${selectedTournament.title}!`, ru: `Команда "${teamName}" зарегистрирована в турнире ${selectedTournament.title}!`, tr: `"${teamName}" takımı ${selectedTournament.title} turnuvasına kaydedildi!` }),
           'success'
         );
         setTeamName('');
@@ -381,7 +374,7 @@ export default function ConsoleGridClassic({
       return;
     }
     if (user.loyaltyPoints < points) {
-      addNotification(language === 'fa' ? 'امتیاز وفاداری شما کافی نیست!' : 'Insufficient points!', 'error');
+      addNotification(L(language, { fa: 'امتیاز وفاداری شما کافی نیست!', en: 'Insufficient points!', ru: 'Недостаточно баллов!', tr: 'Yetersiz puan!' }), 'error');
       return;
     }
 
@@ -401,12 +394,10 @@ export default function ConsoleGridClassic({
             <span className="text-[10px] uppercase font-mono tracking-widest text-[#00ff66] font-bold">Consolidated Dashboard Command</span>
           </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
-            {language === 'fa' ? 'قالب کلاسیک گرید کنسولی (بازی‌نو)' : 'Console Grid Classic Theme'}
+            {L(language, { fa: 'قالب کلاسیک گرید کنسولی (بازی‌نو)', en: 'Console Grid Classic Theme', ru: 'Тема «Консольная сетка Classic»', tr: 'Konsol Izgara Klasik Teması' })}
           </h1>
           <p className="text-xs text-gray-400 max-w-xl font-medium">
-            {language === 'fa' 
-              ? 'این قالب زیبا نمای گرید خدمات سالن را به شکل پنل‌های مستقل و پیشرفته کلاسیک نمایش می‌دهد.' 
-              : 'Access all services simultaneously in a beautifully responsive split console grid classic layout.'}
+            {L(language, { fa: 'این قالب زیبا نمای گرید خدمات سالن را به شکل پنل‌های مستقل و پیشرفته کلاسیک نمایش می‌دهد.', en: 'Access all services simultaneously in a beautifully responsive split console grid classic layout.', ru: 'Все услуги клуба одновременно в адаптивной консольной сетке с независимыми панелями.', tr: 'Tüm hizmetlere aynı anda, bağımsız panellerden oluşan duyarlı bir konsol ızgarasında erişin.' })}
           </p>
         </div>
 
@@ -418,7 +409,7 @@ export default function ConsoleGridClassic({
               className="px-6 py-3 bg-[#00ff66] hover:bg-[#00d957] text-black rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-[0_0_20px_rgba(0,255,102,0.35)] transition-all"
             >
               <LogIn className="w-4 h-4" />
-              <span>{language === 'fa' ? 'ورود به حساب کاربری گیمر' : 'Authenticate Gamer'}</span>
+              <span>{L(language, { fa: 'ورود به حساب کاربری گیمر', en: 'Authenticate Gamer', ru: 'Войти в аккаунт игрока', tr: 'Oyuncu Girişi' })}</span>
             </button>
           ) : (
             <div className="flex items-center gap-4 bg-black/40 border border-white/5 p-3 rounded-xl">
@@ -446,7 +437,7 @@ export default function ConsoleGridClassic({
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h2 className="text-sm font-black uppercase text-white flex items-center gap-2">
               <Gamepad2 className="w-4 h-4 text-[#00ff66]" />
-              <span>{language === 'fa' ? 'رزرو و وضعیت زنده کلاینت‌ها' : 'Systems & Quick Bookings'}</span>
+              <span>{L(language, { fa: 'رزرو و وضعیت زنده کلاینت‌ها', en: 'Systems & Quick Bookings', ru: 'Системы и быстрое бронирование', tr: 'Sistemler ve Hızlı Rezervasyon' })}</span>
             </h2>
             <span className="text-[10px] font-mono font-bold text-gray-500">Live Client Pool: {systems.length}</span>
           </div>
@@ -479,12 +470,12 @@ export default function ConsoleGridClassic({
 
                 <div>
                   <h3 className="text-xs font-black text-white">{sys.name}</h3>
-                  <span className="text-[10px] text-gray-500 font-bold font-mono mt-0.5 block">{sys.hourlyRate.toLocaleString()} T/H</span>
+                  <span className="text-[10px] text-gray-500 font-bold font-mono mt-0.5 block">{sys.hourlyRate.toLocaleString(localeOf(language))} T/H</span>
                 </div>
 
                 <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-black">
                   <span className={sys.isReserved ? 'text-rose-400' : 'text-[#00ff66]'}>
-                    {sys.isReserved ? (language === 'fa' ? 'مشغول' : 'Busy') : (language === 'fa' ? 'آزاد' : 'Open')}
+                    {sys.isReserved ? (L(language, { fa: 'مشغول', en: 'Busy', ru: 'Занято', tr: 'Dolu' })) : (L(language, { fa: 'آزاد', en: 'Open', ru: 'Свободно', tr: 'Boş' }))}
                   </span>
                   <span className="text-gray-500 group-hover:text-white transition-colors">→</span>
                 </div>
@@ -498,14 +489,14 @@ export default function ConsoleGridClassic({
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <h4 className="text-xs font-black text-white flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-[#00ff66]" />
-                  <span>{language === 'fa' ? `فرم رزرو آنی: ${selectedSystem.name}` : `Quick Reserve: ${selectedSystem.name}`}</span>
+                  <span>{L(language, { fa: `فرم رزرو آنی: ${selectedSystem.name}`, en: `Quick Reserve: ${selectedSystem.name}`, ru: `Быстрая бронь: ${selectedSystem.name}`, tr: `Hızlı Rezervasyon: ${selectedSystem.name}` })}</span>
                 </h4>
                 <button type="button" onClick={() => setSelectedSystem(null)} className="text-gray-500 hover:text-white"><X className="w-4 h-4"/></button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'تعداد ساعات' : 'Hours'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{L(language, { fa: 'تعداد ساعات', en: 'Hours', ru: 'Часов', tr: 'Saat' })}</label>
                   <div className="flex items-center gap-2">
                     <button 
                       type="button" 
@@ -526,15 +517,15 @@ export default function ConsoleGridClassic({
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'کد تخفیف' : 'Promo Code'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{L(language, { fa: 'کد تخفیف', en: 'Promo Code', ru: 'Промокод', tr: 'İndirim Kodu' })}</label>
                   <select 
                     value={reservationCoupon}
                     onChange={(e) => setReservationCoupon(e.target.value)}
                     className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#00ff66] font-bold"
                   >
-                    <option value="">{language === 'fa' ? 'بدون کد تخفیف' : 'No Promo Code'}</option>
+                    <option value="">{L(language, { fa: 'بدون کد تخفیف', en: 'No Promo Code', ru: 'Без промокода', tr: 'İndirim kodu yok' })}</option>
                     {activeCoupons.filter(c => c.isActive).map(c => (
-                      <option key={c.code} value={c.code}>🎫 {c.code} ({c.value.toLocaleString()} T)</option>
+                      <option key={c.code} value={c.code}>🎫 {c.code} ({c.value.toLocaleString(localeOf(language))} T)</option>
                     ))}
                   </select>
                 </div>
@@ -542,9 +533,9 @@ export default function ConsoleGridClassic({
 
               {/* Estimate calculation block */}
               <div className="bg-[#050a0e] p-3 rounded-lg border border-white/5 flex justify-between items-center text-xs font-bold">
-                <span className="text-gray-400">{language === 'fa' ? 'مبلغ کل نهایی:' : 'Final Estimated Cost:'}</span>
+                <span className="text-gray-400">{L(language, { fa: 'مبلغ کل نهایی:', en: 'Final Estimated Cost:', ru: 'Итоговая стоимость:', tr: 'Toplam Tutar:' })}</span>
                 <span className="text-white font-mono text-sm font-black">
-                  {Math.max(0, (selectedSystem.hourlyRate * reservationHours) - (activeCoupons.find(c => c.code === reservationCoupon)?.value || 0)).toLocaleString()} تومان
+                  {Math.max(0, (selectedSystem.hourlyRate * reservationHours) - (activeCoupons.find(c => c.code === reservationCoupon)?.value || 0)).toLocaleString(localeOf(language))} تومان
                 </span>
               </div>
 
@@ -552,7 +543,7 @@ export default function ConsoleGridClassic({
                 type="submit"
                 className="w-full py-2 bg-[#00ff66] hover:bg-[#00d957] text-black rounded-lg text-xs font-black uppercase tracking-wider transition-all"
               >
-                {language === 'fa' ? 'تایید و شروع بازی (شارژ اکانت)' : 'Confirm & Ignite Station'}
+                {L(language, { fa: 'تایید و شروع بازی (شارژ اکانت)', en: 'Confirm & Ignite Station', ru: 'Подтвердить и запустить станцию', tr: 'Onayla ve Oyuna Başla' })}
               </button>
             </form>
           )}
@@ -563,7 +554,7 @@ export default function ConsoleGridClassic({
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h2 className="text-sm font-black uppercase text-white flex items-center gap-2">
               <Award className="w-4 h-4 text-[#00ff66]" />
-              <span>{language === 'fa' ? 'باشگاه وفاداری و کدهای تخفیف' : 'Loyalty & Reward Station'}</span>
+              <span>{L(language, { fa: 'باشگاه وفاداری و کدهای تخفیف', en: 'Loyalty & Reward Station', ru: 'Клуб лояльности и промокоды', tr: 'Sadakat Kulübü ve İndirim Kodları' })}</span>
             </h2>
             <Coins className="w-4 h-4 text-[#00ff66]" />
           </div>
@@ -580,7 +571,7 @@ export default function ConsoleGridClassic({
             <div className="flex items-end justify-between">
               <div>
                 <span className="block text-2xl font-black text-white font-mono">{user ? user.loyaltyPoints : '0'}</span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{language === 'fa' ? 'امتیاز وفاداری جمع شده' : 'Accumulated Loyalty Points'}</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{L(language, { fa: 'امتیاز وفاداری جمع شده', en: 'Accumulated Loyalty Points', ru: 'Накопленные баллы лояльности', tr: 'Biriken Sadakat Puanı' })}</span>
               </div>
               <Flame className="w-8 h-8 text-[#00ff66]  shrink-0" />
             </div>
@@ -602,43 +593,43 @@ export default function ConsoleGridClassic({
 
           {/* Quick Redeeming / Coupon generation */}
           <div className="space-y-2">
-            <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider">{language === 'fa' ? 'تبدیل آنی امتیاز به کدهای تخفیف کیف پول' : 'Redeem Points for Discount Vouchers'}</span>
+            <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider">{L(language, { fa: 'تبدیل آنی امتیاز به کدهای تخفیف کیف پول', en: 'Redeem Points for Discount Vouchers', ru: 'Обменять баллы на скидочные ваучеры', tr: 'Puanları İndirim Kuponuna Dönüştür' })}</span>
             
             <div className="grid grid-cols-2 gap-2">
               <button 
                 onClick={() => handleRedeemPointsAction(100, 15000)}
                 className="p-2.5 border border-white/5 hover:border-[#00ff66] hover:bg-[#00ff66]/5 rounded-xl text-right transition-all flex flex-col justify-between"
               >
-                <span className="text-[10px] text-gray-500 font-bold">100 امتیاز</span>
-                <span className="text-xs font-black text-white mt-1">۱۵,۰۰۰ تومان</span>
-                <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">کد تخفیف بازی نو</span>
+                <span className="text-[10px] text-gray-500 font-bold">100 {L(language, { fa: 'امتیاز', en: 'pts', ru: 'баллов', tr: 'puan' })}</span>
+                <span className="text-xs font-black text-white mt-1">{(15000).toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}</span>
+                <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">{L(language, { fa: 'کد تخفیف بازی نو', en: 'BAZINO discount code', ru: 'Промокод BAZINO', tr: 'BAZINO indirim kodu' })}</span>
               </button>
 
               <button 
                 onClick={() => handleRedeemPointsAction(250, 40000)}
                 className="p-2.5 border border-white/5 hover:border-[#00ff66] hover:bg-[#00ff66]/5 rounded-xl text-right transition-all flex flex-col justify-between"
               >
-                <span className="text-[10px] text-gray-500 font-bold">250 امتیاز</span>
-                <span className="text-xs font-black text-white mt-1">۴۰,۰۰۰ تومان</span>
-                <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">کد تخفیف بازی نو</span>
+                <span className="text-[10px] text-gray-500 font-bold">250 {L(language, { fa: 'امتیاز', en: 'pts', ru: 'баллов', tr: 'puan' })}</span>
+                <span className="text-xs font-black text-white mt-1">{(40000).toLocaleString(localeOf(language))} {L(language, { fa: 'تومان', en: 'Toman', ru: 'туманов', tr: 'Toman' })}</span>
+                <span className="text-[10px] font-mono font-bold text-[#00ff66] mt-2 block">{L(language, { fa: 'کد تخفیف بازی نو', en: 'BAZINO discount code', ru: 'Промокод BAZINO', tr: 'BAZINO indirim kodu' })}</span>
               </button>
             </div>
           </div>
 
           {/* Active vouchers review */}
           <div className="space-y-2">
-            <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider">{language === 'fa' ? 'کدهای تخفیف فعال شما' : 'Your Ready Vouchers'}</span>
+            <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider">{L(language, { fa: 'کدهای تخفیف فعال شما', en: 'Your Ready Vouchers', ru: 'Ваши активные ваучеры', tr: 'Aktif Kuponlarınız' })}</span>
             
             <div className="flex flex-col gap-1.5 max-h-[110px] overflow-y-auto scrollbar-thin">
               {activeCoupons.filter(c => c.isActive).length === 0 ? (
                 <div className="text-center py-4 border border-white/5 rounded-xl text-[10px] text-gray-500 font-bold">
-                  {language === 'fa' ? 'کد تخفیف فعالی ندارید. از امتیاز خود استفاده کنید!' : 'No active vouchers available yet.'}
+                  {L(language, { fa: 'کد تخفیف فعالی ندارید. از امتیاز خود استفاده کنید!', en: 'No active vouchers available yet.', ru: 'Активных ваучеров пока нет. Используйте баллы!', tr: 'Aktif kuponunuz yok. Puanlarınızı kullanın!' })}
                 </div>
               ) : (
                 activeCoupons.filter(c => c.isActive).map((c) => (
                   <div key={c.code} className="flex justify-between items-center p-2 bg-black/40 border border-white/5 rounded-lg text-xs font-bold font-mono">
                     <span className="text-[#00ff66]">🎫 {c.code}</span>
-                    <span className="text-white">{c.value.toLocaleString()} T</span>
+                    <span className="text-white">{c.value.toLocaleString(localeOf(language))} T</span>
                   </div>
                 ))
               )}
@@ -656,9 +647,9 @@ export default function ConsoleGridClassic({
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h2 className="text-sm font-black uppercase text-white flex items-center gap-2">
               <Utensils className="w-4 h-4 text-[#00ff66]" />
-              <span>{language === 'fa' ? 'بوفه کافه و سفارشات غذا' : 'Cafe Quick Buffet Orders'}</span>
+              <span>{L(language, { fa: 'بوفه کافه و سفارشات غذا', en: 'Cafe Quick Buffet Orders', ru: 'Буфет и заказ еды', tr: 'Kafe Büfe Siparişleri' })}</span>
             </h2>
-            <span className="text-[10px] font-mono font-bold text-[#00ff66]">{language === 'fa' ? 'سفارش پای کلاینت' : 'Seat Service'}</span>
+            <span className="text-[10px] font-mono font-bold text-[#00ff66]">{L(language, { fa: 'سفارش پای کلاینت', en: 'Seat Service', ru: 'Доставка к месту', tr: 'Masaya Servis' })}</span>
           </div>
 
           {/* Grid of cafe items */}
@@ -672,12 +663,12 @@ export default function ConsoleGridClassic({
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{item.name}</h3>
-                    <span className="text-[10px] text-[#00ff66] font-bold font-mono mt-0.5 block">{item.price.toLocaleString()} T</span>
+                    <span className="text-[10px] text-[#00ff66] font-bold font-mono mt-0.5 block">{item.price.toLocaleString(localeOf(language))} T</span>
                   </div>
 
                   {/* Quantity selector */}
                   <div className="flex items-center justify-between gap-1 pt-2 border-t border-white/5">
-                    <span className="text-[10px] text-gray-500 font-bold font-mono">{language === 'fa' ? 'تعداد:' : 'Qty:'}</span>
+                    <span className="text-[10px] text-gray-500 font-bold font-mono">{L(language, { fa: 'تعداد:', en: 'Qty:', ru: 'Кол-во:', tr: 'Adet:' })}</span>
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => setCafeCart(prev => ({...prev, [item.id]: Math.max(0, (prev[item.id] || 0) as number - 1)}))}
@@ -705,7 +696,7 @@ export default function ConsoleGridClassic({
             <div className="mt-2 p-3 bg-black/40 border border-[#00ff66]/20 rounded-xl space-y-3 animate-slide-in">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'شماره میز / سیستم' : 'Seat / Desk'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{L(language, { fa: 'شماره میز / سیستم', en: 'Seat / Desk', ru: 'Место / стол', tr: 'Masa / Sistem No' })}</label>
                   <input 
                     type="text" 
                     required 
@@ -717,7 +708,7 @@ export default function ConsoleGridClassic({
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'کد تخفیف بوفه' : 'Food Voucher'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{L(language, { fa: 'کد تخفیف بوفه', en: 'Food Voucher', ru: 'Ваучер на еду', tr: 'Büfe İndirim Kodu' })}</label>
                   <select 
                     value={cafeCoupon}
                     onChange={(e) => setCafeCoupon(e.target.value)}
@@ -725,19 +716,19 @@ export default function ConsoleGridClassic({
                   >
                     <option value="">No Voucher</option>
                     {activeCoupons.filter(c => c.isActive).map(c => (
-                      <option key={c.code} value={c.code}>🎫 {c.code} ({c.value.toLocaleString()} T)</option>
+                      <option key={c.code} value={c.code}>🎫 {c.code} ({c.value.toLocaleString(localeOf(language))} T)</option>
                     ))}
                   </select>
                 </div>
               </div>
 
               <div className="flex justify-between items-center text-xs font-bold border-t border-white/5 pt-2">
-                <span className="text-gray-400">{language === 'fa' ? 'مبلغ کل سفارش بوفه:' : 'Final Cost:'}</span>
+                <span className="text-gray-400">{L(language, { fa: 'مبلغ کل سفارش بوفه:', en: 'Final Cost:', ru: 'Итого за заказ:', tr: 'Büfe Sipariş Toplamı:' })}</span>
                 <span className="text-[#00ff66] font-mono text-xs font-black">
                   {Math.max(0, Object.entries(cafeCart).reduce((sum, [id, qty]) => {
                     const price = cafeItems.find(c => c.id === id)?.price || 0;
                     return sum + price * (qty as number);
-                  }, 0) - (activeCoupons.find(c => c.code === cafeCoupon)?.value || 0)).toLocaleString()} تومان
+                  }, 0) - (activeCoupons.find(c => c.code === cafeCoupon)?.value || 0)).toLocaleString(localeOf(language))} تومان
                 </span>
               </div>
 
@@ -745,7 +736,7 @@ export default function ConsoleGridClassic({
                 onClick={handleCafeOrderSubmit}
                 className="w-full py-2 bg-[#00ff66] hover:bg-[#00d957] text-black rounded-lg text-xs font-black uppercase tracking-wider transition-all"
               >
-                {language === 'fa' ? 'ثبت سفارش و پرداخت از حساب' : 'Send Order to Seat'}
+                {L(language, { fa: 'ثبت سفارش و پرداخت از حساب', en: 'Send Order to Seat', ru: 'Отправить заказ к месту', tr: 'Siparişi Gönder ve Öde' })}
               </button>
             </div>
           )}
@@ -756,7 +747,7 @@ export default function ConsoleGridClassic({
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h2 className="text-sm font-black uppercase text-white flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-[#00ff66]" />
-              <span>{language === 'fa' ? 'فروشگاه جانبی و قطعات آرنا' : 'Gaming Accessories Store'}</span>
+              <span>{L(language, { fa: 'فروشگاه جانبی و قطعات آرنا', en: 'Gaming Accessories Store', ru: 'Магазин игровых аксессуаров', tr: 'Oyun Aksesuar Mağazası' })}</span>
             </h2>
             <span className="text-[10px] font-mono font-bold text-gray-500">Premium Gear</span>
           </div>
@@ -772,12 +763,12 @@ export default function ConsoleGridClassic({
                   
                   <div>
                     <h3 className="text-xs font-black text-white truncate">{acc.name}</h3>
-                    <span className="text-[10px] text-[#00ff66] font-bold font-mono mt-0.5 block">{acc.price.toLocaleString()} T</span>
+                    <span className="text-[10px] text-[#00ff66] font-bold font-mono mt-0.5 block">{acc.price.toLocaleString(localeOf(language))} T</span>
                   </div>
 
                   {/* Quantity selector */}
                   <div className="flex items-center justify-between gap-1 pt-2 border-t border-white/5">
-                    <span className="text-[10px] text-gray-500 font-bold font-mono">{language === 'fa' ? 'تعداد:' : 'Qty:'}</span>
+                    <span className="text-[10px] text-gray-500 font-bold font-mono">{L(language, { fa: 'تعداد:', en: 'Qty:', ru: 'Кол-во:', tr: 'Adet:' })}</span>
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => setShopCart(prev => ({...prev, [acc.id]: Math.max(0, (prev[acc.id] || 0) as number - 1)}))}
@@ -804,17 +795,17 @@ export default function ConsoleGridClassic({
           {Object.values(shopCart).some(qty => (qty as number) > 0) && (
             <div className="mt-2 p-3 bg-black/40 border border-[#00ff66]/20 rounded-xl space-y-3 animate-slide-in">
               <div className="flex justify-between items-center text-xs font-bold">
-                <span className="text-gray-400">{language === 'fa' ? 'مبلغ نهایی سخت افزار:' : 'Final Cost:'}</span>
+                <span className="text-gray-400">{L(language, { fa: 'مبلغ نهایی سخت افزار:', en: 'Final Cost:', ru: 'Итого:', tr: 'Donanım Toplamı:' })}</span>
                 <span className="text-white font-mono text-xs font-black">
                   {Math.max(0, Object.entries(shopCart).reduce((sum, [id, qty]) => {
                     const price = accessories.find(a => a.id === id)?.price || 0;
                     return sum + price * (qty as number);
-                  }, 0) - (activeCoupons.find(c => c.code === shopCoupon)?.value || 0)).toLocaleString()} تومان
+                  }, 0) - (activeCoupons.find(c => c.code === shopCoupon)?.value || 0)).toLocaleString(localeOf(language))} تومان
                 </span>
               </div>
 
               <div className="grid grid-cols-1 gap-1">
-                <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'اعمال کد تخفیف سخت افزار' : 'Promo Code'}</label>
+                <label className="text-[10px] text-gray-500 block mb-1 font-bold">{L(language, { fa: 'اعمال کد تخفیف سخت افزار', en: 'Promo Code', ru: 'Промокод', tr: 'İndirim Kodu' })}</label>
                 <select 
                   value={shopCoupon}
                   onChange={(e) => setShopCoupon(e.target.value)}
@@ -822,7 +813,7 @@ export default function ConsoleGridClassic({
                 >
                   <option value="">No Code</option>
                   {activeCoupons.filter(c => c.isActive).map(c => (
-                    <option key={c.code} value={c.code}>🎫 {c.code} ({c.value.toLocaleString()} T)</option>
+                    <option key={c.code} value={c.code}>🎫 {c.code} ({c.value.toLocaleString(localeOf(language))} T)</option>
                   ))}
                 </select>
               </div>
@@ -831,7 +822,7 @@ export default function ConsoleGridClassic({
                 onClick={handleShopOrderSubmit}
                 className="w-full py-2 bg-[#00ff66] hover:bg-[#00d957] text-black rounded-lg text-xs font-black uppercase tracking-wider transition-all"
               >
-                {language === 'fa' ? 'ثبت سفارش و تحویل درب سالن' : 'Order Accessories'}
+                {L(language, { fa: 'ثبت سفارش و تحویل درب سالن', en: 'Order Accessories', ru: 'Заказать аксессуары', tr: 'Aksesuar Siparişi Ver' })}
               </button>
             </div>
           )}
@@ -848,7 +839,7 @@ export default function ConsoleGridClassic({
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h2 className="text-sm font-black uppercase text-white flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-[#00ff66]" />
-              <span>{language === 'fa' ? 'اتاق گفتگوی زنده کلوپ' : 'Live Gamer Chat Lounge'}</span>
+              <span>{L(language, { fa: 'اتاق گفتگوی زنده کلوپ', en: 'Live Gamer Chat Lounge', ru: 'Живой чат клуба', tr: 'Canlı Oyuncu Sohbet Odası' })}</span>
             </h2>
             <select 
               value={chatRoom}
@@ -866,7 +857,7 @@ export default function ConsoleGridClassic({
           <div className="h-[240px] bg-black/30 border border-white/5 rounded-xl p-3 overflow-y-auto scrollbar-thin flex flex-col gap-2">
             {chatMessages.length === 0 ? (
               <div className="text-center text-gray-600 text-[10px] font-bold py-12">
-                {language === 'fa' ? 'هیچ گفتگویی شروع نشده است. اولین پیام را ارسال کنید!' : 'No messages in this chat room yet.'}
+                {L(language, { fa: 'هیچ گفتگویی شروع نشده است. اولین پیام را ارسال کنید!', en: 'No messages in this chat room yet.', ru: 'Сообщений пока нет. Напишите первым!', tr: 'Henüz mesaj yok. İlk mesajı siz gönderin!' })}
               </div>
             ) : (
               chatMessages.map((msg, index) => {
@@ -891,7 +882,7 @@ export default function ConsoleGridClassic({
             <input 
               type="text" 
               required
-              placeholder={language === 'fa' ? 'پیام خود را به کلوپ بفرستید...' : 'Type message...'}
+              placeholder={L(language, { fa: 'پیام خود را به کلوپ بفرستید...', en: 'Type message...', ru: 'Введите сообщение...', tr: 'Mesajınızı yazın...' })}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               className="flex-grow bg-[#0d122b] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-600 outline-none focus:border-[#00ff66]"
@@ -910,7 +901,7 @@ export default function ConsoleGridClassic({
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h2 className="text-sm font-black uppercase text-white flex items-center gap-2">
               <Trophy className="w-4 h-4 text-[#00ff66]" />
-              <span>{language === 'fa' ? 'تورنمنت‌های فعال و ثبت‌نام تیم' : 'Active Tournaments & Brackets'}</span>
+              <span>{L(language, { fa: 'تورنمنت‌های فعال و ثبت‌نام تیم', en: 'Active Tournaments & Brackets', ru: 'Активные турниры и регистрация команд', tr: 'Aktif Turnuvalar ve Takım Kaydı' })}</span>
             </h2>
             <span className="text-[10px] font-mono font-bold text-gray-500">Esports Center</span>
           </div>
@@ -919,7 +910,7 @@ export default function ConsoleGridClassic({
           <div className="flex flex-col gap-2.5 max-h-[140px] overflow-y-auto scrollbar-thin">
             {tournaments.length === 0 ? (
               <div className="text-center py-6 text-xs text-gray-500 font-bold border border-white/5 rounded-xl">
-                {language === 'fa' ? 'تورنمنتی یافت نشد.' : 'No tournaments active.'}
+                {L(language, { fa: 'تورنمنتی یافت نشد.', en: 'No tournaments active.', ru: 'Активных турниров нет.', tr: 'Aktif turnuva bulunamadı.' })}
               </div>
             ) : (
               tournaments.map((tour) => (
@@ -934,7 +925,7 @@ export default function ConsoleGridClassic({
                 >
                   <div>
                     <h4 className="text-xs font-black text-white font-display">{tour.title}</h4>
-                    <span className="text-[10px] text-gray-400 font-bold block mt-0.5">{tour.game} - شروع: {tour.startDate}</span>
+                    <span className="text-[10px] text-gray-400 font-bold block mt-0.5">{tour.game} - {L(language, { fa: 'شروع:', en: 'Starts:', ru: 'Начало:', tr: 'Başlangıç:' })} {formatJalaliForLanguage(tour.startDate, language)}</span>
                   </div>
 
                   <div className="text-right">
@@ -958,7 +949,7 @@ export default function ConsoleGridClassic({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'نام تیم' : 'Team Name'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{L(language, { fa: 'نام تیم', en: 'Team Name', ru: 'Название команды', tr: 'Takım Adı' })}</label>
                   <input 
                     type="text" 
                     required 
@@ -970,7 +961,7 @@ export default function ConsoleGridClassic({
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{language === 'fa' ? 'آیدی کاپیتان' : 'Leader Gamertag'}</label>
+                  <label className="text-[10px] text-gray-500 block mb-1 font-bold">{L(language, { fa: 'آیدی کاپیتان', en: 'Leader Gamertag', ru: 'Геймертег капитана', tr: 'Kaptan Oyuncu Adı' })}</label>
                   <input 
                     type="text" 
                     required 
@@ -986,7 +977,7 @@ export default function ConsoleGridClassic({
                 type="submit"
                 className="w-full py-2 bg-[#00ff66] hover:bg-[#00d957] text-black rounded-lg text-xs font-black uppercase tracking-wider transition-all"
               >
-                {language === 'fa' ? 'ثبت نام رسمی تیم در مسابقات' : 'Confirm Registration & Enter bracket'}
+                {L(language, { fa: 'ثبت نام رسمی تیم در مسابقات', en: 'Confirm Registration & Enter bracket', ru: 'Подтвердить регистрацию в турнире', tr: 'Takımı Turnuvaya Resmi Olarak Kaydet' })}
               </button>
             </form>
           )}

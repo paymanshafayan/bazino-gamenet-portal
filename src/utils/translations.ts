@@ -232,7 +232,7 @@ export const translations: TranslationDictionary = {
     fa: 'به ازای هر ۱۰,۰۰۰ تومان هزینه در بوفه، رزرو سیستم یا خرید تجهیزات جانبی، ۱ امتیاز وفاداری دریافت می‌کنید.',
     en: 'For every 10,000 Tomans spent in the buffet, system booking, or purchasing accessories, you receive 1 loyalty point.',
     ru: 'За каждые 10 000 томанов, потраченных в буфете, бронировании или покупке аксессуаров, вы получаете 1 балл.',
-    tr: 'Büfede, sistem rezervasyonunda veya aksesuar alımında harcanan her 10.000 Tümen için 1 sadakat puanı kazanırsınız.',
+    tr: 'Büfede, sistem rezervasyonunda veya aksesuar alımında harcanan her 10.000 Toman için 1 sadakat puanı kazanırsınız.',
   },
   'loyalty.levelsTitle': {
     fa: 'سطوح کاربری گیمرها',
@@ -612,7 +612,7 @@ export const translations: TranslationDictionary = {
     fa: 'تومان',
     en: 'Tomans',
     ru: 'томанов',
-    tr: 'Tümen',
+    tr: 'Toman',
   },
   'common.today': {
     fa: 'امروز',

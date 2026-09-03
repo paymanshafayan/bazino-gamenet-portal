@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
 import bazinoLogo from './assets/images/bazino_logo_user-80.webp'; // 48 CSS px × DPR2 ≈ 80px واقعی
 import {
@@ -37,6 +37,7 @@ const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
 const MobileAppDownloadPage = lazy(() => import('./components/MobileAppDownloadPage'));
 const MobileAppDownloadWidget = lazy(() => import('./components/MobileAppDownloadWidget'));
 import { useLanguage } from './context/LanguageContext';
+import { L, localizeList, localeOf } from './utils/i18n';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
   Sparkles, Home, Instagram, Send, Youtube, Twitter, Facebook, Settings, ChevronDown,
@@ -210,12 +211,19 @@ export default function App() {
   const [isInstalled, setIsInstalled] = useState<boolean | null>(true);
   
   // Data States
-  const [systems, setSystems] = useState<GameSystem[]>([]);
-  const [cafeItems, setCafeItems] = useState<CafeItem[]>([]);
-  const [accessories, setAccessories] = useState<Accessory[]>([]);
+  const [rawSystems, setSystems] = useState<GameSystem[]>([]);
+  const [rawCafeItems, setCafeItems] = useState<CafeItem[]>([]);
+  const [rawAccessories, setAccessories] = useState<Accessory[]>([]);
   // اگر سرور داده‌ی اولیه را داخل HTML تزریق کرده باشد، رندر اول همان را دارد
-  const [tournaments, setTournaments] = useState<Tournament[]>(() => BOOTSTRAP_TOURNAMENTS ?? []);
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [rawTournaments, setTournaments] = useState<Tournament[]>(() => BOOTSTRAP_TOURNAMENTS ?? []);
+  const [rawArticles, setArticles] = useState<Article[]>([]);
+  // نسخه‌ی محلی‌شده‌ی کاتالوگ‌ها بر اساس زبان فعال (nameEn/nameRu/nameTr و …).
+  // state خام دست‌نخورده می‌ماند تا شناسه‌ها/قیمت‌ها و درخواست‌های سرور تغییری نکنند.
+  const systems = useMemo(() => localizeList(rawSystems, language), [rawSystems, language]);
+  const cafeItems = useMemo(() => localizeList(rawCafeItems, language), [rawCafeItems, language]);
+  const accessories = useMemo(() => localizeList(rawAccessories, language), [rawAccessories, language]);
+  const tournaments = useMemo(() => localizeList(rawTournaments, language), [rawTournaments, language]);
+  const articles = useMemo(() => localizeList(rawArticles, language), [rawArticles, language]);
   const [transactions, setTransactions] = useState<LoyaltyTx[]>([]);
   const [activeCoupons, setActiveCoupons] = useState<DiscountCode[]>([]);
 
@@ -380,13 +388,11 @@ export default function App() {
       applyServerState(data);
       if (Array.isArray(data?.activeCoupons)) setActiveCoupons(data.activeCoupons);
       addNotification(
-        language === 'fa'
-          ? `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString()} تومانی ساخته شد: ${data?.code}`
-          : `A ${Number(data?.couponValue || 0).toLocaleString()} Toman discount code was created: ${data?.code}`,
+        L(language, { fa: `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} تومانی ساخته شد: ${data?.code}`, en: `A ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} Toman discount code was created: ${data?.code}`, ru: `Создан промокод на ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} туманов: ${data?.code}`, tr: `${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} Toman indirim kodu oluşturuldu: ${data?.code}` }),
         'success'
       );
     } catch (e) {
-      addNotification(errorMessage(e, language === 'fa' ? 'تبدیل امتیاز انجام نشد.' : 'Could not redeem points.'), 'error');
+      addNotification(errorMessage(e, L(language, { fa: 'تبدیل امتیاز انجام نشد.', en: 'Could not redeem points.', ru: 'Не удалось обменять баллы.', tr: 'Puanlar dönüştürülemedi.' })), 'error');
       throw e;
     }
   };
@@ -404,7 +410,7 @@ export default function App() {
       });
       if (res.ok) {
         setUser({ ...user, points: user.loyaltyPoints + points });
-        addNotification(language === 'fa' ? `${points} امتیاز به شما اضافه شد.` : `Added ${points} points.`, 'success');
+        addNotification(L(language, { fa: `${points} امتیاز به شما اضافه شد.`, en: `Added ${points} points.`, ru: `Вам начислено ${points} баллов.`, tr: `${points} puan hesabınıza eklendi.` }), 'success');
       }
     } catch (e) {
       console.error(e);
@@ -419,7 +425,7 @@ export default function App() {
       const data = await postJson('/api/tournaments/register', { tournamentId, team });
       if (Array.isArray(data?.tournaments)) setTournaments(data.tournaments);
     } catch (e) {
-      addNotification(errorMessage(e, language === 'fa' ? 'ثبت‌نام تیم انجام نشد.' : 'Team registration failed.'), 'error');
+      addNotification(errorMessage(e, L(language, { fa: 'ثبت‌نام تیم انجام نشد.', en: 'Team registration failed.', ru: 'Не удалось зарегистрировать команду.', tr: 'Takım kaydı başarısız oldu.' })), 'error');
       throw e;
     }
   };
@@ -428,9 +434,9 @@ export default function App() {
     try {
       const data = await postJson(`/api/articles/${articleId}/comment`, comment);
       if (Array.isArray(data?.articles)) setArticles(data.articles);
-      addNotification(language === 'fa' ? 'نظر شما ثبت شد.' : 'Your comment has been posted.', 'success');
+      addNotification(L(language, { fa: 'نظر شما ثبت شد.', en: 'Your comment has been posted.', ru: 'Ваш комментарий опубликован.', tr: 'Yorumunuz gönderildi.' }), 'success');
     } catch (e) {
-      addNotification(errorMessage(e, language === 'fa' ? 'ثبت نظر انجام نشد.' : 'Could not post the comment.'), 'error');
+      addNotification(errorMessage(e, L(language, { fa: 'ثبت نظر انجام نشد.', en: 'Could not post the comment.', ru: 'Не удалось опубликовать комментарий.', tr: 'Yorum gönderilemedi.' })), 'error');
       throw e;
     }
   };
@@ -458,7 +464,7 @@ export default function App() {
     setUser(null);
     setIsLogoutConfirmOpen(false);
     setActiveTab('home');
-    addNotification(language === 'fa' ? 'خروج موفقیت‌آمیز بود' : 'Logged out successfully', 'success');
+    addNotification(L(language, { fa: 'خروج موفقیت‌آمیز بود', en: 'Logged out successfully', ru: 'Вы успешно вышли', tr: 'Başarıyla çıkış yapıldı' }), 'success');
   };
 
   const renderTabContent = () => (
@@ -484,7 +490,7 @@ export default function App() {
             refreshData={refreshAll}
             onBackToClassic={() => {
               setLayoutMode('classic');
-              addNotification(language === 'fa' ? 'نمای کلاسیک فعال شد' : 'Classic View Activated', 'info');
+              addNotification(L(language, { fa: 'نمای کلاسیک فعال شد', en: 'Classic View Activated', ru: 'Классический вид включён', tr: 'Klasik görünüm etkinleştirildi' }), 'info');
             }}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -588,14 +594,14 @@ export default function App() {
   // بود و ادمین می‌توانست مقاله منتشر کند و اتاق گفتگو بسازد، ولی هیچ بازدیدکننده‌ای
   // راهی برای رسیدن به آن‌ها نداشت.
   const NAV_TABS = [
-    { id: 'home',         label: language === 'fa' ? 'خانه'     : (language === 'ru' ? 'ГЛАВНАЯ' : (language === 'tr' ? 'ANASAYFA' : 'Home')),      icon: Home },
-    { id: 'reservations', label: language === 'fa' ? 'رزرو'     : (language === 'ru' ? 'БРОНЬ'   : (language === 'tr' ? 'REZERV'   : 'Reserve')),   icon: Monitor },
-    { id: 'cafe',         label: language === 'fa' ? 'کافه'     : (language === 'ru' ? 'КАФЕ'    : (language === 'tr' ? 'KAFE'     : 'Cafe')),      icon: Coffee },
-    { id: 'shop',         label: language === 'fa' ? 'فروشگاه'  : (language === 'ru' ? 'МАГАЗИН' : (language === 'tr' ? 'MAĞAZA'   : 'Shop')),      icon: ShoppingBag },
-    { id: 'tournaments',  label: language === 'fa' ? 'مسابقات'  : (language === 'ru' ? 'АРЕНА'   : (language === 'tr' ? 'ARENA'    : 'Arena')),     icon: Trophy },
-    { id: 'loyalty',      label: language === 'fa' ? 'باشگاه'   : (language === 'ru' ? 'КЛУБ'    : (language === 'tr' ? 'KULÜP'    : 'Club')),      icon: Award },
-    { id: 'blog',         label: language === 'fa' ? 'بلاگ'     : (language === 'ru' ? 'БЛОГ'    : (language === 'tr' ? 'BLOG'     : 'Blog')),      icon: Newspaper },
-    { id: 'chat',         label: language === 'fa' ? 'گفتگو'    : (language === 'ru' ? 'ЧАТ'     : (language === 'tr' ? 'SOHBET'   : 'Chat')),      icon: MessageSquare },
+    { id: 'home',         label: L(language, { fa: 'خانه', en: 'Home', ru: 'ГЛАВНАЯ', tr: 'ANASAYFA' }),      icon: Home },
+    { id: 'reservations', label: L(language, { fa: 'رزرو', en: 'Reserve', ru: 'БРОНЬ', tr: 'REZERV' }),   icon: Monitor },
+    { id: 'cafe',         label: L(language, { fa: 'کافه', en: 'Cafe', ru: 'КАФЕ', tr: 'KAFE' }),      icon: Coffee },
+    { id: 'shop',         label: L(language, { fa: 'فروشگاه', en: 'Shop', ru: 'МАГАЗИН', tr: 'MAĞAZA' }),      icon: ShoppingBag },
+    { id: 'tournaments',  label: L(language, { fa: 'مسابقات', en: 'Arena', ru: 'АРЕНА', tr: 'ARENA' }),     icon: Trophy },
+    { id: 'loyalty',      label: L(language, { fa: 'باشگاه', en: 'Club', ru: 'КЛУБ', tr: 'KULÜP' }),      icon: Award },
+    { id: 'blog',         label: L(language, { fa: 'بلاگ', en: 'Blog', ru: 'БЛОГ', tr: 'BLOG' }),      icon: Newspaper },
+    { id: 'chat',         label: L(language, { fa: 'گفتگو', en: 'Chat', ru: 'ЧАТ', tr: 'SOHBET' }),      icon: MessageSquare },
   ];
   // روی موبایل هشت آیکون در ۳۹۰ پیکسل جا نمی‌شود (هر کدام کمتر از ۵۰px می‌شد و
   // هدف لمس بسیار کوچک). پنج تای اول در نوار می‌مانند و بقیه پشت دکمه‌ی «بیشتر».
@@ -631,10 +637,10 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
             <span className="font-display uppercase tracking-wider text-purple-200">
-              {language === 'fa' ? 'پنل مدیریت فعال است' : 'Admin Area Active'}
+              {L(language, { fa: 'پنل مدیریت فعال است', en: 'Admin Area Active', ru: 'Панель администратора активна', tr: 'Yönetim paneli etkin' })}
             </span>
             <span className="text-purple-400 font-normal hidden sm:inline">
-              | {language === 'fa' ? `ورود با حساب مدیر: @${user.username}` : `Logged in as: @${user.username}`}
+              | {L(language, { fa: `ورود با حساب مدیر: @${user.username}`, en: `Logged in as: @${user.username}`, ru: `Вход как администратор: @${user.username}`, tr: `Yönetici olarak giriş yapıldı: @${user.username}` })}
             </span>
           </div>
           <button 
@@ -642,7 +648,7 @@ export default function App() {
             className="bg-primary hover:bg-primary/95 text-black px-3.5 py-1.5 rounded-lg transition-all font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(255,184,0,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
           >
             <Settings className="w-3 h-3" />
-            <span>{language === 'fa' ? 'ورود به پنل مدیریت' : 'Enter Admin Panel'}</span>
+            <span>{L(language, { fa: 'ورود به پنل مدیریت', en: 'Enter Admin Panel', ru: 'Открыть панель администратора', tr: 'Yönetim Paneline Gir' })}</span>
           </button>
         </div>
       )}
@@ -699,7 +705,7 @@ export default function App() {
             <div className="flex items-center gap-4">
                {!user ? (
                  <button onClick={() => setIsAuthModalOpen(true)} className="text-xs font-bold bg-primary text-black px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
-                   <LogIn className="w-4 h-4"/> {language === 'fa' ? 'ورود' : 'Login'}
+                   <LogIn className="w-4 h-4"/> {L(language, { fa: 'ورود', en: 'Login', ru: 'Войти', tr: 'Giriş' })}
                  </button>
                ) : (
                  <div className="flex items-center gap-3">
@@ -710,7 +716,7 @@ export default function App() {
                <button 
                  onClick={() => { setHelpMode('gamenet'); setIsHelpOpen(true); }}
                  className="p-2 text-white bg-white/5 rounded-full hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
-                 title={language === 'fa' ? 'راهنمای تصویری کلوپ' : 'Client Visual Guide'}
+                 title={L(language, { fa: 'راهنمای تصویری کلوپ', en: 'Client Visual Guide', ru: 'Визуальный гид клуба', tr: 'Kulüp Görsel Rehberi' })}
                >
                  <HelpCircle className="w-4 h-4 text-primary" />
                </button>
@@ -728,10 +734,10 @@ export default function App() {
             <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping"></span>
             <div className="flex flex-col">
               <span className="font-display font-black text-sm tracking-wider text-purple-200">
-                {language === 'fa' ? 'پنل مدیریت بازینو پرو' : 'BAZINO PRO ADMIN'}
+                {L(language, { fa: 'پنل مدیریت بازینو پرو', en: 'BAZINO PRO ADMIN', ru: 'АДМИН-ПАНЕЛЬ BAZINO PRO', tr: 'BAZINO PRO YÖNETİM' })}
               </span>
               <span className="text-[10px] text-purple-400 font-medium font-sans">
-                {language === 'fa' ? `مدیر: @${user?.username}` : `Admin: @${user?.username}`}
+                {L(language, { fa: `مدیر: @${user?.username}`, en: `Admin: @${user?.username}`, ru: `Администратор: @${user?.username}`, tr: `Yönetici: @${user?.username}` })}
               </span>
             </div>
           </div>
@@ -742,14 +748,14 @@ export default function App() {
               className="bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/30 text-purple-200 px-3 py-2 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all active:scale-95"
             >
               <HelpCircle className="w-4 h-4 text-purple-300 animate-pulse" />
-              <span>{language === 'fa' ? 'راهنمای ادمین' : 'Admin Guide'}</span>
+              <span>{L(language, { fa: 'راهنمای ادمین', en: 'Admin Guide', ru: 'Гид администратора', tr: 'Yönetici Rehberi' })}</span>
             </button>
             <button 
               onClick={() => setActiveTab('home')} 
               className="bg-white/10 hover:bg-white/15 border border-white/20 hover:border-purple-500/40 text-white px-4 py-2 rounded-xl transition-all font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md active:scale-95"
             >
               {dir === 'rtl' ? <ArrowRight className="w-4 h-4 text-purple-300" /> : <ArrowLeft className="w-4 h-4 text-purple-300" />}
-              <span>{language === 'fa' ? 'بازگشت به سایت' : 'Back to Site'}</span>
+              <span>{L(language, { fa: 'بازگشت به سایت', en: 'Back to Site', ru: 'Вернуться на сайт', tr: 'Siteye Dön' })}</span>
             </button>
           </div>
         </header>
@@ -825,12 +831,10 @@ export default function App() {
                 <LogOut className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-black text-white font-display">
-                {language === 'fa' ? 'خروج از حساب کاربری' : 'Sign Out Profile'}
+                {L(language, { fa: 'خروج از حساب کاربری', en: 'Sign Out Profile', ru: 'Выход из аккаунта', tr: 'Hesaptan Çıkış' })}
               </h3>
               <p className="text-gray-400 text-xs leading-relaxed">
-                {language === 'fa' 
-                  ? 'آیا برای خروج از حساب کاربری خود مطمئن هستید؟ برای استفاده دوباره از خدمات باید وارد شوید.' 
-                  : 'Are you sure you want to sign out from your gaming profile? You will need to login again to reserve rigs.'}
+                {L(language, { fa: 'آیا برای خروج از حساب کاربری خود مطمئن هستید؟ برای استفاده دوباره از خدمات باید وارد شوید.', en: 'Are you sure you want to sign out from your gaming profile? You will need to login again to reserve rigs.', ru: 'Вы уверены, что хотите выйти из своего игрового профиля? Для бронирования потребуется снова войти.', tr: 'Oyuncu profilinizden çıkmak istediğinize emin misiniz? Rezervasyon için tekrar giriş yapmanız gerekecek.' })}
               </p>
             </div>
 
@@ -839,13 +843,13 @@ export default function App() {
                 onClick={() => setIsLogoutConfirmOpen(false)}
                 className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
               >
-                {language === 'fa' ? 'انصراف' : 'Cancel'}
+                {L(language, { fa: 'انصراف', en: 'Cancel', ru: 'Отмена', tr: 'İptal' })}
               </button>
               <button
                 onClick={confirmLogout}
                 className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-black text-xs rounded-xl transition-all shadow-[0_0_20px_rgba(239,68,68,0.3)] cursor-pointer animate-pulse-subtle"
               >
-                {language === 'fa' ? 'خروج' : 'Logout'}
+                {L(language, { fa: 'خروج', en: 'Logout', ru: 'Выйти', tr: 'Çıkış' })}
               </button>
             </div>
           </div>
@@ -889,7 +893,7 @@ export default function App() {
           )}
 
           <nav
-            aria-label={language === 'fa' ? 'ناوبری اصلی' : 'Main navigation'}
+            aria-label={L(language, { fa: 'ناوبری اصلی', en: 'Main navigation', ru: 'Основная навигация', tr: 'Ana gezinme' })}
             className="md:hidden fixed bottom-0 inset-x-0 z-[60] h-16 pb-[env(safe-area-inset-bottom,0px)] box-content border-t border-white/10 bg-dark-card/95 backdrop-blur-xl flex items-stretch"
           >
             {MOBILE_PRIMARY_TABS.map(t => (
@@ -908,13 +912,13 @@ export default function App() {
             <button
               onClick={() => setIsMobileMoreOpen(v => !v)}
               aria-expanded={isMobileMoreOpen}
-              aria-label={language === 'fa' ? 'بیشتر' : 'More'}
+              aria-label={L(language, { fa: 'بیشتر', en: 'More', ru: 'Ещё', tr: 'Daha Fazla' })}
               className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 transition-colors ${
                 isMobileMoreOpen || MOBILE_MORE_TABS.some(t => t.id === activeTab) ? 'text-primary' : 'text-gray-400'
               }`}
             >
               <Menu className="w-5 h-5 shrink-0" />
-              <span className="text-[10px] font-bold truncate max-w-full px-1">{language === 'fa' ? 'بیشتر' : 'More'}</span>
+              <span className="text-[10px] font-bold truncate max-w-full px-1">{L(language, { fa: 'بیشتر', en: 'More', ru: 'Ещё', tr: 'Daha Fazla' })}</span>
             </button>
           </nav>
         </>

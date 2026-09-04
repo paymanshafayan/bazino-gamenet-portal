@@ -71,6 +71,21 @@ export const M = {
   DESKTOP_NOT_BUILT: { fa: 'نسخه‌ی دسکتاپ برای {platform} هنوز build نشده است.', en: 'The desktop build for {platform} has not been produced yet.', ru: 'Десктоп-сборка для {platform} ещё не собрана.', tr: '{platform} için masaüstü sürümü henüz derlenmedi.' },
   DESKTOP_FILE_NOT_FOUND: { fa: 'فایلی برای {platform} پیدا نشد.', en: 'No file found for {platform}.', ru: 'Файл для {platform} не найден.', tr: '{platform} için dosya bulunamadı.' },
   FILE_DOWNLOAD_FAILED: { fa: 'خطا در دانلود فایل', en: 'Failed to download the file.', ru: 'Ошибка загрузки файла.', tr: 'Dosya indirilemedi.' },
+  OTP_PHONE_INVALID: { fa: 'شماره موبایل معتبر نیست. نمونه: 0532… یا +90532…', en: 'Invalid mobile number. Example: 0532… or +90532…', ru: 'Некорректный номер телефона. Пример: 0532… или +90532…', tr: 'Geçersiz cep telefonu numarası. Örnek: 0532… veya +90532…' },
+  OTP_TOO_SOON: { fa: 'کد قبلاً ارسال شده؛ لطفاً {sec} ثانیه دیگر دوباره تلاش کنید.', en: 'A code was just sent. Please try again in {sec} seconds.', ru: 'Код уже отправлен. Повторите через {sec} сек.', tr: 'Kod az önce gönderildi. Lütfen {sec} saniye sonra tekrar deneyin.' },
+  OTP_RATE_LIMIT: { fa: 'تعداد درخواست‌ها بیش از حد مجاز است؛ {sec} ثانیه دیگر تلاش کنید.', en: 'Too many requests. Try again in {sec} seconds.', ru: 'Слишком много запросов. Повторите через {sec} сек.', tr: 'Çok fazla istek. {sec} saniye sonra tekrar deneyin.' },
+  OTP_SEND_FAILED: { fa: 'ارسال پیامک ناموفق بود. لطفاً بعداً تلاش کنید.', en: 'Sending the SMS failed. Please try again later.', ru: 'Не удалось отправить SMS. Попробуйте позже.', tr: 'SMS gönderilemedi. Lütfen daha sonra tekrar deneyin.' },
+  OTP_NOT_FOUND: { fa: 'کدی برای این شماره فعال نیست؛ دوباره درخواست کنید.', en: 'No active code for this number. Request a new one.', ru: 'Для этого номера нет активного кода. Запросите новый.', tr: 'Bu numara için etkin kod yok. Yeni kod isteyin.' },
+  OTP_EXPIRED: { fa: 'کد منقضی شده است؛ کد جدید درخواست کنید.', en: 'The code has expired. Request a new one.', ru: 'Срок действия кода истёк. Запросите новый.', tr: 'Kodun süresi doldu. Yeni kod isteyin.' },
+  OTP_WRONG: { fa: 'کد وارد شده اشتباه است ({left} تلاش باقی مانده).', en: 'Incorrect code ({left} attempts left).', ru: 'Неверный код (осталось попыток: {left}).', tr: 'Kod hatalı ({left} deneme kaldı).' },
+  OTP_LOCKED: { fa: 'تعداد تلاش‌های اشتباه زیاد بود؛ کد باطل شد. کد جدید درخواست کنید.', en: 'Too many wrong attempts; the code is void. Request a new one.', ru: 'Слишком много неверных попыток; код аннулирован. Запросите новый.', tr: 'Çok fazla hatalı deneme; kod iptal edildi. Yeni kod isteyin.' },
+  PASSWORD_TOO_SHORT: { fa: 'رمز عبور باید حداقل ۶ کاراکتر باشد.', en: 'Password must be at least 6 characters.', ru: 'Пароль должен содержать не менее 6 символов.', tr: 'Şifre en az 6 karakter olmalıdır.' },
+  OLD_PASSWORD_WRONG: { fa: 'رمز عبور فعلی اشتباه است.', en: 'Current password is incorrect.', ru: 'Текущий пароль неверен.', tr: 'Mevcut şifre hatalı.' },
+  INVALID_IMAGE: { fa: 'تصویر نامعتبر است (فقط JPG/PNG/WebP تا ۵ مگابایت).', en: 'Invalid image (JPG/PNG/WebP up to 5 MB only).', ru: 'Некорректное изображение (только JPG/PNG/WebP до 5 МБ).', tr: 'Geçersiz görsel (yalnızca 5 MB\'a kadar JPG/PNG/WebP).' },
+  TICKET_FIELDS_REQUIRED: { fa: 'موضوع و متن پیام الزامی است.', en: 'Subject and message are required.', ru: 'Тема и текст сообщения обязательны.', tr: 'Konu ve mesaj zorunludur.' },
+  TICKET_NOT_FOUND: { fa: 'تیکت پیدا نشد.', en: 'Ticket not found.', ru: 'Тикет не найден.', tr: 'Destek talebi bulunamadı.' },
+  TICKET_CLOSED: { fa: 'این تیکت بسته شده است.', en: 'This ticket is closed.', ru: 'Этот тикет закрыт.', tr: 'Bu destek talebi kapatılmış.' },
+  MESSAGE_REQUIRED: { fa: 'متن پیام خالی است.', en: 'Message text is empty.', ru: 'Текст сообщения пуст.', tr: 'Mesaj metni boş.' },
 } satisfies Record<string, Msg>;
 
 export type ApiMessageKey = keyof typeof M;

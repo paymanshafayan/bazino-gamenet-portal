@@ -184,7 +184,7 @@ test('HudSquareButton shows its badge only when there is one', async () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
-   31. AuthModal — فرم ورود/ثبت‌نام
+   31. AuthModal — ورود با کد پیامکی (OTP) / رمز عبور
    ═══════════════════════════════════════════════════════════════════════ */
 suite('31. UI — AuthModal');
 
@@ -209,76 +209,123 @@ test('renders nothing while closed', async () => {
   await el.unmount();
 });
 
-test('renders username and password fields when open', async () => {
-  const el = await mountAuthModal({
-    isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {},
-  });
-  assert.ok(el.findAll('input').length >= 2, 'login form should have at least 2 inputs');
-  assert.ok(el.find('input[type="password"]'), 'no password field');
+const Ev = () => getDocument().defaultView.Event;
+const setInput = async (input: any, value: string) => act(async () => {
+  const setter = Object.getOwnPropertyDescriptor(getDocument().defaultView.HTMLInputElement.prototype, 'value')!.set!;
+  setter.call(input, value);
+  input.dispatchEvent(new (Ev())('input', { bubbles: true }));
+});
+const submit = async (form: any) => { await act(async () => { form.dispatchEvent(new (Ev())('submit', { bubbles: true, cancelable: true })); }); await act(async () => { await new Promise(r => setTimeout(r, 30)); }); };
+const clickTab = async (el: any, i: number) => act(async () => { el.findAll('[role=tab]')[i].click(); });
+
+test('opens on the SMS-code tab with a phone field; no registration tab exists', async () => {
+  const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {} });
+  assert.ok(el.find('[data-otp-step="phone"]'), 'phone step not rendered');
+  assert.ok(el.find('#auth-phone'), 'no phone input');
+  assert.equal(el.findAll('[role=tab]').length, 2, 'exactly two tabs: SMS code / password');
+  assert.ok(!el.find('input[type="email"]'), 'no e-mail/registration form anymore');
   await el.unmount();
 });
 
-test('a successful login stores the JWT and reports the user', async () => {
+test('requesting a code moves to the code step and shows a countdown from the server retryAfter', async () => {
   const calls = stubFetch((url) => {
-    if (url.includes('/api/auth/login')) {
-      return { status: 200, body: { success: true, token: 'jwt-from-test', user: { username: 'tester', role: 'admin' } } };
+    if (url.includes('/api/auth/otp/request')) return { status: 200, body: { success: true, phone: '+905321112233', retryAfter: 45, expiresIn: 300 } };
+    return { status: 200, body: {} };
+  });
+  try {
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {} });
+    await setInput(el.find('#auth-phone'), '0532 111 22 33');
+    await submit(el.find('form'));
+    const req = calls.find(c => c.url.includes('/api/auth/otp/request'));
+    assert.ok(req, 'otp/request was not called');
+    assert.equal(JSON.parse(req!.init.body).phone, '0532 111 22 33');
+    assert.ok(el.find('[data-otp-step="code"]'), 'did not advance to the code step');
+    assert.ok(el.text().includes('+905321112233'), 'normalised phone from the server should be shown');
+    assert.ok(el.find('[data-otp-resend]').textContent.includes('00:45'), `countdown should start at 00:45, got: ${el.find('[data-otp-resend]').textContent}`);
+    await el.unmount();
+  } finally { restoreFetch(); }
+});
+
+test('a 429 from the server is shown with its retryAfter countdown (cooldown is server-driven)', async () => {
+  stubFetch((url) => {
+    if (url.includes('/api/auth/otp/request')) return { status: 429, body: { error: 'Too soon', code: 'OTP_TOO_SOON', retryAfter: 37 } };
+    return { status: 200, body: {} };
+  });
+  try {
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {} });
+    await setInput(el.find('#auth-phone'), '05321112233');
+    await submit(el.find('form'));
+    assert.ok(el.find('[role=alert]')?.textContent.includes('Too soon'), 'server error not displayed');
+    assert.ok(el.find('[data-otp-step="code"]'), 'OTP_TOO_SOON should still let the user type the code they already got');
+    assert.ok(el.find('[data-otp-resend]').textContent.includes('00:37'));
+    await el.unmount();
+  } finally { restoreFetch(); }
+});
+
+test('verifying the code stores the JWT and reports the user; wrong code shows the error', async () => {
+  const { clearAuthToken, getAuthToken } = await loadModule('/src/services/authToken.ts');
+  clearAuthToken();
+  const calls = stubFetch((url, init) => {
+    if (url.includes('/api/auth/otp/request')) return { status: 200, body: { success: true, phone: '+905321112233', retryAfter: 60 } };
+    if (url.includes('/api/auth/otp/verify')) {
+      const { code } = JSON.parse(init.body);
+      if (code === '123456') return { status: 200, body: { success: true, isNew: true, token: 'jwt-otp', user: { username: '905321112233', role: 'gamer', loyaltyPoints: 100 } } };
+      return { status: 400, body: { error: 'Incorrect code (4 attempts left).', code: 'OTP_WRONG', attemptsLeft: 4 } };
     }
     return { status: 200, body: {} };
   });
   try {
     let authed: any = null;
-    const el = await mountAuthModal({
-      isOpen: true, onClose: () => {}, onAuthSuccess: (u: any) => { authed = u; }, addNotification: () => {},
-    });
-
-    const inputs = el.findAll('input');
-    const pwd = el.find('input[type="password"]');
-    const user = inputs.find((i: any) => i !== pwd);
-
-    await act(async () => {
-      user.value = 'tester';
-      user.dispatchEvent(new (getDocument().defaultView.Event)('input', { bubbles: true }));
-      pwd.value = 'secret';
-      pwd.dispatchEvent(new (getDocument().defaultView.Event)('input', { bubbles: true }));
-    });
-
-    const form = el.find('form');
-    assert.ok(form, 'no form element to submit');
-    await act(async () => {
-      form.dispatchEvent(new (getDocument().defaultView.Event)('submit', { bubbles: true, cancelable: true }));
-    });
-    await act(async () => { await new Promise(r => setTimeout(r, 30)); });
-
-    assert.ok(calls.some(c => c.url.includes('/api/auth/login')), 'login endpoint was never called');
-    assert.ok(authed, 'onAuthSuccess was not called');
-    assert.equal(authed.username, 'tester');
-
-    const { getAuthToken } = await loadModule('/src/services/authToken.ts');
-    assert.equal(getAuthToken(), 'jwt-from-test',
-      'the JWT was not persisted — the admin panel would be locked out');
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: (u: any) => { authed = u; }, addNotification: () => {} });
+    await setInput(el.find('#auth-phone'), '05321112233');
+    await submit(el.find('form'));
+    await setInput(el.find('#auth-code'), '000000');
+    await submit(el.find('form'));
+    assert.ok(el.find('[role=alert]')?.textContent.includes('4 attempts'), 'wrong-code error not shown');
+    assert.equal(getAuthToken(), null);
+    await setInput(el.find('#auth-code'), '123456');
+    await submit(el.find('form'));
+    const verify = calls.filter(c => c.url.includes('/api/auth/otp/verify'));
+    assert.equal(verify.length, 2);
+    assert.equal(JSON.parse(verify[1].init.body).phone, '+905321112233', 'verify must use the server-normalised phone');
+    assert.ok(authed && authed.username === '905321112233', 'onAuthSuccess not called with the user');
+    assert.equal(getAuthToken(), 'jwt-otp');
     await el.unmount();
   } finally { restoreFetch(); }
 });
 
-test('a failed login surfaces the server error and stores no token', async () => {
+test('the password tab still logs in with username/password (admin path)', async () => {
+  const calls = stubFetch((url) => {
+    if (url.includes('/api/auth/login')) return { status: 200, body: { success: true, token: 'jwt-from-test', user: { username: 'tester', role: 'admin' } } };
+    return { status: 200, body: {} };
+  });
+  try {
+    let authed: any = null;
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: (u: any) => { authed = u; }, addNotification: () => {} });
+    await clickTab(el, 1);
+    assert.ok(el.find('[data-password-login]'), 'password form not shown');
+    await setInput(el.find('#auth-username'), 'tester');
+    await setInput(el.find('#auth-password'), 'secret');
+    await submit(el.find('form'));
+    assert.ok(calls.some(c => c.url.includes('/api/auth/login')), 'login endpoint was never called');
+    assert.equal(authed?.username, 'tester');
+    const { getAuthToken } = await loadModule('/src/services/authToken.ts');
+    assert.equal(getAuthToken(), 'jwt-from-test');
+    await el.unmount();
+  } finally { restoreFetch(); }
+});
+
+test('a failed password login surfaces the server error and stores no token', async () => {
   const { clearAuthToken, getAuthToken } = await loadModule('/src/services/authToken.ts');
   clearAuthToken();
   stubFetch(() => ({ status: 400, body: { error: 'نام کاربری یا کلمه عبور اشتباه است.' } }));
   try {
     let notified = '';
-    const el = await mountAuthModal({
-      isOpen: true, onClose: () => {}, onAuthSuccess: () => {},
-      addNotification: (m: string) => { notified = m; },
-    });
-    const form = el.find('form');
-    await act(async () => {
-      form.dispatchEvent(new (getDocument().defaultView.Event)('submit', { bubbles: true, cancelable: true }));
-    });
-    await act(async () => { await new Promise(r => setTimeout(r, 30)); });
-
-    assert.ok(el.text().includes('اشتباه') || notified.includes('اشتباه'),
-      `the error was not shown to the user (notified: "${notified}")`);
-    assert.equal(getAuthToken(), null, 'a token was stored despite a failed login');
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: (m: string) => { notified = m; } });
+    await clickTab(el, 1);
+    await submit(el.find('form'));
+    assert.ok(el.text().includes('اشتباه') || notified.includes('اشتباه'), `the error was not shown (notified: "${notified}")`);
+    assert.equal(getAuthToken(), null);
     await el.unmount();
   } finally { restoreFetch(); }
 });

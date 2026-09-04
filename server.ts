@@ -53,6 +53,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
+import { registerAccountRoutes, publicUser } from "./server/accountRoutes";
 import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -460,6 +461,8 @@ async function startServer() {
   const app = express();
   const PORT = process.env.NODE_ENV === "production" ? (Number(process.env.PORT) || 3000) : 3000;
 
+  // پشت Railway/Cloudflare: IP واقعی کاربر از X-Forwarded-For (برای محدودیت OTP)
+  app.set("trust proxy", 1);
   app.use(compression());
 
   // مهر نسخه‌ی دارایی روی URLهای تصاویر در پاسخ‌های API — تا اپ موبایل و کلاینت وب
@@ -734,15 +737,7 @@ async function startServer() {
     }
 
     const row = await store.getUserByUsername(tokenUsername);
-    if (row) {
-      return {
-        username: row.username,
-        email: row.email,
-        phone: row.phone || "",
-        loyaltyPoints: row.loyaltyPoints,
-        role: row.role || "gamer"
-      };
-    }
+    if (row) return publicUser(row);
 
     return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
   }
@@ -793,6 +788,17 @@ async function startServer() {
   // =========================================================================
   // API ROUTE CONTROLLERS
   // =========================================================================
+
+  // تسک ۱۲: OTP پیامکی، پروفایل، تیکت‌ها (server/accountRoutes.ts)
+  await registerAccountRoutes(app, {
+    signAuthToken,
+    requireAuth,
+    jsonParser,
+    dataDir: DATA_DIR,
+    listMyTransactions: async (username) => (await resolveTransactionalList(await getActiveDataProvider().listTransactions(), SAMPLE_TRANSACTIONS)).filter((t: any) => (t.username || "") === username),
+    listMyReservations: async (username) => (await resolveTransactionalList(await getActiveDataProvider().listReservationLogs(), SAMPLE_RESERVATION_LOGS)).filter((r: any) => r.username === username),
+    listTournaments: async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+  });
 
   // Authentication Endpoints
   app.post("/api/auth/register", async (req, res) => {
@@ -857,13 +863,7 @@ async function startServer() {
       // NOTE: deliberately does NOT write a server-wide "activeUsername" setting.
       // Identity lives in the JWT returned below — see getCurrentUser().
 
-      const user = {
-        username: found.username,
-        email: found.email,
-        phone: found.phone || "",
-        loyaltyPoints: found.loyaltyPoints,
-        role: found.role || "gamer"
-      };
+      const user = publicUser(found);
 
       // Real, independent token for this specific user (mobile app / any future client)
       const token = signAuthToken(found.username);
@@ -885,10 +885,7 @@ async function startServer() {
     if (!row) {
       return res.status(401).json(apiError(req, "USER_NOT_FOUND"));
     }
-    res.json({
-      success: true,
-      user: { username: row.username, email: row.email, phone: row.phone || "", loyaltyPoints: row.loyaltyPoints, role: row.role || "gamer" }
-    });
+    res.json({ success: true, user: publicUser(row) });
   });
 
   app.post("/api/auth/logout", async (req, res) => {
@@ -2093,6 +2090,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         tableNumber: tableNumber || "میز عمومی",
         date: "امروز",
         status: "Pending", // Pending, Preparing, Delivered
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addCafeOrder(newOrder);
 
@@ -2186,6 +2184,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         couponCode: coupon ? couponCode : "",
         date: "امروز",
         status: "Processing", // Processing, Shipped, Delivered
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addShopOrder(newOrder);
 
@@ -2348,7 +2347,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     if (kind === "cafe") {
       for (const l of p.items) await store.decrementCafeInventory(l.item.id, l.quantity);
       const id = "CF-" + Math.floor(1000 + Math.random() * 9000);
-      await store.addCafeOrder({ id, items: JSON.stringify(p.items), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, tableNumber: p.tableNumber, date: "امروز", status: "Pending" });
+      await store.addCafeOrder({ id, items: JSON.stringify(p.items), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, tableNumber: p.tableNumber, date: "امروز", status: "Pending", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
       return { orderId: id, points };
@@ -2356,7 +2355,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     if (kind === "shop") {
       for (const l of p.cart) await store.decrementAccessoryStock(l.item.id, l.quantity);
       const id = "ACC-" + Math.floor(1000 + Math.random() * 9000);
-      await store.addShopOrder({ id, cart: JSON.stringify(p.cart), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, date: "امروز", status: "Processing" });
+      await store.addShopOrder({ id, cart: JSON.stringify(p.cart), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, date: "امروز", status: "Processing", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
       return { orderId: id, points };

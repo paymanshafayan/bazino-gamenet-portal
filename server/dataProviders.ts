@@ -78,7 +78,28 @@ export interface UserRow {
   phone: string;
   loyaltyPoints: number;
   role: string;
+  /** پروفایل (تسک ۱۲) — همه اختیاری؛ ردیف‌های قدیمی خالی‌اند */
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+  gamerTag?: string;
+  city?: string;
+  birthDate?: string;
+  /** شماره‌ی تأییدشده با OTP (E.164) — خالی = تأیید نشده */
+  phoneVerifiedAt?: string;
+  /** 1 = کاربر رمز دائمی تنظیم کرده (کاربران OTP-only رمز تصادفی دارند) */
+  hasPassword?: number;
+  createdAt?: string;
 }
+/** ستون‌های قابل ویرایش پروفایل توسط خود کاربر */
+export const USER_PROFILE_COLUMNS = new Set(['displayName', 'avatarUrl', 'bio', 'gamerTag', 'city', 'birthDate', 'email', 'phone', 'phoneVerifiedAt', 'hasPassword', 'passwordHash', 'createdAt']);
+
+/** کد یک‌بارمصرف پیامکی */
+export interface OtpCodeRow { id: string; phone: string; codeHash: string; ip: string; purpose: string; createdAt: string; expiresAt: string; attempts: number; consumedAt: string; }
+/** تیکت پشتیبانی */
+export interface TicketRow { id: string; username: string; subject: string; category: string; priority: string; status: string; createdAt: string; updatedAt: string; lastStaffReplyAt: string; userSeenAt: string; }
+export interface TicketMessageRow { id: string; ticketId: string; author: string; isStaff: number; body: string; createdAt: string; }
+export const TICKET_COLUMNS = new Set(['subject', 'category', 'priority', 'status', 'updatedAt', 'lastStaffReplyAt', 'userSeenAt']);
 export interface ChatMessageRow { id: string; room: string; username: string; message: string; timestamp: string; }
 /** username: صاحب تراکنش. رشته‌ی خالی = ردیف میراث (قبل از افزودن این ستون). */
 export interface TransactionRow { id: string; points: number; description: string; type: string; date: string; username?: string; }
@@ -88,9 +109,9 @@ export interface CouponRow { code: string; type: string; value: number; minOrder
 export interface SystemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
 export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; }
 export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; }
-export interface CafeOrderRow { id: string; items: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; tableNumber: string; date: string; status: string; }
+export interface CafeOrderRow { id: string; items: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; tableNumber: string; date: string; status: string; username?: string; }
 export interface AccessoryRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; description: string; descriptionFa?: string; descriptionEn?: string; descriptionRu?: string; descriptionTr?: string; price: number; imageUrl: string; mobileImageUrl?: string; stock: number; category: string; }
-export interface ShopOrderRow { id: string; cart: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; date: string; status: string; }
+export interface ShopOrderRow { id: string; cart: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; date: string; status: string; username?: string; }
 export interface TournamentRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; game: string; registrationFee: number; startDate: string; maxTeams: number; status: string; registeredTeamsCount: number; teams: string; bracket: string; }
 export interface ArticleRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; content: string; contentFa?: string; contentEn?: string; contentRu?: string; contentTr?: string; category: string; imageUrl: string; mobileImageUrl?: string; author: string; authorFa?: string; authorEn?: string; authorRu?: string; authorTr?: string; date: string; comments: string; }
 export interface UserMessageRow { id: string; sender: string; recipient: string; title: string; body: string; date: string; isRead: boolean; type: string; }
@@ -254,6 +275,23 @@ export interface IDataStore {
   deleteSlider(id: string): Promise<void>;
 
   countReservationLogs(): Promise<number>;
+
+  // Profile / OTP / Tickets (task 12)
+  updateUserFields(username: string, fields: Partial<UserRow>): Promise<void>;
+  getUserByPhone(phone: string): Promise<UserRow | undefined>;
+  createOtp(o: OtpCodeRow): Promise<void>;
+  /** آخرین کدهای این شماره یا این IP از زمان since (برای نرخ‌سنجی سمت سرور) */
+  listRecentOtps(filter: { phone?: string; ip?: string; since: string }): Promise<OtpCodeRow[]>;
+  getLatestActiveOtp(phone: string, purpose: string): Promise<OtpCodeRow | undefined>;
+  updateOtp(id: string, fields: Partial<OtpCodeRow>): Promise<void>;
+  createTicket(t: TicketRow): Promise<void>;
+  getTicketById(id: string): Promise<TicketRow | undefined>;
+  listTicketsFor(username: string): Promise<TicketRow[]>;
+  listTickets(status?: string): Promise<TicketRow[]>;
+  updateTicket(id: string, fields: Partial<TicketRow>): Promise<void>;
+  addTicketMessage(m: TicketMessageRow): Promise<void>;
+  listTicketMessages(ticketId: string): Promise<TicketMessageRow[]>;
+  countOpenTickets(): Promise<number>;
 }
 
 // -----------------------------------------------------------------------------
@@ -323,6 +361,12 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS user_messages (id TEXT PRIMARY KEY, sender TEXT, recipient TEXT, title TEXT, body TEXT, date TEXT, isRead INTEGER DEFAULT 0, type TEXT);
       CREATE TABLE IF NOT EXISTS themes (id TEXT PRIMARY KEY, name TEXT, nameEn TEXT, primaryColor TEXT, primaryHover TEXT, darkBg TEXT, darkCard TEXT, accentRed TEXT);
       CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, mobileImageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT, descFa TEXT, descEn TEXT, descRu TEXT, descTr TEXT);
+      CREATE TABLE IF NOT EXISTS otp_codes (id TEXT PRIMARY KEY, phone TEXT, codeHash TEXT, ip TEXT, purpose TEXT, createdAt TEXT, expiresAt TEXT, attempts INTEGER DEFAULT 0, consumedAt TEXT DEFAULT '');
+      CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_codes(phone, createdAt);
+      CREATE INDEX IF NOT EXISTS idx_otp_ip ON otp_codes(ip, createdAt);
+      CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, username TEXT, subject TEXT, category TEXT, priority TEXT, status TEXT, createdAt TEXT, updatedAt TEXT, lastStaffReplyAt TEXT DEFAULT '', userSeenAt TEXT DEFAULT '');
+      CREATE TABLE IF NOT EXISTS ticket_messages (id TEXT PRIMARY KEY, ticketId TEXT, author TEXT, isStaff INTEGER DEFAULT 0, body TEXT, createdAt TEXT);
+      CREATE INDEX IF NOT EXISTS idx_ticket_msgs ON ticket_messages(ticketId, createdAt);
       CREATE TABLE IF NOT EXISTS payment_orders (merchantOid TEXT PRIMARY KEY, kind TEXT, username TEXT, email TEXT, amountKurus INTEGER, currency TEXT, status TEXT, provider TEXT, payload TEXT, result TEXT, totalAmountKurus INTEGER DEFAULT 0, failedCode TEXT DEFAULT '', failedMsg TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT);
     `);
     logDbQuery(this.name, 'SQL', 'CREATE TABLE IF NOT EXISTS ... (17 tables verified)');
@@ -346,6 +390,19 @@ export class SqliteStore implements IDataStore {
       // مالکیت: تراکنش امتیاز و کد تخفیف شخصی به یک کاربر تعلق دارند.
       { table: 'transactions', column: 'username', type: "TEXT NOT NULL DEFAULT ''" },
       { table: 'active_coupons', column: 'ownerUsername', type: "TEXT NOT NULL DEFAULT ''" },
+      // پروفایل کاربر + OTP (تسک ۱۲)
+      { table: 'users', column: 'displayName', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'avatarUrl', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'bio', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'gamerTag', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'city', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'birthDate', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'phoneVerifiedAt', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'hasPassword', type: "INTEGER DEFAULT 1" },
+      { table: 'users', column: 'createdAt', type: "TEXT DEFAULT ''" },
+      // مالکیت سفارش‌ها برای «سفارش‌های من»
+      { table: 'cafe_orders', column: 'username', type: "TEXT DEFAULT ''" },
+      { table: 'shop_orders', column: 'username', type: "TEXT DEFAULT ''" },
     ];
     for (const { table, column, type } of wanted) {
       try {
@@ -520,8 +577,8 @@ export class SqliteStore implements IDataStore {
   async listCafeOrders() { return this.db.prepare(`SELECT * FROM cafe_orders`).all() as CafeOrderRow[]; }
   async getCafeOrderById(id: string) { return this.db.prepare(`SELECT * FROM cafe_orders WHERE id = ?`).get(id) as CafeOrderRow | undefined; }
   async addCafeOrder(o: CafeOrderRow) {
-    this.db.prepare(`INSERT INTO cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(o.id, o.items, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.tableNumber, o.date, o.status);
+    this.db.prepare(`INSERT INTO cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.items, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.tableNumber, o.date, o.status, o.username || '');
   }
   async setCafeOrderStatus(id: string, status: string) { this.db.prepare(`UPDATE cafe_orders SET status = ? WHERE id = ?`).run(status, id); }
 
@@ -537,6 +594,50 @@ export class SqliteStore implements IDataStore {
     this.db.prepare(`UPDATE payment_orders SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE merchantOid = ?`).run(...keys.map(k => (f as any)[k]), merchantOid);
   }
   async listPaymentOrders(limit = 200) { return this.db.prepare(`SELECT * FROM payment_orders ORDER BY createdAt DESC LIMIT ?`).all(limit) as PaymentOrderRow[]; }
+
+  // ---- Profile / OTP / Tickets (task 12) ----
+  async updateUserFields(username: string, f: Partial<UserRow>) {
+    const keys = Object.keys(f).filter(k => USER_PROFILE_COLUMNS.has(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE users SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE username = ?`).run(...keys.map(k => (f as any)[k]), username);
+  }
+  async getUserByPhone(phone: string) { return this.db.prepare(`SELECT * FROM users WHERE phone = ?`).get(phone) as UserRow | undefined; }
+  async createOtp(o: OtpCodeRow) {
+    this.db.prepare(`INSERT INTO otp_codes (id, phone, codeHash, ip, purpose, createdAt, expiresAt, attempts, consumedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.phone, o.codeHash, o.ip, o.purpose, o.createdAt, o.expiresAt, o.attempts, o.consumedAt);
+  }
+  async listRecentOtps(fl: { phone?: string; ip?: string; since: string }) {
+    if (fl.phone && fl.ip) return this.db.prepare(`SELECT * FROM otp_codes WHERE (phone = ? OR ip = ?) AND createdAt >= ? ORDER BY createdAt DESC`).all(fl.phone, fl.ip, fl.since) as OtpCodeRow[];
+    if (fl.phone) return this.db.prepare(`SELECT * FROM otp_codes WHERE phone = ? AND createdAt >= ? ORDER BY createdAt DESC`).all(fl.phone, fl.since) as OtpCodeRow[];
+    return this.db.prepare(`SELECT * FROM otp_codes WHERE ip = ? AND createdAt >= ? ORDER BY createdAt DESC`).all(fl.ip || '', fl.since) as OtpCodeRow[];
+  }
+  async getLatestActiveOtp(phone: string, purpose: string) {
+    return this.db.prepare(`SELECT * FROM otp_codes WHERE phone = ? AND purpose = ? AND consumedAt = '' ORDER BY createdAt DESC LIMIT 1`).get(phone, purpose) as OtpCodeRow | undefined;
+  }
+  async updateOtp(id: string, f: Partial<OtpCodeRow>) {
+    const keys = Object.keys(f).filter(k => k === 'attempts' || k === 'consumedAt');
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE otp_codes SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => (f as any)[k]), id);
+  }
+  async createTicket(t: TicketRow) {
+    this.db.prepare(`INSERT INTO tickets (id, username, subject, category, priority, status, createdAt, updatedAt, lastStaffReplyAt, userSeenAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(t.id, t.username, t.subject, t.category, t.priority, t.status, t.createdAt, t.updatedAt, t.lastStaffReplyAt, t.userSeenAt);
+  }
+  async getTicketById(id: string) { return this.db.prepare(`SELECT * FROM tickets WHERE id = ?`).get(id) as TicketRow | undefined; }
+  async listTicketsFor(username: string) { return this.db.prepare(`SELECT * FROM tickets WHERE username = ? ORDER BY updatedAt DESC`).all(username) as TicketRow[]; }
+  async listTickets(status?: string) {
+    return (status ? this.db.prepare(`SELECT * FROM tickets WHERE status = ? ORDER BY updatedAt DESC`).all(status) : this.db.prepare(`SELECT * FROM tickets ORDER BY updatedAt DESC`).all()) as TicketRow[];
+  }
+  async updateTicket(id: string, f: Partial<TicketRow>) {
+    const keys = Object.keys(f).filter(k => TICKET_COLUMNS.has(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE tickets SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => (f as any)[k]), id);
+  }
+  async addTicketMessage(m: TicketMessageRow) {
+    this.db.prepare(`INSERT INTO ticket_messages (id, ticketId, author, isStaff, body, createdAt) VALUES (?, ?, ?, ?, ?, ?)`).run(m.id, m.ticketId, m.author, m.isStaff, m.body, m.createdAt);
+  }
+  async listTicketMessages(ticketId: string) { return this.db.prepare(`SELECT * FROM ticket_messages WHERE ticketId = ? ORDER BY createdAt ASC`).all(ticketId) as TicketMessageRow[]; }
+  async countOpenTickets() { return (this.db.prepare(`SELECT COUNT(*) as c FROM tickets WHERE status IN ('open','customer_reply')`).get() as any).c; }
 
   // ---- Accessories / shop ----
   async listAccessories() { return this.db.prepare(`SELECT * FROM accessories`).all() as AccessoryRow[]; }
@@ -561,8 +662,8 @@ export class SqliteStore implements IDataStore {
   async listShopOrders() { return this.db.prepare(`SELECT * FROM shop_orders`).all() as ShopOrderRow[]; }
   async getShopOrderById(id: string) { return this.db.prepare(`SELECT * FROM shop_orders WHERE id = ?`).get(id) as ShopOrderRow | undefined; }
   async addShopOrder(o: ShopOrderRow) {
-    this.db.prepare(`INSERT INTO shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(o.id, o.cart, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.date, o.status);
+    this.db.prepare(`INSERT INTO shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.cart, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.date, o.status, o.username || '');
   }
   async setShopOrderStatus(id: string, status: string) { this.db.prepare(`UPDATE shop_orders SET status = ? WHERE id = ?`).run(status, id); }
 
@@ -611,7 +712,7 @@ export class SqliteStore implements IDataStore {
   // ---- Themes ----
   async listThemes() { return this.db.prepare(`SELECT * FROM themes`).all() as ThemeRow[]; }
   async createTheme(t: ThemeRow) {
-    this.db.prepare(`INSERT INTO themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    this.db.prepare(`INSERT OR IGNORE INTO themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(t.id, t.name, t.nameEn, t.primaryColor, t.primaryHover, t.darkBg, t.darkCard, t.accentRed);
   }
 
@@ -743,6 +844,20 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.app_sliders','descEn') IS NULL ALTER TABLE dbo.app_sliders ADD descEn NVARCHAR(1000) NULL;
       IF COL_LENGTH('dbo.app_sliders','descRu') IS NULL ALTER TABLE dbo.app_sliders ADD descRu NVARCHAR(1000) NULL;
       IF COL_LENGTH('dbo.app_sliders','descTr') IS NULL ALTER TABLE dbo.app_sliders ADD descTr NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.users','displayName') IS NULL ALTER TABLE dbo.users ADD displayName NVARCHAR(100) NULL;
+      IF COL_LENGTH('dbo.users','avatarUrl') IS NULL ALTER TABLE dbo.users ADD avatarUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.users','bio') IS NULL ALTER TABLE dbo.users ADD bio NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.users','gamerTag') IS NULL ALTER TABLE dbo.users ADD gamerTag NVARCHAR(60) NULL;
+      IF COL_LENGTH('dbo.users','city') IS NULL ALTER TABLE dbo.users ADD city NVARCHAR(100) NULL;
+      IF COL_LENGTH('dbo.users','birthDate') IS NULL ALTER TABLE dbo.users ADD birthDate NVARCHAR(20) NULL;
+      IF COL_LENGTH('dbo.users','phoneVerifiedAt') IS NULL ALTER TABLE dbo.users ADD phoneVerifiedAt NVARCHAR(50) NULL;
+      IF COL_LENGTH('dbo.users','hasPassword') IS NULL ALTER TABLE dbo.users ADD hasPassword INT DEFAULT 1;
+      IF COL_LENGTH('dbo.users','createdAt') IS NULL ALTER TABLE dbo.users ADD createdAt NVARCHAR(50) NULL;
+      IF COL_LENGTH('dbo.cafe_orders','username') IS NULL ALTER TABLE dbo.cafe_orders ADD username NVARCHAR(100) NULL;
+      IF COL_LENGTH('dbo.shop_orders','username') IS NULL ALTER TABLE dbo.shop_orders ADD username NVARCHAR(100) NULL;
+      IF OBJECT_ID('dbo.otp_codes','U') IS NULL CREATE TABLE dbo.otp_codes (id NVARCHAR(40) PRIMARY KEY, phone NVARCHAR(30), codeHash NVARCHAR(128), ip NVARCHAR(64), purpose NVARCHAR(20), createdAt NVARCHAR(50), expiresAt NVARCHAR(50), attempts INT DEFAULT 0, consumedAt NVARCHAR(50) DEFAULT '');
+      IF OBJECT_ID('dbo.tickets','U') IS NULL CREATE TABLE dbo.tickets (id NVARCHAR(40) PRIMARY KEY, username NVARCHAR(100), subject NVARCHAR(200), category NVARCHAR(30), priority NVARCHAR(20), status NVARCHAR(30), createdAt NVARCHAR(50), updatedAt NVARCHAR(50), lastStaffReplyAt NVARCHAR(50) DEFAULT '', userSeenAt NVARCHAR(50) DEFAULT '');
+      IF OBJECT_ID('dbo.ticket_messages','U') IS NULL CREATE TABLE dbo.ticket_messages (id NVARCHAR(40) PRIMARY KEY, ticketId NVARCHAR(40), author NVARCHAR(100), isStaff INT DEFAULT 0, body NVARCHAR(MAX), createdAt NVARCHAR(50));
       IF COL_LENGTH('dbo.transactions','username') IS NULL ALTER TABLE dbo.transactions ADD username NVARCHAR(100) NOT NULL DEFAULT '';
       IF COL_LENGTH('dbo.active_coupons','ownerUsername') IS NULL ALTER TABLE dbo.active_coupons ADD ownerUsername NVARCHAR(100) NOT NULL DEFAULT '';
     `);
@@ -943,8 +1058,8 @@ export class SqlServerStore implements IDataStore {
   async addCafeOrder(o: CafeOrderRow) {
     await this.r().input('id', this.sql.NVarChar, o.id).input('items', this.sql.NVarChar, o.items).input('tp', this.sql.Float, o.totalPrice)
       .input('da', this.sql.Float, o.discountApplied).input('fa', this.sql.Float, o.finalAmount).input('cc', this.sql.NVarChar, o.couponCode)
-      .input('tn', this.sql.NVarChar, o.tableNumber).input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status)
-      .query(`INSERT INTO dbo.cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status) VALUES (@id, @items, @tp, @da, @fa, @cc, @tn, @d, @s)`);
+      .input('tn', this.sql.NVarChar, o.tableNumber).input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status).input('u', this.sql.NVarChar, o.username || '')
+      .query(`INSERT INTO dbo.cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status, username) VALUES (@id, @items, @tp, @da, @fa, @cc, @tn, @d, @s, @u)`);
   }
   async setCafeOrderStatus(id: string, status: string) {
     await this.r().input('s', this.sql.NVarChar, status).input('id', this.sql.NVarChar, id).query(`UPDATE dbo.cafe_orders SET status = @s WHERE id = @id`);
@@ -970,6 +1085,51 @@ export class SqlServerStore implements IDataStore {
     await req.query(`UPDATE dbo.payment_orders SET ${columnSet} WHERE merchantOid = @oid`);
   }
   async listPaymentOrders(limit = 200) { return (await this.r().input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.payment_orders ORDER BY createdAt DESC`)).recordset as PaymentOrderRow[]; }
+
+  // ---- Profile / OTP / Tickets (task 12) ----
+  private async dynUpdate(table: string, allowed: Set<string>, keyCol: string, keyVal: string, f: Record<string, any>) {
+    const keys = Object.keys(f).filter(k => allowed.has(k));
+    if (!keys.length) return;
+    const req = this.r().input('key', this.sql.NVarChar, keyVal);
+    keys.forEach((k, i) => { const v = f[k]; req.input(`v${i}`, typeof v === 'number' ? this.sql.BigInt : this.sql.NVarChar, v); });
+    const columnSet = keys.map((k, i) => k + ' = @v' + i).join(', ');
+    const tableName = 'dbo.' + table; const column = keyCol;
+    await req.query(`UPDATE ${tableName} SET ${columnSet} WHERE ${column} = @key`);
+  }
+  async updateUserFields(username: string, f: Partial<UserRow>) { await this.dynUpdate('users', USER_PROFILE_COLUMNS, 'username', username, f as any); }
+  async getUserByPhone(phone: string) { return (await this.r().input('p', this.sql.NVarChar, phone).query(`SELECT * FROM dbo.users WHERE phone = @p`)).recordset[0]; }
+  async createOtp(o: OtpCodeRow) {
+    await this.r().input('id', this.sql.NVarChar, o.id).input('p', this.sql.NVarChar, o.phone).input('h', this.sql.NVarChar, o.codeHash).input('ip', this.sql.NVarChar, o.ip)
+      .input('pu', this.sql.NVarChar, o.purpose).input('c', this.sql.NVarChar, o.createdAt).input('e', this.sql.NVarChar, o.expiresAt).input('a', this.sql.Int, o.attempts).input('co', this.sql.NVarChar, o.consumedAt)
+      .query(`INSERT INTO dbo.otp_codes (id, phone, codeHash, ip, purpose, createdAt, expiresAt, attempts, consumedAt) VALUES (@id, @p, @h, @ip, @pu, @c, @e, @a, @co)`);
+  }
+  async listRecentOtps(fl: { phone?: string; ip?: string; since: string }) {
+    return (await this.r().input('p', this.sql.NVarChar, fl.phone || '').input('ip', this.sql.NVarChar, fl.ip || '').input('s', this.sql.NVarChar, fl.since)
+      .query(`SELECT * FROM dbo.otp_codes WHERE (phone = @p OR ip = @ip) AND createdAt >= @s ORDER BY createdAt DESC`)).recordset as OtpCodeRow[];
+  }
+  async getLatestActiveOtp(phone: string, purpose: string) {
+    return (await this.r().input('p', this.sql.NVarChar, phone).input('pu', this.sql.NVarChar, purpose).query(`SELECT TOP 1 * FROM dbo.otp_codes WHERE phone = @p AND purpose = @pu AND consumedAt = '' ORDER BY createdAt DESC`)).recordset[0];
+  }
+  async updateOtp(id: string, f: Partial<OtpCodeRow>) { await this.dynUpdate('otp_codes', new Set(['attempts', 'consumedAt']), 'id', id, f as any); }
+  async createTicket(t: TicketRow) {
+    await this.r().input('id', this.sql.NVarChar, t.id).input('u', this.sql.NVarChar, t.username).input('s', this.sql.NVarChar, t.subject).input('c', this.sql.NVarChar, t.category)
+      .input('p', this.sql.NVarChar, t.priority).input('st', this.sql.NVarChar, t.status).input('ca', this.sql.NVarChar, t.createdAt).input('ua', this.sql.NVarChar, t.updatedAt)
+      .input('ls', this.sql.NVarChar, t.lastStaffReplyAt).input('us', this.sql.NVarChar, t.userSeenAt)
+      .query(`INSERT INTO dbo.tickets (id, username, subject, category, priority, status, createdAt, updatedAt, lastStaffReplyAt, userSeenAt) VALUES (@id, @u, @s, @c, @p, @st, @ca, @ua, @ls, @us)`);
+  }
+  async getTicketById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.tickets WHERE id = @id`)).recordset[0]; }
+  async listTicketsFor(username: string) { return (await this.r().input('u', this.sql.NVarChar, username).query(`SELECT * FROM dbo.tickets WHERE username = @u ORDER BY updatedAt DESC`)).recordset as TicketRow[]; }
+  async listTickets(status?: string) {
+    if (status) return (await this.r().input('s', this.sql.NVarChar, status).query(`SELECT * FROM dbo.tickets WHERE status = @s ORDER BY updatedAt DESC`)).recordset as TicketRow[];
+    return (await this.r().query(`SELECT * FROM dbo.tickets ORDER BY updatedAt DESC`)).recordset as TicketRow[];
+  }
+  async updateTicket(id: string, f: Partial<TicketRow>) { await this.dynUpdate('tickets', TICKET_COLUMNS, 'id', id, f as any); }
+  async addTicketMessage(m: TicketMessageRow) {
+    await this.r().input('id', this.sql.NVarChar, m.id).input('t', this.sql.NVarChar, m.ticketId).input('a', this.sql.NVarChar, m.author).input('s', this.sql.Int, m.isStaff).input('b', this.sql.NVarChar, m.body).input('c', this.sql.NVarChar, m.createdAt)
+      .query(`INSERT INTO dbo.ticket_messages (id, ticketId, author, isStaff, body, createdAt) VALUES (@id, @t, @a, @s, @b, @c)`);
+  }
+  async listTicketMessages(ticketId: string) { return (await this.r().input('t', this.sql.NVarChar, ticketId).query(`SELECT * FROM dbo.ticket_messages WHERE ticketId = @t ORDER BY createdAt ASC`)).recordset as TicketMessageRow[]; }
+  async countOpenTickets() { return (await this.r().query(`SELECT COUNT(*) as c FROM dbo.tickets WHERE status IN ('open','customer_reply')`)).recordset[0].c; }
 
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.r().query(`SELECT * FROM dbo.accessories`)).recordset as AccessoryRow[]; }
@@ -999,8 +1159,8 @@ export class SqlServerStore implements IDataStore {
   async addShopOrder(o: ShopOrderRow) {
     await this.r().input('id', this.sql.NVarChar, o.id).input('cart', this.sql.NVarChar, o.cart).input('tp', this.sql.Float, o.totalPrice)
       .input('da', this.sql.Float, o.discountApplied).input('fa', this.sql.Float, o.finalAmount).input('cc', this.sql.NVarChar, o.couponCode)
-      .input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status)
-      .query(`INSERT INTO dbo.shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status) VALUES (@id, @cart, @tp, @da, @fa, @cc, @d, @s)`);
+      .input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status).input('u', this.sql.NVarChar, o.username || '')
+      .query(`INSERT INTO dbo.shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status, username) VALUES (@id, @cart, @tp, @da, @fa, @cc, @d, @s, @u)`);
   }
   async setShopOrderStatus(id: string, status: string) {
     await this.r().input('s', this.sql.NVarChar, status).input('id', this.sql.NVarChar, id).query(`UPDATE dbo.shop_orders SET status = @s WHERE id = @id`);
@@ -1062,7 +1222,7 @@ export class SqlServerStore implements IDataStore {
     await this.r().input('id', this.sql.NVarChar, t.id).input('n', this.sql.NVarChar, t.name).input('ne', this.sql.NVarChar, t.nameEn)
       .input('pc', this.sql.NVarChar, t.primaryColor).input('ph', this.sql.NVarChar, t.primaryHover).input('db', this.sql.NVarChar, t.darkBg)
       .input('dc', this.sql.NVarChar, t.darkCard).input('ar', this.sql.NVarChar, t.accentRed)
-      .query(`INSERT INTO dbo.themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (@id, @n, @ne, @pc, @ph, @db, @dc, @ar)`);
+      .query(`IF NOT EXISTS (SELECT 1 FROM dbo.themes WHERE id = @id) INSERT INTO dbo.themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (@id, @n, @ne, @pc, @ph, @db, @dc, @ar)`);
   }
 
   // ---- App sliders ----
@@ -1164,6 +1324,10 @@ export class MongoStore implements IDataStore {
     await this.col('chat_rooms').createIndex({ name: 1 }, { unique: true });
     await this.col('active_coupons').createIndex({ code: 1 }, { unique: true });
     await this.col('payment_orders').createIndex({ merchantOid: 1 }, { unique: true });
+    await this.col('otp_codes').createIndex({ phone: 1, createdAt: -1 });
+    await this.col('otp_codes').createIndex({ ip: 1, createdAt: -1 });
+    await this.col('tickets').createIndex({ username: 1, updatedAt: -1 });
+    await this.col('ticket_messages').createIndex({ ticketId: 1, createdAt: 1 });
     logDbQuery(this.name, 'NoSQL', 'db.createIndex(...) on users/settings/chat_rooms/active_coupons');
     return { success: true, message: `MongoDB collections/indexes verified on database [${this.config.dbName || 'bazino'}].` };
   }
@@ -1299,6 +1463,28 @@ export class MongoStore implements IDataStore {
   async getPaymentOrder(merchantOid: string) { const row = await this.col('payment_orders').findOne({ merchantOid }); return row ? this.strip(row) : undefined; }
   async updatePaymentOrder(merchantOid: string, f: Partial<PaymentOrderRow>) { const { merchantOid: _m, ...rest } = f; await this.col('payment_orders').updateOne({ merchantOid }, { $set: rest }); }
   async listPaymentOrders(limit = 200) { return (await this.col('payment_orders').find({}).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
+
+  // ---- Profile / OTP / Tickets (task 12) ----
+  async updateUserFields(username: string, f: Partial<UserRow>) {
+    const set: Record<string, any> = {}; for (const k of Object.keys(f)) if (USER_PROFILE_COLUMNS.has(k)) set[k] = (f as any)[k];
+    if (Object.keys(set).length) await this.col('users').updateOne({ username }, { $set: set });
+  }
+  async getUserByPhone(phone: string) { const row = await this.col('users').findOne({ phone }); return row ? this.strip(row) : undefined; }
+  async createOtp(o: OtpCodeRow) { await this.col('otp_codes').insertOne({ ...o }); }
+  async listRecentOtps(fl: { phone?: string; ip?: string; since: string }) {
+    const or: any[] = []; if (fl.phone) or.push({ phone: fl.phone }); if (fl.ip) or.push({ ip: fl.ip });
+    return (await this.col('otp_codes').find({ $and: [{ $or: or.length ? or : [{ phone: '__none__' }] }, { createdAt: { $gte: fl.since } }] }).sort({ createdAt: -1 }).toArray()).map((r: any) => this.strip(r));
+  }
+  async getLatestActiveOtp(phone: string, purpose: string) { const row = await this.col('otp_codes').find({ phone, purpose, consumedAt: '' }).sort({ createdAt: -1 }).limit(1).next(); return row ? this.strip(row) : undefined; }
+  async updateOtp(id: string, f: Partial<OtpCodeRow>) { const { id: _i, ...rest } = f as any; await this.col('otp_codes').updateOne({ id }, { $set: rest }); }
+  async createTicket(t: TicketRow) { await this.col('tickets').insertOne({ ...t }); }
+  async getTicketById(id: string) { const row = await this.col('tickets').findOne({ id }); return row ? this.strip(row) : undefined; }
+  async listTicketsFor(username: string) { return (await this.col('tickets').find({ username }).sort({ updatedAt: -1 }).toArray()).map((r: any) => this.strip(r)); }
+  async listTickets(status?: string) { return (await this.col('tickets').find(status ? { status } : {}).sort({ updatedAt: -1 }).toArray()).map((r: any) => this.strip(r)); }
+  async updateTicket(id: string, f: Partial<TicketRow>) { const set: Record<string, any> = {}; for (const k of Object.keys(f)) if (TICKET_COLUMNS.has(k)) set[k] = (f as any)[k]; if (Object.keys(set).length) await this.col('tickets').updateOne({ id }, { $set: set }); }
+  async addTicketMessage(m: TicketMessageRow) { await this.col('ticket_messages').insertOne({ ...m }); }
+  async listTicketMessages(ticketId: string) { return (await this.col('ticket_messages').find({ ticketId }).sort({ createdAt: 1 }).toArray()).map((r: any) => this.strip(r)); }
+  async countOpenTickets() { return this.col('tickets').countDocuments({ status: { $in: ['open', 'customer_reply'] } }); }
 
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.col('accessories').find({}).toArray()).map((r: any) => this.strip(r)); }

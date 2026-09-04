@@ -83,11 +83,11 @@ export default function HubLayout({
           </button>
         ) : (
           <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-              {user.username.charAt(0).toUpperCase()}
-            </div>
+            <a href="/profile" className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden" data-header-profile-link>
+              {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-8 h-8 object-cover" /> : (user.displayName || user.username).charAt(0).toUpperCase()}
+            </a>
             <div className="flex flex-col">
-              <span className="text-white text-xs font-bold">@{user.username}</span>
+              <a href="/profile" className="text-white text-xs font-bold hover:text-primary">{user.displayName || `@${user.username}`}</a>
               <span className="text-primary text-[10px]">{user.loyaltyPoints} EXP</span>
             </div>
             <button onClick={onLogout} className="ml-2 text-red-400 hover:text-red-300">

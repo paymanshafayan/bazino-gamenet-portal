@@ -35,7 +35,8 @@ import {
   HelpCircle,
   MessageSquare,
   Smartphone,
-  Download
+  Download,
+  LifeBuoy
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
@@ -73,9 +74,11 @@ export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; 
   dbLogs:            { fa: 'لاگ‌های دیتابیس', en: 'Database Logs', ru: 'Логи БД', tr: 'Veritabanı Günlükleri', keywords: 'log گزارش خطا error query' },
   apiKeys:           { fa: 'کلیدهای API و اتصال‌ها', en: 'API Keys & Integrations', ru: 'API-ключи и интеграции', tr: 'API Anahtarları ve Entegrasyonlar', keywords: 'token jarvis web sync کلید اتصال integration' },
   presentation:      { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum', keywords: 'slides معرفی pitch' },
+  tickets:           { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения в поддержку', tr: 'Destek Talepleri', keywords: 'support help ticket پشتیبانی تیکت destek' },
 };
 
 const PresentationTab = React.lazy(() => import('./PresentationTab'));
+const AdminTicketsSection = React.lazy(() => import('./AdminTicketsSection'));
 
 interface Props {
   themeId?: string;
@@ -123,6 +126,15 @@ export default function AdminPanelTab({
   // جستجوی سریع بخش‌ها
   const [sectionQuery, setSectionQuery] = useState('');
   const [isSectionSearchOpen, setIsSectionSearchOpen] = useState(false);
+  // شمارندهٔ تیکت‌های در انتظار پاسخ برای نشان (badge) منوی کناری
+  const [openTicketCount, setOpenTicketCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const poll = () => fetch('/api/admin/tickets?status=open').then(r => (r.ok ? r.json() : null)).then(d => { if (!cancelled && d) setOpenTicketCount(d.openCount || 0); }).catch(() => {});
+    poll();
+    const id = window.setInterval(poll, 60_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [activeSubTab]);
   const sectionSearchRef = useRef<HTMLDivElement | null>(null);
   const sectionMatches = (() => {
     const q = sectionQuery.trim().toLowerCase();
@@ -1579,6 +1591,20 @@ export default function AdminPanelTab({
           </button>
 
           <button
+            onClick={() => setActiveSubTab('tickets')}
+            data-admin-nav="tickets"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'tickets'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <LifeBuoy className="w-4 h-4" />
+            <span>{L(language, { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения в поддержку', tr: 'Destek Talepleri' })}</span>
+            {openTicketCount > 0 && <span className="ms-auto text-[10px] bg-rose-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center" data-admin-ticket-badge>{openTicketCount}</span>}
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('migrations')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
               activeSubTab === 'migrations'
@@ -1748,6 +1774,7 @@ export default function AdminPanelTab({
                       customization: { fa: 'سفارشی‌سازی', en: 'Customization', ru: 'Настройка', tr: 'Özelleştirme' },
                       dbLogs: { fa: 'لاگ‌های دیتابیس', en: 'Database Logs', ru: 'Логи БД', tr: 'Veritabanı Günlükleri' },
                       presentation: { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum' },
+                      tickets: { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения', tr: 'Destek Talepleri' },
                     };
                     const name = L(language, names[activeSubTab] ?? { fa: 'تنظیمات کلید‌ها', en: 'API Keys', ru: 'Настройки ключей', tr: 'Anahtar Ayarları' });
                     return L(language, {
@@ -4466,6 +4493,12 @@ export default function AdminPanelTab({
           {activeSubTab === 'presentation' && (
             <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Presentation...</div>}>
               <PresentationTab addNotification={addNotification} />
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'tickets' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Tickets...</div>}>
+              <AdminTicketsSection addNotification={addNotification} />
             </React.Suspense>
           )}
 

@@ -491,7 +491,7 @@ test('API messages: every code covers all four languages and interpolates', asyn
   const known = ['BAD_CREDENTIALS', 'OUT_OF_STOCK', 'SLOT_TAKEN', 'MIN_REDEEM_POINTS', 'ADMIN_ONLY'] as const;
   for (const key of keys.length ? keys : known) {
     for (const lang of LANGS) {
-      const txt = apiMessage(lang, key as any, { min: 100, name: 'X', id: '1', hours: 2, points: 40, platform: 'P', detail: 'D' });
+      const txt = apiMessage(lang, key as any, { min: 100, name: 'X', id: '1', hours: 2, points: 40, platform: 'P', detail: 'D', sec: 30, left: 4 });
       assert.ok(txt && txt.trim(), `${key}.${lang} empty`);
       assert.ok(!/\{\w+\}/.test(txt), `${key}.${lang} left a placeholder: ${txt}`);
       if (lang !== 'fa') assert.ok(!/[\u0600-\u06FF]/.test(txt), `${key}.${lang} contains Persian: ${txt}`);
@@ -737,6 +737,77 @@ test('the public header has no theme-selector button and personal theme choice i
   assert.ok(!app.includes('ThemeSelectorModal'), 'ThemeSelectorModal must not be referenced by App.tsx');
   assert.ok(!/<Palette\b/.test(app), 'palette (theme picker) button must not be in the header');
   assert.ok(!app.includes("getItem('themeChoice')"), 'personal themeChoice must no longer override the site default');
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   12. تسک ۱۲ — OTP / پروفایل / تیکت: مسیرها، لایهٔ SMS و سیاست‌های کد
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('12. OTP auth, profile & tickets — routes, SMS layer, policies');
+
+test('/profile[/tab] and /profile/tickets/:id resolve as theme-independent standalone pages', () => {
+  assert.deepEqual(routes.standalonePageFromPath('/profile'), { type: 'profile', tab: 'overview', ticketId: undefined });
+  assert.deepEqual(routes.standalonePageFromPath('/profile/security'), { type: 'profile', tab: 'security', ticketId: undefined });
+  assert.deepEqual(routes.standalonePageFromPath('/profile/tickets/TK-1'), { type: 'profile', tab: 'tickets', ticketId: 'TK-1' });
+  assert.equal(routes.standalonePageFromPath('/profile/bogus')?.tab, 'overview');
+  assert.equal(routes.pathFromProfileTab('overview'), '/profile');
+  assert.equal(routes.pathFromProfileTab('points'), '/profile/points');
+  assert.equal(routes.tabFromPath('/profile'), 'home', 'profile is not one of the themed tabs');
+  assert.ok(routes.ADMIN_SECTIONS.includes('tickets'));
+  assert.equal(routes.adminSectionFromPath('/admin/tickets'), 'tickets');
+});
+
+test('SMS layer: mock is the default, unknown provider falls back to mock, real providers require keys', async () => {
+  const sms = await import('../server/sms/index.ts');
+  const saved = { P: process.env.SMS_PROVIDER, K: process.env.SMSTO_API_KEY };
+  try {
+    delete process.env.SMS_PROVIDER;
+    const p = sms.getSmsProvider();
+    assert.equal(p.name, 'mock');
+    assert.equal(sms.isMockSms(), true);
+    const r = await p.send('+905321112233', 'Bazino login code: 123456');
+    assert.equal(r.ok, true);
+    assert.equal((p as any).lastFor('+905321112233').message, 'Bazino login code: 123456');
+  } finally { process.env.SMS_PROVIDER = saved.P; process.env.SMSTO_API_KEY = saved.K; }
+  const src = readFileSync(path.join(ROOT, 'server/sms/index.ts'), 'utf8');
+  assert.ok(src.includes("throw new Error('SMS_PROVIDER=smsto requires SMSTO_API_KEY')"));
+  assert.ok(src.includes('https://api.sms.to/sms/send'), 'SMS.to endpoint');
+  assert.ok(src.includes('https://restapi.easysendsms.app/v1/rest/sms/send'), 'EasySendSMS endpoint');
+  assert.ok(existsSync(path.join(ROOT, 'docs/sms/SMS-PROVIDERS.md')));
+});
+
+test('OTP policy in code: hashed storage, 5-minute expiry, 5 attempts, server-side limits, dev-peek gated', () => {
+  const src = readFileSync(path.join(ROOT, 'server/accountRoutes.ts'), 'utf8');
+  assert.ok(src.includes("createHash('sha256')"), 'codes must be hashed');
+  assert.ok(src.includes('OTP_TTL_MS = 5 * 60 * 1000'));
+  assert.ok(src.includes('OTP_MAX_ATTEMPTS = 5'));
+  assert.ok(/phoneMinGapSec: 60/.test(src) && /phonePerHour: 5/.test(src) && /ipPer10Min: 10/.test(src) && /ipPerHour: 30/.test(src));
+  assert.ok(src.includes("res.status(429)") && src.includes('retryAfter'), '429 + retryAfter contract');
+  assert.ok(src.includes('isMockSms()') && src.includes("isProd && process.env.OTP_DEV_PEEK !== '1'"), 'dev-peek must be gated');
+  assert.ok(!/res\.json\(\{[^}]*\bcode\b[^}]*\}\)\s*;\s*\/\/ leak/.test(src));
+  assert.ok(read('server.ts').includes('app.set("trust proxy", 1)'), 'X-Forwarded-For must be trusted for IP limits');
+});
+
+test('the web AuthModal has no registration form; OTP + password only; profile page is lazy and theme-independent', () => {
+  const modal = read('src/components/AuthModal.tsx');
+  assert.ok(!modal.includes('/api/auth/register'), 'registration must go through OTP');
+  assert.ok(modal.includes('/api/auth/otp/request') && modal.includes('/api/auth/otp/verify') && modal.includes('/api/auth/login'));
+  assert.ok(modal.includes('retryAfter'), 'countdown must come from the server');
+  const app = read('src/App.tsx');
+  assert.ok(app.includes("lazy(() => import('./components/profile/ProfilePage'))"));
+  assert.ok(app.includes('data-header-profile-link'), 'header username must link to /profile');
+  const profile = read('src/components/profile/ProfilePage.tsx');
+  assert.ok(profile.includes("from '../../legal/LegalShell'"), 'profile uses the theme-independent shell');
+  assert.ok(!profile.includes('ThemeRegion'));
+});
+
+test('order rows carry the owner username in all three providers', () => {
+  const dp = read('server/dataProviders.ts');
+  assert.ok(/CafeOrderRow \{[^}]*username\?: string/.test(dp) && /ShopOrderRow \{[^}]*username\?: string/.test(dp));
+  assert.equal((dp.match(/INSERT INTO cafe_orders \([^)]*username\)/g) || []).length, 1, 'sqlite cafe insert');
+  assert.equal((dp.match(/INSERT INTO dbo\.cafe_orders \([^)]*username\)/g) || []).length, 1, 'mssql cafe insert');
+  assert.equal((dp.match(/INSERT INTO shop_orders \([^)]*username\)/g) || []).length, 1, 'sqlite shop insert');
+  assert.equal((dp.match(/INSERT INTO dbo\.shop_orders \([^)]*username\)/g) || []).length, 1, 'mssql shop insert');
 });
 
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });

@@ -34,6 +34,7 @@ const BlogTab = lazy(() => import('./components/BlogTab'));
 const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
 
 const AuthModal = lazy(() => import('./components/AuthModal'));
+const ProfilePage = lazy(() => import('./components/profile/ProfilePage'));
 const InstallPage = lazy(() => import('./components/InstallPage'));
 const ChatTab = lazy(() => import('./components/ChatTab'));
 const ConsoleHubView = lazy(() => import('./components/ConsoleHubView'));
@@ -51,6 +52,7 @@ import {
 import { tabFromPath, pathFromTab, standalonePageFromPath } from './utils/routes';
 // صفحات قانونی/تماس/پرداخت عمداً lazy نیستند تا هرگز به قالب و ThemeRegion وابسته نباشند
 import { LegalPage } from './legal/LegalPage';
+import InitialAvatar from './components/InitialAvatar';
 import { ContactPage } from './legal/ContactPage';
 import { PaymentResultPage } from './legal/PaymentResultPage';
 import { LegalFooter } from './legal/LegalFooter';
@@ -301,6 +303,16 @@ export default function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
   const [user, setUser] = useState<UserState | null>(null);
+  // نشان «پاسخ جدید پشتیبانی» روی نام کاربر در هدر (تسک ۱۲)
+  const [unreadTickets, setUnreadTickets] = useState(0);
+  useEffect(() => {
+    if (!user) { setUnreadTickets(0); return; }
+    let cancelled = false;
+    const poll = () => fetch('/api/me/tickets').then(r => (r.ok ? r.json() : null)).then(d => { if (!cancelled && d) setUnreadTickets(d.unread || 0); }).catch(() => {});
+    const t = window.setTimeout(poll, 1500);
+    const id = window.setInterval(poll, 90_000);
+    return () => { cancelled = true; window.clearTimeout(t); window.clearInterval(id); };
+  }, [user?.username, currentPath]);
   // نصب در checkInstallStatus عمداً bypass است؛ مقدار اولیه‌ی true از paint واسط
   // spinner و جابه‌جایی کامل layout در mount دوم جلوگیری می‌کند (CLS/TBT گزارش).
   const [isInstalled, setIsInstalled] = useState<boolean | null>(true);
@@ -671,6 +683,40 @@ export default function App() {
   if (standalone) {
     if (standalone.type === 'legal') return <LegalPage slug={standalone.slug} onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} />;
     if (standalone.type === 'contact') return <ContactPage onBack={() => navigateStandalone('home')} />;
+    if (standalone.type === 'profile') {
+      return (
+        <>
+          <Suspense fallback={<div className="min-h-screen bg-[#0b0f17]" />}>
+            <ProfilePage
+              user={user}
+              tab={standalone.tab}
+              ticketId={standalone.ticketId}
+              onNavigate={navigateStandalone}
+              onUserChange={(u) => setUser(u)}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onLogout={handleLogout}
+              addNotification={addNotification}
+            />
+          </Suspense>
+          <Suspense fallback={null}>
+            {isAuthModalOpen && (
+              <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={(u) => setUser(u)} addNotification={addNotification} />
+            )}
+          </Suspense>
+          {isLogoutConfirmOpen && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80" onClick={() => setIsLogoutConfirmOpen(false)}>
+              <div className="bg-[#121826] border border-[#232c3d] rounded-2xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()} dir={dir}>
+                <p className="text-white font-bold mb-5">{L(language, { fa: 'از حساب خارج می‌شوید؟', en: 'Sign out of your account?', ru: 'Выйти из аккаунта?', tr: 'Hesaptan çıkılsın mı?' })}</p>
+                <div className="flex gap-3">
+                  <button onClick={confirmLogout} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-bold text-sm">{L(language, { fa: 'خروج', en: 'Sign out', ru: 'Выйти', tr: 'Çıkış' })}</button>
+                  <button onClick={() => setIsLogoutConfirmOpen(false)} className="flex-1 bg-white/10 text-white py-2.5 rounded-xl font-bold text-sm">{L(language, { fa: 'انصراف', en: 'Cancel', ru: 'Отмена', tr: 'İptal' })}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
     return <PaymentResultPage outcome={standalone.outcome} oid={standalone.oid} onBack={() => navigateStandalone('home')} onGoTo={navigateStandalone} />;
   }
 
@@ -824,7 +870,11 @@ export default function App() {
                  </button>
                ) : (
                  <div className="flex items-center gap-3">
-                   <span className="text-xs font-bold text-primary">@{user.username}</span>
+                   <a href="/profile" onClick={(e) => { e.preventDefault(); navigateStandalone('/profile'); }} className="flex items-center gap-2 text-xs font-bold text-primary hover:text-white transition relative" data-header-profile-link title={L(language, { fa: 'پروفایل من', en: 'My profile', ru: 'Мой профиль', tr: 'Profilim' })}>
+                     {user.avatarUrl ? <img src={user.avatarUrl} alt="" width={28} height={28} className="w-7 h-7 rounded-full object-cover border border-primary/50" /> : <InitialAvatar name={user.displayName || user.username} size={28} />}
+                     <span className="hidden sm:inline">{user.displayName || `@${user.username}`}</span>
+                     {unreadTickets > 0 && <span className="absolute -top-1.5 -end-2 bg-rose-500 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center" data-header-unread>{unreadTickets}</span>}
+                   </a>
                    <button onClick={handleLogout} aria-label="Logout" className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
                  </div>
                )}

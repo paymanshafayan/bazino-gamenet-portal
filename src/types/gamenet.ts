@@ -4,6 +4,16 @@ export interface UserState {
   phone: string;
   loyaltyPoints: number;
   role?: string;
+  /** پروفایل (تسک ۱۲) — از /api/auth/me و /api/me/profile */
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+  gamerTag?: string;
+  city?: string;
+  birthDate?: string;
+  phoneVerified?: boolean;
+  hasPassword?: boolean;
+  createdAt?: string;
 }
 
 export interface LoyaltyTx {

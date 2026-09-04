@@ -391,6 +391,123 @@ test('seeded articles keep their mobileImageUrl (incl. hardware-pc)', async () =
   assert.equal(art2.mobileImageUrl, '/images/home/hardware-pc-400.webp');
 });
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   16b. OTP / پروفایل / تیکت (تسک ۱۲) — روی SQLite واقعی + منطق محدودیت سرور
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('16b. Database — OTP rate limits, profile & tickets (SQLite)');
+
+const { checkOtpRateLimit, normalizePhone, OTP_LIMITS } = await import('../server/accountRoutes.ts');
+
+test('normalizePhone: E.164 with +90 default, Persian digits, 00-prefix, rejects garbage', () => {
+  assert.equal(normalizePhone('0532 111 22 33'), '+905321112233');
+  assert.equal(normalizePhone('5321112233'), '+905321112233');
+  assert.equal(normalizePhone('+98 912 345 6789'), '+989123456789');
+  assert.equal(normalizePhone('00357 99 123456'), '+35799123456');
+  assert.equal(normalizePhone('۰۵۳۲۱۱۱۲۲۳۳'), '+905321112233');
+  assert.equal(normalizePhone('abc'), null);
+  assert.equal(normalizePhone('+1'), null);
+  assert.equal(normalizePhone(12345 as any), null);
+});
+
+const otpRow = (id: string, phone: string, ip: string, ageMs: number, now: number, consumed = '') => ({
+  id, phone, codeHash: 's$h', ip, purpose: 'login', createdAt: new Date(now - ageMs).toISOString(),
+  expiresAt: new Date(now - ageMs + 300_000).toISOString(), attempts: 0, consumedAt: consumed,
+});
+
+test('otp_codes table: create/list/latest-active/update work and schema is migrated', async () => {
+  const store = await freshStore('otp');
+  const now = Date.now();
+  await store.createOtp(otpRow('a', '+905000000001', '9.9.9.9', 120_000, now));
+  await store.createOtp(otpRow('b', '+905000000001', '9.9.9.9', 5_000, now));
+  const latest = await store.getLatestActiveOtp('+905000000001', 'login');
+  assert.equal(latest?.id, 'b');
+  await store.updateOtp('b', { attempts: 2 });
+  assert.equal((await store.getLatestActiveOtp('+905000000001', 'login'))?.attempts, 2);
+  await store.updateOtp('b', { consumedAt: new Date(now).toISOString() });
+  assert.equal((await store.getLatestActiveOtp('+905000000001', 'login'))?.id, 'a', 'consumed codes are skipped');
+  const recent = await store.listRecentOtps({ phone: '+905000000001', since: new Date(now - 3_600_000).toISOString() });
+  assert.equal(recent.length, 2);
+});
+
+test('rate limit: same phone must wait 60 s between codes (any IP)', async () => {
+  const store = await freshStore('otp-gap');
+  const now = Date.now();
+  await store.createOtp(otpRow('a', '+905000000010', '1.1.1.1', 20_000, now));
+  const r = await checkOtpRateLimit(store, '+905000000010', '2.2.2.2', now);
+  assert.equal(r?.code, 'OTP_TOO_SOON');
+  assert.ok(r!.retryAfter >= 39 && r!.retryAfter <= 41, `retryAfter=${r!.retryAfter}`);
+  assert.equal(await checkOtpRateLimit(store, '+905000000010', '2.2.2.2', now + 41_000), null);
+});
+
+test('rate limit: same phone max 5 per hour even from different IPs', async () => {
+  const store = await freshStore('otp-phone-hour');
+  const now = Date.now();
+  for (let i = 0; i < 5; i++) await store.createOtp(otpRow(`p${i}`, '+905000000020', `10.0.0.${i}`, (i + 2) * 70_000, now));
+  const r = await checkOtpRateLimit(store, '+905000000020', '10.0.0.99', now);
+  assert.equal(r?.code, 'OTP_RATE_LIMIT');
+  assert.ok(r!.retryAfter > 0 && r!.retryAfter <= 3600);
+  // a *different* phone from the same IP is still fine (only 5 on this IP)
+  assert.equal(await checkOtpRateLimit(store, '+905000000021', '10.0.0.1', now), null);
+});
+
+test('rate limit: same IP max 10 per 10 min across different phones', async () => {
+  const store = await freshStore('otp-ip-10');
+  const now = Date.now();
+  for (let i = 0; i < OTP_LIMITS.ipPer10Min; i++) await store.createOtp(otpRow(`i${i}`, `+90500000010${i}`, '5.5.5.5', (i + 1) * 30_000, now));
+  const r = await checkOtpRateLimit(store, '+905000000199', '5.5.5.5', now);
+  assert.equal(r?.code, 'OTP_RATE_LIMIT', 'the 11th phone from the same IP must be blocked');
+  assert.ok(r!.retryAfter <= 600);
+  assert.equal(await checkOtpRateLimit(store, '+905000000199', '6.6.6.6', now), null, 'another IP is unaffected');
+  // after the window slides (oldest is 30 s old → free in ≤ 570 s) it is allowed again
+  assert.equal(await checkOtpRateLimit(store, '+905000000199', '5.5.5.5', now + 600_000), null);
+});
+
+test('rate limit: same IP max 30 per hour', async () => {
+  const store = await freshStore('otp-ip-60');
+  const now = Date.now();
+  for (let i = 0; i < OTP_LIMITS.ipPerHour; i++) await store.createOtp(otpRow(`h${i}`, `+9050000002${String(i).padStart(2, '0')}`, '7.7.7.7', 660_000 + i * 60_000, now));
+  const r = await checkOtpRateLimit(store, '+905000000999', '7.7.7.7', now);
+  assert.equal(r?.code, 'OTP_RATE_LIMIT');
+  assert.equal(await checkOtpRateLimit(store, '+905000000999', '7.7.7.8', now), null);
+});
+
+test('users: profile columns are migrated and updateUserFields ignores non-profile keys', async () => {
+  const store = await freshStore('profile');
+  await store.createUser({ username: 'u_otp', password: 'x', email: '', phone: '+905000000300' });
+  await store.updateUserFields('u_otp', { displayName: 'Sina', avatarUrl: '/a.webp', hasPassword: 0, role: 'admin', loyaltyPoints: 5 } as any);
+  const u = await store.getUserByPhone('+905000000300');
+  assert.equal(u.displayName, 'Sina');
+  assert.equal(u.hasPassword, 0);
+  assert.equal(u.role, 'gamer');
+  assert.notEqual(u.loyaltyPoints, 5);
+});
+
+test('cafe/shop orders keep the owner username', async () => {
+  const store = await freshStore('orders-owner');
+  await store.addCafeOrder({ id: 'CF-1', items: '[]', totalPrice: 10, discountApplied: 0, finalAmount: 10, couponCode: '', tableNumber: 't', date: 'd', status: 'Pending', username: 'u1' });
+  await store.addShopOrder({ id: 'ACC-1', cart: '[]', totalPrice: 10, discountApplied: 0, finalAmount: 10, couponCode: '', date: 'd', status: 'Processing' });
+  assert.equal((await store.getCafeOrderById('CF-1')).username, 'u1');
+  assert.equal((await store.getShopOrderById('ACC-1')).username, '');
+});
+
+test('tickets: lifecycle and open counter', async () => {
+  const store = await freshStore('tickets');
+  const base = { username: 'u1', subject: 's', category: 'general', priority: 'normal', createdAt: '2026-01-01T00:00:00.000Z', lastStaffReplyAt: '', userSeenAt: '' };
+  await store.createTicket({ ...base, id: 'T1', status: 'open', updatedAt: '2026-01-01T00:00:00.000Z' });
+  await store.createTicket({ ...base, id: 'T2', status: 'open', updatedAt: '2026-01-02T00:00:00.000Z' });
+  assert.equal(await store.countOpenTickets(), 2);
+  await store.addTicketMessage({ id: 'm1', ticketId: 'T1', author: 'u1', isStaff: 0, body: 'q', createdAt: '2026-01-01T00:00:01.000Z' });
+  await store.addTicketMessage({ id: 'm2', ticketId: 'T1', author: 'admin', isStaff: 1, body: 'a', createdAt: '2026-01-01T00:00:02.000Z' });
+  await store.updateTicket('T1', { status: 'answered', lastStaffReplyAt: '2026-01-01T00:00:02.000Z' });
+  await store.updateTicket('T2', { status: 'closed' });
+  assert.equal(await store.countOpenTickets(), 0);
+  assert.deepEqual((await store.listTicketsFor('u1')).map((t: any) => t.id), ['T2', 'T1']);
+  assert.equal((await store.listTickets('answered')).length, 1);
+  assert.equal((await store.listTicketMessages('T1')).length, 2);
+  assert.equal((await store.listTicketsFor('someone-else')).length, 0);
+});
+
 }
 
 await run({ title: 'Bazino — Database (real SQLite) tests', jsonOut: 'tests/reports/database.json' });

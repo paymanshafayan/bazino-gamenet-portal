@@ -144,8 +144,10 @@ function TicketThread({ id, onNavigate, addNotification, onUnreadChange }: { id:
         ))}
       </div>
       {ticket.status === 'closed' ? (
-        <div className="bz-alert" style={{ background: '#1a2333', color: LEGAL_PALETTE.muted }}>{L(language, { fa: 'این تیکت بسته شده است. برای موضوع جدید، تیکت جدیدی ثبت کنید.', en: 'This ticket is closed. Open a new ticket for a new issue.', ru: 'Обращение закрыто. Для нового вопроса создайте новое обращение.', tr: 'Bu talep kapatıldı. Yeni bir konu için yeni talep açın.' })}</div>
+        <div className="bz-alert" style={{ background: '#1a2333', color: LEGAL_PALETTE.muted }}>{L(language, { fa: 'این تیکت بسته شده است (تیکت‌های پاسخ‌داده‌شده پس از ۴۸ ساعت بدون جواب کاربر خودکار بسته می‌شوند). برای موضوع جدید، تیکت جدیدی ثبت کنید.', en: 'This ticket is closed. Open a new ticket for a new issue.', ru: 'Обращение закрыто. Для нового вопроса создайте новое обращение.', tr: 'Bu talep kapatıldı. Yeni bir konu için yeni talep açın.' })}</div>
       ) : (
+        <>
+        {ticket.status === 'answered' && <p style={{ color: LEGAL_PALETTE.muted, fontSize: 12, marginBottom: 10 }} data-auto-close-note>{L(language, { fa: 'اگر تا ۴۸ ساعت پس از پاسخ پشتیبانی جوابی ندهید، این تیکت خودکار بسته می‌شود.', en: 'If you do not reply within 48 hours of the support answer, this ticket closes automatically.', ru: 'Если вы не ответите в течение 48 часов после ответа поддержки, обращение закроется автоматически.', tr: 'Destek yanıtından sonra 48 saat içinde cevap vermezseniz bu talep otomatik kapatılır.' })}</p>}
         <form onSubmit={send} data-ticket-reply-form>
           <div className="bz-field"><label htmlFor="tk-reply">{L(language, { fa: 'پاسخ شما', en: 'Your reply', ru: 'Ваш ответ', tr: 'Yanıtınız' })}</label><textarea id="tk-reply" rows={4} value={reply} onChange={e => setReply(e.target.value)} required maxLength={4000} /></div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -153,6 +155,7 @@ function TicketThread({ id, onNavigate, addNotification, onUnreadChange }: { id:
             <button type="button" className="bz-legal-btn bz-legal-btn-ghost" onClick={close} style={{ color: LEGAL_PALETTE.danger }} data-ticket-close>{L(language, { fa: 'بستن تیکت', en: 'Close ticket', ru: 'Закрыть обращение', tr: 'Talebi kapat' })}</button>
           </div>
         </form>
+        </>
       )}
     </div>
   );

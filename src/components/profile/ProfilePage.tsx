@@ -73,10 +73,10 @@ function ensureProfileStyles() {
 
 export function ticketStatusLabel(status: string, language: 'fa' | 'en' | 'ru' | 'tr') {
   const map: Record<string, { fa: string; en: string; ru: string; tr: string }> = {
-    open: { fa: 'باز', en: 'Open', ru: 'Открыт', tr: 'Açık' },
-    answered: { fa: 'پاسخ داده شد', en: 'Answered', ru: 'Есть ответ', tr: 'Yanıtlandı' },
-    customer_reply: { fa: 'در انتظار پشتیبانی', en: 'Awaiting support', ru: 'Ожидает поддержки', tr: 'Destek bekliyor' },
-    closed: { fa: 'بسته', en: 'Closed', ru: 'Закрыт', tr: 'Kapalı' },
+    open: { fa: 'در حال بررسی', en: 'Under review', ru: 'На рассмотрении', tr: 'İnceleniyor' },
+    answered: { fa: 'پاسخ داده شده', en: 'Answered', ru: 'Есть ответ', tr: 'Yanıtlandı' },
+    customer_reply: { fa: 'در حال بررسی', en: 'Under review', ru: 'На рассмотрении', tr: 'İnceleniyor' },
+    closed: { fa: 'بسته شده', en: 'Closed', ru: 'Закрыт', tr: 'Kapatıldı' },
   };
   return L(language, map[status] || { fa: status, en: status, ru: status, tr: status });
 }

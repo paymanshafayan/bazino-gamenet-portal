@@ -397,7 +397,7 @@ test('seeded articles keep their mobileImageUrl (incl. hardware-pc)', async () =
    ═══════════════════════════════════════════════════════════════════════ */
 suite('16b. Database — OTP rate limits, profile & tickets (SQLite)');
 
-const { checkOtpRateLimit, normalizePhone, OTP_LIMITS } = await import('../server/accountRoutes.ts');
+const { checkOtpRateLimit, normalizePhone, OTP_LIMITS, autoCloseStaleTickets, TICKET_AUTO_CLOSE_MS } = await import('../server/accountRoutes.ts');
 
 test('normalizePhone: E.164 with +90 default, Persian digits, 00-prefix, rejects garbage', () => {
   assert.equal(normalizePhone('0532 111 22 33'), '+905321112233');
@@ -506,6 +506,23 @@ test('tickets: lifecycle and open counter', async () => {
   assert.equal((await store.listTickets('answered')).length, 1);
   assert.equal((await store.listTicketMessages('T1')).length, 2);
   assert.equal((await store.listTicketsFor('someone-else')).length, 0);
+});
+
+test('tickets: answered tickets auto-close 48 h after the last staff reply when the user stays silent', async () => {
+  const store = await freshStore('tickets-autoclose');
+  const now = Date.now();
+  const base = { username: 'u1', subject: 's', category: 'general', priority: 'normal', createdAt: '2026-01-01T00:00:00.000Z', userSeenAt: '' };
+  const at = (ago: number) => new Date(now - ago).toISOString();
+  await store.createTicket({ ...base, id: 'A-old', status: 'answered', updatedAt: at(TICKET_AUTO_CLOSE_MS + 60_000), lastStaffReplyAt: at(TICKET_AUTO_CLOSE_MS + 60_000) });
+  await store.createTicket({ ...base, id: 'A-fresh', status: 'answered', updatedAt: at(3_600_000), lastStaffReplyAt: at(3_600_000) });
+  await store.createTicket({ ...base, id: 'C-reply', status: 'customer_reply', updatedAt: at(TICKET_AUTO_CLOSE_MS * 3), lastStaffReplyAt: at(TICKET_AUTO_CLOSE_MS * 3) });
+  await store.createTicket({ ...base, id: 'O-open', status: 'open', updatedAt: at(TICKET_AUTO_CLOSE_MS * 3), lastStaffReplyAt: '' });
+  assert.equal(await autoCloseStaleTickets(store, now), 1);
+  assert.equal((await store.getTicketById('A-old')).status, 'closed');
+  assert.equal((await store.getTicketById('A-fresh')).status, 'answered', 'less than 48 h → stays answered');
+  assert.equal((await store.getTicketById('C-reply')).status, 'customer_reply', 'user replied → never auto-closed');
+  assert.equal((await store.getTicketById('O-open')).status, 'open', 'no staff reply yet → stays under review');
+  assert.equal(await autoCloseStaleTickets(store, now), 0, 'idempotent');
 });
 
 }

@@ -749,7 +749,7 @@ test('/profile[/tab] and /profile/tickets/:id resolve as theme-independent stand
   assert.deepEqual(routes.standalonePageFromPath('/profile'), { type: 'profile', tab: 'overview', ticketId: undefined });
   assert.deepEqual(routes.standalonePageFromPath('/profile/security'), { type: 'profile', tab: 'security', ticketId: undefined });
   assert.deepEqual(routes.standalonePageFromPath('/profile/tickets/TK-1'), { type: 'profile', tab: 'tickets', ticketId: 'TK-1' });
-  assert.equal(routes.standalonePageFromPath('/profile/bogus')?.tab, 'overview');
+  assert.equal((routes.standalonePageFromPath('/profile/bogus') as any)?.tab, 'overview');
   assert.equal(routes.pathFromProfileTab('overview'), '/profile');
   assert.equal(routes.pathFromProfileTab('points'), '/profile/points');
   assert.equal(routes.tabFromPath('/profile'), 'home', 'profile is not one of the themed tabs');
@@ -799,6 +799,15 @@ test('the web AuthModal has no registration form; OTP + password only; profile p
   const profile = read('src/components/profile/ProfilePage.tsx');
   assert.ok(profile.includes("from '../../legal/LegalShell'"), 'profile uses the theme-independent shell');
   assert.ok(!profile.includes('ThemeRegion'));
+});
+
+test('ticket status wording: open/customer_reply = under review, answered, closed; auto-close after 48 h', () => {
+  const pp = read('src/components/profile/ProfilePage.tsx');
+  assert.ok(/open: \{ fa: 'در حال بررسی'/.test(pp) && /customer_reply: \{ fa: 'در حال بررسی'/.test(pp));
+  assert.ok(/answered: \{ fa: 'پاسخ داده شده'/.test(pp) && /closed: \{ fa: 'بسته شده'/.test(pp));
+  const ar = read('server/accountRoutes.ts');
+  assert.ok(ar.includes('TICKET_AUTO_CLOSE_MS = 48 * 60 * 60 * 1000'));
+  assert.ok(ar.includes("app.get('/api/admin/tickets', async (req, res) => {\n    await sweep();"), 'admin list triggers the sweep');
 });
 
 test('order rows carry the owner username in all three providers', () => {

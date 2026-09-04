@@ -108,10 +108,30 @@ export async function checkOtpRateLimit(store: IDataStore, phone: string, ip: st
 }
 
 const TICKET_STATUSES = new Set(['open', 'answered', 'customer_reply', 'closed']);
+/** پس از ۴۸ ساعت از آخرین پاسخ پشتیبانی بدون جواب کاربر، تیکت خودکار بسته می‌شود */
+export const TICKET_AUTO_CLOSE_MS = 48 * 60 * 60 * 1000;
+
+/** بستن تیکت‌های «پاسخ داده شده» که کاربر ۴۸ ساعت جوابی نداده. برمی‌گرداند: تعداد بسته‌شده‌ها */
+export async function autoCloseStaleTickets(store: IDataStore, now = Date.now()): Promise<number> {
+  const answered = await store.listTickets('answered');
+  let n = 0;
+  for (const t of answered) {
+    const last = Date.parse(t.lastStaffReplyAt || t.updatedAt || '');
+    if (Number.isFinite(last) && now - last >= TICKET_AUTO_CLOSE_MS) {
+      await store.updateTicket(t.id, { status: 'closed', updatedAt: iso(now) });
+      n++;
+    }
+  }
+  return n;
+}
 
 export async function registerAccountRoutes(app: express.Express, deps: AccountRouteDeps) {
   const { signAuthToken, requireAuth, jsonParser } = deps;
   const isProd = process.env.NODE_ENV === 'production';
+  // بستن خودکار تیکت‌های بی‌پاسخ: هر ساعت + به‌صورت تنبل هنگام خواندن فهرست‌ها
+  const sweep = () => autoCloseStaleTickets(getActiveDataProvider()).catch(() => 0);
+  const sweepTimer = setInterval(sweep, 60 * 60 * 1000);
+  sweepTimer.unref?.();
 
   // =========================================================================
   // OTP
@@ -337,6 +357,7 @@ export async function registerAccountRoutes(app: express.Express, deps: AccountR
   const ticketOut = (t: TicketRow) => ({ ...t, hasNewReply: !!t.lastStaffReplyAt && t.lastStaffReplyAt > (t.userSeenAt || '') });
 
   app.get('/api/me/tickets', requireAuth, async (req, res) => {
+    await sweep();
     const list = await getActiveDataProvider().listTicketsFor((req as any).authUsername);
     res.json({ success: true, tickets: list.map(ticketOut), unread: list.filter(t => ticketOut(t).hasNewReply).length });
   });
@@ -361,6 +382,7 @@ export async function registerAccountRoutes(app: express.Express, deps: AccountR
   });
 
   app.get('/api/me/tickets/:id', requireAuth, async (req, res) => {
+    await sweep();
     const store = getActiveDataProvider();
     const t = await store.getTicketById(req.params.id);
     if (!t || t.username !== (req as any).authUsername) return res.status(404).json(apiError(req, 'TICKET_NOT_FOUND'));
@@ -396,6 +418,7 @@ export async function registerAccountRoutes(app: express.Express, deps: AccountR
   // تیکت — ادمین (پشت app.use('/api/admin', requireAdmin) در server.ts)
   // =========================================================================
   app.get('/api/admin/tickets', async (req, res) => {
+    await sweep();
     const status = String(req.query.status || '');
     const store = getActiveDataProvider();
     const list = await store.listTickets(TICKET_STATUSES.has(status) ? status : undefined);

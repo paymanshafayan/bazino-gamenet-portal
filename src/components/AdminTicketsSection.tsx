@@ -38,10 +38,10 @@ export default function AdminTicketsSection({ addNotification }: Props) {
 
   const filters: Array<[typeof filter, { fa: string; en: string; ru: string; tr: string }]> = [
     ['', { fa: 'همه', en: 'All', ru: 'Все', tr: 'Tümü' }],
-    ['open', { fa: 'باز', en: 'Open', ru: 'Открытые', tr: 'Açık' }],
+    ['open', { fa: 'در حال بررسی', en: 'Under review', ru: 'На рассмотрении', tr: 'İnceleniyor' }],
     ['customer_reply', { fa: 'پاسخ مشتری', en: 'Customer replied', ru: 'Ответ клиента', tr: 'Müşteri yanıtladı' }],
     ['answered', { fa: 'پاسخ داده‌شده', en: 'Answered', ru: 'Отвечены', tr: 'Yanıtlandı' }],
-    ['closed', { fa: 'بسته', en: 'Closed', ru: 'Закрытые', tr: 'Kapalı' }],
+    ['closed', { fa: 'بسته شده', en: 'Closed', ru: 'Закрытые', tr: 'Kapatıldı' }],
   ];
 
   return (

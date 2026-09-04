@@ -185,6 +185,8 @@ export interface WebSyncStatus {
   isConnected: boolean;
   lastSyncTime?: string;
   pendingTransactionsCount: number;
+  /** تسک ۱۳: تعداد تراکنش‌های کیف پول که هنوز به سرور سایت ارسال نشده‌اند (صف آفلاین) */
+  walletQueueCount?: number;
   /**
    * Base URL of the ONLINE website's server (e.g. "https://bazino.pro"), used when
    * this Management App runs standalone (e.g. the desktop build) with its own local

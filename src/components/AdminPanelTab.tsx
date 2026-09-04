@@ -36,7 +36,8 @@ import {
   MessageSquare,
   Smartphone,
   Download,
-  LifeBuoy
+  LifeBuoy,
+  Wallet
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
@@ -75,10 +76,12 @@ export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; 
   apiKeys:           { fa: 'کلیدهای API و اتصال‌ها', en: 'API Keys & Integrations', ru: 'API-ключи и интеграции', tr: 'API Anahtarları ve Entegrasyonlar', keywords: 'token jarvis web sync کلید اتصال integration' },
   presentation:      { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum', keywords: 'slides معرفی pitch' },
   tickets:           { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения в поддержку', tr: 'Destek Talepleri', keywords: 'support help ticket پشتیبانی تیکت destek' },
+  wallet:            { fa: 'کیف پول و پرداخت حضوری', en: 'Wallet & On-site Payments', ru: 'Кошелёк и оплата на месте', tr: 'Cüzdan ve Mekânda Ödeme', keywords: 'wallet onsite cash pos payment کیف پول پرداخت حضوری cüzdan ödeme' },
 };
 
 const PresentationTab = React.lazy(() => import('./PresentationTab'));
 const AdminTicketsSection = React.lazy(() => import('./AdminTicketsSection'));
+const AdminWalletSection = React.lazy(() => import('./AdminWalletSection'));
 
 interface Props {
   themeId?: string;
@@ -1605,6 +1608,19 @@ export default function AdminPanelTab({
           </button>
 
           <button
+            onClick={() => setActiveSubTab('wallet')}
+            data-admin-nav="wallet"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'wallet'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            <span>{L(language, { fa: 'کیف پول و پرداخت حضوری', en: 'Wallet & On-site', ru: 'Кошелёк и оплата', tr: 'Cüzdan ve Ödeme' })}</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('migrations')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
               activeSubTab === 'migrations'
@@ -1775,6 +1791,7 @@ export default function AdminPanelTab({
                       dbLogs: { fa: 'لاگ‌های دیتابیس', en: 'Database Logs', ru: 'Логи БД', tr: 'Veritabanı Günlükleri' },
                       presentation: { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum' },
                       tickets: { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения', tr: 'Destek Talepleri' },
+                      wallet: { fa: 'کیف پول و پرداخت حضوری', en: 'Wallet & On-site Payments', ru: 'Кошелёк', tr: 'Cüzdan' },
                     };
                     const name = L(language, names[activeSubTab] ?? { fa: 'تنظیمات کلید‌ها', en: 'API Keys', ru: 'Настройки ключей', tr: 'Anahtar Ayarları' });
                     return L(language, {
@@ -4499,6 +4516,12 @@ export default function AdminPanelTab({
           {activeSubTab === 'tickets' && (
             <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Tickets...</div>}>
               <AdminTicketsSection addNotification={addNotification} />
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'wallet' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Wallet...</div>}>
+              <AdminWalletSection addNotification={addNotification} />
             </React.Suspense>
           )}
 

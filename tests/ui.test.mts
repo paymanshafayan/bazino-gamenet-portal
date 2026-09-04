@@ -588,5 +588,100 @@ test('the theme SDK exposes LocationFrame and locationFrom to theme.js', () => {
   assert.equal(typeof w.BazinoThemeSDK?.locationFrom, 'function');
 });
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   39. CheckoutModal — انتخاب روش پرداخت (کیف پول / در محل) — تسک ۱۳
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('39. UI — CheckoutModal (wallet / pay-on-site)');
+
+const CheckoutMod = await loadModule('/src/legal/CheckoutModal.tsx');
+const METHODS = { online: false, currency: 'TL', methods: { reservation: ['wallet', 'onsite'], tournament: ['wallet', 'onsite'], cafe: ['onsite'], shop: ['onsite'] }, onsiteLeadMinutes: { reservation: 10, tournament: 2880 } };
+
+async function mountCheckout(props: any, balance = 0) {
+  const calls: any[] = [];
+  (globalThis as any).fetch = async (input: any, init?: any) => {
+    const url = typeof input === 'string' ? input : String(input?.url ?? input);
+    calls.push({ url, init });
+    if (url.endsWith('/api/payments/methods')) return { ok: true, status: 200, json: async () => METHODS };
+    if (url.endsWith('/api/me/wallet')) return { ok: true, status: 200, json: async () => ({ balance, currency: 'TL', transactions: [] }) };
+    if (url.endsWith('/api/checkout/onsite')) return { ok: true, status: 200, json: async () => ({ success: true, orderId: 'OS-1', amount: 200, status: 'pending_onsite', dueAt: '2026-10-15T09:00:00.000Z', startsAt: '2026-10-17T09:00:00.000Z', result: {} }) };
+    if (url.endsWith('/api/checkout/wallet')) return { ok: true, status: 200, json: async () => ({ success: true, orderId: 'WL-1', amount: 200, balance: balance - 200, result: { points: 20 } }) };
+    return { ok: false, status: 404, json: async () => ({ error: 'nf' }) };
+  };
+  const Wrapper = () => withLanguage(React.createElement(CheckoutMod.CheckoutModal, { isLoggedIn: true, onDone: () => {}, onClose: () => {}, ...props }));
+  const mounted = await mount(Wrapper, {});
+  await act(async () => { await new Promise(r => setTimeout(r, 30)); });
+  // مودال با createPortal داخل document.body رندر می‌شود؛ پس روی سند جست‌وجو می‌کنیم
+  const doc = getDocument();
+  const root = () => { const all = doc.querySelectorAll('[data-checkout-modal]'); return all[all.length - 1] as Element; };
+  const el = { find: (sel: string) => (root()?.querySelector(sel) ?? null) as any, html: () => root()?.outerHTML ?? '', unmount: async () => { await mounted.unmount(); doc.querySelectorAll('[data-checkout-modal]').forEach(n => n.remove()); } };
+  return { el, calls };
+}
+
+test('reservation: shows wallet + on-site with the 10-minute rule; low balance pre-selects on-site and disables wallet', async () => {
+  const { el, calls } = await mountCheckout({ kind: 'reservation', params: { systemId: 's1' }, estimatedAmount: 200 }, 50);
+  assert.ok(el.find('[data-pay-method="wallet"]'), 'wallet option missing');
+  assert.ok(el.find('[data-pay-method="onsite"]'), 'on-site option missing');
+  assert.match(el.html(), /10 minutes|۱۰ دقیقه|10 dakika|10 минут/);
+  assert.match(el.html(), /cancelled automatically|خودکار باطل|otomatik olarak iptal|аннулируется автоматически/i);
+  const onsiteRadio = el.find('[data-pay-method="onsite"] input[type=radio]') as HTMLInputElement;
+  assert.equal(onsiteRadio.checked, true, 'on-site must be pre-selected when balance < amount');
+  assert.ok(el.find('[data-onsite-accept]'), 'deadline acknowledgement checkbox missing');
+  // بدون تیک قانون، تأیید خطای «باید بپذیرید» می‌دهد و درخواستی به سرور نمی‌رود
+  const btn = el.find('[data-checkout-confirm]') as HTMLButtonElement;
+  await act(async () => { btn.click(); await new Promise(r => setTimeout(r, 20)); });
+  assert.ok(el.find('[data-error]'), 'expected an error asking to accept the rule');
+  assert.equal(calls.filter(c => c.url.includes('/api/checkout/')).length, 0);
+  // با تیک قانون → POST /api/checkout/onsite
+  const cb = el.find('[data-onsite-accept] input[type=checkbox]') as HTMLInputElement;
+  await act(async () => { cb.click(); await new Promise(r => setTimeout(r, 10)); });
+  await act(async () => { btn.click(); await new Promise(r => setTimeout(r, 30)); });
+  const post = calls.find(c => c.url.endsWith('/api/checkout/onsite'));
+  assert.ok(post, 'on-site checkout must POST /api/checkout/onsite');
+  assert.equal(JSON.parse(post.init.body).kind, 'reservation');
+  await el.unmount(); restoreFetch();
+});
+
+test('tournament with enough balance pre-selects wallet and shows the 48-hour rule', async () => {
+  const { el, calls } = await mountCheckout({ kind: 'tournament', params: { tournamentId: 't2' }, estimatedAmount: 600 }, 1000);
+  const walletRadio = el.find('[data-pay-method="wallet"] input[type=radio]') as HTMLInputElement;
+  assert.equal(walletRadio.checked, true);
+  assert.match(el.html(), /48 hours|۴۸ ساعت|48 saat|48 часов/);
+  assert.match(el.find('[data-wallet-balance]').textContent || '', /1,000|1000|۱٬۰۰۰/);
+  const btn = el.find('[data-checkout-confirm]') as HTMLButtonElement;
+  assert.equal(btn.disabled, false);
+  await act(async () => { btn.click(); await new Promise(r => setTimeout(r, 30)); });
+  const post = calls.find(c => c.url.endsWith('/api/checkout/wallet'));
+  assert.ok(post, 'wallet checkout must POST /api/checkout/wallet');
+  assert.equal(JSON.parse(post.init.body).kind, 'tournament');
+  await el.unmount(); restoreFetch();
+});
+
+test('cafe and shop: only pay-on-site is offered (no wallet, no online) and no deadline checkbox', async () => {
+  for (const kind of ['cafe', 'shop']) {
+    const { el } = await mountCheckout({ kind, params: {}, estimatedAmount: 120 }, 5000);
+    assert.equal(el.find('[data-pay-method="wallet"]'), null, `${kind}: wallet must not be offered`);
+    assert.equal(el.find('[data-pay-method="online"]'), null, `${kind}: online must not be offered`);
+    assert.ok(el.find('[data-pay-method="onsite"]'), `${kind}: on-site missing`);
+    assert.equal(el.find('[data-onsite-accept]'), null, `${kind}: no deadline rule for cafe/shop`);
+    assert.equal((el.find('[data-checkout-confirm]') as HTMLButtonElement).disabled, false);
+    await el.unmount();
+  }
+  restoreFetch();
+});
+
+test('logged-out user sees a login hint instead of the confirm action', async () => {
+  const { el } = await mountCheckout({ kind: 'reservation', params: {}, estimatedAmount: 100, isLoggedIn: false });
+  assert.ok(el.find('[data-login-hint]'), 'login hint missing');
+  await el.unmount(); restoreFetch();
+});
+
+test('formatDue renders a readable local date/time and onsiteRuleText mentions the correct lead time', () => {
+  assert.match(CheckoutMod.formatDue('2026-10-15T09:00:00.000Z', 'en'), /2026/);
+  assert.match(CheckoutMod.onsiteRuleText('reservation', 'en'), /10 minutes/);
+  assert.match(CheckoutMod.onsiteRuleText('tournament', 'tr'), /48 saat/);
+  assert.match(CheckoutMod.onsiteRuleText('cafe', 'en'), /venue|club|delivery/i);
+});
+
 await run({ title: 'Bazino — UI component tests', jsonOut: 'tests/reports/ui.json' });
 await teardownDom();

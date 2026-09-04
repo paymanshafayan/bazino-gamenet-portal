@@ -58,6 +58,8 @@ export function registerPaymentRoutes(d: PaymentDeps) {
     const c = cfg();
     res.json({
       enabled: !!c,
+      // تسک ۱۳: آنلاین موقتاً غیرفعال؛ فرانت‌اند از /api/payments/methods روش‌های جایگزین را می‌خواند
+      onlineDisabled: !c,
       provider: 'paytr',
       testMode: c ? c.testMode : false,
       mock: c ? c.mock : false,

@@ -53,6 +53,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
+import { registerWalletRoutes } from "./server/wallet/routes";
+import { isOnlinePaymentEnabled } from "./server/payments/paytr";
 import { registerAccountRoutes, publicUser } from "./server/accountRoutes";
 import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
 
@@ -2323,7 +2325,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     if (tour.registeredTeamsCount >= tour.maxTeams) throw Object.assign(new Error("Tournament is full"), { statusCode: 400, code: "TOURNAMENT_FULL" });
     if (!team?.name) throw Object.assign(new Error("Team name required"), { statusCode: 400 });
     const amount = Number(tour.registrationFee) || 0;
-    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, title: tour.title } };
+    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, title: tour.title, startDate: tour.startDate } };
   }
 
   async function creditPoints(username: string, amount: number, description: string) {
@@ -2334,14 +2336,18 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     return pointsEarned;
   }
 
+  // پرچم‌های تسک ۱۳ (پرداخت در محل): __noPoints = جا بگیر ولی امتیاز نده (هنوز پرداخت نشده)،
+  // __pointsOnly = جا قبلاً گرفته شده، فقط امتیاز بده (بعد از تسویه‌ی حضوری).
   async function paymentFulfil(kind: OrderKind, p: any, username: string) {
     const store = getActiveDataProvider();
+    const noPoints = p?.__noPoints === true;
     if (kind === "reservation") {
+      if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز بابت رزرو ${p.systemName} (پرداخت در محل)`) };
       await store.setSystemReserved(p.systemId, true);
       const id = Math.random().toString(36).substring(2, 9);
       await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString() });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
-      const points = await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
+      const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
       return { reservationId: id, points };
     }
     if (kind === "cafe") {
@@ -2360,13 +2366,35 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const points = await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
       return { orderId: id, points };
     }
+    if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title} (پرداخت در محل)`) };
     const tour = await resolveSampleById(() => store.getTournamentById(p.tournamentId), SAMPLE_TOURNAMENTS, p.tournamentId);
     if (!tour) throw new Error("Tournament vanished");
     await ensurePersisted(() => store.getTournamentById(p.tournamentId), t => store.createTournament(t), tour);
     const teams = JSON.parse(tour.teams || "[]"); teams.push(p.team);
     await store.registerTournamentTeam(p.tournamentId, JSON.stringify(teams), tour.registeredTeamsCount + 1);
-    const points = await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title}`);
+    const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title}`);
     return { registered: true, points };
+  }
+
+  /** برگرداندن اثر رزرو/ثبت‌نام (ابطال خودکار «پرداخت در محل» یا لغو کاربر): ایستگاه/ظرفیت آزاد می‌شود. */
+  async function paymentUnfulfil(kind: OrderKind, p: any, username: string, result: any) {
+    const store = getActiveDataProvider();
+    if (kind === "reservation") {
+      if (result?.reservationId) await store.deleteReservationLog(String(result.reservationId));
+      const remaining = (await store.listReservationLogs()).filter(r => r.systemId === p?.systemId && r.date === p?.date && !r.checkedIn);
+      if (remaining.length === 0) await store.setSystemReserved(p.systemId, false);
+      return;
+    }
+    if (kind === "tournament") {
+      const tour = await store.getTournamentById(p?.tournamentId);
+      if (!tour) return;
+      const teams: any[] = JSON.parse(tour.teams || "[]");
+      const idx = teams.findIndex(t => t?.name === p?.team?.name && (t?.leader || "") === (p?.team?.leader || ""));
+      if (idx >= 0) {
+        teams.splice(idx, 1);
+        await store.registerTournamentTeam(p.tournamentId, JSON.stringify(teams), Math.max(0, tour.registeredTeamsCount - 1));
+      }
+    }
   }
 
   registerPaymentRoutes({
@@ -2378,6 +2406,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     fulfil: paymentFulfil,
     currency: "TL",
     pointsPerUnit: POINTS_PER_CURRENCY_UNIT,
+  });
+
+  // تسک ۱۳ — کیف پول حضوری + پرداخت در محل (درگاه آنلاین با PAYMENT_ONLINE_ENABLED=1 برمی‌گردد)
+  registerWalletRoutes({
+    app,
+    getStore: getActiveDataProvider,
+    requireAuth,
+    requireSyncApiKey,
+    authUsername: (req) => (req as any).authUsername || undefined,
+    quote: paymentQuote,
+    fulfil: paymentFulfil,
+    unfulfil: paymentUnfulfil,
+    onlineEnabled: () => isOnlinePaymentEnabled(),
+    log: (msg) => logDbQuery(getActiveDataProvider().name, "SYSTEM", `[Wallet] ${msg}`),
   });
 
   // Blog News Articles & Comments

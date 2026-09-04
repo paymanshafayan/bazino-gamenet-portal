@@ -89,14 +89,22 @@ export interface UserRow {
   phoneVerifiedAt?: string;
   /** 1 = کاربر رمز دائمی تنظیم کرده (کاربران OTP-only رمز تصادفی دارند) */
   hasPassword?: number;
+  /** تسک ۱۳ — موجودی کیف پول (لیر)، کش دفتر کل */
+  walletBalance?: number;
   createdAt?: string;
 }
 /** ستون‌های قابل ویرایش پروفایل توسط خود کاربر */
-export const USER_PROFILE_COLUMNS = new Set(['displayName', 'avatarUrl', 'bio', 'gamerTag', 'city', 'birthDate', 'email', 'phone', 'phoneVerifiedAt', 'hasPassword', 'passwordHash', 'createdAt']);
+export const USER_PROFILE_COLUMNS = new Set(['displayName', 'avatarUrl', 'bio', 'gamerTag', 'city', 'birthDate', 'email', 'phone', 'phoneVerifiedAt', 'hasPassword', 'passwordHash', 'createdAt', 'walletBalance']);
 
 /** کد یک‌بارمصرف پیامکی */
 export interface OtpCodeRow { id: string; phone: string; codeHash: string; ip: string; purpose: string; createdAt: string; expiresAt: string; attempts: number; consumedAt: string; }
 /** تیکت پشتیبانی */
+/** تسک ۱۳ — کیف پول: دفتر کل تراکنش‌ها (مبلغ به لیر؛ مثبت شارژ، منفی برداشت). موجودی = جمع ردیف‌ها و در users.walletBalance کش می‌شود. */
+export interface WalletTxRow { id: string; username: string; amount: number; type: string; ref: string; operator: string; note: string; idempotencyKey: string; balanceAfter: number; createdAt: string; }
+/** تسک ۱۳ — سفارش‌های «پرداخت در محل»: رزرو/تورنمنت با مهلت (dueAt) و بوفه/فروشگاه بدون مهلت. payload همان payload پیش‌فاکتور است. */
+export interface OnsiteOrderRow { id: string; kind: string; username: string; amount: number; status: string; dueAt: string; payload: string; description: string; result: string; createdAt: string; updatedAt: string; settledAt: string; settledBy: string; }
+export const ONSITE_ORDER_COLUMNS = new Set(['status', 'result', 'updatedAt', 'settledAt', 'settledBy', 'dueAt']);
+
 export interface TicketRow { id: string; username: string; subject: string; category: string; priority: string; status: string; createdAt: string; updatedAt: string; lastStaffReplyAt: string; userSeenAt: string; }
 export interface TicketMessageRow { id: string; ticketId: string; author: string; isStaff: number; body: string; createdAt: string; }
 export const TICKET_COLUMNS = new Set(['subject', 'category', 'priority', 'status', 'updatedAt', 'lastStaffReplyAt', 'userSeenAt']);
@@ -292,6 +300,17 @@ export interface IDataStore {
   addTicketMessage(m: TicketMessageRow): Promise<void>;
   listTicketMessages(ticketId: string): Promise<TicketMessageRow[]>;
   countOpenTickets(): Promise<number>;
+
+  // ---- Wallet + on-site orders (task 13) ----
+  /** ثبت اتمیک تراکنش کیف پول: موجودی را می‌خواند، اگر منفی می‌شد خطای INSUFFICIENT_FUNDS، وگرنه ردیف + کش را می‌نویسد و ردیف را برمی‌گرداند. */
+  appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow>;
+  getWalletTxByIdempotencyKey(key: string): Promise<WalletTxRow | undefined>;
+  listWalletTxFor(username: string, limit?: number): Promise<WalletTxRow[]>;
+  listWalletTx(limit?: number): Promise<WalletTxRow[]>;
+  createOnsiteOrder(o: OnsiteOrderRow): Promise<void>;
+  getOnsiteOrder(id: string): Promise<OnsiteOrderRow | undefined>;
+  listOnsiteOrders(filter?: { status?: string; username?: string; kind?: string }): Promise<OnsiteOrderRow[]>;
+  updateOnsiteOrder(id: string, fields: Partial<OnsiteOrderRow>): Promise<void>;
 }
 
 // -----------------------------------------------------------------------------
@@ -364,6 +383,11 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS otp_codes (id TEXT PRIMARY KEY, phone TEXT, codeHash TEXT, ip TEXT, purpose TEXT, createdAt TEXT, expiresAt TEXT, attempts INTEGER DEFAULT 0, consumedAt TEXT DEFAULT '');
       CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_codes(phone, createdAt);
       CREATE INDEX IF NOT EXISTS idx_otp_ip ON otp_codes(ip, createdAt);
+      CREATE TABLE IF NOT EXISTS wallet_transactions (id TEXT PRIMARY KEY, username TEXT, amount REAL, type TEXT, ref TEXT DEFAULT '', operator TEXT DEFAULT '', note TEXT DEFAULT '', idempotencyKey TEXT DEFAULT '', balanceAfter REAL, createdAt TEXT);
+      CREATE INDEX IF NOT EXISTS idx_wallet_user ON wallet_transactions(username, createdAt);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_idem ON wallet_transactions(idempotencyKey) WHERE idempotencyKey <> '';
+      CREATE TABLE IF NOT EXISTS onsite_orders (id TEXT PRIMARY KEY, kind TEXT, username TEXT, amount REAL, status TEXT, dueAt TEXT DEFAULT '', payload TEXT, description TEXT, result TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT, settledAt TEXT DEFAULT '', settledBy TEXT DEFAULT '');
+      CREATE INDEX IF NOT EXISTS idx_onsite_status ON onsite_orders(status, dueAt);
       CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, username TEXT, subject TEXT, category TEXT, priority TEXT, status TEXT, createdAt TEXT, updatedAt TEXT, lastStaffReplyAt TEXT DEFAULT '', userSeenAt TEXT DEFAULT '');
       CREATE TABLE IF NOT EXISTS ticket_messages (id TEXT PRIMARY KEY, ticketId TEXT, author TEXT, isStaff INTEGER DEFAULT 0, body TEXT, createdAt TEXT);
       CREATE INDEX IF NOT EXISTS idx_ticket_msgs ON ticket_messages(ticketId, createdAt);
@@ -400,6 +424,7 @@ export class SqliteStore implements IDataStore {
       { table: 'users', column: 'phoneVerifiedAt', type: "TEXT DEFAULT ''" },
       { table: 'users', column: 'hasPassword', type: "INTEGER DEFAULT 1" },
       { table: 'users', column: 'createdAt', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'walletBalance', type: "REAL DEFAULT 0" },
       // مالکیت سفارش‌ها برای «سفارش‌های من»
       { table: 'cafe_orders', column: 'username', type: "TEXT DEFAULT ''" },
       { table: 'shop_orders', column: 'username', type: "TEXT DEFAULT ''" },
@@ -639,6 +664,40 @@ export class SqliteStore implements IDataStore {
   async listTicketMessages(ticketId: string) { return this.db.prepare(`SELECT * FROM ticket_messages WHERE ticketId = ? ORDER BY createdAt ASC`).all(ticketId) as TicketMessageRow[]; }
   async countOpenTickets() { return (this.db.prepare(`SELECT COUNT(*) as c FROM tickets WHERE status IN ('open','customer_reply')`).get() as any).c; }
 
+  // ---- Wallet + on-site orders (task 13) ----
+  async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    const run = this.db.transaction((t: Omit<WalletTxRow, 'balanceAfter'>) => {
+      const row = this.db.prepare(`SELECT COALESCE(SUM(amount), 0) as bal FROM wallet_transactions WHERE username = ?`).get(t.username) as any;
+      const balanceAfter = Math.round(((row?.bal || 0) + t.amount) * 100) / 100;
+      if (balanceAfter < -0.000001) throw Object.assign(new Error('INSUFFICIENT_FUNDS'), { code: 'INSUFFICIENT_FUNDS', statusCode: 402, balance: row?.bal || 0 });
+      this.db.prepare(`INSERT INTO wallet_transactions (id, username, amount, type, ref, operator, note, idempotencyKey, balanceAfter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(t.id, t.username, t.amount, t.type, t.ref || '', t.operator || '', t.note || '', t.idempotencyKey || '', balanceAfter, t.createdAt);
+      this.db.prepare(`UPDATE users SET walletBalance = ? WHERE username = ?`).run(balanceAfter, t.username);
+      return { ...t, balanceAfter } as WalletTxRow;
+    });
+    return run(tx);
+  }
+  async getWalletTxByIdempotencyKey(key: string) { if (!key) return undefined; return this.db.prepare(`SELECT * FROM wallet_transactions WHERE idempotencyKey = ?`).get(key) as WalletTxRow | undefined; }
+  async listWalletTxFor(username: string, limit = 100) { return this.db.prepare(`SELECT * FROM wallet_transactions WHERE username = ? ORDER BY createdAt DESC, rowid DESC LIMIT ?`).all(username, limit) as WalletTxRow[]; }
+  async listWalletTx(limit = 300) { return this.db.prepare(`SELECT * FROM wallet_transactions ORDER BY createdAt DESC, rowid DESC LIMIT ?`).all(limit) as WalletTxRow[]; }
+  async createOnsiteOrder(o: OnsiteOrderRow) {
+    this.db.prepare(`INSERT INTO onsite_orders (id, kind, username, amount, status, dueAt, payload, description, result, createdAt, updatedAt, settledAt, settledBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.kind, o.username, o.amount, o.status, o.dueAt || '', o.payload, o.description, o.result || '', o.createdAt, o.updatedAt, o.settledAt || '', o.settledBy || '');
+  }
+  async getOnsiteOrder(id: string) { return this.db.prepare(`SELECT * FROM onsite_orders WHERE id = ?`).get(id) as OnsiteOrderRow | undefined; }
+  async listOnsiteOrders(fl: { status?: string; username?: string; kind?: string } = {}) {
+    const where: string[] = []; const vals: any[] = [];
+    if (fl.status) { where.push('status = ?'); vals.push(fl.status); }
+    if (fl.username) { where.push('username = ?'); vals.push(fl.username); }
+    if (fl.kind) { where.push('kind = ?'); vals.push(fl.kind); }
+    return this.db.prepare(`SELECT * FROM onsite_orders ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY createdAt DESC`).all(...vals) as OnsiteOrderRow[];
+  }
+  async updateOnsiteOrder(id: string, f: Partial<OnsiteOrderRow>) {
+    const keys = Object.keys(f).filter(k => ONSITE_ORDER_COLUMNS.has(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE onsite_orders SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => (f as any)[k]), id);
+  }
+
   // ---- Accessories / shop ----
   async listAccessories() { return this.db.prepare(`SELECT * FROM accessories`).all() as AccessoryRow[]; }
   async getAccessoryById(id: string) { return this.db.prepare(`SELECT * FROM accessories WHERE id = ?`).get(id) as AccessoryRow | undefined; }
@@ -853,6 +912,9 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.users','phoneVerifiedAt') IS NULL ALTER TABLE dbo.users ADD phoneVerifiedAt NVARCHAR(50) NULL;
       IF COL_LENGTH('dbo.users','hasPassword') IS NULL ALTER TABLE dbo.users ADD hasPassword INT DEFAULT 1;
       IF COL_LENGTH('dbo.users','createdAt') IS NULL ALTER TABLE dbo.users ADD createdAt NVARCHAR(50) NULL;
+      IF COL_LENGTH('dbo.users','walletBalance') IS NULL ALTER TABLE dbo.users ADD walletBalance FLOAT DEFAULT 0;
+      IF OBJECT_ID('dbo.wallet_transactions','U') IS NULL CREATE TABLE dbo.wallet_transactions (id NVARCHAR(40) PRIMARY KEY, username NVARCHAR(100), amount FLOAT, type NVARCHAR(20), ref NVARCHAR(100) DEFAULT '', operator NVARCHAR(100) DEFAULT '', note NVARCHAR(500) DEFAULT '', idempotencyKey NVARCHAR(100) DEFAULT '', balanceAfter FLOAT, createdAt NVARCHAR(50));
+      IF OBJECT_ID('dbo.onsite_orders','U') IS NULL CREATE TABLE dbo.onsite_orders (id NVARCHAR(40) PRIMARY KEY, kind NVARCHAR(20), username NVARCHAR(100), amount FLOAT, status NVARCHAR(30), dueAt NVARCHAR(50) DEFAULT '', payload NVARCHAR(MAX), description NVARCHAR(500), result NVARCHAR(MAX), createdAt NVARCHAR(50), updatedAt NVARCHAR(50), settledAt NVARCHAR(50) DEFAULT '', settledBy NVARCHAR(100) DEFAULT '');
       IF COL_LENGTH('dbo.cafe_orders','username') IS NULL ALTER TABLE dbo.cafe_orders ADD username NVARCHAR(100) NULL;
       IF COL_LENGTH('dbo.shop_orders','username') IS NULL ALTER TABLE dbo.shop_orders ADD username NVARCHAR(100) NULL;
       IF OBJECT_ID('dbo.otp_codes','U') IS NULL CREATE TABLE dbo.otp_codes (id NVARCHAR(40) PRIMARY KEY, phone NVARCHAR(30), codeHash NVARCHAR(128), ip NVARCHAR(64), purpose NVARCHAR(20), createdAt NVARCHAR(50), expiresAt NVARCHAR(50), attempts INT DEFAULT 0, consumedAt NVARCHAR(50) DEFAULT '');
@@ -1131,6 +1193,38 @@ export class SqlServerStore implements IDataStore {
   async listTicketMessages(ticketId: string) { return (await this.r().input('t', this.sql.NVarChar, ticketId).query(`SELECT * FROM dbo.ticket_messages WHERE ticketId = @t ORDER BY createdAt ASC`)).recordset as TicketMessageRow[]; }
   async countOpenTickets() { return (await this.r().query(`SELECT COUNT(*) as c FROM dbo.tickets WHERE status IN ('open','customer_reply')`)).recordset[0].c; }
 
+  // ---- Wallet + on-site orders (task 13) ----
+  async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    const bal = (await this.r().input('u', this.sql.NVarChar, tx.username).query(`SELECT COALESCE(SUM(amount), 0) as bal FROM dbo.wallet_transactions WHERE username = @u`)).recordset[0]?.bal || 0;
+    const balanceAfter = Math.round((bal + tx.amount) * 100) / 100;
+    if (balanceAfter < -0.000001) throw Object.assign(new Error('INSUFFICIENT_FUNDS'), { code: 'INSUFFICIENT_FUNDS', statusCode: 402, balance: bal });
+    await this.r().input('id', this.sql.NVarChar, tx.id).input('u', this.sql.NVarChar, tx.username).input('a', this.sql.Float, tx.amount).input('t', this.sql.NVarChar, tx.type)
+      .input('r', this.sql.NVarChar, tx.ref || '').input('o', this.sql.NVarChar, tx.operator || '').input('n', this.sql.NVarChar, tx.note || '').input('k', this.sql.NVarChar, tx.idempotencyKey || '')
+      .input('b', this.sql.Float, balanceAfter).input('c', this.sql.NVarChar, tx.createdAt)
+      .query(`INSERT INTO dbo.wallet_transactions (id, username, amount, type, ref, operator, note, idempotencyKey, balanceAfter, createdAt) VALUES (@id, @u, @a, @t, @r, @o, @n, @k, @b, @c)`);
+    await this.r().input('b', this.sql.Float, balanceAfter).input('u', this.sql.NVarChar, tx.username).query(`UPDATE dbo.users SET walletBalance = @b WHERE username = @u`);
+    return { ...tx, balanceAfter } as WalletTxRow;
+  }
+  async getWalletTxByIdempotencyKey(key: string) { if (!key) return undefined; return (await this.r().input('k', this.sql.NVarChar, key).query(`SELECT * FROM dbo.wallet_transactions WHERE idempotencyKey = @k`)).recordset[0]; }
+  async listWalletTxFor(username: string, limit = 100) { return (await this.r().input('u', this.sql.NVarChar, username).input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.wallet_transactions WHERE username = @u ORDER BY createdAt DESC`)).recordset as WalletTxRow[]; }
+  async listWalletTx(limit = 300) { return (await this.r().input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.wallet_transactions ORDER BY createdAt DESC`)).recordset as WalletTxRow[]; }
+  async createOnsiteOrder(o: OnsiteOrderRow) {
+    await this.r().input('id', this.sql.NVarChar, o.id).input('k', this.sql.NVarChar, o.kind).input('u', this.sql.NVarChar, o.username).input('a', this.sql.Float, o.amount)
+      .input('s', this.sql.NVarChar, o.status).input('d', this.sql.NVarChar, o.dueAt || '').input('p', this.sql.NVarChar, o.payload).input('de', this.sql.NVarChar, o.description)
+      .input('r', this.sql.NVarChar, o.result || '').input('ca', this.sql.NVarChar, o.createdAt).input('ua', this.sql.NVarChar, o.updatedAt).input('sa', this.sql.NVarChar, o.settledAt || '').input('sb', this.sql.NVarChar, o.settledBy || '')
+      .query(`INSERT INTO dbo.onsite_orders (id, kind, username, amount, status, dueAt, payload, description, result, createdAt, updatedAt, settledAt, settledBy) VALUES (@id, @k, @u, @a, @s, @d, @p, @de, @r, @ca, @ua, @sa, @sb)`);
+  }
+  async getOnsiteOrder(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.onsite_orders WHERE id = @id`)).recordset[0]; }
+  async listOnsiteOrders(fl: { status?: string; username?: string; kind?: string } = {}) {
+    // فیلترهای اختیاری با الگوی «NULL یا برابر» — کوئری ایستا و کاملاً پارامتری
+    const req = this.r()
+      .input('s', this.sql.NVarChar, fl.status || null)
+      .input('u', this.sql.NVarChar, fl.username || null)
+      .input('k', this.sql.NVarChar, fl.kind || null);
+    return (await req.query(`SELECT * FROM dbo.onsite_orders WHERE (@s IS NULL OR status = @s) AND (@u IS NULL OR username = @u) AND (@k IS NULL OR kind = @k) ORDER BY createdAt DESC`)).recordset as OnsiteOrderRow[];
+  }
+  async updateOnsiteOrder(id: string, f: Partial<OnsiteOrderRow>) { await this.dynUpdate('onsite_orders', ONSITE_ORDER_COLUMNS, 'id', id, f as any); }
+
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.r().query(`SELECT * FROM dbo.accessories`)).recordset as AccessoryRow[]; }
   async getAccessoryById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.accessories WHERE id = @id`)).recordset[0]; }
@@ -1324,6 +1418,9 @@ export class MongoStore implements IDataStore {
     await this.col('chat_rooms').createIndex({ name: 1 }, { unique: true });
     await this.col('active_coupons').createIndex({ code: 1 }, { unique: true });
     await this.col('payment_orders').createIndex({ merchantOid: 1 }, { unique: true });
+    await this.col('wallet_transactions').createIndex({ username: 1, createdAt: -1 });
+    await this.col('wallet_transactions').createIndex({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $gt: '' } } });
+    await this.col('onsite_orders').createIndex({ status: 1, dueAt: 1 });
     await this.col('otp_codes').createIndex({ phone: 1, createdAt: -1 });
     await this.col('otp_codes').createIndex({ ip: 1, createdAt: -1 });
     await this.col('tickets').createIndex({ username: 1, updatedAt: -1 });
@@ -1485,6 +1582,28 @@ export class MongoStore implements IDataStore {
   async addTicketMessage(m: TicketMessageRow) { await this.col('ticket_messages').insertOne({ ...m }); }
   async listTicketMessages(ticketId: string) { return (await this.col('ticket_messages').find({ ticketId }).sort({ createdAt: 1 }).toArray()).map((r: any) => this.strip(r)); }
   async countOpenTickets() { return this.col('tickets').countDocuments({ status: { $in: ['open', 'customer_reply'] } }); }
+
+  // ---- Wallet + on-site orders (task 13) ----
+  async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    const agg = await this.col('wallet_transactions').aggregate([{ $match: { username: tx.username } }, { $group: { _id: null, bal: { $sum: '$amount' } } }]).toArray();
+    const bal = agg[0]?.bal || 0;
+    const balanceAfter = Math.round((bal + tx.amount) * 100) / 100;
+    if (balanceAfter < -0.000001) throw Object.assign(new Error('INSUFFICIENT_FUNDS'), { code: 'INSUFFICIENT_FUNDS', statusCode: 402, balance: bal });
+    const row = { ...tx, ref: tx.ref || '', operator: tx.operator || '', note: tx.note || '', idempotencyKey: tx.idempotencyKey || '', balanceAfter } as WalletTxRow;
+    await this.col('wallet_transactions').insertOne({ ...row });
+    await this.col('users').updateOne({ username: tx.username }, { $set: { walletBalance: balanceAfter } });
+    return row;
+  }
+  async getWalletTxByIdempotencyKey(key: string) { if (!key) return undefined; const row = await this.col('wallet_transactions').findOne({ idempotencyKey: key }); return row ? this.strip(row) : undefined; }
+  async listWalletTxFor(username: string, limit = 100) { return (await this.col('wallet_transactions').find({ username }).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
+  async listWalletTx(limit = 300) { return (await this.col('wallet_transactions').find({}).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
+  async createOnsiteOrder(o: OnsiteOrderRow) { await this.col('onsite_orders').insertOne({ ...o }); }
+  async getOnsiteOrder(id: string) { const row = await this.col('onsite_orders').findOne({ id }); return row ? this.strip(row) : undefined; }
+  async listOnsiteOrders(fl: { status?: string; username?: string; kind?: string } = {}) {
+    const q: Record<string, any> = {}; if (fl.status) q.status = fl.status; if (fl.username) q.username = fl.username; if (fl.kind) q.kind = fl.kind;
+    return (await this.col('onsite_orders').find(q).sort({ createdAt: -1 }).toArray()).map((r: any) => this.strip(r));
+  }
+  async updateOnsiteOrder(id: string, f: Partial<OnsiteOrderRow>) { const set: Record<string, any> = {}; for (const k of Object.keys(f)) if (ONSITE_ORDER_COLUMNS.has(k)) set[k] = (f as any)[k]; if (Object.keys(set).length) await this.col('onsite_orders').updateOne({ id }, { $set: set }); }
 
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.col('accessories').find({}).toArray()).map((r: any) => this.strip(r)); }

@@ -3,7 +3,7 @@ import { Accessory, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Tag, CreditCard, ChevronRight, Check, X, Sparkles, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { postJson, errorMessage, toServerCart } from '../services/postJson';
-import { PaymentCheckout, getPaymentConfig } from '../legal/PaymentCheckout';
+import { CheckoutModal, type CheckoutResult } from '../legal/CheckoutModal';
 import { L, localeOf } from '../utils/i18n';
 
 interface Props {
@@ -124,12 +124,10 @@ export default function ShopTab({
   const handleCheckout = async () => {
     if (cart.length === 0 || isSubmitting) return;
 
-    const pay = await getPaymentConfig();
-    if (pay.enabled) {
-      setCheckout({ params: { cart: toServerCart(cart), couponCode: appliedCoupon?.code || '' }, amount: getSubtotal() - getDiscountAmount() });
-      return;
-    }
-
+    // تسک ۱۳: فروشگاه فقط «پرداخت در محل» — کالا در کلاب تحویل و تسویه می‌شود
+    setCheckout({ params: { cart: toServerCart(cart), couponCode: appliedCoupon?.code || '' }, amount: getSubtotal() - getDiscountAmount() });
+    return;
+    // eslint-disable-next-line no-unreachable
     setIsSubmitting(true);
     try {
       const data = await postJson('/api/accessories/order', {
@@ -163,7 +161,12 @@ export default function ShopTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
-      {checkout && <PaymentCheckout kind="shop" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)} />}
+      {checkout && <CheckoutModal kind="shop" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)}
+        onDone={(r: CheckoutResult) => {
+          setCheckout(null);
+          addNotification(L(language, { fa: `سفارش شما ثبت شد (${r.orderId}). کالا در کلاب تحویل و هزینه حضوری تسویه می‌شود؛ امتیاز پس از پرداخت داده می‌شود.`, en: `Order registered (${r.orderId}). Pick up and pay at the club; points are credited after payment.`, ru: `Заказ оформлен (${r.orderId}). Получение и оплата в клубе; баллы начисляются после оплаты.`, tr: `Sipariş kaydedildi (${r.orderId}). Ürün kulüpte teslim edilir ve ödeme yerinde yapılır; puanlar ödemeden sonra eklenir.` }), 'success');
+          setCart([]); setAppliedCoupon(null); setCouponCode('');
+        }} />}
       
       {/* Products list area */}
       <div className="lg:col-span-3 flex flex-col gap-6">

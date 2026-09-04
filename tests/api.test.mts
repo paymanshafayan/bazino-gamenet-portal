@@ -52,6 +52,8 @@ if (!existsSync(bundle)) {
         BAZINO_DATA_DIR: path.join(workDir, 'data'),
         // درگاه شبیه‌سازی‌شده تا جریان create → callback → fulfil بدون paytr.com تست شود
         PAYTR_MOCK: '1',
+        // تسک ۱۳: درگاه آنلاین به‌صورت پیش‌فرض خاموش است؛ برای تست جریان PayTR صریحاً روشن می‌شود
+        PAYMENT_ONLINE_ENABLED: '1',
         PAYTR_TEST_MODE: '1',
         // OTP از طریق درایور mock؛ dev-peek در production فقط با این پرچم باز می‌شود
         SMS_PROVIDER: 'mock',
@@ -1893,6 +1895,219 @@ test('tickets: admin reply → answered + unread badge; user view clears it; use
 
 test('SPA shell is served for /profile routes and /admin/tickets', async () => {
   for (const p of ['/profile', '/profile/security', '/profile/tickets/new', '/admin/tickets']) {
+    const res = await fetch(`${BASE}${p}`);
+    assert.equal(res.status, 200, p);
+    assert.match(res.headers.get('content-type') || '', /text\/html/);
+  }
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   35. Wallet & pay-on-site (تسک ۱۳)
+   ══════════════════════════════════════════════════════════════════════════ */
+suite('35. API — wallet & pay-on-site');
+
+const wUser = `w_${Date.now().toString(36)}`;
+const wPhone = `0912${String(Date.now()).slice(-7)}`;
+let wToken = '';
+const wAuth = () => ({ Authorization: `Bearer ${wToken}` });
+let onsiteTournamentOrder = '';
+let walletReservationOrder = '';
+let cafeOnsiteOrder = '';
+
+test('payment methods: wallet+onsite for reservation/tournament, onsite-only for cafe/shop', async () => {
+  const m: any = await getJson(`${BASE}/api/payments/methods`);
+  // با PAYMENT_ONLINE_ENABLED=1 گزینهٔ «online» به انتهای فهرست اضافه می‌شود؛ ترتیب wallet→onsite ثابت است
+  assert.equal(JSON.stringify(m.methods.reservation.slice(0, 2)), '["wallet","onsite"]');
+  assert.equal(JSON.stringify(m.methods.tournament.slice(0, 2)), '["wallet","onsite"]');
+  assert.equal(m.online, true);
+  assert.equal(m.methods.cafe[0], 'onsite'); assert.ok(!m.methods.cafe.includes('wallet'));
+  assert.equal(m.methods.shop[0], 'onsite'); assert.ok(!m.methods.shop.includes('wallet'));
+  assert.equal(m.onsiteLeadMinutes.reservation, 10);
+  assert.equal(m.onsiteLeadMinutes.tournament, 48 * 60);
+  assert.equal(m.currency, 'TL');
+});
+
+test('wallet endpoints require auth; new user starts at 0', async () => {
+  const anon = await fetch(`${BASE}/api/me/wallet`);
+  assert.equal(anon.status, 401);
+  const reg = await postJson(`${BASE}/api/auth/register`, { username: wUser, email: `${wUser}@t.dev`, password: 'Passw0rd!', phone: wPhone });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  wToken = reg.body.token;
+  const w: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(w.balance, 0);
+  assert.deepEqual(w.transactions, []);
+});
+
+test('sync top-up (Management App) credits by phone and is idempotent', async () => {
+  const key = `idem-${wUser}`;
+  const a = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier', idempotencyKey: key });
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.equal(a.body.username, wUser);
+  assert.equal(a.body.balance, 1000);
+  const b = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier', idempotencyKey: key });
+  assert.equal(b.body.duplicate, true);
+  assert.equal(b.body.balance, 1000, 'duplicate key must not credit twice');
+  const bad = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: -5 });
+  assert.equal(bad.status, 400);
+});
+
+test('wallet never goes negative (sync charge over balance is rejected)', async () => {
+  const r = await postJson(`${BASE}/api/sync/wallet/charge`, { phone: wPhone, amount: 5000, operator: 'cashier' });
+  assert.equal(r.status, 402);
+  assert.equal(r.body.code, 'INSUFFICIENT_FUNDS');
+  const w: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(w.balance, 1000);
+});
+
+test('reservation paid from wallet: balance deducted, reservation + points created immediately', async () => {
+  const sys = sample.SAMPLE_SYSTEMS.find((s: any) => !s.isReserved) || sample.SAMPLE_SYSTEMS[0];
+  const r = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'reservation', params: { systemId: sys.id, startTime: '20:00', endTime: '21:00', date: 'فردا' } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.orderId.startsWith('WL-'));
+  assert.equal(r.body.amount, sys.hourlyRate);
+  assert.equal(r.body.balance, 1000 - sys.hourlyRate);
+  assert.ok(r.body.result.reservationId);
+  assert.equal(r.body.result.points, Math.floor(sys.hourlyRate / 10));
+  walletReservationOrder = r.body.orderId;
+  const pts: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  assert.ok(pts.transactions.some((t: any) => t.points === Math.floor(sys.hourlyRate / 10)));
+  const w: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(w.transactions[0].type, 'purchase');
+  assert.equal(w.transactions[0].amount, -sys.hourlyRate);
+});
+
+test('wallet checkout refuses when balance is insufficient (402) and for cafe (METHOD_NOT_ALLOWED)', async () => {
+  const t = sample.SAMPLE_TOURNAMENTS.find((x: any) => x.id === 't2');
+  // موجودی را تا زیر هزینهٔ ثبت‌نام پایین می‌آوریم (برداشت حضوری از اپ مدیریت)
+  const cur: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const drain = await postJson(`${BASE}/api/sync/wallet/charge`, { phone: wPhone, amount: cur.balance - 100, operator: 'cashier', note: 'drain' });
+  assert.equal(drain.status, 200, JSON.stringify(drain.body));
+  const r = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'tournament', params: { tournamentId: t.id, team: { name: 'Rich', leader: wUser, members: [] } } }, wAuth());
+  assert.equal(r.status, 402);
+  assert.equal(r.body.code, 'INSUFFICIENT_FUNDS');
+  const c = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'cafe', params: { items: [{ item: { id: sample.SAMPLE_CAFE_ITEMS[0].id }, quantity: 1 }], tableNumber: 'A1' } }, wAuth());
+  assert.equal(c.status, 400);
+  assert.equal(c.body.code, 'METHOD_NOT_ALLOWED');
+});
+
+test('tournament on-site: registered as pending with dueAt = start − 48h; wallet untouched', async () => {
+  const t = sample.SAMPLE_TOURNAMENTS.find((x: any) => x.id === 't2');
+  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'tournament', params: { tournamentId: t.id, team: { name: `Onsite-${wUser}`, leader: wUser, members: [] } } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.status, 'pending_onsite');
+  assert.ok(r.body.orderId.startsWith('OS-'));
+  assert.equal(Date.parse(r.body.startsAt) - Date.parse(r.body.dueAt), 48 * 3600 * 1000);
+  onsiteTournamentOrder = r.body.orderId;
+  const after: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(after.balance, before.balance);
+  const list: any = await getJson(`${BASE}/api/me/onsite-orders`, 200, wAuth());
+  assert.ok(list.some((o: any) => o.id === onsiteTournamentOrder && o.status === 'pending_onsite'));
+  const tours: any = await getJson(`${BASE}/api/tournaments`);
+  const teamsRaw = tours.find((x: any) => x.id === t.id).teams; const teams = typeof teamsRaw === 'string' ? JSON.parse(teamsRaw || '[]') : (teamsRaw || []);
+  assert.ok(teams.some((tm: any) => tm.name === `Onsite-${wUser}`), 'seat is held while pending');
+});
+
+test('tournament on-site refused when start is < 48h away (ONSITE_TOO_LATE)', async () => {
+  const soon = new Date(Date.now() + 24 * 3600 * 1000);
+  const created = await postJson(`${BASE}/api/admin/tournaments`, { title: 'Soon Cup', game: 'X', registrationFee: 100, startDate: soon.toISOString().slice(0, 10), maxTeams: 8, status: 'Upcoming' }, adminAuth());
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const id = (created.body.tournaments || []).find((t: any) => t.title === 'Soon Cup')?.id;
+  assert.ok(id, 'created tournament id');
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'tournament', params: { tournamentId: id, team: { name: 'Late', leader: wUser, members: [] } } }, wAuth());
+  assert.equal(r.status, 400);
+  assert.equal(r.body.code, 'ONSITE_TOO_LATE');
+});
+
+test('reservation on-site: dueAt = session start − 10 min; too-late session refused', async () => {
+  const sys = sample.SAMPLE_SYSTEMS[sample.SAMPLE_SYSTEMS.length - 1];
+  const ok = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: '10:00', endTime: '11:00', date: 'فردا' } }, wAuth());
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(Date.parse(ok.body.startsAt) - Date.parse(ok.body.dueAt), 10 * 60 * 1000);
+  const past = new Date(Date.now() - 3600 * 1000);
+  const hh = String(past.getHours()).padStart(2, '0');
+  const late = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: `${hh}:00`, endTime: `${hh}:30`, date: 'امروز' } }, wAuth());
+  assert.equal(late.status, 400);
+  assert.equal(late.body.code, 'ONSITE_TOO_LATE');
+});
+
+test('cafe on-site: order pending, no stock/points until staff settles; then points credited once', async () => {
+  const item = sample.SAMPLE_CAFE_ITEMS[0];
+  const ptsBefore: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'cafe', params: { items: [{ item: { id: item.id }, quantity: 1 }], tableNumber: 'A1' } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.status, 'pending_onsite');
+  assert.equal(r.body.dueAt, '');
+  cafeOnsiteOrder = r.body.orderId;
+  const ptsMid: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  assert.equal(ptsMid.loyaltyPoints, ptsBefore.loyaltyPoints, 'no points before settlement');
+  const pending: any = await getJson(`${BASE}/api/sync/onsite-orders?status=pending_onsite`);
+  assert.ok(pending.some((o: any) => o.id === cafeOnsiteOrder));
+  const settle = await postJson(`${BASE}/api/sync/onsite-orders/${cafeOnsiteOrder}/settle`, { method: 'cash', operator: 'cashier' });
+  assert.equal(settle.status, 200, JSON.stringify(settle.body));
+  assert.equal(settle.body.status, 'settled');
+  assert.equal(settle.body.result.points, Math.floor(item.price / 10));
+  const ptsAfter: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  assert.equal(ptsAfter.loyaltyPoints, ptsBefore.loyaltyPoints + Math.floor(item.price / 10));
+  const again = await postJson(`${BASE}/api/sync/onsite-orders/${cafeOnsiteOrder}/settle`, { method: 'cash' });
+  assert.equal(again.status, 400);
+  assert.equal(again.body.code, 'BAD_STATE');
+});
+
+test('staff settles a pending order from the customer wallet (deducts balance)', async () => {
+  const sys = sample.SAMPLE_SYSTEMS[0];
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: '12:00', endTime: '13:00', date: 'فردا' } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  // موجودی ناکافی → تسویه از کیف پول رد می‌شود و سفارش pending می‌ماند
+  const low = await postJson(`${BASE}/api/admin/onsite-orders/${r.body.orderId}/settle`, { method: 'wallet' }, adminAuth());
+  assert.equal(low.status, 402);
+  const top = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier' });
+  assert.equal(top.status, 200);
+  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const s = await postJson(`${BASE}/api/admin/onsite-orders/${r.body.orderId}/settle`, { method: 'wallet' }, adminAuth());
+  assert.equal(s.status, 200, JSON.stringify(s.body));
+  const after: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(after.balance, before.balance - r.body.amount);
+});
+
+test('user cancels pending on-site tournament → seat released; cancels wallet-paid reservation → refund', async () => {
+  const c = await postJson(`${BASE}/api/checkout/onsite/${onsiteTournamentOrder}/cancel`, {}, wAuth());
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+  assert.equal(c.body.status, 'cancelled_user');
+  const tours: any = await getJson(`${BASE}/api/tournaments`);
+  const teamsRaw = tours.find((x: any) => x.id === 't2').teams; const teams = typeof teamsRaw === 'string' ? JSON.parse(teamsRaw || '[]') : (teamsRaw || []);
+  assert.ok(!teams.some((tm: any) => tm.name === `Onsite-${wUser}`), 'seat released');
+  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const rc = await postJson(`${BASE}/api/checkout/onsite/${walletReservationOrder}/cancel`, {}, wAuth());
+  assert.equal(rc.status, 200, JSON.stringify(rc.body));
+  assert.ok(rc.body.refunded > 0);
+  const after: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(after.balance, before.balance + rc.body.refunded);
+  assert.equal(after.transactions[0].type, 'refund');
+  // cancelling someone else's order → 404
+  const other = await postJson(`${BASE}/api/checkout/onsite/${cafeOnsiteOrder}/cancel`, {}, { Authorization: `Bearer ${authToken}` });
+  assert.equal(other.status, 404);
+});
+
+test('admin wallet: lookup, manual adjust, transactions list; PayTR gate flag reported in config', async () => {
+  const look: any = await getJson(`${BASE}/api/admin/wallet/${wUser}`, 200, adminAuth());
+  assert.equal(look.username, wUser);
+  const adj = await postJson(`${BASE}/api/admin/wallet/adjust`, { username: wUser, amount: -look.balance - 1, note: 'over' }, adminAuth());
+  assert.equal(adj.status, 402, 'admin cannot push wallet negative');
+  const adj2 = await postJson(`${BASE}/api/admin/wallet/adjust`, { username: wUser, amount: 50, note: 'cash' }, adminAuth());
+  assert.equal(adj2.status, 200);
+  assert.equal(adj2.body.balance, look.balance + 50);
+  const txs: any = await getJson(`${BASE}/api/admin/wallet/transactions`, 200, adminAuth());
+  assert.ok(txs.some((t: any) => t.username === wUser));
+  const anon = await fetch(`${BASE}/api/admin/wallet/transactions`);
+  assert.equal(anon.status, 401);
+  const cfg: any = await getJson(`${BASE}/api/payments/config`);
+  assert.equal(cfg.onlineDisabled, false, 'suite runs with PAYMENT_ONLINE_ENABLED=1');
+});
+
+test('SPA shell served for /profile/wallet and /admin/wallet', async () => {
+  for (const p of ['/profile/wallet', '/admin/wallet']) {
     const res = await fetch(`${BASE}${p}`);
     assert.equal(res.status, 200, p);
     assert.match(res.headers.get('content-type') || '', /text\/html/);

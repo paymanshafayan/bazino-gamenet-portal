@@ -133,6 +133,12 @@ export default function App() {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  // تسک ۱۳: مودال پرداخت (مستقل از قالب) با رویداد سراسری ورود را باز می‌کند
+  useEffect(() => {
+    const open = () => setIsAuthModalOpen(true);
+    window.addEventListener('bazino:open-auth', open);
+    return () => window.removeEventListener('bazino:open-auth', open);
+  }, []);
   // مقدار ذخیره‌شده را «بدون اعتبارسنجی» برمی‌داریم: قالب‌های سروری (نصب‌شده با
   // ZIP) در localStorage نیستند و بعداً با /api/themes می‌رسند. اگر همین‌جا به
   // dark-gold برگردیم، useEffect پایین بلافاصله انتخاب کاربر را در localStorage
@@ -404,6 +410,13 @@ export default function App() {
     loadedRef.current = new Set(Object.keys(fetchDataset));
     Object.values(fetchDataset).forEach(fn => void fn());
   };
+  // تسک ۱۳: پس از پرداخت با کیف پول / ثبت حضوری (CheckoutModal) داده‌ها تازه شوند
+  useEffect(() => {
+    const h = () => refreshAll();
+    window.addEventListener('bazino:refresh-data', h);
+    return () => window.removeEventListener('bazino:refresh-data', h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // نصب در حالت bypass است (isInstalled از ابتدا true)؛ بنابراین صفحه‌ی install
   // نمایش داده نمی‌شود و نیاز به checkInstallStatus نیست. اگر خواستید نصب را

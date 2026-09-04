@@ -3,7 +3,7 @@ import { CafeItem, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Check, X, Sparkles, Coffee, Utensils, Zap } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { postJson, errorMessage, toServerCart } from '../services/postJson';
-import { PaymentCheckout, getPaymentConfig } from '../legal/PaymentCheckout';
+import { CheckoutModal, type CheckoutResult } from '../legal/CheckoutModal';
 import { L, localeOf } from '../utils/i18n';
 
 interface Props {
@@ -129,12 +129,10 @@ export default function CafeTab({
       return;
     }
 
-    // اگر درگاه آنلاین فعال باشد، پرداخت از مسیر مستقل از قالب PayTR انجام می‌شود و سفارش پس از callback ثبت می‌گردد
-    const pay = await getPaymentConfig();
-    if (pay.enabled) {
-      setCheckout({ params: { items: toServerCart(cart), couponCode: appliedCoupon?.code || '', tableNumber: systemNumber }, amount: getSubtotal() - getDiscountAmount() });
-      return;
-    }
+    // تسک ۱۳: بوفه فقط «پرداخت در محل» — سفارش ثبت می‌شود و هنگام تحویل تسویه می‌گردد (امتیاز بعد از تسویه)
+    setCheckout({ params: { items: toServerCart(cart), couponCode: appliedCoupon?.code || '', tableNumber: systemNumber }, amount: getSubtotal() - getDiscountAmount() });
+    return;
+    // eslint-disable-next-line no-unreachable
 
     setIsSubmitting(true);
     try {
@@ -170,7 +168,12 @@ export default function CafeTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
-      {checkout && <PaymentCheckout kind="cafe" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)} />}
+      {checkout && <CheckoutModal kind="cafe" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)}
+        onDone={(r: CheckoutResult) => {
+          setCheckout(null);
+          addNotification(L(language, { fa: `سفارش شما ثبت شد (${r.orderId}). هزینه هنگام تحویل روی صندلی ${systemNumber} در محل تسویه می‌شود و امتیاز پس از پرداخت به حساب‌تان می‌آید.`, en: `Order registered (${r.orderId}). Pay at the venue on delivery to seat ${systemNumber}; points are credited after payment.`, ru: `Заказ оформлен (${r.orderId}). Оплата на месте при доставке к месту ${systemNumber}; баллы начисляются после оплаты.`, tr: `Sipariş kaydedildi (${r.orderId}). ${systemNumber} numaralı koltuğa teslimatta mekânda ödenir; puanlar ödemeden sonra eklenir.` }), 'success');
+          setCart([]); setAppliedCoupon(null); setCouponCode('');
+        }} />}
       
       {/* Menu items list */}
       <div className="lg:col-span-3 flex flex-col gap-6">

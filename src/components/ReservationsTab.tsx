@@ -4,7 +4,7 @@ import { Monitor, Cpu, Sparkles, Clock, Check, X, ShieldAlert, CreditCard, QrCod
 import QrCodeImage from './QrCodeImage';
 import { useLanguage } from '../context/LanguageContext';
 import { L, localeOf } from '../utils/i18n';
-import { PaymentCheckout, getPaymentConfig } from '../legal/PaymentCheckout';
+import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
 
 interface Props {
   themeId?: string;
@@ -141,53 +141,22 @@ export default function ReservationsTab({
     const discount = getDiscountAmount();
     const finalAmount = subtotal - discount;
 
-    // Calculate points: 1 point per 10 TL
-    const pointsEarned = Math.floor(finalAmount / 10);
-
     const descMsg = L(language, { fa: `رزرو آنلاین ${selectedSystem.name} به مدت ${hours} ساعت`, en: `Online booking of ${selectedSystem.name} for ${hours} hours`, ru: `Онлайн бронирование ${selectedSystem.name} на ${hours} ч.`, tr: `${selectedSystem.name} için ${hours} saatlik online rezervasyon` });
 
-    // درگاه آنلاین فعال → پرداخت PayTR (مستقل از قالب)؛ رزرو پس از callback سرور ثبت می‌شود
-    const pay = await getPaymentConfig();
-    if (pay.enabled) {
-      setCheckout({ params: { systemId: selectedSystem.id, startTime: '14:00', endTime: `${14 + hours}:00`, date: 'امروز', couponCode: appliedCoupon?.code || '' }, amount: finalAmount, title: descMsg });
-      return;
+    // تسک ۱۳: انتخاب روش پرداخت (کیف پول / در محل / آنلاین اگر فعال) — مستقل از قالب؛
+    // رزرو و امتیاز را سرور پس از تأیید روش ثبت می‌کند.
+    setCheckout({ params: { systemId: selectedSystem.id, startTime: '14:00', endTime: `${14 + hours}:00`, date: 'امروز', couponCode: appliedCoupon?.code || '' }, amount: finalAmount, title: descMsg });
+  };
+
+  const onCheckoutDone = (r: CheckoutResult) => {
+    setCheckout(null);
+    if (r.method === 'wallet') {
+      addNotification(L(language, { fa: `رزرو ${selectedSystem?.name ?? ''} با کیف پول انجام شد. ${r.result?.points ?? 0} امتیاز گرفتید؛ موجودی: ${(r.balance ?? 0).toLocaleString()} TL`, en: `${selectedSystem?.name ?? 'System'} booked with your wallet. You earned ${r.result?.points ?? 0} points; balance: ${(r.balance ?? 0).toLocaleString()} TL`, ru: `${selectedSystem?.name ?? 'Система'} забронирована из кошелька. Начислено ${r.result?.points ?? 0} баллов; баланс: ${(r.balance ?? 0).toLocaleString()} TL`, tr: `${selectedSystem?.name ?? 'Sistem'} cüzdanla rezerve edildi. ${r.result?.points ?? 0} puan kazandınız; bakiye: ${(r.balance ?? 0).toLocaleString()} TL` }), 'success');
+    } else {
+      const due = formatDue(r.dueAt, language);
+      addNotification(L(language, { fa: `رزرو ثبت شد. لطفاً حداکثر تا ${due} (۱۰ دقیقه قبل از سانس) در کلاب حاضر شده و حضوری پرداخت کنید؛ در غیر این صورت رزرو باطل می‌شود.`, en: `Booking registered. Please arrive and pay at the club by ${due} (10 minutes before the session); otherwise it will be cancelled.`, ru: `Бронь оформлена. Придите и оплатите в клубе до ${due} (за 10 минут до сеанса); иначе она будет аннулирована.`, tr: `Rezervasyon kaydedildi. Lütfen en geç ${due} (seanstan 10 dakika önce) kulübe gelip ödeme yapın; aksi hâlde iptal edilir.` }), 'info');
     }
-
-    try {
-      const response = await fetch('/api/systems/reserve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemId: selectedSystem.id,
-          startTime: '14:00',
-          endTime: `${14 + hours}:00`,
-          totalPrice: finalAmount,
-          pointsEarned,
-          date: 'امروز'
-        })
-      });
-
-      if (response.ok) {
-        onAddLoyaltyPoints(pointsEarned, descMsg);
-
-        const successMsg = L(language, { fa: `رزرو سیستم ${selectedSystem.name} با موفقیت انجام شد! ${pointsEarned} امتیاز وفاداری به شما تعلق گرفت.`, en: `Successfully booked ${selectedSystem.name}! You earned ${pointsEarned} loyalty points.`, ru: `Система ${selectedSystem.name} успешно забронирована! Вам начислено ${pointsEarned} баллов.`, tr: `${selectedSystem.name} başarıyla rezerve edildi! ${pointsEarned} sadakat puanı kazandınız.` });
-
-        addNotification(successMsg, 'success');
-        fetchReservations();
-      } else {
-        const errData = await response.json();
-        addNotification(errData.error || 'Error', 'error');
-      }
-    } catch (err) {
-      console.error("Reserve error:", err);
-      onAddLoyaltyPoints(pointsEarned, descMsg);
-      addNotification(
-        L(language, { fa: `رزرو سیستم ${selectedSystem.name} با موفقیت انجام شد!`, en: `Successfully booked ${selectedSystem.name}!`, ru: `Система ${selectedSystem.name} успешно забронирована!`, tr: `${selectedSystem.name} başarıyla rezerve edildi!` }),
-        'success'
-      );
-    }
-
-    // Reset fields
+    fetchReservations();
     setSelectedSystemId(null);
     setHours(2);
     setAppliedCoupon(null);
@@ -239,7 +208,7 @@ export default function ReservationsTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
-      {checkout && <PaymentCheckout kind="reservation" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onClose={() => { setCheckout(null); fetchReservations(); }} />}
+      {checkout && <CheckoutModal kind="reservation" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onDone={onCheckoutDone} onClose={() => { setCheckout(null); fetchReservations(); }} />}
       
       {/* Grid of systems & Interactive Map */}
       <div className="lg:col-span-3 flex flex-col gap-6">

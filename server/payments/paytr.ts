@@ -33,7 +33,16 @@ export const PAYTR_BASE = 'https://www.paytr.com';
 export const PAYTR_IFRAME_RESIZER = `${PAYTR_BASE}/js/iframeResizer.min.js`;
 
 /** خواندن پیکربندی از env؛ اگر کلیدها نباشند، درگاه غیرفعال است. */
+/**
+ * تسک ۱۳: پرداخت آنلاین به‌صورت پیش‌فرض «موقتاً غیرفعال» است (در KKTC درگاهی در دسترس نیست).
+ * با PAYMENT_ONLINE_ENABLED=1 دوباره فعال می‌شود؛ کد/مسیرها/مستندات PayTR دست‌نخورده‌اند.
+ */
+export function isOnlinePaymentEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return /^(1|true|yes|on)$/i.test(String(env.PAYMENT_ONLINE_ENABLED || '').trim());
+}
+
 export function readPaytrConfig(env: NodeJS.ProcessEnv = process.env): PaytrConfig | null {
+  if (!isOnlinePaymentEnabled(env)) return null;
   const merchantId = (env.PAYTR_MERCHANT_ID || '').trim();
   const merchantKey = (env.PAYTR_MERCHANT_KEY || '').trim();
   const merchantSalt = (env.PAYTR_MERCHANT_SALT || '').trim();

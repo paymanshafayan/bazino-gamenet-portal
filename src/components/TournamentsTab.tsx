@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Tournament } from '../types/gamenet';
 import { Trophy, Calendar, Users, Plus, UserPlus, Trash2, Check, Star, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { PaymentCheckout, getPaymentConfig } from '../legal/PaymentCheckout';
-import { L, localeOf, formatJalaliForLanguage } from '../utils/i18n';
+import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
+import { L, localeOf, formatJalaliForLanguage, jalaliToGregorianDate } from '../utils/i18n';
 
 // Jalali Date Helpers
 const persianToEnglishDigits = (str: string): string => {
@@ -30,20 +30,8 @@ const parseJalaliDate = (dateStr: string) => {
   return null;
 };
 
-const jalaliToGregorian = (y: number, m: number, d: number): Date => {
-  const monthLengths = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
-  let days = d - 1;
-  for (let i = 0; i < m - 1; i++) {
-    days += monthLengths[i];
-  }
-  let startYear = 2026;
-  if (y === 1404) startYear = 2025;
-  else if (y === 1405) startYear = 2026;
-  else if (y === 1406) startYear = 2027;
-  
-  const startDate = new Date(startYear, 2, 21);
-  return new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
-};
+// تبدیل جلالی→میلادی با الگوریتم استاندارد مشترک (قبلاً محاسبهٔ تقریبی اشتباه بود — تسک ۱۳)
+const jalaliToGregorian = (y: number, m: number, d: number): Date => jalaliToGregorianDate(y, m, d);
 
 const getPersianWeekdayIndex = (gregorianDay: number): number => {
   return (gregorianDay + 1) % 7;
@@ -348,13 +336,10 @@ export default function TournamentsTab({
     }
 
     const allMembers = [leaderName, ...members];
-    // هزینهٔ ثبت‌نام > 0 و درگاه فعال → پرداخت PayTR؛ ثبت تیم پس از callback انجام می‌شود
+    // تسک ۱۳: هزینهٔ ثبت‌نام > 0 → انتخاب روش پرداخت (کیف پول / در محل با مهلت ۴۸ ساعت)؛ ثبت تیم را سرور انجام می‌دهد
     if (selectedTournament.registrationFee > 0) {
-      const pay = await getPaymentConfig();
-      if (pay.enabled) {
-        setCheckout({ params: { tournamentId: selectedTournament.id, team: { name: teamName, leader: leaderName, members: allMembers } }, amount: selectedTournament.registrationFee, title: selectedTournament.title });
-        return;
-      }
+      setCheckout({ params: { tournamentId: selectedTournament.id, team: { name: teamName, leader: leaderName, members: allMembers } }, amount: selectedTournament.registrationFee, title: selectedTournament.title });
+      return;
     }
     setIsSubmitting(true);
     try {
@@ -383,7 +368,14 @@ export default function TournamentsTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in font-sans" dir={dir}>
-      {checkout && <PaymentCheckout kind="tournament" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onClose={() => setCheckout(null)} />}
+      {checkout && <CheckoutModal kind="tournament" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onClose={() => setCheckout(null)}
+        onDone={(r: CheckoutResult) => {
+          setCheckout(null);
+          if (r.method === 'wallet') addNotification(L(language, { fa: `تیم «${teamName}» ثبت شد و هزینه از کیف پول کسر شد (${r.result?.points ?? 0} امتیاز).`, en: `Team “${teamName}” registered; fee deducted from your wallet (${r.result?.points ?? 0} points).`, ru: `Команда «${teamName}» зарегистрирована; взнос списан из кошелька (${r.result?.points ?? 0} баллов).`, tr: `“${teamName}” takımı kaydedildi; ücret cüzdandan düşüldü (${r.result?.points ?? 0} puan).` }), 'success');
+          else addNotification(L(language, { fa: `تیم «${teamName}» ثبت شد. لطفاً حداکثر تا ${formatDue(r.dueAt, language)} (۴۸ ساعت قبل از شروع) در کلاب حاضر شده و حضوری پرداخت کنید؛ در غیر این صورت ثبت‌نام باطل می‌شود.`, en: `Team “${teamName}” registered. Please arrive and pay at the club by ${formatDue(r.dueAt, language)} (48 hours before the start); otherwise the registration will be cancelled.`, ru: `Команда «${teamName}» зарегистрирована. Придите и оплатите в клубе до ${formatDue(r.dueAt, language)} (за 48 часов до начала); иначе регистрация будет аннулирована.`, tr: `“${teamName}” takımı kaydedildi. Lütfen en geç ${formatDue(r.dueAt, language)} (başlangıçtan 48 saat önce) kulübe gelip ödeme yapın; aksi hâlde kayıt iptal edilir.` }), 'info');
+          setTeamName(''); setLeaderName(''); setMembers([]);
+          window.dispatchEvent(new CustomEvent('bazino:refresh-data'));
+        }} />}
       
       {/* Tournament Selector and Bracket Display */}
       <div className="lg:col-span-2 flex flex-col gap-6">

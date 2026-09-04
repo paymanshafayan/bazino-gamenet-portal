@@ -13,6 +13,7 @@ import { PROFILE_TABS, pathFromProfileTab, type ProfileTab } from '../../utils/r
 import type { UserState } from '../../types/gamenet';
 import { ProfileOverview } from './ProfileOverview';
 import { ProfilePoints, ProfileReservations, ProfileOrders, ProfileTournaments } from './ProfileLists';
+import ProfileWallet from './ProfileWallet';
 import { ProfileTickets } from './ProfileTickets';
 import { ProfileSecurity } from './ProfileSecurity';
 
@@ -29,6 +30,7 @@ export interface ProfilePageProps {
 
 export const PROFILE_TAB_LABELS: Record<ProfileTab, { fa: string; en: string; ru: string; tr: string }> = {
   overview: { fa: 'حساب من', en: 'My account', ru: 'Мой аккаунт', tr: 'Hesabım' },
+  wallet: { fa: 'کیف پول', en: 'Wallet', ru: 'Кошелёк', tr: 'Cüzdan' },
   points: { fa: 'امتیازها', en: 'Points', ru: 'Баллы', tr: 'Puanlar' },
   reservations: { fa: 'رزروها', en: 'Reservations', ru: 'Брони', tr: 'Rezervasyonlar' },
   orders: { fa: 'سفارش‌ها', en: 'Orders', ru: 'Заказы', tr: 'Siparişler' },
@@ -124,6 +126,7 @@ export default function ProfilePage(props: ProfilePageProps) {
           ))}
         </nav>
         {tab === 'overview' && <ProfileOverview {...props} user={user} />}
+        {tab === 'wallet' && <ProfileWallet addNotification={props.addNotification} />}
         {tab === 'points' && <ProfilePoints />}
         {tab === 'reservations' && <ProfileReservations />}
         {tab === 'orders' && <ProfileOrders />}

@@ -62,7 +62,7 @@ export function toLatinDigits(s: string): string {
   return s.replace(/[۰-۹]/g, d => String(PERSIAN_DIGITS.indexOf(d))).replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 }
 
-function jalaliToGregorianDate(jy: number, jm: number, jd: number): Date {
+export function jalaliToGregorianDate(jy: number, jm: number, jd: number): Date {
   // الگوریتم استاندارد تبدیل جلالی → میلادی
   jy += 1595;
   let days = -355668 + 365 * jy + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jd + (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186);

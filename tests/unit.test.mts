@@ -635,10 +635,15 @@ const creds = { merchantId: '123456', merchantKey: 'k3y', merchantSalt: 's4lt' }
 
 test('readPaytrConfig is null without credentials and enabled with them / mock', () => {
   assert.equal(paytr.readPaytrConfig({}), null);
-  const live = paytr.readPaytrConfig({ PAYTR_MERCHANT_ID: '1', PAYTR_MERCHANT_KEY: 'a', PAYTR_MERCHANT_SALT: 'b', PAYTR_TEST_MODE: '0' });
+  // تسک ۱۳: درگاه آنلاین به‌صورت پیش‌فرض خاموش است — حتی با کلیدهای کامل، بدون PAYMENT_ONLINE_ENABLED=1 null برمی‌گردد
+  assert.equal(paytr.readPaytrConfig({ PAYTR_MERCHANT_ID: '1', PAYTR_MERCHANT_KEY: 'a', PAYTR_MERCHANT_SALT: 'b' }), null, 'gateway must stay disabled by default');
+  assert.equal(paytr.isOnlinePaymentEnabled({}), false);
+  assert.equal(paytr.isOnlinePaymentEnabled({ PAYMENT_ONLINE_ENABLED: '1' }), true);
+  assert.equal(paytr.isOnlinePaymentEnabled({ PAYMENT_ONLINE_ENABLED: 'true' }), true);
+  const live = paytr.readPaytrConfig({ PAYMENT_ONLINE_ENABLED: '1', PAYTR_MERCHANT_ID: '1', PAYTR_MERCHANT_KEY: 'a', PAYTR_MERCHANT_SALT: 'b', PAYTR_TEST_MODE: '0' });
   assert.equal(live?.testMode, false);
   assert.equal(live?.mock, false);
-  const mock = paytr.readPaytrConfig({ PAYTR_MOCK: '1' });
+  const mock = paytr.readPaytrConfig({ PAYMENT_ONLINE_ENABLED: '1', PAYTR_MOCK: '1' });
   assert.equal(mock?.mock, true);
   assert.equal(mock?.testMode, true, 'test mode must default to on');
 });
@@ -837,6 +842,96 @@ test('order rows carry the owner username in all three providers', () => {
   assert.equal((dp.match(/INSERT INTO dbo\.cafe_orders \([^)]*username\)/g) || []).length, 1, 'mssql cafe insert');
   assert.equal((dp.match(/INSERT INTO shop_orders \([^)]*username\)/g) || []).length, 1, 'sqlite shop insert');
   assert.equal((dp.match(/INSERT INTO dbo\.shop_orders \([^)]*username\)/g) || []).length, 1, 'mssql shop insert');
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   13. Wallet & pay-on-site helpers (تسک ۱۳)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('13. Wallet & pay-on-site — helpers');
+
+const wallet = await import('../server/wallet/routes.ts');
+
+test('METHODS_BY_KIND: reservation/tournament = wallet+onsite, cafe/shop = onsite only', () => {
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.reservation), '["wallet","onsite"]');
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.tournament), '["wallet","onsite"]');
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.cafe), '["onsite"]');
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.shop), '["onsite"]');
+  assert.equal(wallet.ONSITE_RESERVATION_LEAD_MS, 10 * 60 * 1000);
+  assert.equal(wallet.ONSITE_TOURNAMENT_LEAD_MS, 48 * 3600 * 1000);
+});
+
+test('parseSiteDate understands امروز/فردا, ISO and Jalali (Persian digits)', () => {
+  const now = new Date(2026, 8, 4, 15, 30);
+  assert.equal(wallet.parseSiteDate('امروز', now)?.getDate(), 4);
+  assert.equal(wallet.parseSiteDate('tomorrow', now)?.getDate(), 5);
+  assert.equal(wallet.parseSiteDate('2026-10-17', now)?.getMonth(), 9);
+  const j = wallet.parseSiteDate('۱۴۰۵/۰۷/۲۵', now)!;
+  assert.equal(`${j.getFullYear()}-${j.getMonth() + 1}-${j.getDate()}`, '2026-10-17');
+  assert.equal(wallet.parseSiteDate('garbage', now), null);
+});
+
+test('computeOnsiteDueAt: reservation = start − 10 min, tournament = start − 48 h, cafe/shop = none', () => {
+  const now = new Date(2026, 8, 4, 9, 0);
+  const r = wallet.computeOnsiteDueAt('reservation', { date: 'امروز', startTime: '18:00' }, now);
+  assert.equal(new Date(r.startsAt).getHours(), 18);
+  assert.equal(Date.parse(r.startsAt) - Date.parse(r.dueAt), 10 * 60 * 1000);
+  const t = wallet.computeOnsiteDueAt('tournament', { startDate: '۱۴۰۵/۰۷/۲۵' }, now);
+  assert.equal(Date.parse(t.startsAt) - Date.parse(t.dueAt), 48 * 3600 * 1000);
+  assert.equal(wallet.computeOnsiteDueAt('cafe', {}, now).dueAt, '');
+  assert.equal(wallet.computeOnsiteDueAt('shop', {}, now).dueAt, '');
+});
+
+test('expireOnsiteOrders cancels only overdue pending orders and releases their seat', async () => {
+  const calls: any[] = [];
+  const rows: any[] = [
+    { id: 'a', kind: 'reservation', username: 'u', status: 'pending_onsite', dueAt: '2026-01-01T00:00:00.000Z', payload: '{}', result: '{"reservationId":"r1"}' },
+    { id: 'b', kind: 'tournament', username: 'u', status: 'pending_onsite', dueAt: '2999-01-01T00:00:00.000Z', payload: '{}', result: '{}' },
+    { id: 'c', kind: 'cafe', username: 'u', status: 'pending_onsite', dueAt: '', payload: '{}', result: '' },
+  ];
+  const store: any = {
+    listOnsiteOrders: async () => rows.filter(r => r.status === 'pending_onsite'),
+    updateOnsiteOrder: async (id: string, f: any) => { Object.assign(rows.find(r => r.id === id), f); },
+  };
+  const n = await wallet.expireOnsiteOrders(store, { unfulfil: async (...a: any[]) => { calls.push(a); } }, Date.parse('2026-06-01T00:00:00Z'));
+  assert.equal(n, 1);
+  assert.equal(rows[0].status, 'cancelled_unpaid');
+  assert.equal(rows[1].status, 'pending_onsite');
+  assert.equal(rows[2].status, 'pending_onsite', 'cafe orders have no deadline');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'reservation');
+});
+
+test('Management App wallet queue: enqueue → flush with idempotency key; failures stay queued', async () => {
+  const mem: Record<string, string> = {};
+  (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; } };
+  const ws = await import('../Management App/Bazino/src/utils/walletSync.ts');
+  ws.saveQueue([]);
+  ws.enqueueWalletOp({ type: 'topup', phone: '05331112233', amount: 100, operator: 'ali', note: 'cash' });
+  ws.enqueueWalletOp({ type: 'charge', phone: '05331112233', amount: 30, operator: 'ali', note: 'snack' });
+  assert.equal(ws.loadQueue().length, 2);
+  const seen: any[] = [];
+  const fakeFetch: any = async (url: string, init: any) => {
+    const body = JSON.parse(init.body);
+    seen.push({ url, body, auth: init.headers.Authorization });
+    if (body.type === undefined && url.endsWith('/charge')) return { ok: false, status: 402, json: async () => ({ error: 'INSUFFICIENT_FUNDS' }) };
+    return { ok: true, status: 200, json: async () => ({ success: true, balance: 100 }) };
+  };
+  const r = await ws.flushWalletQueue({ webServerUrl: 'https://bazino.pro', apiKey: 'KEY' }, fakeFetch);
+  assert.equal(r.sent, 1); assert.equal(r.failed, 1);
+  assert.equal(seen[0].url, 'https://bazino.pro/api/sync/wallet/topup');
+  assert.equal(seen[0].auth, 'Bearer KEY');
+  assert.match(seen[0].body.idempotencyKey, /^mgmt-/);
+  assert.equal(r.remaining.length, 1);
+  assert.equal(r.remaining[0].type, 'charge');
+  assert.equal(r.remaining[0].attempts, 1);
+  assert.equal(r.remaining[0].lastError, 'INSUFFICIENT_FUNDS');
+  // ارسال مجدد همان کلید (بعد از قطعی) → همان idempotencyKey
+  const key = r.remaining[0].idempotencyKey;
+  const r2 = await ws.flushWalletQueue({ webServerUrl: '', apiKey: '' }, async (url: string, init: any) => ({ ok: true, status: 200, json: async () => ({ success: true, duplicate: true, balance: 70, key: JSON.parse(init.body).idempotencyKey }) }) as any);
+  assert.equal(r2.sent, 1); assert.equal(ws.loadQueue().length, 0);
+  assert.equal(key, r.remaining[0].idempotencyKey);
+  delete (globalThis as any).localStorage;
 });
 
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });

@@ -24,9 +24,12 @@ const {
 const { getResponsiveSrcSet } = await import('../src/components/PerformanceGuards.tsx');
 const { sanitizeThemeId, stripCssComments, extractIdFromCss, hasNewFormat, extractColorsFromCss } =
   await import('../src/themes/themeCssUtils.ts');
-const { parseThemeZip, buildSampleThemeZip, rewriteCssAssetUrls, isZipParseError } =
+const { parseThemeZip, buildSampleThemeZip, buildThemeZip, rewriteCssAssetUrls, isZipParseError, normalizeThemeStrings } =
   await import('../src/themes/themeZipCore.ts');
+const { detectRegisteredRegions, KNOWN_REGIONS } = await import('../server/themeStore.ts');
+const { makeThemeStrings, THEME_REGIONS } = await import('../src/themeSdk/sdk.ts');
 const { translations } = await import('../src/utils/translations.ts');
+const routes = await import('../src/utils/routes.ts');
 
 // src/themes/index.ts is browser-coupled (import.meta.glob, `?inline` CSS and an
 // image asset import), so plain Node cannot load it. Vite's SSR loader resolves
@@ -379,6 +382,55 @@ test('the generated sample theme ZIP parses back correctly', () => {
   assert.ok(Object.keys(theme.assets).length > 0, 'missing assets');
 });
 
+test('sample theme is region-based (SDK v2): hero + footer, 4-language strings, tokens', () => {
+  const theme = parseThemeZip(buildSampleThemeZip(), 'sample.zip') as any;
+  assert.deepEqual(detectRegisteredRegions(theme.componentJs).sort(), ['footer', 'hero']);
+  assert.deepEqual(Object.keys(theme.meta.strings).sort(), ['en', 'fa', 'ru', 'tr']);
+  for (const lang of ['fa', 'en', 'ru', 'tr']) assert.ok(theme.meta.strings[lang].title, `strings.${lang}.title missing`);
+  assert.ok(theme.meta.tokens && theme.meta.tokens['card-2'], 'tokens missing');
+});
+
+test('CSS-only theme (no theme.js) is a valid package', () => {
+  const sample = parseThemeZip(buildSampleThemeZip(), 'x') as any;
+  const zip = buildThemeZip(sample.css, { id: 'neon-storm', name: 'CSS only' }, {});
+  const parsed = parseThemeZip(zip, 'css-only.zip');
+  assert.ok(!isZipParseError(parsed), `css-only package rejected: ${JSON.stringify(parsed)}`);
+  assert.equal((parsed as any).componentJs, '');
+});
+
+test('region contract: server KNOWN_REGIONS === client THEME_REGIONS', () => {
+  assert.deepEqual([...KNOWN_REGIONS].sort(), [...THEME_REGIONS].sort());
+});
+
+test('detectRegisteredRegions finds every registerComponent call', () => {
+  const js = "SDK.registerComponent('hero', {}); window.BazinoThemeSDK.registerComponent(\"home.pricing\", function(){});";
+  assert.deepEqual(detectRegisteredRegions(js).sort(), ['hero', 'home.pricing']);
+});
+
+test('ts(): theme strings fall back language → en → first → key', () => {
+  const strings = normalizeThemeStrings({ en: { a: 'A-en' }, tr: { a: 'A-tr', b: 'B-tr' }, junk: 5 });
+  assert.deepEqual(Object.keys(strings!).sort(), ['en', 'tr']);
+  assert.equal(makeThemeStrings(strings, 'tr')('a'), 'A-tr');
+  assert.equal(makeThemeStrings(strings, 'fa')('a'), 'A-en');
+  assert.equal(makeThemeStrings(strings, 'fa')('b'), 'B-tr');
+  assert.equal(makeThemeStrings(strings, 'fa')('zzz', 'fb'), 'fb');
+  assert.equal(makeThemeStrings(undefined, 'fa')('zzz'), 'zzz');
+});
+
+test('routes: browser path ↔ tab / admin section mapping', () => {
+  assert.equal(routes.tabFromPath('/'), 'home');
+  assert.equal(routes.tabFromPath('/reservations'), 'reservations');
+  assert.equal(routes.tabFromPath('/admin/themes'), 'admin');
+  assert.equal(routes.tabFromPath('/nope'), 'home');
+  assert.equal(routes.pathFromTab('home'), '/');
+  assert.equal(routes.pathFromTab('cafe'), '/cafe');
+  assert.equal(routes.adminSectionFromPath('/admin'), 'dashboard');
+  assert.equal(routes.adminSectionFromPath('/admin/appSlider'), 'appSlider');
+  assert.equal(routes.adminSectionFromPath('/admin/unknown'), 'dashboard');
+  assert.equal(routes.pathFromAdminSection('dashboard'), '/admin');
+  assert.equal(routes.pathFromAdminSection('themes'), '/admin/themes');
+});
+
 test('parseThemeZip rejects non-zip input instead of throwing', () => {
   const result = parseThemeZip(new Uint8Array([1, 2, 3, 4, 5]), 'bad.zip');
   assert.ok(isZipParseError(result), 'expected a ZipParseError for garbage input');
@@ -428,6 +480,50 @@ test('Persian strings actually contain Persian/Arabic script', () => {
     if (!/[\u0600-\u06FF]/.test(fa)) suspicious.push(`${key} → "${fa}"`);
   }
   assert.deepEqual(suspicious, [], `fa values without Persian script: ${suspicious.join(', ')}`);
+});
+
+
+test('API messages: every code covers all four languages and interpolates', async () => {
+  const { apiMessage, requestLang } = await import('../server/apiMessages.ts');
+  const mod: any = await import('../server/apiMessages.ts');
+  // Reach the dictionary through apiMessage for every key we can discover.
+  const keys = Object.keys((mod as any).M ?? {});
+  const known = ['BAD_CREDENTIALS', 'OUT_OF_STOCK', 'SLOT_TAKEN', 'MIN_REDEEM_POINTS', 'ADMIN_ONLY'] as const;
+  for (const key of keys.length ? keys : known) {
+    for (const lang of LANGS) {
+      const txt = apiMessage(lang, key as any, { min: 100, name: 'X', id: '1', hours: 2, points: 40, platform: 'P', detail: 'D', sec: 30, left: 4 });
+      assert.ok(txt && txt.trim(), `${key}.${lang} empty`);
+      assert.ok(!/\{\w+\}/.test(txt), `${key}.${lang} left a placeholder: ${txt}`);
+      if (lang !== 'fa') assert.ok(!/[\u0600-\u06FF]/.test(txt), `${key}.${lang} contains Persian: ${txt}`);
+    }
+  }
+  assert.equal(apiMessage('tr', 'MIN_REDEEM_POINTS', { min: 100 }), 'Dönüştürülebilecek en az puan 100 puandır.');
+  const mk = (h: Record<string, string>) => ({ headers: h }) as any;
+  assert.equal(requestLang(mk({ 'x-lang': 'ru' })), 'ru');
+  assert.equal(requestLang(mk({ 'accept-language': 'tr-TR,tr;q=0.9' })), 'tr');
+  assert.equal(requestLang(mk({ 'accept-language': 'de-DE' })), 'fa');
+  assert.equal(requestLang(mk({})), 'fa');
+});
+
+test('server.ts sends no raw Persian error strings (all go through apiMessages)', () => {
+  const src = read('server.ts');
+  const offenders = src.split('\n')
+    .map((l, i) => [i + 1, l] as const)
+    .filter(([, l]) => /\b(error|message)\s*:\s*[`'"][^`'"]*[\u0600-\u06FF]/.test(l))
+    .map(([n, l]) => `${n}: ${l.trim().slice(0, 80)}`);
+  assert.deepEqual(offenders, [], `raw Persian API messages:\n${offenders.join('\n')}`);
+});
+
+test('customer-facing components have no fa/en-only ternaries left', () => {
+  const dir = path.join(ROOT, 'src/components');
+  const offenders: string[] = [];
+  for (const f of readdirSync(dir).filter(f => f.endsWith('.tsx'))) {
+    const src = read(`src/components/${f}`);
+    const re = /language\s*===\s*'fa'\s*\?\s*(?!'rtl'|'ltr'|'right'|'left'|"rtl"|"ltr")[`'"][^`'"\n]*[\u0600-\u06FF]/g;
+    const hits = src.match(re)?.length ?? 0;
+    if (hits) offenders.push(`${f} (${hits})`);
+  }
+  assert.deepEqual(offenders, [], `bilingual-only ternaries remain in: ${offenders.join(', ')}`);
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -526,6 +622,316 @@ test('the vite CSS-inlining plugin is still wired up', () => {
   const cfg = read('vite.config.ts');
   assert.ok(cfg.includes('inlineRenderBlockingCss'), 'plugin function missing');
   assert.match(cfg, /plugins:\s*\[[\s\S]*inlineRenderBlockingCss\(\)/, 'plugin not registered');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   10. PayTR helpers (امضاها طبق مستندات dev.paytr.com)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('10. PayTR helpers');
+
+const paytr = await import('../server/payments/paytr.ts');
+const { createHmac } = await import('node:crypto');
+const creds = { merchantId: '123456', merchantKey: 'k3y', merchantSalt: 's4lt' };
+
+test('readPaytrConfig is null without credentials and enabled with them / mock', () => {
+  assert.equal(paytr.readPaytrConfig({}), null);
+  // تسک ۱۳: درگاه آنلاین به‌صورت پیش‌فرض خاموش است — حتی با کلیدهای کامل، بدون PAYMENT_ONLINE_ENABLED=1 null برمی‌گردد
+  assert.equal(paytr.readPaytrConfig({ PAYTR_MERCHANT_ID: '1', PAYTR_MERCHANT_KEY: 'a', PAYTR_MERCHANT_SALT: 'b' }), null, 'gateway must stay disabled by default');
+  assert.equal(paytr.isOnlinePaymentEnabled({}), false);
+  assert.equal(paytr.isOnlinePaymentEnabled({ PAYMENT_ONLINE_ENABLED: '1' }), true);
+  assert.equal(paytr.isOnlinePaymentEnabled({ PAYMENT_ONLINE_ENABLED: 'true' }), true);
+  const live = paytr.readPaytrConfig({ PAYMENT_ONLINE_ENABLED: '1', PAYTR_MERCHANT_ID: '1', PAYTR_MERCHANT_KEY: 'a', PAYTR_MERCHANT_SALT: 'b', PAYTR_TEST_MODE: '0' });
+  assert.equal(live?.testMode, false);
+  assert.equal(live?.mock, false);
+  const mock = paytr.readPaytrConfig({ PAYMENT_ONLINE_ENABLED: '1', PAYTR_MOCK: '1' });
+  assert.equal(mock?.mock, true);
+  assert.equal(mock?.testMode, true, 'test mode must default to on');
+});
+
+test('merchant_oid is alphanumeric and ≤ 64 chars', () => {
+  const oid = paytr.generateMerchantOid();
+  assert.match(oid, /^[A-Za-z0-9]{8,64}$/);
+  assert.ok(paytr.isValidMerchantOid(oid));
+  assert.ok(!paytr.isValidMerchantOid('bad-oid_1'));
+});
+
+test('user_basket is base64 JSON of [name, "price", qty] triples', () => {
+  const b64 = paytr.encodeBasket([{ name: 'Latte', unitPrice: 120, qty: 2 }]);
+  const arr = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+  assert.deepEqual(arr, [['Latte', '120.00', 2]]);
+});
+
+test('paytr_token matches the documented HMAC-SHA256 formula', () => {
+  const input = { userIp: '1.2.3.4', merchantOid: 'BZ1', email: 'a@b.co', amountKurus: 12345, userBasketB64: 'W10=', currency: 'TL' as const, noInstallment: 1 as const, maxInstallment: 0, userName: 'n', userAddress: 'a', userPhone: 'p', okUrl: 'https://x/ok', failUrl: 'https://x/fail' };
+  const msg = '123456' + '1.2.3.4' + 'BZ1' + 'a@b.co' + '12345' + 'W10=' + '1' + '0' + 'TL' + '1' + 's4lt';
+  const expected = createHmac('sha256', 'k3y').update(msg).digest('base64');
+  assert.equal(paytr.buildPaytrToken(creds, input, true), expected);
+  assert.notEqual(paytr.buildPaytrToken(creds, input, false), expected, 'test_mode must be part of the signature');
+});
+
+test('callback hash verifies and rejects tampering', () => {
+  const hash = paytr.buildCallbackHash(creds, 'BZ1', 'success', '12345');
+  const expected = createHmac('sha256', 'k3y').update('BZ1' + 's4lt' + 'success' + '12345').digest('base64');
+  assert.equal(hash, expected);
+  assert.ok(paytr.verifyCallbackHash(creds, { merchant_oid: 'BZ1', status: 'success', total_amount: '12345', hash }));
+  assert.ok(!paytr.verifyCallbackHash(creds, { merchant_oid: 'BZ1', status: 'success', total_amount: '99999', hash }));
+  assert.ok(!paytr.verifyCallbackHash(creds, { merchant_oid: 'BZ1', status: 'failed', total_amount: '12345', hash }));
+});
+
+test('refund form signs merchant_id + merchant_oid + return_amount with a dot decimal', () => {
+  const f = paytr.buildRefundForm(creds, 'BZ1', 11.97);
+  assert.equal(f.get('return_amount'), '11.97');
+  const expected = createHmac('sha256', 'k3y').update('123456' + 'BZ1' + '11.97' + 's4lt').digest('base64');
+  assert.equal(f.get('paytr_token'), expected);
+});
+
+test('toKurus rounds to integer kuruş', () => {
+  assert.equal(paytr.toKurus(12.345), 1235);
+  assert.equal(paytr.toKurus(100), 10000);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   11. Legal content (theme-independent pages)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('11. Legal content');
+
+const legal = await import('../src/legal/legalContent.ts');
+
+test('every legal slug has a title and body in fa/en/ru/tr', () => {
+  for (const slug of legal.LEGAL_SLUGS) {
+    for (const lang of ['fa', 'en', 'ru', 'tr'] as const) {
+      assert.ok(legal.LEGAL_TITLES[slug][lang], `${slug}.${lang} title`);
+      assert.ok(legal.LEGAL_DEFAULTS[slug][lang]?.length > 100, `${slug}.${lang} body too short`);
+    }
+  }
+});
+
+test('fillLegalTemplate replaces every placeholder', () => {
+  const out = legal.fillLegalTemplate('{{company}} / {{address}} / {{email}} / {{phone}} / {{taxNo}} / {{site}}', { company: 'C', address: 'A', email: 'E', phone: 'P', taxNo: 'T', site: 'S' });
+  assert.equal(out, 'C / A / E / P / T / S');
+  assert.ok(!legal.fillLegalTemplate(legal.LEGAL_DEFAULTS.terms.tr, { company: 'C', address: 'A', email: 'E', phone: 'P', taxNo: 'T', site: 'S' }).includes('{{'));
+});
+
+test('theme-independent pages never use theme tokens', () => {
+  const files = ['src/legal/LegalShell.tsx', 'src/legal/LegalFooter.tsx', 'src/legal/LegalPage.tsx', 'src/legal/ContactPage.tsx', 'src/legal/PaymentCheckout.tsx', 'src/legal/PaymentResultPage.tsx', 'src/legal/PaymentBadges.tsx'];
+  const forbidden = [/bg-dark-card/, /text-primary/, /bg-primary/, /--primary-color/, /ThemeRegion/, /useThemeScript/, /themeSdk/];
+  for (const f of files) {
+    // کامنت‌ها را حذف می‌کنیم؛ فقط کد واقعی (import/JSX/className) بررسی می‌شود
+    const src = read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const re of forbidden) assert.ok(!re.test(src), `${f} references theme token ${re}`);
+  }
+});
+
+test('App.tsx renders legal/contact/payment pages before ThemeRegionProvider and a fixed LegalFooter', () => {
+  const app = read('src/App.tsx');
+  const standaloneIdx = app.indexOf('standalonePageFromPath(currentPath');
+  const providerIdx = app.indexOf('<ThemeRegionProvider');
+  assert.ok(standaloneIdx > 0 && providerIdx > 0 && standaloneIdx < providerIdx, 'standalone pages must be returned before the theme provider mounts');
+  assert.ok(app.includes('<LegalFooter'), 'LegalFooter missing');
+});
+
+test('no Toman/تومان currency string survives in the frontend', () => {
+  const dir = path.join(ROOT, 'src');
+  const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  const offenders = walk(dir).filter(f => /\.(tsx?|json)$/.test(f) && !f.includes(`${path.sep}data${path.sep}csharp`)).filter(f => /تومان|Toman|томан/i.test(readFileSync(f, 'utf8')));
+  assert.deepEqual(offenders.map(f => path.relative(ROOT, f)), []);
+});
+
+test('the public header has no theme-selector button and personal theme choice is not honoured', () => {
+  const app = read('src/App.tsx');
+  assert.ok(!app.includes('ThemeSelectorModal'), 'ThemeSelectorModal must not be referenced by App.tsx');
+  assert.ok(!/<Palette\b/.test(app), 'palette (theme picker) button must not be in the header');
+  assert.ok(!app.includes("getItem('themeChoice')"), 'personal themeChoice must no longer override the site default');
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   12. تسک ۱۲ — OTP / پروفایل / تیکت: مسیرها، لایهٔ SMS و سیاست‌های کد
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('12. OTP auth, profile & tickets — routes, SMS layer, policies');
+
+test('/profile[/tab] and /profile/tickets/:id resolve as theme-independent standalone pages', () => {
+  assert.deepEqual(routes.standalonePageFromPath('/profile'), { type: 'profile', tab: 'overview', ticketId: undefined });
+  assert.deepEqual(routes.standalonePageFromPath('/profile/security'), { type: 'profile', tab: 'security', ticketId: undefined });
+  assert.deepEqual(routes.standalonePageFromPath('/profile/tickets/TK-1'), { type: 'profile', tab: 'tickets', ticketId: 'TK-1' });
+  assert.equal((routes.standalonePageFromPath('/profile/bogus') as any)?.tab, 'overview');
+  assert.equal(routes.pathFromProfileTab('overview'), '/profile');
+  assert.equal(routes.pathFromProfileTab('points'), '/profile/points');
+  assert.equal(routes.tabFromPath('/profile'), 'home', 'profile is not one of the themed tabs');
+  assert.ok(routes.ADMIN_SECTIONS.includes('tickets'));
+  assert.equal(routes.adminSectionFromPath('/admin/tickets'), 'tickets');
+});
+
+test('SMS layer: mock is the default, unknown provider falls back to mock, real providers require keys', async () => {
+  const sms = await import('../server/sms/index.ts');
+  const saved = { P: process.env.SMS_PROVIDER, K: process.env.SMSTO_API_KEY };
+  try {
+    delete process.env.SMS_PROVIDER;
+    const p = sms.getSmsProvider();
+    assert.equal(p.name, 'mock');
+    assert.equal(sms.isMockSms(), true);
+    const r = await p.send('+905321112233', 'Bazino login code: 123456');
+    assert.equal(r.ok, true);
+    assert.equal((p as any).lastFor('+905321112233').message, 'Bazino login code: 123456');
+  } finally { process.env.SMS_PROVIDER = saved.P; process.env.SMSTO_API_KEY = saved.K; }
+  const src = readFileSync(path.join(ROOT, 'server/sms/index.ts'), 'utf8');
+  assert.ok(src.includes("throw new Error('SMS_PROVIDER=smsto requires SMSTO_API_KEY')"));
+  assert.ok(src.includes('https://api.sms.to/sms/send'), 'SMS.to endpoint');
+  assert.ok(src.includes('https://restapi.easysendsms.app/v1/rest/sms/send'), 'EasySendSMS endpoint');
+  assert.ok(existsSync(path.join(ROOT, 'docs/sms/SMS-PROVIDERS.md')));
+});
+
+test('OTP policy in code: hashed storage, 5-minute expiry, 5 attempts, server-side limits, dev-peek gated', () => {
+  const src = readFileSync(path.join(ROOT, 'server/accountRoutes.ts'), 'utf8');
+  assert.ok(src.includes("createHash('sha256')"), 'codes must be hashed');
+  assert.ok(src.includes('OTP_TTL_MS = 5 * 60 * 1000'));
+  assert.ok(src.includes('OTP_MAX_ATTEMPTS = 5'));
+  assert.ok(/phoneMinGapSec: 60/.test(src) && /phonePerHour: 5/.test(src) && /ipPer10Min: 10/.test(src) && /ipPerHour: 30/.test(src));
+  assert.ok(src.includes("res.status(429)") && src.includes('retryAfter'), '429 + retryAfter contract');
+  assert.ok(src.includes('isMockSms()') && src.includes("isProd && process.env.OTP_DEV_PEEK !== '1'"), 'dev-peek must be gated');
+  assert.ok(!/res\.json\(\{[^}]*\bcode\b[^}]*\}\)\s*;\s*\/\/ leak/.test(src));
+  assert.ok(read('server.ts').includes('app.set("trust proxy", 1)'), 'X-Forwarded-For must be trusted for IP limits');
+});
+
+test('the web AuthModal has no registration form; OTP + password only; profile page is lazy and theme-independent', () => {
+  const modal = read('src/components/AuthModal.tsx');
+  assert.ok(!modal.includes('/api/auth/register'), 'registration must go through OTP');
+  assert.ok(modal.includes('/api/auth/otp/request') && modal.includes('/api/auth/otp/verify') && modal.includes('/api/auth/login'));
+  assert.ok(modal.includes('retryAfter'), 'countdown must come from the server');
+  const app = read('src/App.tsx');
+  assert.ok(app.includes("lazy(() => import('./components/profile/ProfilePage'))"));
+  assert.ok(app.includes('data-header-profile-link'), 'header username must link to /profile');
+  const profile = read('src/components/profile/ProfilePage.tsx');
+  assert.ok(profile.includes("from '../../legal/LegalShell'"), 'profile uses the theme-independent shell');
+  assert.ok(!profile.includes('ThemeRegion'));
+});
+
+test('theme ZIP packed inside a root folder (my-theme/theme.js) still installs theme.js/theme.json (E.86)', async () => {
+  const { zipSync, strToU8 } = await import('fflate');
+  const css = readFileSync(path.join(ROOT, 'src/themes/dark-gold.css'), 'utf8').replace(/dark-gold/g, 'boxed');
+  const js = "window.BazinoThemeSDK.registerComponent('header', { render: function () { return null; } });";
+  const zip = zipSync({ 'my-theme/theme.json': strToU8(JSON.stringify({ id: 'boxed', name: 'Boxed', regions: ['header'] })), 'my-theme/theme.css': strToU8(css), 'my-theme/theme.js': strToU8(js), 'my-theme/assets/a.svg': strToU8('<svg/>') });
+  const parsed = parseThemeZip(zip, 'boxed.zip') as any;
+  assert.ok(!isZipParseError(parsed), parsed.error);
+  assert.equal(parsed.componentJs, js, 'theme.js must not be silently dropped');
+  assert.equal(parsed.meta.name, 'Boxed');
+  assert.deepEqual(Object.keys(parsed.assets), ['a.svg']);
+});
+
+test('server bootstrap carries the active theme and App renders the first frame with it (E.86)', () => {
+  const srv = read('server.ts');
+  assert.ok(srv.includes('activeThemeId,\n          theme: activeServerTheme,'), 'bootstrap has activeThemeId + theme');
+  const app = read('src/App.tsx');
+  assert.ok(app.includes('const __initialThemeId = __bootstrapActiveId || getStoredThemeId();'));
+  assert.ok(app.includes("themeRegistered.includes('hero') || themeRegistered.includes('home')"), 'default slider is not painted when the theme owns hero/home');
+});
+
+test('ticket status wording: open/customer_reply = under review, answered, closed; auto-close after 48 h', () => {
+  const pp = read('src/components/profile/ProfilePage.tsx');
+  assert.ok(/open: \{ fa: 'در حال بررسی'/.test(pp) && /customer_reply: \{ fa: 'در حال بررسی'/.test(pp));
+  assert.ok(/answered: \{ fa: 'پاسخ داده شده'/.test(pp) && /closed: \{ fa: 'بسته شده'/.test(pp));
+  const ar = read('server/accountRoutes.ts');
+  assert.ok(ar.includes('TICKET_AUTO_CLOSE_MS = 48 * 60 * 60 * 1000'));
+  assert.ok(ar.includes("app.get('/api/admin/tickets', async (req, res) => {\n    await sweep();"), 'admin list triggers the sweep');
+});
+
+test('order rows carry the owner username in all three providers', () => {
+  const dp = read('server/dataProviders.ts');
+  assert.ok(/CafeOrderRow \{[^}]*username\?: string/.test(dp) && /ShopOrderRow \{[^}]*username\?: string/.test(dp));
+  assert.equal((dp.match(/INSERT INTO cafe_orders \([^)]*username\)/g) || []).length, 1, 'sqlite cafe insert');
+  assert.equal((dp.match(/INSERT INTO dbo\.cafe_orders \([^)]*username\)/g) || []).length, 1, 'mssql cafe insert');
+  assert.equal((dp.match(/INSERT INTO shop_orders \([^)]*username\)/g) || []).length, 1, 'sqlite shop insert');
+  assert.equal((dp.match(/INSERT INTO dbo\.shop_orders \([^)]*username\)/g) || []).length, 1, 'mssql shop insert');
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   13. Wallet & pay-on-site helpers (تسک ۱۳)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('13. Wallet & pay-on-site — helpers');
+
+const wallet = await import('../server/wallet/routes.ts');
+
+test('METHODS_BY_KIND: reservation/tournament = wallet+onsite, cafe/shop = onsite only', () => {
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.reservation), '["wallet","onsite"]');
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.tournament), '["wallet","onsite"]');
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.cafe), '["onsite"]');
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.shop), '["onsite"]');
+  assert.equal(wallet.ONSITE_RESERVATION_LEAD_MS, 10 * 60 * 1000);
+  assert.equal(wallet.ONSITE_TOURNAMENT_LEAD_MS, 48 * 3600 * 1000);
+});
+
+test('parseSiteDate understands امروز/فردا, ISO and Jalali (Persian digits)', () => {
+  const now = new Date(2026, 8, 4, 15, 30);
+  assert.equal(wallet.parseSiteDate('امروز', now)?.getDate(), 4);
+  assert.equal(wallet.parseSiteDate('tomorrow', now)?.getDate(), 5);
+  assert.equal(wallet.parseSiteDate('2026-10-17', now)?.getMonth(), 9);
+  const j = wallet.parseSiteDate('۱۴۰۵/۰۷/۲۵', now)!;
+  assert.equal(`${j.getFullYear()}-${j.getMonth() + 1}-${j.getDate()}`, '2026-10-17');
+  assert.equal(wallet.parseSiteDate('garbage', now), null);
+});
+
+test('computeOnsiteDueAt: reservation = start − 10 min, tournament = start − 48 h, cafe/shop = none', () => {
+  const now = new Date(2026, 8, 4, 9, 0);
+  const r = wallet.computeOnsiteDueAt('reservation', { date: 'امروز', startTime: '18:00' }, now);
+  assert.equal(new Date(r.startsAt).getHours(), 18);
+  assert.equal(Date.parse(r.startsAt) - Date.parse(r.dueAt), 10 * 60 * 1000);
+  const t = wallet.computeOnsiteDueAt('tournament', { startDate: '۱۴۰۵/۰۷/۲۵' }, now);
+  assert.equal(Date.parse(t.startsAt) - Date.parse(t.dueAt), 48 * 3600 * 1000);
+  assert.equal(wallet.computeOnsiteDueAt('cafe', {}, now).dueAt, '');
+  assert.equal(wallet.computeOnsiteDueAt('shop', {}, now).dueAt, '');
+});
+
+test('expireOnsiteOrders cancels only overdue pending orders and releases their seat', async () => {
+  const calls: any[] = [];
+  const rows: any[] = [
+    { id: 'a', kind: 'reservation', username: 'u', status: 'pending_onsite', dueAt: '2026-01-01T00:00:00.000Z', payload: '{}', result: '{"reservationId":"r1"}' },
+    { id: 'b', kind: 'tournament', username: 'u', status: 'pending_onsite', dueAt: '2999-01-01T00:00:00.000Z', payload: '{}', result: '{}' },
+    { id: 'c', kind: 'cafe', username: 'u', status: 'pending_onsite', dueAt: '', payload: '{}', result: '' },
+  ];
+  const store: any = {
+    listOnsiteOrders: async () => rows.filter(r => r.status === 'pending_onsite'),
+    updateOnsiteOrder: async (id: string, f: any) => { Object.assign(rows.find(r => r.id === id), f); },
+  };
+  const n = await wallet.expireOnsiteOrders(store, { unfulfil: async (...a: any[]) => { calls.push(a); } }, Date.parse('2026-06-01T00:00:00Z'));
+  assert.equal(n, 1);
+  assert.equal(rows[0].status, 'cancelled_unpaid');
+  assert.equal(rows[1].status, 'pending_onsite');
+  assert.equal(rows[2].status, 'pending_onsite', 'cafe orders have no deadline');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'reservation');
+});
+
+test('Management App wallet queue: enqueue → flush with idempotency key; failures stay queued', async () => {
+  const mem: Record<string, string> = {};
+  (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; } };
+  const ws = await import('../Management App/Bazino/src/utils/walletSync.ts');
+  ws.saveQueue([]);
+  ws.enqueueWalletOp({ type: 'topup', phone: '05331112233', amount: 100, operator: 'ali', note: 'cash' });
+  ws.enqueueWalletOp({ type: 'charge', phone: '05331112233', amount: 30, operator: 'ali', note: 'snack' });
+  assert.equal(ws.loadQueue().length, 2);
+  const seen: any[] = [];
+  const fakeFetch: any = async (url: string, init: any) => {
+    const body = JSON.parse(init.body);
+    seen.push({ url, body, auth: init.headers.Authorization });
+    if (body.type === undefined && url.endsWith('/charge')) return { ok: false, status: 402, json: async () => ({ error: 'INSUFFICIENT_FUNDS' }) };
+    return { ok: true, status: 200, json: async () => ({ success: true, balance: 100 }) };
+  };
+  const r = await ws.flushWalletQueue({ webServerUrl: 'https://bazino.pro', apiKey: 'KEY' }, fakeFetch);
+  assert.equal(r.sent, 1); assert.equal(r.failed, 1);
+  assert.equal(seen[0].url, 'https://bazino.pro/api/sync/wallet/topup');
+  assert.equal(seen[0].auth, 'Bearer KEY');
+  assert.match(seen[0].body.idempotencyKey, /^mgmt-/);
+  assert.equal(r.remaining.length, 1);
+  assert.equal(r.remaining[0].type, 'charge');
+  assert.equal(r.remaining[0].attempts, 1);
+  assert.equal(r.remaining[0].lastError, 'INSUFFICIENT_FUNDS');
+  // ارسال مجدد همان کلید (بعد از قطعی) → همان idempotencyKey
+  const key = r.remaining[0].idempotencyKey;
+  const r2 = await ws.flushWalletQueue({ webServerUrl: '', apiKey: '' }, async (url: string, init: any) => ({ ok: true, status: 200, json: async () => ({ success: true, duplicate: true, balance: 70, key: JSON.parse(init.body).idempotencyKey }) }) as any);
+  assert.equal(r2.sent, 1); assert.equal(ws.loadQueue().length, 0);
+  assert.equal(key, r.remaining[0].idempotencyKey);
+  delete (globalThis as any).localStorage;
 });
 
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });

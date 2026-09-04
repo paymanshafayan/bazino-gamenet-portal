@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from 'react';
 import { UserState, LoyaltyTx, GameSystem, CafeItem, Accessory, Tournament, Article, DiscountCode } from './types/gamenet';
 import bazinoLogo from './assets/images/bazino_logo_user-80.webp'; // 48 CSS px × DPR2 ≈ 80px واقعی
 import {
@@ -7,13 +7,20 @@ import {
   loadCustomThemes,
   loadThemeStylesheet,
   saveCustomThemes,
+  resolveThemeTokens,
+  applyThemeTokens,
   type ThemeInfo
 } from './themes';
+import { ThemeRegionProvider, type ThemeRegionBase } from './themeSdk/ThemeRegion';
+import ThemeRegion from './themeSdk/ThemeRegion';
+import { useThemeScript } from './themeSdk/useThemeScript';
+import type { ThemeSlide } from './themeSdk/sdk';
 // تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند. HomeTab هم شامل چندین
 // بخش/دادهٔ پایین صفحه است؛ Hero سبکِ LandingHero بلافاصله paint می‌شود و خود
 // HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
 import LandingHero from './components/LandingHero';
 import { clearAuthToken } from './services/authToken';
+import { LanguageMenu, LanguageRow } from './components/LanguageMenu';
 import { postJson, errorMessage } from './services/postJson';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
@@ -27,29 +34,76 @@ const BlogTab = lazy(() => import('./components/BlogTab'));
 const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
 
 const AuthModal = lazy(() => import('./components/AuthModal'));
+const ProfilePage = lazy(() => import('./components/profile/ProfilePage'));
 const InstallPage = lazy(() => import('./components/InstallPage'));
 const ChatTab = lazy(() => import('./components/ChatTab'));
-const ThemeSelectorModal = lazy(() => import('./components/ThemeSelectorModal'));
 const ConsoleHubView = lazy(() => import('./components/ConsoleHubView'));
 const ConsoleGridClassic = lazy(() => import('./components/ConsoleGridClassic'));
 const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
 const MobileAppDownloadPage = lazy(() => import('./components/MobileAppDownloadPage'));
 const MobileAppDownloadWidget = lazy(() => import('./components/MobileAppDownloadWidget'));
 import { useLanguage } from './context/LanguageContext';
+import { L, localizeList, localeOf } from './utils/i18n';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
   Sparkles, Home, Instagram, Send, Youtube, Twitter, Facebook, Settings, ChevronDown,
-  Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight, Palette
+  Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight
 } from 'lucide-react';
+import { tabFromPath, pathFromTab, standalonePageFromPath } from './utils/routes';
+// صفحات قانونی/تماس/پرداخت عمداً lazy نیستند تا هرگز به قالب و ThemeRegion وابسته نباشند
+import { LegalPage } from './legal/LegalPage';
+import InitialAvatar from './components/InitialAvatar';
+import { ContactPage } from './legal/ContactPage';
+import { PaymentResultPage } from './legal/PaymentResultPage';
+import { LegalFooter } from './legal/LegalFooter';
 
 /* ────────────────────────────────────────────────────────────────
    THEME BOOTSTRAP (یک‌بار قبل از اولین رندر)
    فایل CSS قالب ذخیره‌شده را قبل از paint اولیه اعمال می‌کند تا
    هنگام بارگذاری صفحه هیچ پرش ظاهری (flash) رخ ندهد.
    ──────────────────────────────────────────────────────────────── */
+// ── داده‌ی اولیه‌ی تزریق‌شده در HTML توسط سرور ────────────────────────────
+// سرور در production، لیست مسابقات را به‌صورت window.__BAZINO_BOOTSTRAP__
+// داخل خودِ HTML می‌گذارد تا اولین رندر منتظر یک رفت‌وبرگشت اضافه‌ی /api
+// نماند — یعنی /api/tournaments از زنجیره‌ی بحرانی LCP (HTML → JS → API) که
+// Lighthouse گزارش کرده بود حذف می‌شود. در dev (Vite) این متغیر وجود ندارد
+// و کد همان مسیر fetch قبلی را می‌رود.
+type BgRequestInit = RequestInit & { priority?: 'high' | 'low' | 'auto' };
+const BOOTSTRAP = (typeof window !== 'undefined'
+  ? (window as unknown as { __BAZINO_BOOTSTRAP__?: { tournaments?: Tournament[]; activeThemeId?: string; theme?: unknown } }).__BAZINO_BOOTSTRAP__
+  : undefined);
+const BOOTSTRAP_TOURNAMENTS: Tournament[] | null = Array.isArray(BOOTSTRAP?.tournaments) ? (BOOTSTRAP!.tournaments as Tournament[]) : null;
+
+/** تبدیل رکورد قالب سروری (/api/themes یا bootstrap) به ThemeInfo کلاینت */
+function serverThemeToInfo(t: any): ThemeInfo {
+  return {
+    id: t.id,
+    name: t.name,
+    type: 'custom',
+    kind: 'server',
+    version: t.version,
+    description: t.description,
+    colors: t.colors,
+    cssUrl: t.cssUrl,
+    hasAssets: t.hasAssets,
+    assetFiles: t.assetFiles,
+    assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
+    installedAt: t.installedAt,
+    hasComponentJs: t.hasComponentJs !== false,
+    regions: t.regions,
+    strings: t.strings,
+    tokens: t.tokens,
+    author: t.author,
+  };
+}
+
 const __initialCustomThemes = loadCustomThemes();
-const __initialThemeId = getStoredThemeId();
-const __initialTheme = [...BUILT_IN_THEMES, ...__initialCustomThemes]
+// قالب فعال سراسری که سرور داخل HTML تزریق کرده (production) — اولین رندر با همان
+// قالب انجام می‌شود تا هدر/هرو پیش‌فرض یک لحظه هم دیده نشود (E.86).
+const __bootstrapTheme: ThemeInfo | null = BOOTSTRAP?.theme && typeof BOOTSTRAP.theme === 'object' && (BOOTSTRAP.theme as any).id ? serverThemeToInfo(BOOTSTRAP.theme) : null;
+const __bootstrapActiveId: string | null = typeof BOOTSTRAP?.activeThemeId === 'string' ? BOOTSTRAP.activeThemeId : null;
+const __initialThemeId = __bootstrapActiveId || getStoredThemeId();
+const __initialTheme = [...BUILT_IN_THEMES, ...__initialCustomThemes, ...(__bootstrapTheme ? [__bootstrapTheme] : [])]
   .find(t => t.id === __initialThemeId) ?? BUILT_IN_THEMES[0];
 document.body.setAttribute('data-theme', __initialTheme.id);
 loadThemeStylesheet(__initialTheme);
@@ -69,17 +123,6 @@ const TAB_DATASETS: Record<string, string[]> = {
   loyalty: ['transactions', 'coupons', 'user'],
 };
 
-// ── داده‌ی اولیه‌ی تزریق‌شده در HTML توسط سرور ────────────────────────────
-// سرور در production، لیست مسابقات را به‌صورت window.__BAZINO_BOOTSTRAP__
-// داخل خودِ HTML می‌گذارد تا اولین رندر منتظر یک رفت‌وبرگشت اضافه‌ی /api
-// نماند — یعنی /api/tournaments از زنجیره‌ی بحرانی LCP (HTML → JS → API) که
-// Lighthouse گزارش کرده بود حذف می‌شود. در dev (Vite) این متغیر وجود ندارد
-// و کد همان مسیر fetch قبلی را می‌رود.
-type BgRequestInit = RequestInit & { priority?: 'high' | 'low' | 'auto' };
-const BOOTSTRAP = (typeof window !== 'undefined'
-  ? (window as unknown as { __BAZINO_BOOTSTRAP__?: { tournaments?: Tournament[] } }).__BAZINO_BOOTSTRAP__
-  : undefined);
-const BOOTSTRAP_TOURNAMENTS: Tournament[] | null = Array.isArray(BOOTSTRAP?.tournaments) ? (BOOTSTRAP!.tournaments as Tournament[]) : null;
 
 // fetchهای پس‌زمینه با اولویت «low» — با منابع LCP رقابت نمی‌کنند و در
 // درخت وابستگی شبکه‌ی Chrome بخشی از مسیر بحرانی حساب نمی‌شوند.
@@ -90,15 +133,23 @@ export default function App() {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [themeId, setThemeId] = useState(() => {
-    const saved = getStoredThemeId();
-    const known = [...BUILT_IN_THEMES, ...loadCustomThemes()];
-    return known.some(t => t.id === saved) ? saved : 'dark-gold';
-  });
+  // تسک ۱۳: مودال پرداخت (مستقل از قالب) با رویداد سراسری ورود را باز می‌کند
+  useEffect(() => {
+    const open = () => setIsAuthModalOpen(true);
+    window.addEventListener('bazino:open-auth', open);
+    return () => window.removeEventListener('bazino:open-auth', open);
+  }, []);
+  // مقدار ذخیره‌شده را «بدون اعتبارسنجی» برمی‌داریم: قالب‌های سروری (نصب‌شده با
+  // ZIP) در localStorage نیستند و بعداً با /api/themes می‌رسند. اگر همین‌جا به
+  // dark-gold برگردیم، useEffect پایین بلافاصله انتخاب کاربر را در localStorage
+  // بازنویسی می‌کند و بعد از هر رفرش قالب به پیش‌فرض برمی‌گردد. اعتبارسنجی
+  // نهایی بعد از دریافت لیست سرور انجام می‌شود.
+  const [themeId, setThemeId] = useState(() => __initialThemeId || 'dark-gold');
   const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
   const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
     ...BUILT_IN_THEMES,
-    ...loadCustomThemes()
+    ...loadCustomThemes(),
+    ...(__bootstrapTheme ? [__bootstrapTheme] : []),
   ]);
 
   // نسخه‌ی هوشمند setAvailableThemes: قالب‌های سفارشی (محلی) را در
@@ -114,39 +165,76 @@ export default function App() {
     });
   };
 
-  const [activeTab, setActiveTab] = useState('home');
+  // مسیر مرورگر ↔ تب: /reservations، /admin، /admin/themes … (رفرش صفحه همان تب را باز می‌کند)
+  const [activeTab, setActiveTabState] = useState(() => tabFromPath(window.location.pathname));
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(tab);
+    const target = pathFromTab(tab);
+    const cur = window.location.pathname;
+    // زیرمسیر ادمین (/admin/<section>) را خودِ پنل مدیریت می‌نویسد
+    if (tab === 'admin' && cur.startsWith('/admin')) return;
+    if (cur !== target) window.history.pushState({}, '', target);
+    setCurrentPath(target);
+  }, []);
+
+  // هر بار پنل ادمین قالبی نصب/حذف می‌کند، این شمارنده بالا می‌رود تا لیست سروری
+  // (و installedAt جدید برای cache-busting) دوباره از سرور خوانده شود.
+  const [themeStoreVersion, setThemeStoreVersion] = useState(0);
+  const refreshServerThemes = useCallback(() => setThemeStoreVersion(v => v + 1), []);
+  const [serverActiveThemeId, setServerActiveThemeId] = useState<string>('dark-gold');
 
   // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
   useEffect(() => {
-    fetch('/api/themes')
+    fetch('/api/themes', { cache: 'no-store' })
       .then(r => r.json())
-      .then((data: { serverThemes?: any[] }) => {
-        if (!data.serverThemes || data.serverThemes.length === 0) return;
-        const serverThemes: ThemeInfo[] = data.serverThemes.map(t => ({
-          id: t.id,
-          name: t.name,
-          type: 'custom',
-          kind: 'server',
-          version: t.version,
-          description: t.description,
-          colors: t.colors,
-          cssUrl: t.cssUrl,
-          hasAssets: t.hasAssets,
-          assetFiles: t.assetFiles,
-          assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
-        }));
+      .then((data: { serverThemes?: any[]; activeThemeId?: string }) => {
+        const serverThemes: ThemeInfo[] = (data.serverThemes || []).map(serverThemeToInfo);
+        setServerActiveThemeId(data.activeThemeId || 'dark-gold');
         setAvailableThemesState(prev => {
-          const existing = new Set(prev.map(t => t.id));
-          const merged = [...prev, ...serverThemes.filter(t => !existing.has(t.id))];
+          // قالب‌های سروری همیشه از پاسخ تازه‌ی سرور جایگزین می‌شوند (نسخه/installedAt جدید)؛
+          // قالب‌های داخلی و محلی حفظ می‌شوند.
+          const nonServer = prev.filter(t => t.kind !== 'server');
+          const merged = [...nonServer, ...serverThemes];
+          // حالا که لیست کامل (داخلی + محلی + سروری) را داریم، قالب فعال را
+          // اعتبارسنجی می‌کنیم. اگر کاربر انتخابی نداشته، قالب فعال سراسری سرور
+          // اعمال می‌شود؛ اگر id ناشناخته بود، به پیش‌فرض برمی‌گردیم.
+          setThemeId(current => {
+            const knownIds = new Set(merged.map(t => t.id));
+            const serverActive = data.activeThemeId;
+            // «قالب پیش‌فرض سایت» (انتخاب ادمین) برای همه اعمال می‌شود، مگر اینکه کاربر
+            // خودش آگاهانه قالب دیگری را از ThemeSelector انتخاب کرده باشد
+            // (themeChoice=personal). انتخاب‌های قدیمی/ضمنی localStorage دیگر
+            // انتخاب سراسری ادمین را بلوکه نمی‌کنند.
+            // انتخاب شخصی قالب توسط کاربر حذف شده است (E.72): قالب پیش‌فرض سایت (ادمین) همیشه غالب است.
+            try { localStorage.removeItem('themeChoice'); } catch { /* ignore */ }
+            if (serverActive && knownIds.has(serverActive)) return serverActive;
+            if (knownIds.has(current)) return current;
+            // قالب ذخیره‌شده‌ی کاربر دیگر روی سرور وجود ندارد (حذف شده یا فایل‌سیستم سرور
+            // موقتی بوده). به‌جای سقوط بی‌صدا، هشدار بده تا علت دیده شود.
+            console.warn(`[Themes] stored theme "${current}" is no longer available on the server → falling back`);
+            const fallback = serverActive && knownIds.has(serverActive) ? serverActive : 'dark-gold';
+            window.setTimeout(() => addNotification(
+              L(language, {
+                fa: `قالب «${current}» دیگر روی سرور وجود ندارد؛ قالب «${fallback}» اعمال شد.`,
+                en: `Theme "${current}" no longer exists on the server; switched to "${fallback}".`,
+                ru: `Тема «${current}» больше не существует на сервере; применена «${fallback}».`,
+                tr: `"${current}" teması artık sunucuda yok; "${fallback}" uygulandı.`,
+              }), 'info'), 0);
+            return fallback;
+          });
           // اگر قالب فعال یک قالب سروری است، استایلش الان بارگذاری می‌شود
           // (useEffect پایین با تغییر availableThemes دوباره اجرا می‌شود)
           return merged;
         });
       })
-      .catch(err => console.error('[Themes] Failed to fetch server themes:', err));
-  }, []);
+      .catch(err => {
+        // خطای شبکه → انتخاب کاربر دست نمی‌خورد (قبلاً هم چیزی تغییر نمی‌داد، ولی صریح می‌کنیم)
+        console.error('[Themes] Failed to fetch server themes (keeping current theme):', err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themeStoreVersion]);
 
   useEffect(() => {
     localStorage.setItem('themeId', themeId);
@@ -159,14 +247,46 @@ export default function App() {
   useEffect(() => {
     const theme = availableThemes.find(t => t.id === themeId) ?? BUILT_IN_THEMES[0];
     loadThemeStylesheet(theme);
+    applyThemeTokens(resolveThemeTokens(theme));
   }, [themeId, availableThemes]);
+
+  // قالب فعال + theme.js آن (بخش‌های اختصاصی) — یک‌بار در سطح App بارگذاری می‌شود
+  const activeTheme = useMemo(() => availableThemes.find(t => t.id === themeId) ?? BUILT_IN_THEMES[0], [availableThemes, themeId]);
+  const themeScriptSource = useMemo(() => (
+    activeTheme.kind === 'server' && activeTheme.cssUrl
+      ? { cssUrl: activeTheme.cssUrl, installedAt: activeTheme.installedAt, hasComponentJs: activeTheme.hasComponentJs !== false }
+      : null
+  ), [activeTheme]);
+  const themeScript = useThemeScript(themeScriptSource);
+  const themeRegistered = themeScript.registered;
+  const [themeSlides, setThemeSlides] = useState<ThemeSlide[]>([]);
+  useEffect(() => {
+    // اسلایدهای ادمین (چهارزبانه) برای بخش‌های قالب — کم‌اولویت
+    const timer = window.setTimeout(() => {
+      fetch('/api/app-sliders', BG_FETCH).then(r => r.json()).then((rows: any[]) => {
+        if (!Array.isArray(rows)) return;
+        setThemeSlides(rows.map((s, i) => ({
+          id: s.id || `slide-${i}`,
+          imageUrl: s.imageUrl,
+          mobileImageUrl: s.mobileImageUrl,
+          target: s.target || 'reservations',
+          title: { fa: s.titleFa || s.titleEn || '', en: s.titleEn || s.titleFa || '', ru: s.titleRu || s.titleEn || s.titleFa || '', tr: s.titleTr || s.titleEn || s.titleFa || '' },
+          desc: { fa: s.descFa || '', en: s.descEn || '', ru: s.descRu || s.descEn || '', tr: s.descTr || s.descEn || '' },
+        })));
+      }).catch(() => {});
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('layoutMode', layoutMode);
   }, [layoutMode]);
 
   useEffect(() => {
-    const onPopState = () => setCurrentPath(window.location.pathname);
+    const onPopState = () => {
+      setCurrentPath(window.location.pathname);
+      setActiveTabState(tabFromPath(window.location.pathname));
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -178,11 +298,20 @@ export default function App() {
   };
 
   const backToHomeFromDownload = () => {
-    window.history.pushState({}, '', '/');
-    setCurrentPath('/');
     setActiveTab('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  /** ناوبری به مسیرهای مستقل از قالب (/legal/*, /contact) یا تب‌ها */
+  const navigateStandalone = useCallback((pathOrTab: string) => {
+    if (pathOrTab.startsWith('/')) {
+      if (window.location.pathname !== pathOrTab) window.history.pushState({}, '', pathOrTab);
+      setCurrentPath(pathOrTab);
+    } else {
+      setActiveTab(pathOrTab);
+    }
+    window.scrollTo({ top: 0 });
+  }, [setActiveTab]);
 
   // Keep the LCP-only LandingHero as the first commit. HomeTab contains all below-fold
   // cards and effects, so mounting it only after the load event's first idle window avoids
@@ -192,22 +321,38 @@ export default function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
   const [user, setUser] = useState<UserState | null>(null);
+  // نشان «پاسخ جدید پشتیبانی» روی نام کاربر در هدر (تسک ۱۲)
+  const [unreadTickets, setUnreadTickets] = useState(0);
+  useEffect(() => {
+    if (!user) { setUnreadTickets(0); return; }
+    let cancelled = false;
+    const poll = () => fetch('/api/me/tickets').then(r => (r.ok ? r.json() : null)).then(d => { if (!cancelled && d) setUnreadTickets(d.unread || 0); }).catch(() => {});
+    const t = window.setTimeout(poll, 1500);
+    const id = window.setInterval(poll, 90_000);
+    return () => { cancelled = true; window.clearTimeout(t); window.clearInterval(id); };
+  }, [user?.username, currentPath]);
   // نصب در checkInstallStatus عمداً bypass است؛ مقدار اولیه‌ی true از paint واسط
   // spinner و جابه‌جایی کامل layout در mount دوم جلوگیری می‌کند (CLS/TBT گزارش).
   const [isInstalled, setIsInstalled] = useState<boolean | null>(true);
   
   // Data States
-  const [systems, setSystems] = useState<GameSystem[]>([]);
-  const [cafeItems, setCafeItems] = useState<CafeItem[]>([]);
-  const [accessories, setAccessories] = useState<Accessory[]>([]);
+  const [rawSystems, setSystems] = useState<GameSystem[]>([]);
+  const [rawCafeItems, setCafeItems] = useState<CafeItem[]>([]);
+  const [rawAccessories, setAccessories] = useState<Accessory[]>([]);
   // اگر سرور داده‌ی اولیه را داخل HTML تزریق کرده باشد، رندر اول همان را دارد
-  const [tournaments, setTournaments] = useState<Tournament[]>(() => BOOTSTRAP_TOURNAMENTS ?? []);
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [rawTournaments, setTournaments] = useState<Tournament[]>(() => BOOTSTRAP_TOURNAMENTS ?? []);
+  const [rawArticles, setArticles] = useState<Article[]>([]);
+  // نسخه‌ی محلی‌شده‌ی کاتالوگ‌ها بر اساس زبان فعال (nameEn/nameRu/nameTr و …).
+  // state خام دست‌نخورده می‌ماند تا شناسه‌ها/قیمت‌ها و درخواست‌های سرور تغییری نکنند.
+  const systems = useMemo(() => localizeList(rawSystems, language), [rawSystems, language]);
+  const cafeItems = useMemo(() => localizeList(rawCafeItems, language), [rawCafeItems, language]);
+  const accessories = useMemo(() => localizeList(rawAccessories, language), [rawAccessories, language]);
+  const tournaments = useMemo(() => localizeList(rawTournaments, language), [rawTournaments, language]);
+  const articles = useMemo(() => localizeList(rawArticles, language), [rawArticles, language]);
   const [transactions, setTransactions] = useState<LoyaltyTx[]>([]);
   const [activeCoupons, setActiveCoupons] = useState<DiscountCode[]>([]);
 
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; type: 'success' | 'error' | 'info' }>>([]);
-  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   const addNotification = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -265,6 +410,13 @@ export default function App() {
     loadedRef.current = new Set(Object.keys(fetchDataset));
     Object.values(fetchDataset).forEach(fn => void fn());
   };
+  // تسک ۱۳: پس از پرداخت با کیف پول / ثبت حضوری (CheckoutModal) داده‌ها تازه شوند
+  useEffect(() => {
+    const h = () => refreshAll();
+    window.addEventListener('bazino:refresh-data', h);
+    return () => window.removeEventListener('bazino:refresh-data', h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // نصب در حالت bypass است (isInstalled از ابتدا true)؛ بنابراین صفحه‌ی install
   // نمایش داده نمی‌شود و نیاز به checkInstallStatus نیست. اگر خواستید نصب را
@@ -367,13 +519,11 @@ export default function App() {
       applyServerState(data);
       if (Array.isArray(data?.activeCoupons)) setActiveCoupons(data.activeCoupons);
       addNotification(
-        language === 'fa'
-          ? `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString()} تومانی ساخته شد: ${data?.code}`
-          : `A ${Number(data?.couponValue || 0).toLocaleString()} Toman discount code was created: ${data?.code}`,
+        L(language, { fa: `کد تخفیف ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} لیری ساخته شد: ${data?.code}`, en: `A ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} TL discount code was created: ${data?.code}`, ru: `Создан промокод на ${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} TL: ${data?.code}`, tr: `${Number(data?.couponValue || 0).toLocaleString(localeOf(language))} TL indirim kodu oluşturuldu: ${data?.code}` }),
         'success'
       );
     } catch (e) {
-      addNotification(errorMessage(e, language === 'fa' ? 'تبدیل امتیاز انجام نشد.' : 'Could not redeem points.'), 'error');
+      addNotification(errorMessage(e, L(language, { fa: 'تبدیل امتیاز انجام نشد.', en: 'Could not redeem points.', ru: 'Не удалось обменять баллы.', tr: 'Puanlar dönüştürülemedi.' })), 'error');
       throw e;
     }
   };
@@ -391,7 +541,7 @@ export default function App() {
       });
       if (res.ok) {
         setUser({ ...user, points: user.loyaltyPoints + points });
-        addNotification(language === 'fa' ? `${points} امتیاز به شما اضافه شد.` : `Added ${points} points.`, 'success');
+        addNotification(L(language, { fa: `${points} امتیاز به شما اضافه شد.`, en: `Added ${points} points.`, ru: `Вам начислено ${points} баллов.`, tr: `${points} puan hesabınıza eklendi.` }), 'success');
       }
     } catch (e) {
       console.error(e);
@@ -406,7 +556,7 @@ export default function App() {
       const data = await postJson('/api/tournaments/register', { tournamentId, team });
       if (Array.isArray(data?.tournaments)) setTournaments(data.tournaments);
     } catch (e) {
-      addNotification(errorMessage(e, language === 'fa' ? 'ثبت‌نام تیم انجام نشد.' : 'Team registration failed.'), 'error');
+      addNotification(errorMessage(e, L(language, { fa: 'ثبت‌نام تیم انجام نشد.', en: 'Team registration failed.', ru: 'Не удалось зарегистрировать команду.', tr: 'Takım kaydı başarısız oldu.' })), 'error');
       throw e;
     }
   };
@@ -415,9 +565,9 @@ export default function App() {
     try {
       const data = await postJson(`/api/articles/${articleId}/comment`, comment);
       if (Array.isArray(data?.articles)) setArticles(data.articles);
-      addNotification(language === 'fa' ? 'نظر شما ثبت شد.' : 'Your comment has been posted.', 'success');
+      addNotification(L(language, { fa: 'نظر شما ثبت شد.', en: 'Your comment has been posted.', ru: 'Ваш комментарий опубликован.', tr: 'Yorumunuz gönderildi.' }), 'success');
     } catch (e) {
-      addNotification(errorMessage(e, language === 'fa' ? 'ثبت نظر انجام نشد.' : 'Could not post the comment.'), 'error');
+      addNotification(errorMessage(e, L(language, { fa: 'ثبت نظر انجام نشد.', en: 'Could not post the comment.', ru: 'Не удалось опубликовать комментарий.', tr: 'Yorum gönderilemedi.' })), 'error');
       throw e;
     }
   };
@@ -445,8 +595,20 @@ export default function App() {
     setUser(null);
     setIsLogoutConfirmOpen(false);
     setActiveTab('home');
-    addNotification(language === 'fa' ? 'خروج موفقیت‌آمیز بود' : 'Logged out successfully', 'success');
+    addNotification(L(language, { fa: 'خروج موفقیت‌آمیز بود', en: 'Logged out successfully', ru: 'Вы успешно вышли', tr: 'Başarıyla çıkış yapıldı' }), 'success');
   };
+
+  // جای‌نگهدار LCP صفحه‌ی اصلی: اسلایدر پیش‌فرض فقط وقتی paint می‌شود که مطمئن باشیم
+  // قالب فعال بخش hero/home اختصاصی ندارد؛ وگرنه (theme.js در حال بارگذاری یا بخش ثبت‌شده)
+  // یک بلوک خالی هم‌ارتفاع نشان می‌دهیم تا اسلایدر یک لحظه «فلش» نکند (E.86).
+  const themeOwnsHero = !themeScript.ready || themeRegistered.includes('hero') || themeRegistered.includes('home');
+  // وقتی قالب خودش hero/home دارد، تأخیر LCP معنایی ندارد → HomeTab بلافاصله mount می‌شود
+  useEffect(() => {
+    if (themeScript.ready && (themeRegistered.includes('hero') || themeRegistered.includes('home'))) setIsHomeContentReady(true);
+  }, [themeScript.ready, themeRegistered]);
+  const homePlaceholder = themeOwnsHero
+    ? <div className="w-full min-h-[340px]" aria-hidden="true" data-hero-pending="" />
+    : <LandingHero onNavigate={() => setActiveTab('reservations')} />;
 
   const renderTabContent = () => (
     <Suspense fallback={
@@ -471,7 +633,7 @@ export default function App() {
             refreshData={refreshAll}
             onBackToClassic={() => {
               setLayoutMode('classic');
-              addNotification(language === 'fa' ? 'نمای کلاسیک فعال شد' : 'Classic View Activated', 'info');
+              addNotification(L(language, { fa: 'نمای کلاسیک فعال شد', en: 'Classic View Activated', ru: 'Классический вид включён', tr: 'Klasik görünüm etkinleştirildi' }), 'info');
             }}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -493,19 +655,13 @@ export default function App() {
             refreshData={refreshAll}
           />
         ) : !isHomeContentReady ? (
-          <LandingHero onNavigate={() => setActiveTab('reservations')} />
+          homePlaceholder
         ) : (
-          <Suspense fallback={<LandingHero onNavigate={() => setActiveTab('reservations')} />}>
+          <Suspense fallback={homePlaceholder}>
             <HomeTab
               themeId={themeId}
               tournaments={tournaments}
               onNavigate={setActiveTab}
-              themeComponent={(() => {
-                const th = availableThemes.find(x => x.id === themeId);
-                return th && th.kind === 'server' && th.cssUrl
-                  ? { cssUrl: th.cssUrl, assetsBase: th.assetsBase || th.cssUrl.replace(/\/theme\.css$/, '/assets') }
-                  : null;
-              })()}
             />
           </Suspense>
         )
@@ -522,6 +678,7 @@ export default function App() {
           setThemeId={setThemeId} 
           availableThemes={availableThemes} 
           setAvailableThemes={setAvailableThemes} 
+          refreshServerThemes={refreshServerThemes}
           addNotification={addNotification} 
           layoutMode={layoutMode}
           setLayoutMode={setLayoutMode}
@@ -558,6 +715,48 @@ export default function App() {
     );
   }
 
+  // صفحات مستقل از قالب: پیش از ThemeRegionProvider رندر می‌شوند و هیچ قالبی به آن‌ها دسترسی ندارد
+  const standalone = standalonePageFromPath(currentPath, window.location.search);
+  if (standalone) {
+    if (standalone.type === 'legal') return <LegalPage slug={standalone.slug} onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} />;
+    if (standalone.type === 'contact') return <ContactPage onBack={() => navigateStandalone('home')} />;
+    if (standalone.type === 'profile') {
+      return (
+        <>
+          <Suspense fallback={<div className="min-h-screen bg-[#0b0f17]" />}>
+            <ProfilePage
+              user={user}
+              tab={standalone.tab}
+              ticketId={standalone.ticketId}
+              onNavigate={navigateStandalone}
+              onUserChange={(u) => setUser(u)}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onLogout={handleLogout}
+              addNotification={addNotification}
+            />
+          </Suspense>
+          <Suspense fallback={null}>
+            {isAuthModalOpen && (
+              <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={(u) => setUser(u)} addNotification={addNotification} />
+            )}
+          </Suspense>
+          {isLogoutConfirmOpen && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80" onClick={() => setIsLogoutConfirmOpen(false)}>
+              <div className="bg-[#121826] border border-[#232c3d] rounded-2xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()} dir={dir}>
+                <p className="text-white font-bold mb-5">{L(language, { fa: 'از حساب خارج می‌شوید؟', en: 'Sign out of your account?', ru: 'Выйти из аккаунта?', tr: 'Hesaptan çıkılsın mı?' })}</p>
+                <div className="flex gap-3">
+                  <button onClick={confirmLogout} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-bold text-sm">{L(language, { fa: 'خروج', en: 'Sign out', ru: 'Выйти', tr: 'Çıkış' })}</button>
+                  <button onClick={() => setIsLogoutConfirmOpen(false)} className="flex-1 bg-white/10 text-white py-2.5 rounded-xl font-bold text-sm">{L(language, { fa: 'انصراف', en: 'Cancel', ru: 'Отмена', tr: 'İptal' })}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+    return <PaymentResultPage outcome={standalone.outcome} oid={standalone.oid} onBack={() => navigateStandalone('home')} onGoTo={navigateStandalone} />;
+  }
+
   if (currentPath === '/app-download') {
     return (
       <Suspense fallback={
@@ -575,14 +774,14 @@ export default function App() {
   // بود و ادمین می‌توانست مقاله منتشر کند و اتاق گفتگو بسازد، ولی هیچ بازدیدکننده‌ای
   // راهی برای رسیدن به آن‌ها نداشت.
   const NAV_TABS = [
-    { id: 'home',         label: language === 'fa' ? 'خانه'     : (language === 'ru' ? 'ГЛАВНАЯ' : (language === 'tr' ? 'ANASAYFA' : 'Home')),      icon: Home },
-    { id: 'reservations', label: language === 'fa' ? 'رزرو'     : (language === 'ru' ? 'БРОНЬ'   : (language === 'tr' ? 'REZERV'   : 'Reserve')),   icon: Monitor },
-    { id: 'cafe',         label: language === 'fa' ? 'کافه'     : (language === 'ru' ? 'КАФЕ'    : (language === 'tr' ? 'KAFE'     : 'Cafe')),      icon: Coffee },
-    { id: 'shop',         label: language === 'fa' ? 'فروشگاه'  : (language === 'ru' ? 'МАГАЗИН' : (language === 'tr' ? 'MAĞAZA'   : 'Shop')),      icon: ShoppingBag },
-    { id: 'tournaments',  label: language === 'fa' ? 'مسابقات'  : (language === 'ru' ? 'АРЕНА'   : (language === 'tr' ? 'ARENA'    : 'Arena')),     icon: Trophy },
-    { id: 'loyalty',      label: language === 'fa' ? 'باشگاه'   : (language === 'ru' ? 'КЛУБ'    : (language === 'tr' ? 'KULÜP'    : 'Club')),      icon: Award },
-    { id: 'blog',         label: language === 'fa' ? 'بلاگ'     : (language === 'ru' ? 'БЛОГ'    : (language === 'tr' ? 'BLOG'     : 'Blog')),      icon: Newspaper },
-    { id: 'chat',         label: language === 'fa' ? 'گفتگو'    : (language === 'ru' ? 'ЧАТ'     : (language === 'tr' ? 'SOHBET'   : 'Chat')),      icon: MessageSquare },
+    { id: 'home',         label: L(language, { fa: 'خانه', en: 'Home', ru: 'ГЛАВНАЯ', tr: 'ANASAYFA' }),      icon: Home },
+    { id: 'reservations', label: L(language, { fa: 'رزرو', en: 'Reserve', ru: 'БРОНЬ', tr: 'REZERV' }),   icon: Monitor },
+    { id: 'cafe',         label: L(language, { fa: 'کافه', en: 'Cafe', ru: 'КАФЕ', tr: 'KAFE' }),      icon: Coffee },
+    { id: 'shop',         label: L(language, { fa: 'فروشگاه', en: 'Shop', ru: 'МАГАЗИН', tr: 'MAĞAZA' }),      icon: ShoppingBag },
+    { id: 'tournaments',  label: L(language, { fa: 'مسابقات', en: 'Arena', ru: 'АРЕНА', tr: 'ARENA' }),     icon: Trophy },
+    { id: 'loyalty',      label: L(language, { fa: 'باشگاه', en: 'Club', ru: 'КЛУБ', tr: 'KULÜP' }),      icon: Award },
+    { id: 'blog',         label: L(language, { fa: 'بلاگ', en: 'Blog', ru: 'БЛОГ', tr: 'BLOG' }),      icon: Newspaper },
+    { id: 'chat',         label: L(language, { fa: 'گفتگو', en: 'Chat', ru: 'ЧАТ', tr: 'SOHBET' }),      icon: MessageSquare },
   ];
   // روی موبایل هشت آیکون در ۳۹۰ پیکسل جا نمی‌شود (هر کدام کمتر از ۵۰px می‌شد و
   // هدف لمس بسیار کوچک). پنج تای اول در نوار می‌مانند و بقیه پشت دکمه‌ی «بیشتر».
@@ -606,7 +805,24 @@ export default function App() {
     '--theme-card-border': 'rgba(255,255,255,0.10)',
   } as React.CSSProperties : undefined;
 
+  // داده‌های مشترک همه‌ی بخش‌های قالب (Partial Views)
+  const themeRegionBase: ThemeRegionBase = {
+    language, dir, t,
+    themeId: themeId || 'dark-gold',
+    strings: activeTheme.strings,
+    tokens: resolveThemeTokens(activeTheme),
+    slides: themeSlides,
+    onNavigate: (tab: string) => setActiveTab(tab),
+    activeTab,
+    user: user ? { username: user.username, points: (user as any).points, role: user.role } : null,
+    settings: {},
+    logoUrl: '/logo.png',
+    assetsBase: activeTheme.assetsBase || '',
+    ready: themeScript.ready,
+  };
+
   return (
+    <ThemeRegionProvider value={themeRegionBase}>
     <div 
       className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} ${showMobileNav ? 'pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'} w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
       style={adminShellVars}
@@ -618,10 +834,10 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
             <span className="font-display uppercase tracking-wider text-purple-200">
-              {language === 'fa' ? 'پنل مدیریت فعال است' : 'Admin Area Active'}
+              {L(language, { fa: 'پنل مدیریت فعال است', en: 'Admin Area Active', ru: 'Панель администратора активна', tr: 'Yönetim paneli etkin' })}
             </span>
             <span className="text-purple-400 font-normal hidden sm:inline">
-              | {language === 'fa' ? `ورود با حساب مدیر: @${user.username}` : `Logged in as: @${user.username}`}
+              | {L(language, { fa: `ورود با حساب مدیر: @${user.username}`, en: `Logged in as: @${user.username}`, ru: `Вход как администратор: @${user.username}`, tr: `Yönetici olarak giriş yapıldı: @${user.username}` })}
             </span>
           </div>
           <button 
@@ -629,7 +845,7 @@ export default function App() {
             className="bg-primary hover:bg-primary/95 text-black px-3.5 py-1.5 rounded-lg transition-all font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(255,184,0,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
           >
             <Settings className="w-3 h-3" />
-            <span>{language === 'fa' ? 'ورود به پنل مدیریت' : 'Enter Admin Panel'}</span>
+            <span>{L(language, { fa: 'ورود به پنل مدیریت', en: 'Enter Admin Panel', ru: 'Открыть панель администратора', tr: 'Yönetim Paneline Gir' })}</span>
           </button>
         </div>
       )}
@@ -641,8 +857,8 @@ export default function App() {
           here was the single largest CLS source (score 1.0). Fixed ambient lighting is
           also the intended visual for these subtle blurred glows. */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-[#A855F7]/5 rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-[#06B6D4]/5 rounded-full blur-[150px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-violet-token/5 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-info-token/5 rounded-full blur-[150px]" />
       </div>
       
       {/* Toast Notifications Layer */}
@@ -665,6 +881,7 @@ export default function App() {
       </div>
 
       {!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin' && (
+        <ThemeRegion name="header" className="sticky top-0 z-40 w-full" fallback={
         <header className="site-header h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
                <img src={bazinoLogo} alt="Bazino Pro" width="40" height="40" className="brand-logo-guard h-10 w-auto" />
@@ -686,26 +903,29 @@ export default function App() {
             <div className="flex items-center gap-4">
                {!user ? (
                  <button onClick={() => setIsAuthModalOpen(true)} className="text-xs font-bold bg-primary text-black px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
-                   <LogIn className="w-4 h-4"/> {language === 'fa' ? 'ورود' : 'Login'}
+                   <LogIn className="w-4 h-4"/> {L(language, { fa: 'ورود', en: 'Login', ru: 'Войти', tr: 'Giriş' })}
                  </button>
                ) : (
                  <div className="flex items-center gap-3">
-                   <span className="text-xs font-bold text-primary">@{user.username}</span>
+                   <a href="/profile" onClick={(e) => { e.preventDefault(); navigateStandalone('/profile'); }} className="flex items-center gap-2 text-xs font-bold text-primary hover:text-white transition relative" data-header-profile-link title={L(language, { fa: 'پروفایل من', en: 'My profile', ru: 'Мой профиль', tr: 'Profilim' })}>
+                     {user.avatarUrl ? <img src={user.avatarUrl} alt="" width={28} height={28} className="w-7 h-7 rounded-full object-cover border border-primary/50" /> : <InitialAvatar name={user.displayName || user.username} size={28} />}
+                     <span className="hidden sm:inline">{user.displayName || `@${user.username}`}</span>
+                     {unreadTickets > 0 && <span className="absolute -top-1.5 -end-2 bg-rose-500 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center" data-header-unread>{unreadTickets}</span>}
+                   </a>
                    <button onClick={handleLogout} aria-label="Logout" className="text-red-400 hover:text-red-300"><LogOut className="w-4 h-4"/></button>
                  </div>
                )}
                <button 
                  onClick={() => { setHelpMode('gamenet'); setIsHelpOpen(true); }}
                  className="p-2 text-white bg-white/5 rounded-full hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
-                 title={language === 'fa' ? 'راهنمای تصویری کلوپ' : 'Client Visual Guide'}
+                 title={L(language, { fa: 'راهنمای تصویری کلوپ', en: 'Client Visual Guide', ru: 'Визуальный гид клуба', tr: 'Kulüp Görsel Rehberi' })}
                >
                  <HelpCircle className="w-4 h-4 text-primary" />
                </button>
-               <button onClick={() => setIsThemeModalOpen(true)} className="p-2 text-white bg-white/5 rounded-full hover:bg-white/10">
-                 <Palette className="w-4 h-4"/>
-               </button>
+               <LanguageMenu language={language} setLanguage={setLanguage} open={langDropdownOpen} setOpen={setLangDropdownOpen} />
             </div>
           </header>
+        } />
       )}
 
       {activeTab === 'admin' && (
@@ -714,10 +934,10 @@ export default function App() {
             <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping"></span>
             <div className="flex flex-col">
               <span className="font-display font-black text-sm tracking-wider text-purple-200">
-                {language === 'fa' ? 'پنل مدیریت بازینو پرو' : 'BAZINO PRO ADMIN'}
+                {L(language, { fa: 'پنل مدیریت بازینو پرو', en: 'BAZINO PRO ADMIN', ru: 'АДМИН-ПАНЕЛЬ BAZINO PRO', tr: 'BAZINO PRO YÖNETİM' })}
               </span>
               <span className="text-[10px] text-purple-400 font-medium font-sans">
-                {language === 'fa' ? `مدیر: @${user?.username}` : `Admin: @${user?.username}`}
+                {L(language, { fa: `مدیر: @${user?.username}`, en: `Admin: @${user?.username}`, ru: `Администратор: @${user?.username}`, tr: `Yönetici: @${user?.username}` })}
               </span>
             </div>
           </div>
@@ -728,14 +948,14 @@ export default function App() {
               className="bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/30 text-purple-200 px-3 py-2 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all active:scale-95"
             >
               <HelpCircle className="w-4 h-4 text-purple-300 animate-pulse" />
-              <span>{language === 'fa' ? 'راهنمای ادمین' : 'Admin Guide'}</span>
+              <span>{L(language, { fa: 'راهنمای ادمین', en: 'Admin Guide', ru: 'Гид администратора', tr: 'Yönetici Rehberi' })}</span>
             </button>
             <button 
               onClick={() => setActiveTab('home')} 
               className="bg-white/10 hover:bg-white/15 border border-white/20 hover:border-purple-500/40 text-white px-4 py-2 rounded-xl transition-all font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md active:scale-95"
             >
               {dir === 'rtl' ? <ArrowRight className="w-4 h-4 text-purple-300" /> : <ArrowLeft className="w-4 h-4 text-purple-300" />}
-              <span>{language === 'fa' ? 'بازگشت به سایت' : 'Back to Site'}</span>
+              <span>{L(language, { fa: 'بازگشت به سایت', en: 'Back to Site', ru: 'Вернуться на сайт', tr: 'Siteye Dön' })}</span>
             </button>
           </div>
         </header>
@@ -750,9 +970,9 @@ export default function App() {
       {/* Modals — lazy: چانک هر مودال فقط هنگام «اولین باز شدن» دانلود و اجرا می‌شود.
           قبلاً بدون شرط mount می‌شدند (چون داخلاً return null می‌کنند) و React همین که
           کامپوننت lazy رندر شود، چانکش را در startup دانلود/اجرا می‌کرد — همین باعث
-          TBT بالا و دانلود ThemeSelectorModal/AuthModal/VisualHelpGuide در بار اول
+          TBT بالا و دانلود AuthModal/VisualHelpGuide در بار اول
           می‌شد (مشاهده‌شده در Waterfall گزارش GTmetrix). با شرطی کردن، این چانک‌ها
-          (شامل motion که فقط داخل ThemeSelectorModal است) از مسیر بحرانی حذف شدند. */}
+          (شامل motion) از مسیر بحرانی حذف شدند. */}
       <Suspense fallback={null}>
         {isHelpOpen && (
           <VisualHelpGuide
@@ -769,16 +989,6 @@ export default function App() {
             isOpen={isAuthModalOpen}
             onClose={() => setIsAuthModalOpen(false)}
             onAuthSuccess={setUser}
-          />
-        )}
-        {isThemeModalOpen && (
-          <ThemeSelectorModal
-            isOpen={isThemeModalOpen}
-            onClose={() => setIsThemeModalOpen(false)}
-            availableThemes={availableThemes}
-            themeId={themeId}
-            setThemeId={setThemeId}
-            language={language}
           />
         )}
       </Suspense>
@@ -811,12 +1021,10 @@ export default function App() {
                 <LogOut className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-black text-white font-display">
-                {language === 'fa' ? 'خروج از حساب کاربری' : 'Sign Out Profile'}
+                {L(language, { fa: 'خروج از حساب کاربری', en: 'Sign Out Profile', ru: 'Выход из аккаунта', tr: 'Hesaptan Çıkış' })}
               </h3>
               <p className="text-gray-400 text-xs leading-relaxed">
-                {language === 'fa' 
-                  ? 'آیا برای خروج از حساب کاربری خود مطمئن هستید؟ برای استفاده دوباره از خدمات باید وارد شوید.' 
-                  : 'Are you sure you want to sign out from your gaming profile? You will need to login again to reserve rigs.'}
+                {L(language, { fa: 'آیا برای خروج از حساب کاربری خود مطمئن هستید؟ برای استفاده دوباره از خدمات باید وارد شوید.', en: 'Are you sure you want to sign out from your gaming profile? You will need to login again to reserve rigs.', ru: 'Вы уверены, что хотите выйти из своего игрового профиля? Для бронирования потребуется снова войти.', tr: 'Oyuncu profilinizden çıkmak istediğinize emin misiniz? Rezervasyon için tekrar giriş yapmanız gerekecek.' })}
               </p>
             </div>
 
@@ -825,13 +1033,13 @@ export default function App() {
                 onClick={() => setIsLogoutConfirmOpen(false)}
                 className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
               >
-                {language === 'fa' ? 'انصراف' : 'Cancel'}
+                {L(language, { fa: 'انصراف', en: 'Cancel', ru: 'Отмена', tr: 'İptal' })}
               </button>
               <button
                 onClick={confirmLogout}
                 className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-black text-xs rounded-xl transition-all shadow-[0_0_20px_rgba(239,68,68,0.3)] cursor-pointer animate-pulse-subtle"
               >
-                {language === 'fa' ? 'خروج' : 'Logout'}
+                {L(language, { fa: 'خروج', en: 'Logout', ru: 'Выйти', tr: 'Çıkış' })}
               </button>
             </div>
           </div>
@@ -845,7 +1053,7 @@ export default function App() {
           CTA داخل صفحه بود و برای کافه/فروشگاه/باشگاه حتی همان هم نبود.
           ────────────────────────────────────────────────────────────── */}
       {showMobileNav && (
-        <>
+        <ThemeRegion name="mobileNav" fallback={<>
           {isMobileMoreOpen && (
             <div
               className="md:hidden fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
@@ -869,12 +1077,13 @@ export default function App() {
                     <span>{t.label}</span>
                   </button>
                 ))}
+                <LanguageRow language={language} setLanguage={setLanguage} />
               </div>
             </div>
           )}
 
           <nav
-            aria-label={language === 'fa' ? 'ناوبری اصلی' : 'Main navigation'}
+            aria-label={L(language, { fa: 'ناوبری اصلی', en: 'Main navigation', ru: 'Основная навигация', tr: 'Ana gezinme' })}
             className="md:hidden fixed bottom-0 inset-x-0 z-[60] h-16 pb-[env(safe-area-inset-bottom,0px)] box-content border-t border-white/10 bg-dark-card/95 backdrop-blur-xl flex items-stretch"
           >
             {MOBILE_PRIMARY_TABS.map(t => (
@@ -893,22 +1102,29 @@ export default function App() {
             <button
               onClick={() => setIsMobileMoreOpen(v => !v)}
               aria-expanded={isMobileMoreOpen}
-              aria-label={language === 'fa' ? 'بیشتر' : 'More'}
+              aria-label={L(language, { fa: 'بیشتر', en: 'More', ru: 'Ещё', tr: 'Daha Fazla' })}
               className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 transition-colors ${
                 isMobileMoreOpen || MOBILE_MORE_TABS.some(t => t.id === activeTab) ? 'text-primary' : 'text-gray-400'
               }`}
             >
               <Menu className="w-5 h-5 shrink-0" />
-              <span className="text-[10px] font-bold truncate max-w-full px-1">{language === 'fa' ? 'بیشتر' : 'More'}</span>
+              <span className="text-[10px] font-bold truncate max-w-full px-1">{L(language, { fa: 'بیشتر', en: 'More', ru: 'Ещё', tr: 'Daha Fazla' })}</span>
             </button>
           </nav>
-        </>
+        </>} />
       )}
+
+      {activeTab !== 'admin' && !(layoutMode === 'hub' && activeTab === 'home') && (
+        <ThemeRegion name="footer" fallback={null} className="w-full" />
+      )}
+      {/* نوار قانونی ثابت: خارج از ThemeRegion؛ قالب‌ها نمی‌توانند آن را جایگزین یا پنهان کنند */}
+      {activeTab !== 'admin' && <LegalFooter onNavigate={navigateStandalone} />}
 
       <ScrollToTop 
         hidden={activeTab === 'admin' || activeTab === 'hub' || activeTab === 'console_grid'} 
         isRTL={dir === 'rtl'} 
       />
     </div>
+    </ThemeRegionProvider>
   );
 }

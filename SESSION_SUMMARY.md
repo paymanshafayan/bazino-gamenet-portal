@@ -851,3 +851,87 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - `vite build` ریشه → موفق ✅ (vendor-react + index همان ۱۵۱KB)
 - flutter_app ساختار سالم (pubspec + lib + پلتفرم‌ها) ✅
 - هیچ ارجاعی در کد به مسیرهای حذف‌شده وجود ندارد ✅
+
+## ۱۴۰۵/۰۶/۱۲ — ترجمه‌ی کامل سایت به fa/en/ru/tr (+ CSP، تم، منوی زبان)
+
+**کامیت‌ها (شاخه `arena/01a067ac-bazino-gamenet-portal`):** `ad6414f` CSP → `3a7ebe3` پایداری تم → `4e78eb4` منوی زبان + GeoIP → `3239806` بچ A/B/D → `006ff6f` بچ C → `afe1046` بچ E → بچ F (تست‌ها/مستندات).
+
+**الگو:** به‌جای کلیدهای انتزاعی، هر متن به‌صورت inline با `L(language, { fa, en, ru, tr })` (در `src/utils/i18n.ts`) نوشته شده تا diff قابل بازبینی بماند. RTL فقط برای fa؛ اعداد با `localeOf(language)`؛ واحد پول «تومان» و نام‌های برند حفظ شدند.
+
+**ابزار:** `scripts/i18n-extract.mts` (extract / apply / audit روی AST) — ~۹۰۰ سه‌تایی را استخراج و پس از ترجمه جای‌گذاری کرد؛ موارد تودرتو دستی اصلاح شدند.
+
+**سرور:** `server/apiMessages.ts` دیکشنری ۴۹ پیام × ۴ زبان؛ `server.ts` همه‌ی خطاهای کاربرپسند را با `apiError(req, KEY)` برمی‌گرداند (متن ترجمه‌شده + `code`). کلاینت زبان انتخابی را با هدر `X-Lang` می‌فرستد (اینترسپتور `src/services/authToken.ts`)؛ در نبود آن `Accept-Language`.
+
+**تست‌ها:** `npm test` = ۲۴۶/۲۴۶ (۳ تست جدید: کامل‌بودن دیکشنری API، نبودن متن خام فارسی در server.ts، نبودن سه‌تایی fa/en در کامپوننت‌ها). `tsc` و `vite build` سبز.
+
+**بررسی بصری (Chromium واقعی، production build):** صفحه‌ی اصلی و رزرو در هر ۴ زبان (`final-{lang}-home|reserve.png`) و ۱۶ بخش پنل مدیریت در ru/tr (`i18n-admin-{lang}-NN.png`): صفر خطای کنسول؛ تنها متن فارسی باقی‌مانده در ru/tr داده‌های نمونه‌ی دیتابیس است (E.42).
+
+**خارج از محدوده:** اپ Flutter، Management App، theme.js شخص ثالث، ترجمه‌ی sampleData.
+
+## ۱۴۰۵/۰۶/۱۲ — سیستم قالب: ماندگاری (Volume/Mongo)، نصب اتمیک، حذف امن، فعال‌سازی سراسری
+
+- `server/paths.ts` جدید؛ `BAZINO_DATA_DIR` و `MONGO_URL` (README به‌روز شد).
+- themeStore: نصب اتمیک با replace، cleanup پوشه‌های نیمه‌کاره، `installedAt` در فهرست.
+- server.ts: نصب = فعال‌سازی سراسری، DELETE ریست activeThemeId، `GET /api/admin/storage-status`.
+- کلاینت: بدون fallback بی‌صدا، کش نسخه‌دار، دکمه‌ی «انتخاب به‌عنوان قالب سایت» سراسری، کارت زیرساخت و «حالت به‌روزرسانی» در پنل.
+- تست: ۲۵۱/۲۵۱ + فلو UI در Chromium واقعی (`browser-test/t2-*.png`). Railway واقعی تست‌نشده.
+
+## ۱۴۰۵/۰۶/۱۲ — سیستم قالب v2: بخش‌ها (regions)، توکن‌ها، رشته‌های ۴زبانه، اسلایدر ۴زبانه
+
+- `src/themeSdk/sdk.ts` v2 (`THEME_REGIONS`, `ThemeComponentProps` با `ts/tokens/slides/region`), `ThemeRegion.tsx` (fallback به پیش‌فرض)، `App.tsx`/`HomeTab.tsx` بخش‌بندی شدند؛ قالب `home` نسخه ۱ بدون تغییر کار می‌کند.
+- `server/themeStore.ts`: `detectRegisteredRegions`, `KNOWN_REGIONS`, strings/tokens/regions در `/api/themes`؛ `theme.js` اختیاری؛ region ناشناخته → 400.
+- `src/index.css`: پل توکن `body[data-theme]` → کلاس‌های Tailwind (E.51 — دلیل واقعی «هدر عوض نمی‌شد»).
+- پنل ادمین: توضیح اسلاید در ۴ زبان، بج regions/CSS-only روی کارت قالب، پیش‌نمایش ZIP.
+- قالب نمونه (`themeZipCore.ts`): SDK v2 با hero+footer، strings ۴زبانه، tokens.
+- مستندات: `src/themes/README.md` بازنویسی (regions، توکن‌ها، قرارداد RTL/فونت، strings)، بخش قالب در README.
+- تأیید بصری در Chromium واقعی (`r1…r7`, `b-*.png`)؛ تست‌ها ۲۵۸/۲۵۸.
+
+## ۱۴۰۵/۰۶/۱۳ — روتینگ آدرس، عنوان/جستجوی پنل، آدرس و نقشه‌ی واقعی
+- `src/utils/routes.ts` + `App.tsx`/`AdminPanelTab.tsx`: آدرس مرورگر = صفحه‌ی فعلی؛ رفرش/Back درست؛ `<base href="/">`.
+- پنل: هدر بخش (نام + مسیر)، `document.title`، جستجوی سریع بخش‌ها با نتایج لینکی.
+- آدرس/تلفن/نقشه‌ی واقعی İskele (Vista Mare) + فیلدهای Google Maps/Lat/Lng در سفارشی‌سازی.
+- `public/images/real/` برای تصاویر واقعی. تست‌ها ۲۵۹/۲۵۹.
+
+## ۱۴۰۵/۰۶/۱۳ — تصاویر واقعی + تحقیق درگاه PayTR
+- تصاویر نمونه‌ی هرو/ژانر/سالن/اسلاید موبایل با عکس‌های واقعی جایگزین شد (`public/images/real/`, `sharp`، همه‌ی سایزها). کافه/فروشگاه هنوز نمونه.
+- تحقیق PayTR و ذخیره در `docs/payments/` (چک‌لیست الزامات سایت + مرجع API). هنوز هیچ کدی برای پرداخت نوشته نشده؛ برنامه‌ی ۵ مرحله‌ای در `PAYTR.md §۴`.
+
+## ۱۴۰۵/۰۶/۱۳ — PayTR + صفحات قانونی مستقل از قالب + TL
+
+- راهنمای گام‌به‌گام دریافت درگاه: `docs/payments/PAYTR-BASVURU-REHBERI.md` (مدارک، ثبت‌نام در سایت، دریافت merchant_id/key/salt، تنظیم Bildirim URL، حالت تست → زنده، ریسک KKTC).
+- بک‌اند: `server/payments/paytr.ts` (امضاها/HTTP) و `server/payments/routes.ts` (config/create/callback/orders/mock/admin list/refund)؛ جدول `payment_orders` در هر سه پرووایدر؛ env: `PAYTR_MERCHANT_ID/KEY/SALT`, `PAYTR_TEST_MODE` (پیش‌فرض ۱), `PAYTR_MOCK`, `PUBLIC_URL`.
+- فرانت مستقل از قالب: `src/legal/` (LegalShell, LegalPage, ContactPage, LegalFooter, PaymentBadges, PaymentCheckout, PaymentResultPage, LegalAdminSection, legalContent). مسیرها در `routes.ts` (`standalonePageFromPath`)، رندر قبل از ThemeRegionProvider در `App.tsx`.
+- خریدها (کافه/فروشگاه/رزرو/تورنمنت): اگر `/api/payments/config.enabled` → مودال PayTR؛ وگرنه مسیر قدیمی بدون پرداخت (سازگاری عقب‌رو).
+- واحد پول TL در کل سایت؛ امتیاز = مبلغ/10.
+- تست‌ها: ۲۸۳/۲۸۳ (۲۴ تست جدید: امضاهای PayTR، محتوای قانونی، استقلال از قالب، جریان create→mock→callback، idempotency، هش نامعتبر، رزرو/هم‌پوشانی، فهرست ادمین، تنظیمات).
+- تست‌نشده: درگاه واقعی PayTR، رندر فونت فارسی در sandbox، Railway.
+
+## ۱۴۰۵/۰۶/۱۳ — انتخاب قالب فقط توسط ادمین، رفع باگ SDK هدر، `SDK.LocationFrame`
+
+- هدر: دکمه‌ی انتخاب قالب و `ThemeSelectorModal` حذف؛ قالب سایت همیشه = انتخاب ادمین.
+- علت «قالب جدید هدر را تغییر نمی‌دهد»: باگ سیستم قالب (خروجی DOM خام از `render()` نادیده گرفته می‌شد). رفع در `src/themeSdk/sdk.ts` (`normalizeRenderOutput`).
+- `src/themeSdk/LocationFrame.tsx`: فریم آماده‌ی لوکیشن (card/map/inline) + `locationFrom`؛ روی `window.BazinoThemeSDK` در دسترس theme.js؛ مستند در README قالب‌ها (+ سه شکل مجاز خروجی render).
+- تست‌ها ۲۸۹/۲۸۹ (۶ جدید).
+
+## ۱۴۰۵/۰۶/۱۳ — ورود با کد پیامکی (OTP)، پروفایل کاربر، تیکت پشتیبانی
+
+- احراز هویت: ثبت‌نام فرم‌محور در وب حذف شد؛ ورود/عضویت با شماره‌ی موبایل + کد پیامکی (`/api/auth/otp/request|verify`)، کد هش‌شده در جدول `otp_codes`، محدودیت‌ها سمت سرور روی شماره و IP هم‌زمان (`429 + retryAfter`). ورود با رمز برای ادمین و کاربرانی که رمز دائمی گذاشته‌اند باقی است.
+- لایه‌ی SMS: `server/sms/` (smsto اصلی، easysendsms، mock) + `docs/sms/SMS-PROVIDERS.md`؛ env: `SMS_PROVIDER`, `SMSTO_API_KEY`, `SMS_SENDER_ID`.
+- پروفایل `/profile[/tab]` مستقل از قالب: ویرایش مشخصات، آواتار WebP، امتیازها، رزروها، سفارش‌ها (ستون `username` روی سفارش‌ها)، تورنمنت‌ها، پشتیبانی، امنیت (شماره‌ی تأییدشده + رمز دائمی اختیاری).
+- تیکت پشتیبانی: کاربر (ایجاد/پاسخ/بستن) + ادمین `/admin/tickets`؛ نشان «پاسخ جدید» در هدر و تب پشتیبانی.
+- رفع باگ‌های جانبی: مودال ورود زیر ویجت دانلود اپ (E.82)، شکست نصب پس از بوت با ادمین fallback (E.83).
+- تست‌ها ۳۲۶/۳۲۶. تست‌نشده: ارسال واقعی پیامک با SMS.to (کلید ندارید)، چیدمان RTL فارسی در Chromium (فونت)، Railway.
+- اصلاح وضعیت تیکت‌ها طبق درخواست: «در حال بررسی» → «پاسخ داده شده» → «بسته شده» خودکار پس از ۴۸ ساعت بی‌پاسخی کاربر (E.85).
+- رفع «هدر جایگزین نمی‌شود / فلش اسلایدر قبل از هروی قالب» (E.86): ZIP با پوشه‌ی ریشه، bootstrap قالب فعال در HTML، جای‌نگهدار hero وابسته به قالب.
+
+## ۱۴۰۵/۰۶/۱۳ — تسک ۱۳: کیف پول + پرداخت در محل، PayTR خاموش (نه حذف)
+
+- درگاه PayTR با `PAYMENT_ONLINE_ENABLED` (پیش‌فرض خاموش) گیت شد؛ کد/callback/docs باقی است؛ ادمین «موقتاً غیرفعال» نشان می‌دهد.
+- بک‌اند: `server/wallet/routes.ts`؛ جدول‌های `wallet_transactions` (دفتر کل، `balanceAfter`، `idempotencyKey` یکتا) و `onsite_orders` در SQLite/SQL Server/Mongo. موجودی هرگز منفی نمی‌شود.
+- قوانین: رزرو ایستگاه → کیف پول یا در محل تا ۱۰ دقیقه قبل از سانس؛ تورنمنت → کیف پول یا در محل تا ۴۸ ساعت قبل از شروع؛ گذشت مهلت → ابطال خودکار (`expireOnsiteOrders` هر دقیقه). بوفه/فروشگاه فقط در محل؛ موجودی انبار و امتیاز فقط بعد از تأیید پرداخت. لغو کاربر قبل از مهلت → آزادسازی جا / بازگشت وجه.
+- فرانت مستقل از قالب: `CheckoutModal` (انتخاب روش + متن قانون + تیک پذیرش + مهلت دقیق در نوتیفیکیشن)، `/profile/wallet` (موجودی، گردش، سفارش‌های در انتظار + لغو)، `/admin/wallet` (تأیید نقدی/کارت/کیف پول، لغو، جست‌وجو/اصلاح کیف پول، تراکنش‌ها). فوتر بدون نشان کارت وقتی درگاه خاموش است.
+- اپ مدیریت: `walletSync.ts` (صف آفلاین با idempotency، flush خودکار) + `WebWalletPanel` در تب «اعضا و کیف پول»؛ آزمایش زنده روی سرور محلی.
+- API sync برای اپ: `/api/sync/wallet/topup|charge|:phone`, `/api/sync/onsite-orders[…/settle|cancel]`.
+- سند: `docs/payments/WALLET.md`. ISSUES E.87–E.92.
+- تست‌ها: API ۱۶۳/۱۶۳ (۱۳ جدید)، Unit ۸۷/۸۷ (۵ جدید)، UI ۴۲/۴۲ (۵ جدید)، DB ۳۶/۳۶، Providers ۲۶/۲۶ → **۳۵۴/۳۵۴**. Chromium: مودال رزرو (EN دسکتاپ)، تورنمنت در محل (EN)، بوفه (TR موبایل)، پروفایل کیف پول (EN دسکتاپ+موبایل)، ادمین (TR)، اپ مدیریت (FA).
+- تست‌نشده: اجرای واقعی روی SQL Server/Mongo؛ فونت فارسی در Chromium sandbox؛ Railway.

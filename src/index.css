@@ -38,6 +38,14 @@
      ندارد. قالب‌ها برای نمایش لوگو باید از این متغیر استفاده
      کنند (آدرس استاندارد: /logo.png). */
   --brand-logo-url: url('/logo.png');
+
+  /* توکن‌های طراحی قالب (App.tsx با applyThemeTokens روی <body> بازنویسی می‌کند) */
+  --bz-border: rgba(255, 255, 255, 0.1);
+  --bz-text: #f3f4f6;
+  --bz-muted: #9ca3af;
+  --bz-success: #10B981;
+  --bz-info: #1bc2ca;
+  --bz-violet: #A855F7;
 }
 
 /* محافظ لوگو: هیچ قالبی نمی‌تواند لوگوی هدر را پنهان یا حذف کند.
@@ -83,9 +91,44 @@
   --color-accent-red: var(--accent-red-color, #ff3b30);
   --color-dark-bg: var(--dark-bg-color, #07080a);
   --color-dark-card: var(--dark-card-color, #12141c);
-  --font-sans: "Vazirmatn", ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif;
-  --font-display: "Orbitron", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  /* ── Design tokens (قابل تغییر توسط هر قالب از طریق theme.json.tokens → --bz-*) ──
+     کلاس‌های tailwind: bg-card-2, bg-card-3, bg-surface, bg-surface-2, border-token,
+     text-token, text-muted-token, text-success-token, text-info-token, bg-violet-token */
+  --color-card-2: var(--bz-card-2, var(--dark-card-color, #0d122b));
+  --color-card-3: var(--bz-card-3, var(--dark-card-color, #0f1326));
+  --color-surface: var(--bz-surface, var(--dark-card-color, #0a0e21));
+  --color-surface-2: var(--bz-surface-2, var(--dark-bg-color, #050608));
+  --color-token: var(--bz-text, #f3f4f6);
+  --color-muted-token: var(--bz-muted, #9ca3af);
+  --color-success-token: var(--bz-success, #10B981);
+  --color-info-token: var(--bz-info, #1bc2ca);
+  --color-violet-token: var(--bz-violet, #A855F7);
+  --font-sans: var(--bz-font-sans, "Vazirmatn", ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif);
+  --font-display: var(--bz-font-display, "Orbitron", "Vazirmatn", ui-sans-serif, system-ui, sans-serif);
   --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", "Vazirmatn", monospace;
+}
+
+/* پل توکن‌ها → Tailwind روی <body>:
+   متغیرهای @theme روی :root محاسبه می‌شوند؛ قالب‌ها --primary-color و ... را روی body
+   تعریف می‌کنند، پس باید همین‌جا دوباره به --color-* وصل شوند وگرنه کلاس‌های
+   text-primary / bg-dark-card و ... همیشه رنگ پیش‌فرض می‌مانند. */
+body, body[data-theme] {
+  --color-primary: var(--primary-color, #ffb800);
+  --color-primary-hover: var(--primary-hover-color, #e09900);
+  --color-accent-red: var(--accent-red-color, #ff3b30);
+  --color-dark-bg: var(--dark-bg-color, #07080a);
+  --color-dark-card: var(--dark-card-color, #12141c);
+  --color-card-2: var(--bz-card-2, var(--dark-card-color, #0d122b));
+  --color-card-3: var(--bz-card-3, var(--dark-card-color, #0f1326));
+  --color-surface: var(--bz-surface, var(--dark-card-color, #0a0e21));
+  --color-surface-2: var(--bz-surface-2, var(--dark-bg-color, #050608));
+  --color-token: var(--bz-text, #f3f4f6);
+  --color-muted-token: var(--bz-muted, #9ca3af);
+  --color-success-token: var(--bz-success, #10B981);
+  --color-info-token: var(--bz-info, #1bc2ca);
+  --color-violet-token: var(--bz-violet, #A855F7);
+  --font-sans: var(--bz-font-sans, "Vazirmatn", ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif);
+  --font-display: var(--bz-font-display, "Orbitron", "Vazirmatn", ui-sans-serif, system-ui, sans-serif);
 }
 
 /* Custom Mobirise GamingAMP Utilities */

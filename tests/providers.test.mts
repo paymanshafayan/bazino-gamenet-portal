@@ -239,19 +239,25 @@ function createFakeMongo() {
   };
   const matches = (doc: any, q: any): boolean =>
     Object.entries(q ?? {}).every(([k, v]) => {
+      if (k === '$and') return (v as any[]).every(sub => matches(doc, sub));
+      if (k === '$or') return (v as any[]).some(sub => matches(doc, sub));
       if (v && typeof v === 'object' && '$regex' in (v as any)) {
         const rx = new RegExp((v as any).$regex, (v as any).$options ?? '');
         return rx.test(String(doc[k] ?? ''));
       }
+      if (v && typeof v === 'object' && '$in' in (v as any)) return (v as any).$in.includes(doc[k]);
+      if (v && typeof v === 'object' && '$gte' in (v as any)) return doc[k] >= (v as any).$gte;
       return doc[k] === v;
     });
 
   const collection = (name: string) => ({
     find(q: any = {}) {
-      const rows = col(name).filter(d => matches(d, q));
+      let rows = col(name).filter(d => matches(d, q));
       const cursor: any = {
         toArray: async () => rows.map(r => ({ ...r })),
-        sort: () => cursor, limit: () => cursor, project: () => cursor,
+        next: async () => (rows[0] ? { ...rows[0] } : null),
+        sort: (spec: Record<string, 1 | -1>) => { const [[k, dir]] = Object.entries(spec); rows = [...rows].sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * (dir as number)); return cursor; },
+        limit: (n: number) => { rows = rows.slice(0, n); return cursor; }, project: () => cursor,
       };
       return cursor;
     },
@@ -378,6 +384,45 @@ test('loyalty points are incremented atomically', async () => {
 test('users are looked up case-insensitively', async () => {
   const upper = await mongo.getUserByUsername('MONGO_USER');
   assert.ok(upper, 'a differently-cased username should still resolve');
+});
+
+test('Mongo: OTP rows are filtered by phone/ip + since and the latest active one wins', async () => {
+  const now = Date.now();
+  const mk = (id: string, phone: string, ip: string, ago: number, consumedAt = '') => ({ id, phone, codeHash: 'x$y', ip, purpose: 'login', createdAt: new Date(now - ago).toISOString(), expiresAt: new Date(now + 300000).toISOString(), attempts: 0, consumedAt });
+  await mongo.createOtp(mk('o1', '+905000000001', '1.1.1.1', 90_000));
+  await mongo.createOtp(mk('o2', '+905000000001', '1.1.1.1', 10_000));
+  await mongo.createOtp(mk('o3', '+905000000002', '1.1.1.1', 5_000_000));
+  await mongo.createOtp(mk('o4', '+905000000003', '2.2.2.2', 1_000));
+  const since = new Date(now - 3_600_000).toISOString();
+  assert.equal((await mongo.listRecentOtps({ phone: '+905000000001', since })).length, 2);
+  assert.equal((await mongo.listRecentOtps({ ip: '1.1.1.1', since })).length, 2, 'the 83-minute-old row must be excluded');
+  const latest = await mongo.getLatestActiveOtp('+905000000001', 'login');
+  assert.equal(latest?.id, 'o2');
+  await mongo.updateOtp('o2', { consumedAt: new Date().toISOString(), attempts: 3 });
+  assert.equal((await mongo.getLatestActiveOtp('+905000000001', 'login'))?.id, 'o1');
+});
+
+test('Mongo: tickets + messages round-trip and countOpenTickets counts open/customer_reply only', async () => {
+  const t = (id: string, status: string) => ({ id, username: 'u1', subject: 's', category: 'general', priority: 'normal', status, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: `2026-01-0${id.slice(-1)}T00:00:00.000Z`, lastStaffReplyAt: '', userSeenAt: '' });
+  await mongo.createTicket(t('t1', 'open')); await mongo.createTicket(t('t2', 'closed')); await mongo.createTicket(t('t3', 'customer_reply'));
+  await mongo.addTicketMessage({ id: 'm1', ticketId: 't1', author: 'u1', isStaff: 0, body: 'hi', createdAt: '2026-01-01T00:00:01.000Z' });
+  await mongo.addTicketMessage({ id: 'm2', ticketId: 't1', author: 'admin', isStaff: 1, body: 'hello', createdAt: '2026-01-01T00:00:02.000Z' });
+  assert.equal(await mongo.countOpenTickets(), 2);
+  assert.deepEqual((await mongo.listTicketsFor('u1')).map((x: any) => x.id), ['t3', 't2', 't1'], 'newest updatedAt first');
+  assert.equal((await mongo.listTickets('closed')).length, 1);
+  await mongo.updateTicket('t1', { status: 'answered', lastStaffReplyAt: 'now', bogus: 'ignored' } as any);
+  const got = await mongo.getTicketById('t1');
+  assert.equal(got.status, 'answered'); assert.equal(got.bogus, undefined);
+  assert.deepEqual((await mongo.listTicketMessages('t1')).map((m: any) => m.id), ['m1', 'm2']);
+});
+
+test('Mongo: updateUserFields only touches whitelisted profile columns; getUserByPhone works', async () => {
+  await mongo.createUser({ username: 'otpuser', password: 'p', email: '', phone: '+905000000009' });
+  await mongo.updateUserFields('otpuser', { displayName: 'Ali', role: 'admin', loyaltyPoints: 99999 } as any);
+  const u = await mongo.getUserByPhone('+905000000009');
+  assert.equal(u.displayName, 'Ali');
+  assert.notEqual(u.role, 'admin', 'role must not be editable through updateUserFields');
+  assert.notEqual(u.loyaltyPoints, 99999);
 });
 
 /* ═══════════════════════════════════════════════════════════════════════

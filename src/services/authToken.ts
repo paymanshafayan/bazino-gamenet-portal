@@ -58,6 +58,16 @@ function isSameOriginApiUrl(url: string): boolean {
   return false;
 }
 
+/** زبان فعلی رابط (همان کلیدی که LanguageContext ذخیره می‌کند). */
+function getUiLanguage(): string | null {
+  try {
+    const v = localStorage.getItem('cyber_lang');
+    return v && /^(fa|en|ru|tr)$/.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 let installed = false;
 
 /**
@@ -78,7 +88,6 @@ export function installAuthFetchInterceptor(): void {
 
   const patched = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const token = getAuthToken();
-    if (!token) return originalFetch(input as any, init);
 
     const url =
       typeof input === 'string' ? input :
@@ -90,7 +99,10 @@ export function installAuthFetchInterceptor(): void {
     const headers = new Headers(
       init?.headers ?? (input instanceof Request ? input.headers : undefined)
     );
-    if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+    if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+    // زبان انتخابی کاربر → سرور پیام‌های خطا را به همان زبان برمی‌گرداند.
+    const lang = getUiLanguage();
+    if (lang && !headers.has('X-Lang')) headers.set('X-Lang', lang);
 
     return originalFetch(input as any, { ...init, headers });
   };

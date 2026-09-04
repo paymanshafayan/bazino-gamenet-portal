@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserState, LoyaltyTx, DiscountCode } from '../types/gamenet';
 import { Award, Gift, ArrowLeftRight, TrendingUp, History, Copy, Check, Info } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { L, localeOf } from '../utils/i18n';
 
 interface Props {
   themeId?: string;
@@ -24,7 +25,7 @@ export default function LoyaltyProfileTab({
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // Conversion rates
-  const pointsRate = 100; // 1 Point = 100 Tomans
+  const pointsRate = 0.1; // 1 Point = 0.1 TL
   const couponValue = pointsToRedeem * pointsRate;
 
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -35,9 +36,7 @@ export default function LoyaltyProfileTab({
     if (isRedeeming) return;
     if (user.loyaltyPoints < pointsToRedeem) {
       addNotification(
-        language === 'fa' ? 'امتیاز شما کافی نیست!' :
-        language === 'en' ? 'Insufficient points!' :
-        language === 'ru' ? 'Недостаточно баллов!' : 'Puanınız yetersiz!',
+        L(language, { fa: 'امتیاز شما کافی نیست!', en: 'Insufficient points!', ru: 'Недостаточно баллов!', tr: 'Puanınız yetersiz!' }),
         'error'
       );
       return;
@@ -57,13 +56,7 @@ export default function LoyaltyProfileTab({
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     
-    const copyMsg = language === 'fa'
-      ? `کد تخفیف ${code} کپی شد! می‌توانید در خریدهای خود استفاده کنید.`
-      : language === 'en'
-      ? `Discount code ${code} copied! You can use it in your next orders.`
-      : language === 'ru'
-      ? `Промокод ${code} скопирован! Вы можете использовать его при покупках.`
-      : `İndirim kodu ${code} kopyalandı! Alışverişlerinizde kullanabilirsiniz.`;
+    const copyMsg = L(language, { fa: `کد تخفیف ${code} کپی شد! می‌توانید در خریدهای خود استفاده کنید.`, en: `Discount code ${code} copied! You can use it in your next orders.`, ru: `Промокод ${code} скопирован! Вы можете использовать его при покупках.`, tr: `${code} indirim kodu kopyalandı! Alışverişlerinizde kullanabilirsiniz.` });
 
     addNotification(copyMsg, 'success');
     setTimeout(() => setCopiedCode(null), 2000);
@@ -102,7 +95,7 @@ export default function LoyaltyProfileTab({
               <span className="text-gray-400 text-xs font-bold font-mono">PTS</span>
             </div>
             <p className="text-gray-400 text-xs mt-3 leading-relaxed">
-              {t('loyalty.approxValue', 'برابر با ارزش حدودی')} <strong className="text-primary font-mono font-bold">{(user.loyaltyPoints * pointsRate).toLocaleString()} {t('common.currency', 'تومان')}</strong> {t('loyalty.discountDirect', 'تخفیف مستقیم کافه و سیستم')}
+              {t('loyalty.approxValue', 'برابر با ارزش حدودی')} <strong className="text-primary font-mono font-bold">{(user.loyaltyPoints * pointsRate).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</strong> {t('loyalty.discountDirect', 'تخفیف مستقیم کافه و سیستم')}
             </p>
           </div>
 
@@ -119,7 +112,7 @@ export default function LoyaltyProfileTab({
                 {(user.loyaltyPoints % 1000)} / 1000 {t('loyalty.pointsToSilver', 'امتیاز تا نقره‌ای')}
               </span>
             </div>
-            <div className="w-full bg-[#0d122b] rounded-full h-2 overflow-hidden border border-white/5">
+            <div className="w-full bg-card-2 rounded-full h-2 overflow-hidden border border-white/5">
               <div 
                 className="bg-primary h-2 rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,240,255,0.6)]"
                 style={{ width: `${Math.min(100, ((user.loyaltyPoints % 1000) / 1000) * 100)}%` }}
@@ -172,7 +165,7 @@ export default function LoyaltyProfileTab({
               value={pointsToRedeem}
               onChange={(e) => setPointsToRedeem(Number(e.target.value))}
               disabled={user.loyaltyPoints < 100}
-              className="w-full h-1.5 bg-[#0d122b] rounded-lg appearance-none cursor-pointer accent-primary"
+              className="w-full h-1.5 bg-card-2 rounded-lg appearance-none cursor-pointer accent-primary"
             />
             <div className="flex justify-between text-[10px] text-gray-500 font-bold font-mono">
               <span>100 PTS</span>
@@ -181,14 +174,14 @@ export default function LoyaltyProfileTab({
           </div>
 
           {/* Exchange review */}
-          <div className="bg-[#0d122b] border border-white/5 rounded-xl p-4 mb-6">
+          <div className="bg-card-2 border border-white/5 rounded-xl p-4 mb-6">
             <div className="flex justify-between text-xs text-gray-400 mb-2.5">
               <span>{t('loyalty.couponValue', 'ارزش کد تخفیف:')}</span>
-              <span className="text-primary font-bold font-mono">+{couponValue.toLocaleString()} {t('common.currency', 'تومان')}</span>
+              <span className="text-primary font-bold font-mono">+{couponValue.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
             </div>
             <div className="flex justify-between text-xs text-gray-400 mb-2.5">
               <span>{t('loyalty.minOrder', 'حداقل سفارش خرید:')}</span>
-              <span className="text-gray-300 font-medium font-mono">{(couponValue * 1.5).toLocaleString()} {t('common.currency', 'تومان')}</span>
+              <span className="text-gray-300 font-medium font-mono">{(couponValue * 1.5).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
             </div>
             <div className="flex justify-between text-xs text-gray-400">
               <span>{t('loyalty.validity', 'مدت اعتبار کد تخفیف:')}</span>
@@ -230,7 +223,7 @@ export default function LoyaltyProfileTab({
               {activeCoupons.map((coupon) => (
                 <div 
                   key={coupon.code}
-                  className="rounded-xl border border-white/10 bg-[#0f1326] hover:border-primary p-5 relative overflow-hidden flex flex-col justify-between transition-all group"
+                  className="rounded-xl border border-white/10 bg-card-3 hover:border-primary p-5 relative overflow-hidden flex flex-col justify-between transition-all group"
                 >
                   <div className="absolute -top-12 -right-12 w-24 h-24 bg-primary/5 blur-2xl pointer-events-none group-hover:bg-primary/10 transition-all"></div>
                   <div className="flex justify-between items-start gap-2 relative z-10">
@@ -239,14 +232,14 @@ export default function LoyaltyProfileTab({
                         {coupon.type === 'Fixed' ? t('loyalty.typeFixed', 'مبلغ ثابت') : t('loyalty.typePercent', 'درصدی')}
                       </span>
                       <h4 className="text-2xl font-black text-white mt-3 font-mono">
-                        {coupon.value.toLocaleString()} {coupon.type === 'Fixed' ? t('common.currency', 'تومان') : '%'}
+                        {coupon.value.toLocaleString(localeOf(language))} {coupon.type === 'Fixed' ? t('common.currency', 'لیر') : '%'}
                       </h4>
                     </div>
                     
                     <button
                       onClick={() => handleCopyCode(coupon.code)}
                       className="p-2.5 rounded-lg bg-white/5 hover:bg-primary hover:text-black text-gray-400 transition-all border border-white/5 cursor-pointer"
-                      title="کپی کردن کد"
+                      title={L(language, { fa: 'کپی کردن کد', en: 'Copy code', ru: 'Скопировать код', tr: 'Kodu kopyala' })}
                     >
                       {copiedCode === coupon.code ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </button>
@@ -257,7 +250,7 @@ export default function LoyaltyProfileTab({
                       <span>{t('loyalty.couponLabel', 'کد کوپن:')} </span>
                       <strong className="text-primary tracking-widest text-sm font-bold">{coupon.code}</strong>
                     </div>
-                    <span className="text-[10px] text-gray-500">{t('loyalty.minOrderLabel', 'حداقل خرید:')} {coupon.minOrder.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                    <span className="text-[10px] text-gray-500">{t('loyalty.minOrderLabel', 'حداقل خرید:')} {coupon.minOrder.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                   </div>
                 </div>
               ))}
@@ -275,7 +268,7 @@ export default function LoyaltyProfileTab({
             <div>
               <h4 className="text-white text-sm font-bold font-display uppercase tracking-wide">{t('loyalty.howToEarnTitle', 'چگونه امتیاز کسب کنم؟')}</h4>
               <p className="text-gray-400 text-xs mt-2.5 leading-relaxed">
-                {t('loyalty.howToEarnDesc', 'به ازای هر ۱۰,۰۰۰ تومان هزینه در بوفه، رزرو سیستم یا خرید تجهیزات جانبی، ۱ امتیاز وفاداری دریافت می‌کنید.')}
+                {t('loyalty.howToEarnDesc', 'به ازای هر ۱۰ لیر هزینه در بوفه، رزرو سیستم یا خرید تجهیزات جانبی، ۱ امتیاز وفاداری دریافت می‌کنید.')}
               </p>
             </div>
           </div>
@@ -304,7 +297,7 @@ export default function LoyaltyProfileTab({
 
           <div className="overflow-x-auto mt-4">
             <table className="w-full text-sm text-gray-400">
-              <thead className="text-xs text-gray-400 uppercase bg-[#0d122b] border-b border-white/10 font-mono font-bold">
+              <thead className="text-xs text-gray-400 uppercase bg-card-2 border-b border-white/10 font-mono font-bold">
                 <tr>
                   <th scope="col" className={`px-4 py-3 ${dir === 'rtl' ? 'text-right rounded-r-lg' : 'text-left rounded-l-lg'}`}>{t('loyalty.tableDesc', 'شرح تراکنش وفاداری')}</th>
                   <th scope="col" className="px-4 py-3 text-center">{t('loyalty.tableType', 'نوع تراکنش')}</th>
@@ -322,7 +315,7 @@ export default function LoyaltyProfileTab({
                         .replace('امتیاز سفارش پیتزا پپرونی و ردبول از کافه بوفه', 'Points for ordering Pepperoni Pizza and RedBull from Cafe Buffet')
                         .replace('تبدیل', 'Converted')
                         .replace('امتیاز به کد تخفیف', 'points to discount code')
-                        .replace('تومانی', 'Tomans')
+                        .replace('لیری', 'TL')
                         .replace('سیستم', 'System')
                         .replace('کافه', 'Cafe');
 

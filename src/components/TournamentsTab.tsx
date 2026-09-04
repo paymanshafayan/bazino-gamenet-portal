@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Tournament } from '../types/gamenet';
 import { Trophy, Calendar, Users, Plus, UserPlus, Trash2, Check, Star, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
+import { L, localeOf, formatJalaliForLanguage, jalaliToGregorianDate } from '../utils/i18n';
 
 // Jalali Date Helpers
 const persianToEnglishDigits = (str: string): string => {
@@ -28,20 +30,8 @@ const parseJalaliDate = (dateStr: string) => {
   return null;
 };
 
-const jalaliToGregorian = (y: number, m: number, d: number): Date => {
-  const monthLengths = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
-  let days = d - 1;
-  for (let i = 0; i < m - 1; i++) {
-    days += monthLengths[i];
-  }
-  let startYear = 2026;
-  if (y === 1404) startYear = 2025;
-  else if (y === 1405) startYear = 2026;
-  else if (y === 1406) startYear = 2027;
-  
-  const startDate = new Date(startYear, 2, 21);
-  return new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
-};
+// تبدیل جلالی→میلادی با الگوریتم استاندارد مشترک (قبلاً محاسبهٔ تقریبی اشتباه بود — تسک ۱۳)
+const jalaliToGregorian = (y: number, m: number, d: number): Date => jalaliToGregorianDate(y, m, d);
 
 const getPersianWeekdayIndex = (gregorianDay: number): number => {
   return (gregorianDay + 1) % 7;
@@ -128,18 +118,12 @@ export default function TournamentsTab({
       if (tDate && tDate.year === y && tDate.month === m && tDate.day === d) {
         events.push({
           id: `start-${t.id}`,
-          title: language === 'fa' ? `🏆 افتتاحیه و آغاز بازی‌های ${t.title}`
-                 : language === 'en' ? `🏆 Opening & Kick-off of ${t.title}`
-                 : language === 'ru' ? `🏆 Открытие и начало игр ${t.title}`
-                 : `🏆 Açılış ve Başlangıç ${t.title}`,
+          title: L(language, { fa: `🏆 افتتاحیه و آغاز بازی‌های ${t.title}`, en: `🏆 Opening & Kick-off of ${t.title}`, ru: `🏆 Открытие и начало игр ${t.title}`, tr: `🏆 ${t.title} açılışı ve başlangıcı` }),
           type: 'tournament_start',
           time: '۱۵:۰۰',
           tournamentTitle: t.title,
           game: t.game,
-          details: language === 'fa' ? `ورودی: ${t.registrationFee.toLocaleString()} تومان | ظرفیت: ${t.registeredTeamsCount}/${t.maxTeams} تیم`
-                 : language === 'en' ? `Entry: ${t.registrationFee.toLocaleString()} Tomans | Capacity: ${t.registeredTeamsCount}/${t.maxTeams} Teams`
-                 : language === 'ru' ? `Взнос: ${t.registrationFee.toLocaleString()} томанов | Вместимость: ${t.registeredTeamsCount}/${t.maxTeams} команд`
-                 : `Katılım: ${t.registrationFee.toLocaleString()} Tümen | Kapasite: ${t.registeredTeamsCount}/${t.maxTeams} Takım`,
+          details: L(language, { fa: `ورودی: ${t.registrationFee.toLocaleString(localeOf(language))} لیر | ظرفیت: ${t.registeredTeamsCount}/${t.maxTeams} تیم`, en: `Entry: ${t.registrationFee.toLocaleString(localeOf(language))} TL | Capacity: ${t.registeredTeamsCount}/${t.maxTeams} Teams`, ru: `Взнос: ${t.registrationFee.toLocaleString(localeOf(language))} TL | Вместимость: ${t.registeredTeamsCount}/${t.maxTeams} команд`, tr: `Giriş: ${t.registrationFee.toLocaleString(localeOf(language))} TL | Kapasite: ${t.registeredTeamsCount}/${t.maxTeams} Takım` }),
           badgeColor: 'from-primary to-yellow-500',
         });
       }
@@ -341,6 +325,8 @@ export default function TournamentsTab({
   // ثبت‌نام حالا واقعاً به سرور می‌رود؛ توست موفقیت و پاک‌کردن فرم فقط پس از
   // تأیید سرور انجام می‌شوند (قبلاً تیم فقط در state کلاینت ظاهر می‌شد و با
   // یک refresh ناپدید می‌شد).
+  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number; title: string } | null>(null);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTournament || isSubmitting) return;
@@ -350,6 +336,11 @@ export default function TournamentsTab({
     }
 
     const allMembers = [leaderName, ...members];
+    // تسک ۱۳: هزینهٔ ثبت‌نام > 0 → انتخاب روش پرداخت (کیف پول / در محل با مهلت ۴۸ ساعت)؛ ثبت تیم را سرور انجام می‌دهد
+    if (selectedTournament.registrationFee > 0) {
+      setCheckout({ params: { tournamentId: selectedTournament.id, team: { name: teamName, leader: leaderName, members: allMembers } }, amount: selectedTournament.registrationFee, title: selectedTournament.title });
+      return;
+    }
     setIsSubmitting(true);
     try {
       await onRegisterTeam(selectedTournament.id, {
@@ -358,8 +349,8 @@ export default function TournamentsTab({
         members: allMembers,
       });
 
-      // Award loyalty points for tournament registration fee: 1 point per 10,000 Tomans
-      const pointsEarned = Math.floor(selectedTournament.registrationFee / 10000);
+      // Award loyalty points for tournament registration fee: 1 point per 10 TL
+      const pointsEarned = Math.floor(selectedTournament.registrationFee / 10);
       await onAddLoyaltyPoints(pointsEarned, `ثبت‌نام تیم ${teamName} در تورنمنت ${selectedTournament.title}`);
 
       addNotification(`تیم "${teamName}" با موفقیت در تورنمنت ثبت‌نام شد! ${pointsEarned} امتیاز وفاداری باشگاه مشتریان به شما تعلق گرفت.`, 'success');
@@ -377,6 +368,14 @@ export default function TournamentsTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in font-sans" dir={dir}>
+      {checkout && <CheckoutModal kind="tournament" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onClose={() => setCheckout(null)}
+        onDone={(r: CheckoutResult) => {
+          setCheckout(null);
+          if (r.method === 'wallet') addNotification(L(language, { fa: `تیم «${teamName}» ثبت شد و هزینه از کیف پول کسر شد (${r.result?.points ?? 0} امتیاز).`, en: `Team “${teamName}” registered; fee deducted from your wallet (${r.result?.points ?? 0} points).`, ru: `Команда «${teamName}» зарегистрирована; взнос списан из кошелька (${r.result?.points ?? 0} баллов).`, tr: `“${teamName}” takımı kaydedildi; ücret cüzdandan düşüldü (${r.result?.points ?? 0} puan).` }), 'success');
+          else addNotification(L(language, { fa: `تیم «${teamName}» ثبت شد. لطفاً حداکثر تا ${formatDue(r.dueAt, language)} (۴۸ ساعت قبل از شروع) در کلاب حاضر شده و حضوری پرداخت کنید؛ در غیر این صورت ثبت‌نام باطل می‌شود.`, en: `Team “${teamName}” registered. Please arrive and pay at the club by ${formatDue(r.dueAt, language)} (48 hours before the start); otherwise the registration will be cancelled.`, ru: `Команда «${teamName}» зарегистрирована. Придите и оплатите в клубе до ${formatDue(r.dueAt, language)} (за 48 часов до начала); иначе регистрация будет аннулирована.`, tr: `“${teamName}” takımı kaydedildi. Lütfen en geç ${formatDue(r.dueAt, language)} (başlangıçtan 48 saat önce) kulübe gelip ödeme yapın; aksi hâlde kayıt iptal edilir.` }), 'info');
+          setTeamName(''); setLeaderName(''); setMembers([]);
+          window.dispatchEvent(new CustomEvent('bazino:refresh-data'));
+        }} />}
       
       {/* Tournament Selector and Bracket Display */}
       <div className="lg:col-span-2 flex flex-col gap-6">
@@ -388,17 +387,17 @@ export default function TournamentsTab({
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
                 <span className="w-1.5 h-6 bg-primary rounded-md shadow-[0_0_10px_rgba(0,240,255,0.4)]"></span>
-                <span>{language === 'fa' ? 'جداول مسابقات و براکت‌ها' : 'Tournament Brackets'}</span>
+                <span>{L(language, { fa: 'جداول مسابقات و براکت‌ها', en: 'Tournament Brackets', ru: 'Турнирные сетки', tr: 'Turnuva Tabloları' })}</span>
               </h3>
               <p className="text-gray-400 text-xs mt-1.5 leading-relaxed font-medium">
-                {language === 'fa' ? 'تورنمنت مورد نظر را برای مشاهده روند بازی‌ها و جدول حذفی انتخاب کنید.' : 'Choose tournament to view brackets & game results.'}
+                {L(language, { fa: 'تورنمنت مورد نظر را برای مشاهده روند بازی‌ها و جدول حذفی انتخاب کنید.', en: 'Choose tournament to view brackets & game results.', ru: 'Выберите турнир, чтобы посмотреть сетку и результаты матчей.', tr: 'Tabloyu ve maç sonuçlarını görmek için bir turnuva seçin.' })}
               </p>
             </div>
 
             <select
               value={selectedTournamentId}
               onChange={(e) => setSelectedTournamentId(e.target.value)}
-              className="bg-[#0d122b] border border-white/10 rounded-lg px-4 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold font-mono cursor-pointer"
+              className="bg-card-2 border border-white/10 rounded-lg px-4 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold font-mono cursor-pointer"
             >
               {tournaments.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -414,11 +413,11 @@ export default function TournamentsTab({
           <div className="rounded-2xl border border-white/10 bg-dark-card p-6 overflow-x-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-white/5">
               <div className="flex gap-4 text-xs text-gray-400 font-mono font-bold">
-                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-primary" /> {language === 'fa' ? 'شروع:' : 'Starts:'} {selectedTournament.startDate}</span>
-                <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-primary" /> {language === 'fa' ? 'ظرفیت:' : 'Teams:'} {selectedTournament.registeredTeamsCount}/{selectedTournament.maxTeams}</span>
+                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-primary" /> {L(language, { fa: 'شروع:', en: 'Starts:', ru: 'Начало:', tr: 'Başlangıç:' })} {formatJalaliForLanguage(selectedTournament.startDate, language)}</span>
+                <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-primary" /> {L(language, { fa: 'ظرفیت:', en: 'Teams:', ru: 'Команд:', tr: 'Kapasite:' })} {selectedTournament.registeredTeamsCount}/{selectedTournament.maxTeams}</span>
               </div>
               <span className="px-3 py-1 rounded bg-primary/10 text-primary border border-primary/20 font-black text-xs font-mono">
-                {language === 'fa' ? 'جایزه بزرگ: ۵,۰۰0,۰۰۰ تومان + ۱۰۰۰ امتیاز' : 'Prize: 5,000,000 Tomans + 1,000 PTS'}
+                {L(language, { fa: 'جایزه بزرگ: ۱۰,۰۰۰ لیر + ۱۰۰۰ امتیاز', en: 'Prize: 10,000 TL + 1,000 PTS', ru: 'Главный приз: 10 000 TL + 1000 баллов', tr: 'Büyük Ödül: 10.000 TL + 1000 Puan' })}
               </span>
             </div>
 
@@ -427,7 +426,7 @@ export default function TournamentsTab({
               <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
                 <Trophy className="w-12 h-12 text-primary/30" />
                 <span className="text-sm font-bold text-gray-400 font-display">
-                  {language === 'fa' ? 'جدول حذفی هنوز مشخص نشده است' : 'Bracket not drawn yet'}
+                  {L(language, { fa: 'جدول حذفی هنوز مشخص نشده است', en: 'Bracket not drawn yet', ru: 'Сетка ещё не сформирована', tr: 'Eleme tablosu henüz belirlenmedi' })}
                 </span>
               </div>
             ) : (
@@ -435,10 +434,10 @@ export default function TournamentsTab({
                 {/* Round 1 Column (Quarter Finals) */}
                 <div className="flex-1 flex flex-col gap-6 justify-around h-full">
                   <div className="text-center text-xs text-primary font-black tracking-wider uppercase mb-2 font-display">
-                    {language === 'fa' ? 'یک‌چهارم نهایی' : 'Quarterfinals'}
+                    {L(language, { fa: 'یک‌چهارم نهایی', en: 'Quarterfinals', ru: 'Четвертьфинал', tr: 'Çeyrek Final' })}
                   </div>
                   {selectedTournament.bracket.round1.map((match) => (
-                  <div key={match.id} className="bg-[#0d122b] rounded-lg border border-white/10 p-3.5 flex flex-col gap-2 relative">
+                  <div key={match.id} className="bg-card-2 rounded-lg border border-white/10 p-3.5 flex flex-col gap-2 relative">
                     <div className="flex justify-between items-center text-xs font-bold">
                       <span className={`font-bold font-display ${match.winner === match.teamA ? 'text-primary' : 'text-gray-300'}`}>{match.teamA}</span>
                       <span className="text-gray-500 font-mono">{match.scoreA ?? '-'}</span>
@@ -455,10 +454,10 @@ export default function TournamentsTab({
               {/* Connecting lines spacer */}
               <div className="flex-1 flex flex-col gap-12 justify-around h-full">
                 <div className="text-center text-xs text-primary font-black tracking-wider uppercase mb-2 font-display">
-                  {language === 'fa' ? 'نیمه نهایی' : 'Semifinals'}
+                  {L(language, { fa: 'نیمه نهایی', en: 'Semifinals', ru: 'Полуфинал', tr: 'Yarı Final' })}
                 </div>
                 {selectedTournament.bracket.semis.map((match) => (
-                  <div key={match.id} className="bg-[#0d122b] rounded-lg border border-primary/20 p-3.5 flex flex-col gap-2 relative shadow-[0_0_15px_rgba(0,240,255,0.02)]">
+                  <div key={match.id} className="bg-card-2 rounded-lg border border-primary/20 p-3.5 flex flex-col gap-2 relative shadow-[0_0_15px_rgba(0,240,255,0.02)]">
                     <div className="flex justify-between items-center text-xs font-bold">
                       <span className={`font-bold font-display ${match.winner === match.teamA ? 'text-primary' : 'text-gray-300'}`}>{match.teamA}</span>
                       <span className="text-gray-500 font-mono">{match.scoreA ?? '-'}</span>
@@ -475,7 +474,7 @@ export default function TournamentsTab({
               {/* Finals Spacer */}
               <div className="flex-1 flex flex-col gap-24 justify-center h-full">
                 <div className="text-center text-xs text-primary font-black tracking-wider uppercase mb-2 font-display">
-                  {language === 'fa' ? 'فینال بزرگ' : 'Grand Finals'}
+                  {L(language, { fa: 'فینال بزرگ', en: 'Grand Finals', ru: 'Гранд-финал', tr: 'Büyük Final' })}
                 </div>
                 {selectedTournament.bracket.finals.map((match) => (
                   <div key={match.id} className="bg-primary/5 rounded-lg border-2 border-primary p-5 flex flex-col gap-2.5 shadow-[0_0_15px_rgba(0,240,255,0.1)]">
@@ -492,7 +491,7 @@ export default function TournamentsTab({
                     {match.winner && (
                       <div className="mt-2 text-center bg-primary/10 text-primary font-black text-xs rounded py-1.5 flex items-center justify-center gap-1 font-display">
                         <Star className="w-3.5 h-3.5 fill-primary" />
-                        <span>{language === 'fa' ? 'قهرمان:' : 'Champion:'} {match.winner}</span>
+                        <span>{L(language, { fa: 'قهرمان:', en: 'Champion:', ru: 'Чемпион:', tr: 'Şampiyon:' })} {match.winner}</span>
                       </div>
                     )}
                   </div>
@@ -559,15 +558,15 @@ export default function TournamentsTab({
                 <div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
                     <Calendar className="w-5 h-5 text-primary" />
-                    <span>{language === 'fa' ? 'تقویم زمان‌بندی مسابقات و رویدادها' : 'Arena Match Schedule'}</span>
+                    <span>{L(language, { fa: 'تقویم زمان‌بندی مسابقات و رویدادها', en: 'Arena Match Schedule', ru: 'Календарь матчей и событий', tr: 'Maç ve Etkinlik Takvimi' })}</span>
                   </h3>
                   <p className="text-gray-400 text-xs mt-1.5 leading-relaxed font-medium">
-                    {language === 'fa' ? 'زمان‌بندی مسابقات، مراحل حذفی و بازی‌های خود را روی تقویم دنبال کنید.' : 'Track live events, finals and tournament matches on calendar.'}
+                    {L(language, { fa: 'زمان‌بندی مسابقات، مراحل حذفی و بازی‌های خود را روی تقویم دنبال کنید.', en: 'Track live events, finals and tournament matches on calendar.', ru: 'Следите за расписанием матчей, стадиями плей-офф и своими играми в календаре.', tr: 'Maç programını, eleme aşamalarını ve kendi oyunlarınızı takvimde takip edin.' })}
                   </p>
                 </div>
 
                 {/* Quick Filters */}
-                <div className="flex gap-2 bg-[#0d122b] p-1 rounded-lg border border-white/5 self-start">
+                <div className="flex gap-2 bg-card-2 p-1 rounded-lg border border-white/5 self-start">
                   <button
                     onClick={() => setCalendarFilter('all')}
                     className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
@@ -576,7 +575,7 @@ export default function TournamentsTab({
                         : 'text-gray-400 hover:text-white bg-white/5'
                     }`}
                   >
-                    {language === 'fa' ? 'همه بازی‌ها' : 'All Matches'}
+                    {L(language, { fa: 'همه بازی‌ها', en: 'All Matches', ru: 'Все матчи', tr: 'Tüm Maçlar' })}
                   </button>
                   <button
                     onClick={() => setCalendarFilter('user')}
@@ -586,7 +585,7 @@ export default function TournamentsTab({
                         : 'text-gray-400 hover:text-white bg-white/5'
                     }`}
                   >
-                    {language === 'fa' ? 'بازی‌های من' : 'My Matches'}
+                    {L(language, { fa: 'بازی‌های من', en: 'My Matches', ru: 'Мои матчи', tr: 'Maçlarım' })}
                   </button>
                   <button
                     onClick={() => setCalendarFilter('finals')}
@@ -596,7 +595,7 @@ export default function TournamentsTab({
                         : 'text-gray-400 hover:text-white bg-white/5'
                     }`}
                   >
-                    {language === 'fa' ? 'فینال‌ها' : 'Finals'}
+                    {L(language, { fa: 'فینال‌ها', en: 'Finals', ru: 'Финалы', tr: 'Finaller' })}
                   </button>
                 </div>
               </div>
@@ -644,7 +643,7 @@ export default function TournamentsTab({
 
                   {/* Weekday Labels */}
                   <div className="grid grid-cols-7 gap-1 text-center border-b border-white/5 pb-2">
-                    {['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'].map((day, idx) => (
+                    {(language === 'fa' ? ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'] : language === 'ru' ? ['Сб', 'Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт'] : language === 'tr' ? ['Ct', 'Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu'] : ['Sa', 'Su', 'Mo', 'Tu', 'We', 'Th', 'Fr']).map((day, idx) => (
                       <span
                         key={idx}
                         className={`text-[10px] font-black ${
@@ -696,7 +695,7 @@ export default function TournamentsTab({
                           </span>
                           
                           {isToday && !isSelected && (
-                            <span className="absolute top-0.5 text-[10px] text-primary font-black scale-90">امروز</span>
+                            <span className="absolute top-0.5 text-[10px] text-primary font-black scale-90">{L(language, { fa: 'امروز', en: 'Today', ru: 'Сегодня', tr: 'Bugün' })}</span>
                           )}
 
                           {hasEvents && (
@@ -724,7 +723,7 @@ export default function TournamentsTab({
                       </span>
                     </h4>
                     {selectedDay === 22 && currentMonth === 4 && currentYear === 1405 && (
-                      <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-black border border-primary/20">امروز</span>
+                      <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-black border border-primary/20">{L(language, { fa: 'امروز', en: 'Today', ru: 'Сегодня', tr: 'Bugün' })}</span>
                     )}
                   </div>
 
@@ -736,7 +735,7 @@ export default function TournamentsTab({
                           return (
                             <div className="text-center py-10 text-gray-500 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-2">
                               <Calendar className="w-8 h-8 opacity-30 text-gray-400" />
-                              <p className="text-xs font-medium">{language === 'fa' ? 'رویدادی برای این روز برنامه‌ریزی نشده است.' : 'No events scheduled for today.'}</p>
+                              <p className="text-xs font-medium">{L(language, { fa: 'رویدادی برای این روز برنامه‌ریزی نشده است.', en: 'No events scheduled for today.', ru: 'На этот день событий не запланировано.', tr: 'Bu gün için planlanmış etkinlik yok.' })}</p>
                             </div>
                           );
                         }
@@ -770,7 +769,7 @@ export default function TournamentsTab({
                             )}
 
                             <div className="flex justify-between items-center text-[10px] text-gray-500 font-bold border-t border-white/5 pt-1.5 mt-1">
-                              <span>{language === 'fa' ? 'بازی:' : 'Game:'} {ev.game}</span>
+                              <span>{L(language, { fa: 'بازی:', en: 'Game:', ru: 'Игра:', tr: 'Oyun:' })} {ev.game}</span>
                               <span className="truncate max-w-[120px] text-left">{ev.tournamentTitle}</span>
                             </div>
 
@@ -781,14 +780,14 @@ export default function TournamentsTab({
                               className="mt-2 text-right text-[10px] text-primary hover:text-white font-bold flex items-center gap-1 transition-all self-start cursor-pointer font-mono"
                             >
                               <Plus className="w-3 h-3" />
-                              <span>{language === 'fa' ? 'افزودن به تقویم شخصی' : 'Add to personal calendar'}</span>
+                              <span>{L(language, { fa: 'افزودن به تقویم شخصی', en: 'Add to personal calendar', ru: 'Добавить в личный календарь', tr: 'Kişisel takvime ekle' })}</span>
                             </button>
                           </div>
                         ));
                       })()
                     ) : (
                       <div className="text-center py-10 text-gray-500 bg-black/20 rounded-xl border border-white/5">
-                        <p className="text-xs font-medium">یک روز را از تقویم انتخاب کنید تا رویدادهای آن نمایش داده شود.</p>
+                        <p className="text-xs font-medium">{L(language, { fa: 'یک روز را از تقویم انتخاب کنید تا رویدادهای آن نمایش داده شود.', en: 'Pick a day on the calendar to see its events.', ru: 'Выберите день в календаре, чтобы увидеть события.', tr: 'Etkinlikleri görmek için takvimden bir gün seçin.' })}</p>
                       </div>
                     )}
                   </div>
@@ -807,63 +806,63 @@ export default function TournamentsTab({
         <div className="rounded-2xl border border-white/10 bg-dark-card p-6 sticky top-6">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-white/5 pb-3 font-display uppercase tracking-wider">
             <span className="w-1.5 h-6 bg-primary rounded-md shadow-[0_0_10px_rgba(0,240,255,0.4)]"></span>
-            <span>{language === 'fa' ? 'ثبت‌نام مسابقات' : 'Tournament Register'}</span>
+            <span>{L(language, { fa: 'ثبت‌نام مسابقات', en: 'Tournament Register', ru: 'Регистрация на турнир', tr: 'Turnuva Kaydı' })}</span>
           </h3>
 
           {selectedTournament?.status === 'Completed' ? (
             <div className="text-center py-8 text-gray-400 bg-slate-950/40 rounded-xl border border-white/5">
               <Trophy className="w-10 h-10 text-primary mx-auto mb-2" />
-              <p className="text-sm font-bold">تورنمنت به پایان رسیده است.</p>
-              <p className="text-xs text-gray-500 mt-1">جهت ثبت‌نام، یکی از تورنمنت‌های آینده را انتخاب کنید.</p>
+              <p className="text-sm font-bold">{L(language, { fa: 'تورنمنت به پایان رسیده است.', en: 'This tournament has ended.', ru: 'Турнир завершён.', tr: 'Bu turnuva sona erdi.' })}</p>
+              <p className="text-xs text-gray-500 mt-1">{L(language, { fa: 'جهت ثبت‌نام، یکی از تورنمنت‌های آینده را انتخاب کنید.', en: 'Pick an upcoming tournament to register.', ru: 'Для регистрации выберите предстоящий турнир.', tr: 'Kayıt için yaklaşan turnuvalardan birini seçin.' })}</p>
             </div>
           ) : (
             <form onSubmit={handleRegister} className="flex flex-col gap-4">
               
-              <div className="bg-[#0d122b] p-4 rounded-xl border border-white/5">
-                <span className="text-[10px] text-gray-400 font-bold uppercase font-mono">{language === 'fa' ? 'تورنمنت انتخاب شده:' : 'Selected Tournament:'}</span>
+              <div className="bg-card-2 p-4 rounded-xl border border-white/5">
+                <span className="text-[10px] text-gray-400 font-bold uppercase font-mono">{L(language, { fa: 'تورنمنت انتخاب شده:', en: 'Selected Tournament:', ru: 'Выбранный турнир:', tr: 'Seçilen Turnuva:' })}</span>
                 <h4 className="text-white text-xs font-bold mt-1 font-display">{selectedTournament?.title}</h4>
                 <div className="flex justify-between items-center text-xs text-primary font-bold mt-2 pt-2 border-t border-white/5 font-mono">
-                  <span>{language === 'fa' ? 'هزینه ورودی تیم:' : 'Entry Fee:'}</span>
-                  <span>{selectedTournament?.registrationFee.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span>{L(language, { fa: 'هزینه ورودی تیم:', en: 'Entry Fee:', ru: 'Взнос команды:', tr: 'Takım Giriş Ücreti:' })}</span>
+                  <span>{selectedTournament?.registrationFee.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
               </div>
 
               {/* Team name */}
               <div>
-                <label className="text-xs text-gray-400 block mb-1.5 font-bold">{language === 'fa' ? 'نام تیم (Team Name)' : 'Team Name'}</label>
+                <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نام تیم (Team Name)', en: 'Team Name', ru: 'Название команды', tr: 'Takım Adı' })}</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Persis Esports"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
-                  className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
+                  className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
                 />
               </div>
 
               {/* Leader name */}
               <div>
-                <label className="text-xs text-gray-400 block mb-1.5 font-bold">{language === 'fa' ? 'نام و گیمرتگ سرپرست' : 'Leader Gamertag'}</label>
+                <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نام و گیمرتگ سرپرست', en: 'Leader Gamertag', ru: 'Имя и геймертег капитана', tr: 'Kaptan Adı ve Oyuncu Adı' })}</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Sina_Gamer"
                   value={leaderName}
                   onChange={(e) => setLeaderName(e.target.value)}
-                  className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
+                  className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
                 />
               </div>
 
               {/* Dynamic Member registration */}
               <div>
-                <label className="text-xs text-gray-400 block mb-1.5 font-bold">{language === 'fa' ? `افزودن هم‌تیمی‌ها (${members.length}/4 نفر)` : `Add Teammates (${members.length}/4)`}</label>
+                <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: `افزودن هم‌تیمی‌ها (${members.length}/4 نفر)`, en: `Add Teammates (${members.length}/4)`, ru: `Добавить тиммейтов (${members.length}/4)`, tr: `Takım Arkadaşı Ekle (${members.length}/4)` })}</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     placeholder="Gamertag"
                     value={memberInput}
                     onChange={(e) => setMemberInput(e.target.value)}
-                    className="flex-1 bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium font-mono"
+                    className="flex-1 bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium font-mono"
                   />
                   <button
                     type="button"
@@ -876,7 +875,7 @@ export default function TournamentsTab({
 
                 {/* Render current members list */}
                 {members.length > 0 && (
-                  <div className="flex flex-col gap-2 mt-2 bg-[#0d122b] p-3 rounded-lg border border-white/5">
+                  <div className="flex flex-col gap-2 mt-2 bg-card-2 p-3 rounded-lg border border-white/5">
                     {members.map((m, idx) => (
                       <div key={idx} className="flex justify-between items-center text-xs text-gray-300 font-bold font-mono">
                         <span>{idx + 1}. {m}</span>
@@ -895,9 +894,9 @@ export default function TournamentsTab({
 
               <div className="border-t border-white/5 pt-3">
                 <div className="flex justify-between text-xs text-gray-400 font-bold font-mono">
-                  <span>{language === 'fa' ? 'امتیاز دریافتی بابت ثبت‌نام:' : 'Loyalty Points Earned:'}</span>
+                  <span>{L(language, { fa: 'امتیاز دریافتی بابت ثبت‌نام:', en: 'Loyalty Points Earned:', ru: 'Баллы лояльности за регистрацию:', tr: 'Kayıt için Kazanılan Puan:' })}</span>
                   <span className="text-primary font-bold">
-                    {selectedTournament ? Math.floor(selectedTournament.registrationFee / 10000) : 0} PTS
+                    {selectedTournament ? Math.floor(selectedTournament.registrationFee / 10) : 0} PTS
                   </span>
                 </div>
               </div>
@@ -906,7 +905,7 @@ export default function TournamentsTab({
                 type="submit"
                 className="w-full py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 cursor-pointer font-display text-xs"
               >
-                <span>{language === 'fa' ? 'پرداخت ورودی و ثبت‌نام تیم' : 'PAY FEE & REGISTER TEAM'}</span>
+                <span>{L(language, { fa: 'پرداخت ورودی و ثبت‌نام تیم', en: 'PAY FEE & REGISTER TEAM', ru: 'ОПЛАТИТЬ ВЗНОС И ЗАРЕГИСТРИРОВАТЬ КОМАНДУ', tr: 'ÜCRETİ ÖDE VE TAKIMI KAYDET' })}</span>
               </button>
 
             </form>
@@ -917,12 +916,12 @@ export default function TournamentsTab({
             <div className="mt-6 border-t border-white/10 pt-4">
               <h4 className="text-xs font-bold text-white mb-2.5 flex items-center gap-1.5 font-display uppercase tracking-wide">
                 <Users className="w-4 h-4 text-primary" />
-                <span>{language === 'fa' ? `تیم‌های ثبت‌نام شده (${selectedTournament.teams?.length ?? 0})` : `Registered Teams (${selectedTournament.teams?.length ?? 0})`}</span>
+                <span>{L(language, { fa: `تیم‌های ثبت‌نام شده (${selectedTournament.teams?.length ?? 0})`, en: `Registered Teams (${selectedTournament.teams?.length ?? 0})`, ru: `Зарегистрированные команды (${selectedTournament.teams?.length ?? 0})`, tr: `Kayıtlı Takımlar (${selectedTournament.teams?.length ?? 0})` })}</span>
               </h4>
 
               <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
                 {(selectedTournament.teams ?? []).map((t, idx) => (
-                  <div key={idx} className="bg-[#0d122b] p-3 rounded-lg border border-white/5 flex flex-col gap-1.5 text-xs">
+                  <div key={idx} className="bg-card-2 p-3 rounded-lg border border-white/5 flex flex-col gap-1.5 text-xs">
                     <div className="flex justify-between font-bold text-gray-200">
                       <span className="font-display text-primary">{t.name}</span>
                       <span className="text-[10px] text-gray-500 font-mono">Leader: {t.leader}</span>

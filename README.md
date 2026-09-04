@@ -19,6 +19,8 @@
 | 🛒 فروشگاه جانبی | تجهیزات گیمینگ با گارانتی کلوپ |
 | 🏆 مسابقات | تورنمنت‌های CS2، Dota 2، FIFA و ... با ثبت‌نام تیمی |
 | ⭐ باشگاه وفاداری | امتیازدهی و تبدیل امتیاز به کد تخفیف |
+| 👛 کیف پول و پرداخت در محل | کیف پول بازینو (شارژ فقط حضوری از اپ مدیریت/ادمین، هرگز منفی) + پرداخت در محل با مهلت ۱۰ دقیقه (رزرو) / ۴۸ ساعت (تورنمنت) و ابطال خودکار؛ بوفه/فروشگاه فقط در محل. درگاه آنلاین PayTR موجود ولی پیش‌فرض خاموش — `docs/payments/WALLET.md` |
+| 📱 ورود با پیامک + پروفایل + تیکت | ورود OTP، پروفایل `/profile` (کیف پول، امتیاز، رزرو، سفارش، تورنمنت، پشتیبانی، امنیت) |
 | 💬 چت زنده | اتاق‌های گفتگو با WebSocket |
 | 🎨 موتور قالب | هر قالب فایل CSS مجزا + نصب قالب از ZIP (با assets و کامپوننت) |
 | 🗄️ منبع داده | سوییچ بین «داده نمونه» و «دیتابیس» از پنل ادمین |
@@ -50,6 +52,8 @@ npm run dev
 ## 🧪 تست‌ها
 
 ```bash
+npm test                                       # همه‌ی سوئیت‌ها (unit, db, providers, api, ui) — ۳۵۴ تست؛ خودش vite build + باندل سرور را می‌سازد
+npm run test:api                               # فقط API/E2E (سرور واقعی روی پورت 3457)
 npm run lint                                   # تایپ‌چک
 npx tsx scripts/verify-themes.ts               # تست موتور قالب
 npx tsx scripts/test-theme-store.mts           # تست ذخیره‌ساز قالب
@@ -69,6 +73,12 @@ npx tsx scripts/test-theme-sdk.mts             # تست SDK کامپوننت ق�
 | `GEMINI_API_KEY` | کلید API گوگل جمینای (برای ترجمه خودکار و دستیار هوشمند در پنل ادمین) |
 | `APP_URL` | آدرس عمومی میزبانی برنامه |
 | `JWT_SECRET` | کلید امضای توکن‌های احراز هویت (در production الزامی است) |
+| `BAZINO_DATA_DIR` | پوشه‌ی داده‌های ماندگار (قالب‌های نصب‌شده `themes/`، فایل SQLite، `install-config.json`، APK). پیش‌فرض: پوشه‌ی جاری. روی Railway یک Volume با مسیر `/data` بسازید و `BAZINO_DATA_DIR=/data` بدهید؛ در غیر این صورت قالب‌ها با هر دیپلوی پاک می‌شوند. |
+| `SMS_PROVIDER` | درایور پیامک برای ورود با کد یک‌بارمصرف: `smsto` (پیشنهادی)، `easysendsms`، `mock` (پیش‌فرض؛ فقط لاگ کنسول — برای production مناسب نیست). جزئیات: `docs/sms/SMS-PROVIDERS.md` |
+| `SMSTO_API_KEY` / `EASYSENDSMS_API_KEY` | کلید API ارائه‌دهنده‌ی انتخاب‌شده |
+| `SMS_SENDER_ID` | نام فرستنده (حداکثر ۱۱ کاراکتر، پیش‌فرض `Bazino`) |
+| `PAYMENT_ONLINE_ENABLED` | پیش‌فرض خاموش. با `1` درگاه PayTR (به‌همراه `PAYTR_MERCHANT_ID/KEY/SALT`, `PAYTR_TEST_MODE`, `PAYTR_MOCK`) دوباره فعال می‌شود و گزینه‌ی «پرداخت آنلاین» به مودال پرداخت اضافه می‌شود. تا آن زمان پرداخت‌ها فقط با کیف پول / در محل است — `docs/payments/WALLET.md`, `docs/payments/PAYTR.md` |
+| `MONGO_URL` (یا `MONGODB_URI`) | اگر تنظیم شود، سرور بدون نیاز به پنل نصب مستقیماً به MongoDB وصل می‌شود (Railway: Reference به سرویس Mongo). نام دیتابیس از `MONGO_DB_NAME` یا مسیر URL؛ پیش‌فرض `bazino`. |
 
 ## 📁 ساختار پروژه
 
@@ -77,11 +87,19 @@ npx tsx scripts/test-theme-sdk.mts             # تست SDK کامپوننت ق�
 ├── server/              ← provider های دیتابیس، داده نمونه، ذخیره‌ساز قالب
 ├── src/                 ← فرانت‌اند React
 │   ├── themes/          ← موتور قالب‌بندی (CSS مجزای هر قالب + فرمت ZIP)
-│   └── themeSdk/        ← SDK کامپوننت قالب (theme.js)
+│   └── themeSdk/        ← SDK کامپوننت قالب v2 (theme.js — regions: header/hero/home.*/footer/mobileNav)
 ├── flutter_app/         ← اپلیکیشن موبایل Flutter (پروژه مستقل)
 ├── Management App/      ← اپ دسکتاپ مدیریت (پروژه مستقل)
 └── public/              ← فایل‌های استاتیک (لوگو و ...)
 ```
+
+## 🎨 قالب‌ها (خلاصه — جزئیات در `src/themes/README.md`)
+
+- پکیج ZIP: `theme.json` + `theme.css` اجباری، `theme.js` اختیاری (قالب فقط-CSS معتبر است).
+- `theme.js` با SDK v2 می‌تواند هر **بخش** سایت را جداگانه جایگزین کند: `header`, `hero`, `home.*`, `footer`, `mobileNav` (یا `home` کل صفحه — قرارداد v1، همچنان پشتیبانی می‌شود).
+- رنگ/فونت از طریق متغیرهای CSS روی `body[data-theme]` (`--primary-color`, `--bz-*`) به همه‌ی کلاس‌های سایت (هدر، دکمه‌ها، بج‌ها) می‌رسد.
+- متن‌های قالب چهارزبانه در `theme.json.strings` (`props.ts('key')`)؛ اسلایدهای ادمین هم چهارزبانه (عنوان + توضیح) و در `props.slides` در دسترس‌اند.
+- فونت تیتر باید برای فارسی/روسی fallback داشته باشد (Orbitron حروف فارسی ندارد).
 
 ## 📜 مجوز
 

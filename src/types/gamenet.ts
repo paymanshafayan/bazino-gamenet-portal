@@ -4,6 +4,16 @@ export interface UserState {
   phone: string;
   loyaltyPoints: number;
   role?: string;
+  /** پروفایل (تسک ۱۲) — از /api/auth/me و /api/me/profile */
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+  gamerTag?: string;
+  city?: string;
+  birthDate?: string;
+  phoneVerified?: boolean;
+  hasPassword?: boolean;
+  createdAt?: string;
 }
 
 export interface LoyaltyTx {
@@ -21,8 +31,12 @@ export interface LoyaltyTx {
 export interface GameSystem {
   id: string;
   name: string;
+  nameFa?: string;
+  nameEn?: string;
+  nameRu?: string;
+  nameTr?: string;
   type: 'PC' | 'PS5' | 'Xbox';
-  hourlyRate: number; // in Tomans
+  hourlyRate: number; // in TL (Turkish lira)
   isActive: boolean;
   isReserved: boolean;
 }
@@ -43,7 +57,7 @@ export interface CafeItem {
   id: string;
   name: string;
   category: 'Drinks' | 'Foods' | 'Snacks';
-  price: number; // in Tomans
+  price: number; // in TL (Turkish lira)
   imageUrl: string;
   inventory: number;
   isAvailable: boolean;
@@ -58,7 +72,7 @@ export interface Accessory {
   id: string;
   name: string;
   description: string;
-  price: number; // Tomans
+  price: number; // TL
   imageUrl: string;
   stock: number;
   category: 'Keyboard' | 'Mouse' | 'Headset' | 'Controller';
@@ -104,7 +118,7 @@ export interface Article {
 export interface DiscountCode {
   code: string;
   type: 'Percent' | 'Fixed';
-  value: number; // percentage or fixed Toman amount
+  value: number; // percentage or fixed TL amount
   minOrder: number;
   expiry: string;
   isActive: boolean;

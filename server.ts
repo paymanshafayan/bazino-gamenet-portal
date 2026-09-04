@@ -3,6 +3,7 @@
 // are injected directly into the environment and no .env file is present). `dotenv`
 // was already an installed dependency but was never actually imported anywhere.
 import "dotenv/config";
+import geoip from "geoip-lite";
 import express from "express";
 import compression from "compression";
 import { formidable } from "formidable";
@@ -43,10 +44,19 @@ import {
   readThemeCss,
   getThemeAsset,
   getThemeComponentJs,
-  exportThemeZip
+  exportThemeZip,
+  ensureThemesDir,
+  cleanupStaleThemeDirs,
+  THEMES_DIR
 } from "./server/themeStore";
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
+import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
+import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
+import { registerWalletRoutes } from "./server/wallet/routes";
+import { isOnlinePaymentEnabled } from "./server/payments/paytr";
+import { registerAccountRoutes, publicUser } from "./server/accountRoutes";
+import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
 
 /* ═══════════════════════════════════════════════════════════════════
    DATA SOURCE MODE — «منبع داده سایت و اپلیکیشن»
@@ -422,10 +432,39 @@ async function resolveAdminMobileImageUrl(
   return generateMobileImageVariant(imageUrl, kind);
 }
 
+// ── GeoIP → زبان ────────────────────────────────────────────────────────────
+type SiteLang = "fa" | "en" | "ru" | "tr";
+const COUNTRY_TO_LANG: Record<string, SiteLang> = {
+  IR: "fa",
+  TR: "tr",
+  CY: "tr", // قبرس (شامل قبرس شمالی — کد ISO مستقلی ندارد)
+  RU: "ru",
+};
+function getVisitorIp(req: express.Request): string {
+  const cf = req.headers["cf-connecting-ip"];
+  if (typeof cf === "string" && cf) return cf.trim();
+  const xff = req.headers["x-forwarded-for"];
+  const first = Array.isArray(xff) ? xff[0] : xff;
+  if (first) return first.split(",")[0].trim();
+  return (req.ip || req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+}
+function detectVisitorLanguage(req: express.Request): { country: string | null; lang: SiteLang } {
+  let country: string | null = null;
+  const cfCountry = req.headers["cf-ipcountry"];
+  if (typeof cfCountry === "string" && /^[A-Z]{2}$/i.test(cfCountry)) country = cfCountry.toUpperCase();
+  if (!country) {
+    const ip = getVisitorIp(req);
+    if (ip) country = geoip.lookup(ip)?.country ?? null;
+  }
+  return { country, lang: (country && COUNTRY_TO_LANG[country]) || "en" };
+}
+
 async function startServer() {
   const app = express();
   const PORT = process.env.NODE_ENV === "production" ? (Number(process.env.PORT) || 3000) : 3000;
 
+  // پشت Railway/Cloudflare: IP واقعی کاربر از X-Forwarded-For (برای محدودیت OTP)
+  app.set("trust proxy", 1);
   app.use(compression());
 
   // مهر نسخه‌ی دارایی روی URLهای تصاویر در پاسخ‌های API — تا اپ موبایل و کلاینت وب
@@ -449,7 +488,7 @@ async function startServer() {
         "default-src 'self'",
         "base-uri 'self'",
         "object-src 'none'",
-        "script-src 'self' 'unsafe-inline'",
+        "script-src 'self' 'unsafe-inline' https://www.paytr.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
@@ -488,7 +527,7 @@ async function startServer() {
             room,
             username,
             message: text,
-            timestamp: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })
+            timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
           };
 
           await getActiveDataProvider().addChatMessage(newMsg);
@@ -625,6 +664,9 @@ async function startServer() {
   // "installSampleData" toggle, or later via the admin panel's reset button.
   // =========================================================================
   await initializeActiveProvider();
+  ensureThemesDir();
+  cleanupStaleThemeDirs();
+  console.log(`[Storage] data dir: ${DATA_DIR}${IS_PERSISTENT_DATA_DIR ? " (persistent, BAZINO_DATA_DIR)" : " (cwd — set BAZINO_DATA_DIR for persistence on ephemeral hosts)"}`);
   const bootStore = getActiveDataProvider();
 
   // ردیف‌های قدیمی کاتالوگ (لینک unsplash یا جایگذار عمومی cafe-320) را در
@@ -697,15 +739,7 @@ async function startServer() {
     }
 
     const row = await store.getUserByUsername(tokenUsername);
-    if (row) {
-      return {
-        username: row.username,
-        email: row.email,
-        phone: row.phone || "",
-        loyaltyPoints: row.loyaltyPoints,
-        role: row.role || "gamer"
-      };
-    }
+    if (row) return publicUser(row);
 
     return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
   }
@@ -722,7 +756,7 @@ async function startServer() {
   // acting as "Guest" would make no sense (e.g. checking "my" reservation).
   function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     if (!(req as any).authUsername) {
-      return res.status(401).json({ error: "برای این عملیات باید وارد حساب کاربری خود شوید." });
+      return res.status(401).json(apiError(req, "AUTH_REQUIRED"));
     }
     next();
   }
@@ -736,11 +770,11 @@ async function startServer() {
     try {
       const username = (req as any).authUsername;
       if (!username) {
-        return res.status(401).json({ error: "برای دسترسی به این بخش باید با حساب مدیر وارد شوید." });
+        return res.status(401).json(apiError(req, "ADMIN_LOGIN_REQUIRED"));
       }
       const row = await getActiveDataProvider().getUserByUsername(username);
       if (!row || (row.role || "gamer") !== "admin") {
-        return res.status(403).json({ error: "این عملیات فقط برای مدیر سیستم مجاز است." });
+        return res.status(403).json(apiError(req, "ADMIN_ONLY"));
       }
       next();
     } catch (err) {
@@ -757,18 +791,29 @@ async function startServer() {
   // API ROUTE CONTROLLERS
   // =========================================================================
 
+  // تسک ۱۲: OTP پیامکی، پروفایل، تیکت‌ها (server/accountRoutes.ts)
+  await registerAccountRoutes(app, {
+    signAuthToken,
+    requireAuth,
+    jsonParser,
+    dataDir: DATA_DIR,
+    listMyTransactions: async (username) => (await resolveTransactionalList(await getActiveDataProvider().listTransactions(), SAMPLE_TRANSACTIONS)).filter((t: any) => (t.username || "") === username),
+    listMyReservations: async (username) => (await resolveTransactionalList(await getActiveDataProvider().listReservationLogs(), SAMPLE_RESERVATION_LOGS)).filter((r: any) => r.username === username),
+    listTournaments: async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+  });
+
   // Authentication Endpoints
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { username, email, password, phone } = req.body;
       if (!username || !email || !password) {
-        return res.status(400).json({ error: "لطفاً تمامی فیلدهای ضروری را پر کنید." });
+        return res.status(400).json(apiError(req, "FILL_REQUIRED_FIELDS"));
       }
 
       const store = getActiveDataProvider();
       const exists = await store.getUserByUsername(username);
       if (exists) {
-        return res.status(400).json({ error: "این نام کاربری قبلاً توسط گیمر دیگری ثبت شده است." });
+        return res.status(400).json(apiError(req, "USERNAME_TAKEN"));
       }
 
       // createUser hashes the password internally (bcrypt) before storing it
@@ -807,26 +852,20 @@ async function startServer() {
     try {
       const { username, password } = req.body;
       if (!username || !password) {
-        return res.status(400).json({ error: "لطفاً نام کاربری و کلمه عبور را وارد کنید." });
+        return res.status(400).json(apiError(req, "ENTER_CREDENTIALS"));
       }
 
       const store = getActiveDataProvider();
       // verifyLogin compares the given password against the stored bcrypt hash
       const found = await store.verifyLogin(username, password);
       if (!found) {
-        return res.status(400).json({ error: "نام کاربری یا کلمه عبور اشتباه است." });
+        return res.status(400).json(apiError(req, "BAD_CREDENTIALS"));
       }
 
       // NOTE: deliberately does NOT write a server-wide "activeUsername" setting.
       // Identity lives in the JWT returned below — see getCurrentUser().
 
-      const user = {
-        username: found.username,
-        email: found.email,
-        phone: found.phone || "",
-        loyaltyPoints: found.loyaltyPoints,
-        role: found.role || "gamer"
-      };
+      const user = publicUser(found);
 
       // Real, independent token for this specific user (mobile app / any future client)
       const token = signAuthToken(found.username);
@@ -841,17 +880,14 @@ async function startServer() {
   app.get("/api/auth/me", async (req, res) => {
     const authUsername = (req as any).authUsername;
     if (!authUsername) {
-      return res.status(401).json({ error: "توکن نامعتبر یا منقضی شده است." });
+      return res.status(401).json(apiError(req, "TOKEN_INVALID"));
     }
     const store = getActiveDataProvider();
     const row = await store.getUserByUsername(authUsername);
     if (!row) {
-      return res.status(401).json({ error: "کاربر یافت نشد." });
+      return res.status(401).json(apiError(req, "USER_NOT_FOUND"));
     }
-    res.json({
-      success: true,
-      user: { username: row.username, email: row.email, phone: row.phone || "", loyaltyPoints: row.loyaltyPoints, role: row.role || "gamer" }
-    });
+    res.json({ success: true, user: publicUser(row) });
   });
 
   app.post("/api/auth/logout", async (req, res) => {
@@ -878,7 +914,7 @@ async function startServer() {
     try {
       const { name } = req.body;
       if (!name) {
-        return res.status(400).json({ error: "نام اتاق گفتگو الزامی است." });
+        return res.status(400).json(apiError(req, "ROOM_NAME_REQUIRED"));
       }
       const store = getActiveDataProvider();
       await store.createChatRoom(name);
@@ -915,7 +951,7 @@ async function startServer() {
     try {
       const { room, username, message } = req.body;
       if (!room || !username || !message) {
-        return res.status(400).json({ error: "اطلاعات پیام ناقص است." });
+        return res.status(400).json(apiError(req, "MESSAGE_INCOMPLETE"));
       }
 
       const newMsg = {
@@ -923,7 +959,7 @@ async function startServer() {
         room,
         username,
         message,
-        timestamp: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })
+        timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       };
 
       await getActiveDataProvider().addChatMessage(newMsg);
@@ -1028,7 +1064,7 @@ async function startServer() {
   // درخواست دستی می‌شد با ۱ امتیاز یک کوپن ۵۰ میلیون تومانی ساخت، یا کدی ساخت که با یک کد
   // تبلیغاتی موجود تداخل کند. همان قاعده‌ای که برای رزرو و سفارش رعایت شده بود، اینجا از قلم
   // افتاده بود: هرگز به عددی که کلاینت می‌فرستد اعتماد نکن.
-  const POINTS_TO_TOMAN = 100;      // ۱ امتیاز = ۱۰۰ تومان
+  const POINTS_TO_TOMAN = 0.1;      // ۱ امتیاز = ۰٫۱ TL (۱۰۰ امتیاز = ۱۰ TL)
   const MIN_REDEEM_POINTS = 100;
 
   app.post("/api/loyalty/redeem", requireAuth, async (req, res) => {
@@ -1038,13 +1074,13 @@ async function startServer() {
 
       const points = Math.floor(Number(req.body?.points));
       if (!Number.isFinite(points) || points < MIN_REDEEM_POINTS) {
-        return res.status(400).json({ error: `حداقل امتیاز قابل تبدیل ${MIN_REDEEM_POINTS} امتیاز است.` });
+        return res.status(400).json(apiError(req, "MIN_REDEEM_POINTS", { min: MIN_REDEEM_POINTS }));
       }
       if (user.loyaltyPoints < points) {
-        return res.status(400).json({ error: "امتیاز کافی ندارید" });
+        return res.status(400).json(apiError(req, "NOT_ENOUGH_POINTS"));
       }
 
-      const couponValue = points * POINTS_TO_TOMAN;
+      const couponValue = Math.round(points * POINTS_TO_TOMAN * 100) / 100;
 
       // کد یکتا، سمت سرور. اگر برخورد داشت چند بار دیگر تلاش می‌شود.
       let code = "";
@@ -1053,7 +1089,7 @@ async function startServer() {
         if (!(await store.getCouponByCode(candidate))) { code = candidate; break; }
       }
       if (!code) {
-        return res.status(500).json({ error: "تولید کد تخفیف ناموفق بود. دوباره تلاش کنید." });
+        return res.status(500).json(apiError(req, "COUPON_GENERATION_FAILED"));
       }
 
       await store.addLoyaltyPointsToUser(user.username, -points);
@@ -1062,7 +1098,7 @@ async function startServer() {
       await store.addTransaction({
         id: Math.random().toString(36).substring(2, 9),
         points: -points,
-        description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} تومانی (${code})`,
+        description: `تبدیل ${points} امتیاز به کد تخفیف ${couponValue.toLocaleString()} لیری (${code})`,
         type: "Redeemed",
         date: "امروز",
         username: user.username,
@@ -1142,7 +1178,7 @@ async function startServer() {
       // Business rule: never allow two paid reservations to overlap on the same system/date
       const overlapping = await store.hasOverlappingReservation(systemId, reservationDate, st, et);
       if (overlapping) {
-        return res.status(409).json({ error: "این سیستم در بازه زمانی انتخابی شما قبلاً رزرو شده است. لطفاً بازه دیگری انتخاب کنید." });
+        return res.status(409).json(apiError(req, "SLOT_TAKEN"));
       }
 
       // Price and points are always computed server-side from the system's real
@@ -1151,7 +1187,7 @@ async function startServer() {
       const baseTotal = Math.round(durationHours * system.hourlyRate);
       const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, (req as any).authUsername);
       const totalPrice = Math.max(0, baseTotal - discountAmount);
-      const pointsEarned = Math.floor(totalPrice / 10000);
+      const pointsEarned = Math.floor(totalPrice / 10);
 
       await store.setSystemReserved(systemId, true);
 
@@ -1191,7 +1227,7 @@ async function startServer() {
       if (coupon) {
         const consumed = await store.recordCouponUsage(couponCode);
         if (!consumed) {
-          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+          return res.status(409).json(apiError(req, "COUPON_RACE"));
         }
       }
 
@@ -1285,25 +1321,25 @@ async function startServer() {
       const store = getActiveDataProvider();
       const user = await getCurrentUser(req);
       if (user.username === "Guest") {
-        return res.status(401).json({ error: "برای تمدید رزرو باید وارد حساب کاربری خود شوید." });
+        return res.status(401).json(apiError(req, "EXTEND_LOGIN_REQUIRED"));
       }
 
       const hours = Math.max(1, Math.min(4, Number(req.body?.hours) || 1));
       const active = await store.getActiveReservationForUser(user.username);
       if (!active) {
-        return res.status(404).json({ error: "در حال حاضر هیچ رزرو فعالی برای شما یافت نشد." });
+        return res.status(404).json(apiError(req, "NO_ACTIVE_RESERVATION"));
       }
 
       const pointsNeeded = hours * 50;
       const freshUser = await store.getUserByUsername(user.username);
       if (!freshUser || freshUser.loyaltyPoints < pointsNeeded) {
-        return res.status(400).json({ error: `امتیاز باشگاه کافی نیست. تمدید ${hours} ساعت به ${pointsNeeded} امتیاز نیاز دارد.` });
+        return res.status(400).json(apiError(req, "EXTEND_NOT_ENOUGH_POINTS", { hours, points: pointsNeeded }));
       }
 
       const newEndTime = addHoursToTimeString(active.endTime, hours);
       const overlapping = await store.hasOverlappingReservation(active.systemId, active.date, active.endTime, newEndTime);
       if (overlapping) {
-        return res.status(409).json({ error: "بلافاصله بعد از پایان رزرو فعلی شما، این سیستم برای کاربر دیگری رزرو شده است." });
+        return res.status(409).json(apiError(req, "EXTEND_SLOT_TAKEN"));
       }
 
       const system = await store.getSystemById(active.systemId);
@@ -1331,7 +1367,7 @@ async function startServer() {
     try {
       const { message } = req.body;
       if (!message || !message.trim()) {
-        return res.status(400).json({ error: "متن درخواست نمی‌تواند خالی باشد." });
+        return res.status(400).json(apiError(req, "PROMPT_EMPTY"));
       }
       const store = getActiveDataProvider();
       const user = await getCurrentUser(req);
@@ -1542,7 +1578,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }
 
         await store.decrementCafeInventory(match.id, 1);
-        const pointsEarned = Math.floor(match.price / 10000);
+        const pointsEarned = Math.floor(match.price / 10);
         if (user.username !== "Guest") {
           await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         }
@@ -1633,7 +1669,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           room: roomMatch,
           username: user.username,
           message: `🎙️ ${intent.params.message || ""}`,
-          timestamp: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
         };
         await store.addChatMessage(chatMsg);
         return { reply: `پیامت با موفقیت توی اتاق «${roomMatch}» فرستاده شد. 🔫`, chatMsg };
@@ -1653,7 +1689,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         if (overlapping) return { reply: `سیستم پیشنهادی در بازه ${startTime} تا ${endTime} رزرو است؛ یک بازه دیگر بگو.` };
         await store.setSystemReserved(system.id, true);
         const totalPrice = Math.round(system.hourlyRate * hours);
-        const pointsEarned = Math.floor(totalPrice / 10000);
+        const pointsEarned = Math.floor(totalPrice / 10);
         await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         const log = { id: "res-" + Math.random().toString(36).substring(2, 9), systemId: system.id, username: user.username, systemName: system.name, startTime, endTime, totalPrice, date: "امروز", checkedIn: false, timestamp: new Date().toISOString() };
         await store.addReservationLog(log);
@@ -1684,7 +1720,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const free = systems.filter(s => s.isActive && !s.isReserved).sort((a, b) => b.hourlyRate - a.hourlyRate);
         if (free.length === 0) return { reply: "الان هیچ سیستم آزادی پیدا نکردم." };
         const s = free[0];
-        return { reply: `پیشنهاد من ${s.name} است؛ نوع ${s.type} با تعرفه ${s.hourlyRate.toLocaleString()} تومان در ساعت و الان آزاد است.` };
+        return { reply: `پیشنهاد من ${s.name} است؛ نوع ${s.type} با تعرفه ${s.hourlyRate.toLocaleString()} لیر در ساعت و الان آزاد است.` };
       }
 
       case "list_tournaments": {
@@ -1710,7 +1746,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
         const q = String(intent.params.query || "").toLowerCase();
         const matches = items.filter(i => i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())).slice(0, 5);
-        return { reply: matches.length ? `این کالاها را پیدا کردم: ${matches.map(i => `${i.name} (${i.price.toLocaleString()} تومان)`).join("، ")}` : "کالایی با این مشخصات پیدا نکردم." };
+        return { reply: matches.length ? `این کالاها را پیدا کردم: ${matches.map(i => `${i.name} (${i.price.toLocaleString()} لیر)`).join("، ")}` : "کالایی با این مشخصات پیدا نکردم." };
       }
 
       case "purchase_shop_item": {
@@ -1721,10 +1757,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode, user.username);
         await store.decrementAccessoryStock(item.id, 1);
         const finalAmount = Math.max(0, item.price - discountAmount);
-        const pointsEarned = Math.floor(finalAmount / 10000);
+        const pointsEarned = Math.floor(finalAmount / 10);
         if (user.username !== "Guest") await store.addLoyaltyPointsToUser(user.username, pointsEarned);
         await store.addShopOrder({ id: "ACC-" + Math.floor(1000 + Math.random() * 9000), cart: JSON.stringify([{ item, quantity: 1 }]), totalPrice: item.price, discountApplied: discountAmount, finalAmount, couponCode: coupon ? intent.params.couponCode : "", date: "امروز", status: "Processing" });
-        return { reply: `خرید «${item.name}» ثبت شد. مبلغ نهایی ${finalAmount.toLocaleString()} تومان است.` };
+        return { reply: `خرید «${item.name}» ثبت شد. مبلغ نهایی ${finalAmount.toLocaleString()} لیر است.` };
       }
 
       case "read_messages": {
@@ -1752,7 +1788,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { command, language } = req.body;
       if (!command || !String(command).trim()) {
-        return res.status(400).json({ error: "دستور نمی‌تواند خالی باشد." });
+        return res.status(400).json(apiError(req, "COMMAND_EMPTY"));
       }
 
       const store = getActiveDataProvider();
@@ -1940,10 +1976,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           `رزرو ${reservationId} روی سایت با وضعیت ${newStatus} ثبت نهایی شد.`,
           1
         );
-        res.json({ success: true, message: `رزرو ${reservationId} در سایت ثبت نهایی شد.` });
+        res.json({ success: true, message: t(req, "RESERVATION_FINALIZED", { id: reservationId }) });
       } else {
         logSyncEvent("RESERVATION_UPDATE", "WARNING", `وضعیت نامعتبر برای رزرو ${reservationId}: ${newStatus}`, 0);
-        res.status(400).json({ success: false, message: "وضعیت نامعتبر" });
+        res.status(400).json({ success: false, message: t(req, "INVALID_STATUS"), code: "INVALID_STATUS" });
       }
     } catch (e) {
       logSyncEvent("RESERVATION_UPDATE", "ERROR", `به‌روزرسانی رزرو ناموفق: ${String(e)}`, 0);
@@ -1990,7 +2026,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       throw Object.assign(new Error("این کد تخفیف به سقف تعداد مجاز استفاده رسیده است."), { statusCode: 400 });
     }
     if (amount < coupon.minOrder) {
-      throw Object.assign(new Error(`حداقل مبلغ خرید جهت استفاده از این کد ${coupon.minOrder.toLocaleString()} تومان است.`), { statusCode: 400 });
+      throw Object.assign(new Error(`حداقل مبلغ خرید جهت استفاده از این کد ${coupon.minOrder.toLocaleString()} TL است.`), { statusCode: 400 });
     }
     const discountAmount = coupon.type === "Percent" ? amount * (coupon.value / 100) : coupon.value;
     return { discountAmount: Math.min(discountAmount, amount), coupon };
@@ -2002,7 +2038,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const store = getActiveDataProvider();
 
       if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: "سبد خرید خالی است." });
+        return res.status(400).json(apiError(req, "CART_EMPTY"));
       }
 
       // Price is always computed server-side from the real menu prices/stock —
@@ -2011,17 +2047,17 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       for (const orderItem of items) {
         const menuItem = await resolveSampleById(() => store.getCafeItemById(orderItem.item.id), SAMPLE_CAFE_ITEMS, orderItem.item.id);
         if (!menuItem) {
-          return res.status(404).json({ error: `آیتم منو یافت نشد: ${orderItem.item?.id}` });
+          return res.status(404).json(apiError(req, "MENU_ITEM_NOT_FOUND", { id: String(orderItem.item?.id) }));
         }
         if (menuItem.inventory < orderItem.quantity) {
-          return res.status(400).json({ error: `موجودی «${menuItem.name}» کافی نیست.` });
+          return res.status(400).json(apiError(req, "OUT_OF_STOCK", { name: menuItem.name }));
         }
         totalPrice += menuItem.price * orderItem.quantity;
       }
 
       const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
-      const pointsEarned = Math.floor(finalAmount / 10000);
+      const pointsEarned = Math.floor(finalAmount / 10);
 
       // Deduct stock inventory (already validated above)
       for (const orderItem of items) {
@@ -2056,6 +2092,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         tableNumber: tableNumber || "میز عمومی",
         date: "امروز",
         status: "Pending", // Pending, Preparing, Delivered
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addCafeOrder(newOrder);
 
@@ -2063,7 +2100,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       if (coupon) {
         const consumed = await store.recordCouponUsage(couponCode);
         if (!consumed) {
-          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+          return res.status(409).json(apiError(req, "COUPON_RACE"));
         }
       }
 
@@ -2098,7 +2135,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const store = getActiveDataProvider();
 
       if (!Array.isArray(cart) || cart.length === 0) {
-        return res.status(400).json({ error: "سبد خرید خالی است." });
+        return res.status(400).json(apiError(req, "CART_EMPTY"));
       }
 
       // Price is always computed server-side from the real catalog prices/stock —
@@ -2107,17 +2144,17 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       for (const cartItem of cart) {
         const catalogItem = await resolveSampleById(() => store.getAccessoryById(cartItem.item.id), SAMPLE_ACCESSORIES, cartItem.item.id);
         if (!catalogItem) {
-          return res.status(404).json({ error: `کالا یافت نشد: ${cartItem.item?.id}` });
+          return res.status(404).json(apiError(req, "PRODUCT_NOT_FOUND", { id: String(cartItem.item?.id) }));
         }
         if (catalogItem.stock < cartItem.quantity) {
-          return res.status(400).json({ error: `موجودی «${catalogItem.name}» کافی نیست.` });
+          return res.status(400).json(apiError(req, "OUT_OF_STOCK", { name: catalogItem.name }));
         }
         totalPrice += catalogItem.price * cartItem.quantity;
       }
 
       const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
       const finalAmount = Math.max(0, totalPrice - discountAmount);
-      const pointsEarned = Math.floor(finalAmount / 10000);
+      const pointsEarned = Math.floor(finalAmount / 10);
 
       for (const cartItem of cart) {
         await store.decrementAccessoryStock(cartItem.item.id, cartItem.quantity);
@@ -2149,6 +2186,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         couponCode: coupon ? couponCode : "",
         date: "امروز",
         status: "Processing", // Processing, Shipped, Delivered
+        username: user.username !== "Guest" ? user.username : "",
       };
       await store.addShopOrder(newOrder);
 
@@ -2156,7 +2194,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       if (coupon) {
         const consumed = await store.recordCouponUsage(couponCode);
         if (!consumed) {
-          return res.status(409).json({ error: "این کد تخفیف هم‌زمان توسط درخواست دیگری مصرف شد. لطفاً دوباره تلاش کنید." });
+          return res.status(409).json(apiError(req, "COUPON_RACE"));
         }
       }
 
@@ -2224,6 +2262,164 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
+  });
+
+
+  // =========================================================================
+  // ONLINE PAYMENTS (PayTR) — پیش‌فاکتور و تکمیل سفارش بعد از callback
+  // =========================================================================
+  const POINTS_PER_CURRENCY_UNIT = 10;   // هر ۱۰ TL = ۱ امتیاز (معادل قاعده‌ی قبلی ÷10000)
+
+  async function paymentQuote(kind: OrderKind, params: any, username?: string) {
+    const store = getActiveDataProvider();
+    if (kind === "reservation") {
+      const { systemId, startTime, endTime, date, couponCode } = params || {};
+      const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
+      if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
+      const st = startTime || "12:00", et = endTime || "14:00", reservationDate = date || "امروز";
+      if (await store.hasOverlappingReservation(systemId, reservationDate, st, et)) throw Object.assign(new Error("SLOT_TAKEN"), { statusCode: 409, code: "SLOT_TAKEN" });
+      const durationHours = hoursBetween(st, et) || 1;
+      const baseTotal = Math.round(durationHours * system.hourlyRate);
+      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, username);
+      const amount = Math.max(0, baseTotal - discountAmount);
+      return {
+        amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
+        basket: [{ name: `${system.name} (${durationHours}h)`, unitPrice: amount, qty: 1 }],
+        payload: { systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", amount, systemName: system.name },
+      };
+    }
+    if (kind === "cafe") {
+      const { items, couponCode, tableNumber } = params || {};
+      if (!Array.isArray(items) || items.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
+      for (const it of items) {
+        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const m = await resolveSampleById(() => store.getCafeItemById(id), SAMPLE_CAFE_ITEMS, id);
+        if (!m) throw Object.assign(new Error(`Menu item not found: ${id}`), { statusCode: 404 });
+        if (m.inventory < qty) throw Object.assign(new Error(`Out of stock: ${m.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
+        total += m.price * qty; basket.push({ name: m.name, unitPrice: m.price, qty }); lines.push({ item: { id: m.id, name: m.name, price: m.price }, quantity: qty });
+      }
+      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
+      const amount = Math.max(0, total - discountAmount);
+      return { amount, description: `Kafe siparişi (${lines.length} kalem)`, basket, payload: { items: lines, couponCode: coupon ? couponCode : "", tableNumber: tableNumber || "میز عمومی", totalPrice: total, discountAmount, amount } };
+    }
+    if (kind === "shop") {
+      const { cart, couponCode } = params || {};
+      if (!Array.isArray(cart) || cart.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
+      for (const it of cart) {
+        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const a = await resolveSampleById(() => store.getAccessoryById(id), SAMPLE_ACCESSORIES, id);
+        if (!a) throw Object.assign(new Error(`Product not found: ${id}`), { statusCode: 404 });
+        if (a.stock < qty) throw Object.assign(new Error(`Out of stock: ${a.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
+        total += a.price * qty; basket.push({ name: a.name, unitPrice: a.price, qty }); lines.push({ item: { id: a.id, name: a.name, price: a.price }, quantity: qty });
+      }
+      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
+      const amount = Math.max(0, total - discountAmount);
+      return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
+    }
+    // tournament
+    const { tournamentId, team } = params || {};
+    const tour = await resolveSampleById(() => store.getTournamentById(tournamentId), SAMPLE_TOURNAMENTS, tournamentId);
+    if (!tour) throw Object.assign(new Error("Tournament not found"), { statusCode: 404 });
+    if (tour.registeredTeamsCount >= tour.maxTeams) throw Object.assign(new Error("Tournament is full"), { statusCode: 400, code: "TOURNAMENT_FULL" });
+    if (!team?.name) throw Object.assign(new Error("Team name required"), { statusCode: 400 });
+    const amount = Number(tour.registrationFee) || 0;
+    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, title: tour.title, startDate: tour.startDate } };
+  }
+
+  async function creditPoints(username: string, amount: number, description: string) {
+    const store = getActiveDataProvider();
+    const pointsEarned = Math.floor(amount / POINTS_PER_CURRENCY_UNIT);
+    if (username && pointsEarned > 0) await store.addLoyaltyPointsToUser(username, pointsEarned);
+    await store.addTransaction({ id: Math.random().toString(36).substring(2, 9), points: pointsEarned, description, type: "Earned", date: "امروز", username: username || "" });
+    return pointsEarned;
+  }
+
+  // پرچم‌های تسک ۱۳ (پرداخت در محل): __noPoints = جا بگیر ولی امتیاز نده (هنوز پرداخت نشده)،
+  // __pointsOnly = جا قبلاً گرفته شده، فقط امتیاز بده (بعد از تسویه‌ی حضوری).
+  async function paymentFulfil(kind: OrderKind, p: any, username: string) {
+    const store = getActiveDataProvider();
+    const noPoints = p?.__noPoints === true;
+    if (kind === "reservation") {
+      if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز بابت رزرو ${p.systemName} (پرداخت در محل)`) };
+      await store.setSystemReserved(p.systemId, true);
+      const id = Math.random().toString(36).substring(2, 9);
+      await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString() });
+      if (p.couponCode) await store.recordCouponUsage(p.couponCode);
+      const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
+      return { reservationId: id, points };
+    }
+    if (kind === "cafe") {
+      for (const l of p.items) await store.decrementCafeInventory(l.item.id, l.quantity);
+      const id = "CF-" + Math.floor(1000 + Math.random() * 9000);
+      await store.addCafeOrder({ id, items: JSON.stringify(p.items), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, tableNumber: p.tableNumber, date: "امروز", status: "Pending", username: username !== "Guest" ? username : "" });
+      if (p.couponCode) await store.recordCouponUsage(p.couponCode);
+      const points = await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
+      return { orderId: id, points };
+    }
+    if (kind === "shop") {
+      for (const l of p.cart) await store.decrementAccessoryStock(l.item.id, l.quantity);
+      const id = "ACC-" + Math.floor(1000 + Math.random() * 9000);
+      await store.addShopOrder({ id, cart: JSON.stringify(p.cart), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, date: "امروز", status: "Processing", username: username !== "Guest" ? username : "" });
+      if (p.couponCode) await store.recordCouponUsage(p.couponCode);
+      const points = await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
+      return { orderId: id, points };
+    }
+    if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title} (پرداخت در محل)`) };
+    const tour = await resolveSampleById(() => store.getTournamentById(p.tournamentId), SAMPLE_TOURNAMENTS, p.tournamentId);
+    if (!tour) throw new Error("Tournament vanished");
+    await ensurePersisted(() => store.getTournamentById(p.tournamentId), t => store.createTournament(t), tour);
+    const teams = JSON.parse(tour.teams || "[]"); teams.push(p.team);
+    await store.registerTournamentTeam(p.tournamentId, JSON.stringify(teams), tour.registeredTeamsCount + 1);
+    const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title}`);
+    return { registered: true, points };
+  }
+
+  /** برگرداندن اثر رزرو/ثبت‌نام (ابطال خودکار «پرداخت در محل» یا لغو کاربر): ایستگاه/ظرفیت آزاد می‌شود. */
+  async function paymentUnfulfil(kind: OrderKind, p: any, username: string, result: any) {
+    const store = getActiveDataProvider();
+    if (kind === "reservation") {
+      if (result?.reservationId) await store.deleteReservationLog(String(result.reservationId));
+      const remaining = (await store.listReservationLogs()).filter(r => r.systemId === p?.systemId && r.date === p?.date && !r.checkedIn);
+      if (remaining.length === 0) await store.setSystemReserved(p.systemId, false);
+      return;
+    }
+    if (kind === "tournament") {
+      const tour = await store.getTournamentById(p?.tournamentId);
+      if (!tour) return;
+      const teams: any[] = JSON.parse(tour.teams || "[]");
+      const idx = teams.findIndex(t => t?.name === p?.team?.name && (t?.leader || "") === (p?.team?.leader || ""));
+      if (idx >= 0) {
+        teams.splice(idx, 1);
+        await store.registerTournamentTeam(p.tournamentId, JSON.stringify(teams), Math.max(0, tour.registeredTeamsCount - 1));
+      }
+    }
+  }
+
+  registerPaymentRoutes({
+    app,
+    getStore: getActiveDataProvider,
+    requireAdmin,
+    authUsername: (req) => (req as any).authUsername || undefined,
+    quote: paymentQuote,
+    fulfil: paymentFulfil,
+    currency: "TL",
+    pointsPerUnit: POINTS_PER_CURRENCY_UNIT,
+  });
+
+  // تسک ۱۳ — کیف پول حضوری + پرداخت در محل (درگاه آنلاین با PAYMENT_ONLINE_ENABLED=1 برمی‌گردد)
+  registerWalletRoutes({
+    app,
+    getStore: getActiveDataProvider,
+    requireAuth,
+    requireSyncApiKey,
+    authUsername: (req) => (req as any).authUsername || undefined,
+    quote: paymentQuote,
+    fulfil: paymentFulfil,
+    unfulfil: paymentUnfulfil,
+    onlineEnabled: () => isOnlinePaymentEnabled(),
+    log: (msg) => logDbQuery(getActiveDataProvider().name, "SYSTEM", `[Wallet] ${msg}`),
   });
 
   // Blog News Articles & Comments
@@ -2307,17 +2503,17 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
    *  رزروها و سفارش‌های موجود ارجاع داده شده‌اند). */
   /** پیام خطای قابل‌فهم برای ادمین به‌جای متن خام موتور دیتابیس.
    *  ادمین نباید چیزی مثل «SqliteError: UNIQUE constraint failed: systems.id» ببیند. */
-  function adminErrorMessage(e: any): { status: number; message: string } {
+  function adminErrorMessage(e: any, req?: express.Request): { status: number; message: string; code?: string } {
     if (e?.statusCode && e?.message) return { status: e.statusCode, message: e.message };
     const raw = String(e?.message || e);
     if (/UNIQUE constraint|duplicate key|E11000/i.test(raw)) {
-      return { status: 409, message: "رکوردی با همین شناسه از قبل وجود دارد. دوباره تلاش کنید." };
+      return { status: 409, message: apiMessage(req ? requestLang(req) : "fa", "DUPLICATE_RECORD"), code: "DUPLICATE_RECORD" };
     }
     if (/NOT NULL constraint|cannot be null/i.test(raw)) {
-      return { status: 400, message: "یکی از فیلدهای الزامی خالی است." };
+      return { status: 400, message: apiMessage(req ? requestLang(req) : "fa", "REQUIRED_FIELD_EMPTY"), code: "REQUIRED_FIELD_EMPTY" };
     }
     console.error("[Admin]", raw);
-    return { status: 500, message: "ثبت اطلاعات در پایگاه داده انجام نشد. جزئیات در لاگ سرور ثبت شد." };
+    return { status: 500, message: apiMessage(req ? requestLang(req) : "fa", "DB_WRITE_FAILED"), code: "DB_WRITE_FAILED" };
   }
 
   async function nextEntityId(
@@ -2406,8 +2602,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listSystems();
       res.json({ success: true, systems: list });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2477,8 +2673,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listCafeItems();
       res.json({ success: true, cafeItems: list });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2575,8 +2771,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const list = await store.listAccessories();
       res.json({ success: true, accessories: list });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2683,8 +2879,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2755,8 +2951,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         }))
       });
     } catch (e) {
-      const { status, message } = adminErrorMessage(e);
-      res.status(status).json({ error: message });
+      const { status, message, code } = adminErrorMessage(e, req);
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -2803,7 +2999,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { recipient, title, body, sendAsNotification } = req.body;
       if (!recipient || !title || !body) {
-        return res.status(400).json({ error: "اطلاعات پیام ناقص است." });
+        return res.status(400).json(apiError(req, "MESSAGE_INCOMPLETE"));
       }
 
       const newMsg = {
@@ -2862,6 +3058,18 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  // GEO → LANGUAGE — انتخاب زبان پیش‌فرض بر اساس کشور IP بازدیدکننده
+  //   IR → fa · TR / CY (قبرس؛ قبرس شمالی کد ISO جداگانه ندارد و CY برمی‌گردد) → tr
+  //   RU → ru · بقیه → en
+  //   منبع کشور: هدر CF-IPCountry (Cloudflare) و در نبود آن، geoip-lite آفلاین.
+  // ═══════════════════════════════════════════════════════════════════
+  app.get("/api/geo/lang", (req, res) => {
+    const { country, lang } = detectVisitorLanguage(req);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ country, lang });
+  });
+
   // Themes Management Endpoints
   app.get("/api/themes", async (req, res) => {
     try {
@@ -2889,15 +3097,23 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       try {
         const buffer = req.body as Buffer | undefined;
         if (!buffer || buffer.length === 0) {
-          return res.status(400).json({ error: "فایل ZIP ارسال نشده است" });
+          return res.status(400).json(apiError(req, "ZIP_MISSING"));
         }
         const fallbackName = (req.query.name as string) || undefined;
-        const result = await installThemeZip(new Uint8Array(buffer), fallbackName);
+        // replace=1 → نصب نسخه‌ی جدید روی همان شناسه (جایگزینی اتمیک پوشه)
+        const replace = String(req.query.replace || "") === "1";
+        const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
         if ("error" in result) {
-          return res.status(400).json({ error: result.error, performance: result.performance });
+          return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
         }
-        logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${result.theme.id}" installed (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
-        res.json({ success: true, theme: result.theme, performance: result.performance });
+        const store = getActiveDataProvider();
+        logDbQuery(store.name, "SYSTEM", `Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
+        // فعال‌سازی سراسری همین‌جا (اتمیک با نصب) — قبلاً کلاینت جداگانه صدا می‌زد و در صورت
+        // خطا، قالب نصب می‌شد ولی پیش‌فرض سایت عوض نمی‌شد.
+        const activate = String(req.query.activate || "1") !== "0";
+        if (activate) await store.setSetting("activeThemeId", result.theme.id);
+        const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+        res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
       } catch (e) {
         console.error("Theme install error:", e);
         res.status(500).json({ error: String(e) });
@@ -2967,12 +3183,20 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   });
 
   // حذف قالب (پوشه کامل قالب حذف می‌شود)
-  app.delete("/api/admin/themes/:id", (req, res) => {
+  app.delete("/api/admin/themes/:id", async (req, res) => {
     try {
       const removed = deleteTheme(req.params.id);
       if (!removed) return res.status(404).json({ error: "Theme not found" });
-      logDbQuery(getActiveDataProvider().name, "SYSTEM", `Theme "${req.params.id}" deleted (folder removed)`);
-      res.json({ success: true, serverThemes: listInstalledThemes() });
+      const store = getActiveDataProvider();
+      logDbQuery(store.name, "SYSTEM", `Theme "${req.params.id}" deleted (folder removed)`);
+      // اگر قالب حذف‌شده، قالب فعال سراسری بود → به پیش‌فرض برگرد؛ وگرنه بازدیدکنندگان
+      // با یک شناسه‌ی مرده می‌ماندند و هر بار به پیش‌فرض «سقوط» می‌کردند.
+      let activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+      if (activeThemeId === req.params.id) {
+        activeThemeId = "dark-gold";
+        await store.setSetting("activeThemeId", activeThemeId);
+      }
+      res.json({ success: true, serverThemes: listInstalledThemes(), activeThemeId });
     } catch (e) {
       res.status(400).json({ error: String(e) });
     }
@@ -2982,7 +3206,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed } = req.body;
       if (!name || !primaryColor || !darkBg || !darkCard) {
-        return res.status(400).json({ error: "اطلاعات تم ناقص است." });
+        return res.status(400).json(apiError(req, "THEME_INCOMPLETE"));
       }
       const store = getActiveDataProvider();
       const newTheme = {
@@ -3012,10 +3236,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const { themeId } = req.body;
       const store = getActiveDataProvider();
       const themes = await store.listThemes();
-      const themeExists = themes.some(t => t.id === themeId);
+      // قالب‌های نصب‌شده با ZIP (پوشه‌ی سروری) هم قابل فعال‌سازی سراسری هستند
+      const themeExists =
+        themes.some(t => t.id === themeId) ||
+        listInstalledThemes().some(t => t.id === themeId);
 
       if (!themeExists) {
-        return res.status(404).json({ error: "تم یافت نشد." });
+        return res.status(404).json(apiError(req, "THEME_NOT_FOUND"));
       }
 
       await store.setSetting("activeThemeId", themeId);
@@ -3037,9 +3264,9 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/admin/app-sliders", async (req, res) => {
     try {
-      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr } = req.body;
       if (!imageUrl || !target) {
-        return res.status(400).json({ error: "آدرس تصویر و بخش هدف الزامی هستند." });
+        return res.status(400).json(apiError(req, "SLIDE_FIELDS_REQUIRED"));
       }
       const store = getActiveDataProvider();
       // اسلایدر اپ عمودی است (کادر Expanded + BoxFit.cover)؛ واریانت موبایل ۳:۴ ساخته می‌شود
@@ -3052,7 +3279,11 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         titleFa: titleFa || "",
         titleEn: titleEn || "",
         titleRu: titleRu || "",
-        titleTr: titleTr || ""
+        titleTr: titleTr || "",
+        descFa: typeof descFa === "string" ? descFa : "",
+        descEn: typeof descEn === "string" ? descEn : "",
+        descRu: typeof descRu === "string" ? descRu : "",
+        descTr: typeof descTr === "string" ? descTr : "",
       };
 
       await store.createSlider(newSlide);
@@ -3067,7 +3298,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/app-sliders/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr } = req.body;
+      const { imageUrl, mobileImageUrl, autoGenerateMobile, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr } = req.body;
       const store = getActiveDataProvider();
       const slide = await store.getSliderById(id);
 
@@ -3086,12 +3317,16 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           titleEn: titleEn !== undefined ? titleEn : slide.titleEn,
           titleRu: titleRu !== undefined ? titleRu : (slide.titleRu || ""),
           titleTr: titleTr !== undefined ? titleTr : (slide.titleTr || ""),
+          descFa: descFa !== undefined ? descFa : (slide.descFa || ""),
+          descEn: descEn !== undefined ? descEn : (slide.descEn || ""),
+          descRu: descRu !== undefined ? descRu : (slide.descRu || ""),
+          descTr: descTr !== undefined ? descTr : (slide.descTr || ""),
         });
 
         const list = await store.listSliders();
         res.json({ success: true, appSliders: list });
       } else {
-        res.status(404).json({ error: "اسلاید پیدا نشد." });
+        res.status(404).json(apiError(req, "SLIDE_NOT_FOUND"));
       }
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -3113,7 +3348,11 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // =========================================================================
   // MOBILE APP DOWNLOADS — مستقل از قالب سایت
   // =========================================================================
-  const getMobileAppDownloadDir = () => path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "downloads");
+  // فایل APK آپلودشده باید ماندگار باشد → در DATA_DIR/downloads (وقتی BAZINO_DATA_DIR ست شده)؛
+  // در غیر این صورت همان public/downloads قبلی.
+  const getMobileAppDownloadDir = () => IS_PERSISTENT_DATA_DIR
+    ? dataPath("downloads")
+    : path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "public", "downloads");
   const getMobileAppApkPath = () => path.join(getMobileAppDownloadDir(), MOBILE_APP_APK_FILE_NAME);
   const MAX_APK_BYTES = 160 * 1024 * 1024;
 
@@ -3154,15 +3393,15 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
-  app.get("/api/mobile-app/download", async (_req, res) => {
+  app.get("/api/mobile-app/download", async (req, res) => {
     const apkPath = getMobileAppApkPath();
     if (!fs.existsSync(apkPath)) {
-      return res.status(404).json({ error: "فایل APK هنوز توسط مدیر آپلود نشده است." });
+      return res.status(404).json(apiError(req, "APK_NOT_UPLOADED"));
     }
     res.download(apkPath, MOBILE_APP_APK_FILE_NAME, (err) => {
       if (err) {
         console.error("Error downloading mobile APK:", err);
-        if (!res.headersSent) res.status(500).json({ error: "خطا در دانلود فایل APK" });
+        if (!res.headersSent) res.status(500).json(apiError(req, "APK_DOWNLOAD_FAILED"));
       }
     });
   });
@@ -3187,7 +3426,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       res.send(buffer);
     } catch (e) {
       console.error("Mobile app QR generation failed:", e);
-      res.status(502).json({ error: "خطا در ساخت QR Code دانلود اپلیکیشن" });
+      res.status(502).json(apiError(req, "QR_FAILED"));
     }
   });
 
@@ -3832,7 +4071,7 @@ namespace GameNet.Infrastructure.Migrations
   app.post("/api/admin/reset-database", async (req, res) => {
     try {
       await getActiveDataProvider().seedSampleData();
-      res.json({ success: true, message: "دیتای نمونه با موفقیت بارگذاری شد." });
+      res.json({ success: true, message: t(req, "SAMPLE_LOADED") });
     } catch (err) {
       console.error("Error seeding sample data:", err);
       res.status(500).json({ error: "Failed to load sample data" });
@@ -3844,7 +4083,7 @@ namespace GameNet.Infrastructure.Migrations
   app.post("/api/admin/clear-database", async (req, res) => {
     try {
       await getActiveDataProvider().purgeSampleData();
-      res.json({ success: true, message: "دیتای نمونه با موفقیت حذف شد." });
+      res.json({ success: true, message: t(req, "SAMPLE_REMOVED") });
     } catch (err) {
       console.error("Error clearing sample data:", err);
       res.status(500).json({ error: "Failed to purge sample data" });
@@ -3953,16 +4192,19 @@ Example format:
   // =========================================================================
   app.get("/api/install/status", async (req, res) => {
     try {
-      const installConfigPath = path.join(process.cwd(), 'install-config.json');
+      const installConfigPath = installConfigFile();
+      const envMongo = !!(process.env.MONGO_URL || process.env.MONGODB_URI);
       if (fs.existsSync(installConfigPath)) {
         const configData = JSON.parse(fs.readFileSync(installConfigPath, 'utf8'));
         return res.json({
           isInstalled: !!configData.isInstalled,
-          dbType: configData.dbType || 'sqlite',
-          installedAt: configData.installedAt || ''
+          dbType: envMongo ? 'mongodb' : (configData.dbType || 'sqlite'),
+          installedAt: configData.installedAt || '',
+          configSource: envMongo ? 'env' : 'install-config'
         });
       }
-      res.json({ isInstalled: false });
+      // MONGO_URL از محیط → سایت عملاً نصب‌شده است (ادمین fallback ساخته می‌شود)
+      res.json({ isInstalled: envMongo, dbType: envMongo ? 'mongodb' : 'sqlite', configSource: envMongo ? 'env' : 'none' });
     } catch (e) {
       res.json({ isInstalled: false });
     }
@@ -3984,7 +4226,7 @@ Example format:
       } = req.body;
 
       if (!adminEmail || !adminUsername || !adminPassword) {
-        return res.status(400).json({ error: "اطلاعات حساب مدیر کل الزامی است." });
+        return res.status(400).json(apiError(req, "ADMIN_ACCOUNT_REQUIRED"));
       }
 
       let provider;
@@ -4037,7 +4279,7 @@ Example format:
         installedAt: new Date().toISOString()
       };
 
-      const installConfigPath = path.join(process.cwd(), 'install-config.json');
+      const installConfigPath = dataPath('install-config.json');
       fs.writeFileSync(installConfigPath, JSON.stringify(installConfig, null, 2), 'utf8');
 
       // Set global active provider
@@ -4049,13 +4291,52 @@ Example format:
       // freshly installed site with an admin panel they can't call.
       res.json({
         success: true,
-        message: "نصب با موفقیت انجام شد.",
+        message: t(req, "INSTALL_OK"),
         token: signAuthToken(adminUsername),
         user: { username: adminUsername, email: adminEmail || "", phone: "", loyaltyPoints: 1000, role: "admin" }
       });
     } catch (err: any) {
       console.error("Installation failure:", err);
-      res.status(500).json({ error: `خطا در فرآیند نصب: ${err.message}` });
+      res.status(500).json(apiError(req, "INSTALL_FAILED", { detail: err.message }));
+    }
+  });
+
+  // وضعیت ذخیره‌سازی ماندگار + موتور دیتابیس (برای کارت «زیرساخت» در پنل)
+  app.get("/api/admin/storage-status", async (req, res) => {
+    try {
+      const provider = getActiveDataProvider();
+      const themes = listInstalledThemes();
+      const dirSize = (dir: string): number => {
+        try {
+          let total = 0;
+          for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, e.name);
+            total += e.isDirectory() ? dirSize(full) : fs.statSync(full).size;
+          }
+          return total;
+        } catch { return 0; }
+      };
+      const envMongo = !!(process.env.MONGO_URL || process.env.MONGODB_URI);
+      const sqlitePath = dataPath("bazino.sqlite3");
+      res.json({
+        dataDir: DATA_DIR,
+        persistent: IS_PERSISTENT_DATA_DIR,
+        writable: isDataDirWritable(),
+        platform: process.env.RAILWAY_PROJECT_ID ? "railway" : (process.env.RENDER ? "render" : "generic"),
+        usedBytes: dirSize(DATA_DIR),
+        themesDir: THEMES_DIR,
+        installedThemes: themes.map(t => ({ id: t.id, name: t.name, version: t.version, installedAt: t.installedAt })),
+        activeThemeId: (await provider.getSetting("activeThemeId")) || "dark-gold",
+        db: {
+          provider: provider.name,
+          connected: provider.isConnected,
+          configSource: envMongo ? "env:MONGO_URL" : (fs.existsSync(installConfigFile()) ? "install-config.json" : "default"),
+          sqliteFile: provider.name === "SQLite" ? sqlitePath : undefined,
+          sqliteBytes: provider.name === "SQLite" && fs.existsSync(sqlitePath) ? fs.statSync(sqlitePath).size : undefined,
+        },
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
     }
   });
 
@@ -4112,25 +4393,25 @@ Example format:
   app.get("/api/desktop/download/:platform", (req, res) => {
     const platform = desktopPlatforms[req.params.platform];
     if (!platform) {
-      return res.status(400).json({ error: "پلتفرم نامعتبر است" });
+      return res.status(400).json(apiError(req, "INVALID_PLATFORM"));
     }
     const platformDir = path.join(desktopBuildsDir, platform.dir);
     if (!fs.existsSync(platformDir)) {
       return res.status(404).json({
-        error: `نسخه‌ی دسکتاپ برای ${platform.label} هنوز build نشده است.`,
+        ...apiError(req, "DESKTOP_NOT_BUILT", { platform: platform.label }),
         hint: "راهنما: desktop-app/README.md — دستور 'npm run dist' را روی یک دستگاه واقعی همان سیستم‌عامل اجرا کنید و خروجی را در desktop-builds/" + platform.dir + "/ قرار دهید."
       });
     }
     const files = fs.readdirSync(platformDir).filter(f => !f.startsWith("."));
     if (files.length === 0) {
-      return res.status(404).json({ error: `فایلی برای ${platform.label} پیدا نشد.` });
+      return res.status(404).json(apiError(req, "DESKTOP_FILE_NOT_FOUND", { platform: platform.label }));
     }
     // If multiple files exist (e.g. both nsis installer + portable exe), prefer the first one alphabetically.
     const fileName = files.sort()[0];
     res.download(path.join(platformDir, fileName), fileName, (err) => {
       if (err) {
         console.error("Error downloading desktop build:", err);
-        if (!res.headersSent) res.status(500).json({ error: "خطا در دانلود فایل" });
+        if (!res.headersSent) res.status(500).json(apiError(req, "FILE_DOWNLOAD_FAILED"));
       }
     });
   });
@@ -4307,9 +4588,25 @@ Example format:
           }
           indexHtmlTemplate = template;
         }
+        // همان شکلی که /api/tournaments برمی‌گرداند (teams/bracket به‌صورت شیء، نه رشته‌ی JSON)
+        // وگرنه TournamentsTab در production روی `.teams.map` کرش می‌کند.
+        const rawTournaments = await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS);
+        const parseJson = (v: unknown, fallback: unknown) => {
+          if (typeof v !== "string") return v ?? fallback;
+          try { return JSON.parse(v); } catch { return fallback; }
+        };
+        // قالب فعال سایت هم داخل HTML می‌رود تا اولین رندر با همان قالب (و theme.js آن)
+        // شروع شود — قبلاً کلاینت با dark-gold رندر می‌شد و بعد از /api/themes سوییچ می‌کرد
+        // (فلش هدر/اسلایدر پیش‌فرض قبل از بخش‌های قالب — E.86).
+        const activeThemeId = (await getActiveDataProvider().getSetting("activeThemeId")) || "dark-gold";
+        const activeServerTheme = listInstalledThemes().find(t => t.id === activeThemeId) || null;
         const bootstrap = {
-          tournaments: await resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+          activeThemeId,
+          theme: activeServerTheme,
+          tournaments: rawTournaments.map(t => ({ ...t, teams: parseJson(t.teams, []), bracket: parseJson(t.bracket, {}) })),
           assetVersion: ASSET_VERSION,
+          // زبان پیشنهادی بر اساس کشور IP — بدون رفت‌وبرگشت اضافه در اولین رندر
+          lang: detectVisitorLanguage(req).lang,
         };
         // جلوگیری از شکستن HTML توسط دنباله‌هایی مثل "</script>" داخل JSON
         const json = JSON.stringify(bootstrap).replace(/</g, "\\u003c");

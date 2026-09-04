@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { extractColorsFromCss } from '../themes';
+import { L } from '../utils/i18n';
 
 interface ThemeColorConfig {
   primary: string;
@@ -152,7 +153,7 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
 
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 11px system-ui, sans-serif';
-    ctx.fillText(language === 'fa' ? 'پیشرفته‌ترین کلوپ بازی کشور' : 'ULTIMATE ESPORTS ARENA', 25, 95);
+    ctx.fillText(L(language, { fa: 'پیشرفته‌ترین کلوپ بازی کشور', en: 'ULTIMATE ESPORTS ARENA', ru: 'ЛУЧШАЯ КИБЕРСПОРТИВНАЯ АРЕНА', tr: 'EN İYİ ESPOR ARENASI' }), 25, 95);
 
     // Hero paragraph lines
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
@@ -167,7 +168,7 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
 
     ctx.fillStyle = '#000000';
     ctx.font = 'bold 7px system-ui, sans-serif';
-    ctx.fillText(language === 'fa' ? 'رزرو سریع سانس' : 'BOOK SESSION', 33, 134);
+    ctx.fillText(L(language, { fa: 'رزرو سریع سانس', en: 'BOOK SESSION', ru: 'ЗАБРОНИРОВАТЬ', tr: 'SEANS AYIRT' }), 33, 134);
 
     // Hero Graphic / Game Poster on the right
     ctx.strokeStyle = hexToRgba(primary, 0.2);
@@ -255,9 +256,9 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 8px system-ui, sans-serif';
       const cardTitles = [
-        language === 'fa' ? 'سیستم‌های VIP' : 'VIP Workstations',
-        language === 'fa' ? 'مسابقات فعال' : 'Active Brackets',
-        language === 'fa' ? 'سفارش آنلاین' : 'Cafe Smart Order'
+        L(language, { fa: 'سیستم‌های VIP', en: 'VIP Workstations', ru: 'VIP-станции', tr: 'VIP İstasyonlar' }),
+        L(language, { fa: 'مسابقات فعال', en: 'Active Brackets', ru: 'Активные турниры', tr: 'Aktif Turnuvalar' }),
+        L(language, { fa: 'سفارش آنلاین', en: 'Cafe Smart Order', ru: 'Онлайн-заказ в кафе', tr: 'Kafe Online Sipariş' })
       ];
       ctx.fillText(cardTitles[i], cardX + 8, cardY + 56);
 
@@ -334,7 +335,7 @@ export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProp
           {/* Status Indicator */}
           <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-black/75 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            {language === 'fa' ? 'پیش‌نمایش زنده' : 'LIVE VIEWPORT'}
+            {L(language, { fa: 'پیش‌نمایش زنده', en: 'LIVE VIEWPORT', ru: 'ЖИВОЙ ПРЕДПРОСМОТР', tr: 'CANLI ÖNİZLEME' })}
           </div>
 
           {/* Theme specifications footer overlay */}

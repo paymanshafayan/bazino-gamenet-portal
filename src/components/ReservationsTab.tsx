@@ -3,6 +3,8 @@ import { GameSystem, DiscountCode } from '../types/gamenet';
 import { Monitor, Cpu, Sparkles, Clock, Check, X, ShieldAlert, CreditCard, QrCode, UserCheck, ScanLine, Smartphone, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import QrCodeImage from './QrCodeImage';
 import { useLanguage } from '../context/LanguageContext';
+import { L, localeOf } from '../utils/i18n';
+import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
 
 interface Props {
   themeId?: string;
@@ -29,6 +31,7 @@ export default function ReservationsTab({
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [showScannerSim, setShowScannerSim] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
+  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number; title: string } | null>(null);
 
   const fetchReservations = async () => {
     try {
@@ -62,10 +65,7 @@ export default function ReservationsTab({
 
         if (response.ok) {
           addNotification(
-            language === 'fa' ? 'بارکد با موفقیت اسکن شد! کاربر وارد سیستم شد.' :
-            language === 'en' ? 'Barcode scanned successfully! Guest checked into system.' :
-            language === 'ru' ? 'Штрих-код отсканирован! Гость вошел в систему.' :
-            'Barkod başarıyla tarandı! Misafir sisteme giriş yaptı.',
+            L(language, { fa: 'بارکد با موفقیت اسکن شد! کاربر وارد سیستم شد.', en: 'Barcode scanned successfully! Guest checked into system.', ru: 'Штрих-код отсканирован! Гость вошел в систему.', tr: 'Barkod başarıyla tarandı! Kullanıcı sisteme giriş yaptı.' }),
             'success'
           );
           fetchReservations();
@@ -107,10 +107,7 @@ export default function ReservationsTab({
     const found = activeCoupons.find(c => c.code.toUpperCase() === couponCode.trim().toUpperCase());
     if (!found) {
       addNotification(
-        language === 'fa' ? 'کد تخفیف معتبر نیست یا منقضی شده است.' :
-        language === 'en' ? 'Discount code is invalid or expired.' :
-        language === 'ru' ? 'Промокод недействителен или истек.' :
-        'İndirim kodu geçersiz veya süresi dolmuş.',
+        L(language, { fa: 'کد تخفیف معتبر نیست یا منقضی شده است.', en: 'Discount code is invalid or expired.', ru: 'Промокод недействителен или истек.', tr: 'İndirim kodu geçersiz veya süresi dolmuş.' }),
         'error'
       );
       return;
@@ -118,13 +115,7 @@ export default function ReservationsTab({
 
     const subtotal = getSubtotal();
     if (subtotal < found.minOrder) {
-      const errorMsg = language === 'fa'
-        ? `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString()} تومان است.`
-        : language === 'en'
-        ? `Minimum purchase to apply this code is ${found.minOrder.toLocaleString()} Tomans.`
-        : language === 'ru'
-        ? `Минимальный заказ для применения этого кода: ${found.minOrder.toLocaleString()} томанов.`
-        : `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString()} Tümen'dir.`;
+      const errorMsg = L(language, { fa: `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString(localeOf(language))} لیر است.`, en: `Minimum purchase to apply this code is ${found.minOrder.toLocaleString(localeOf(language))} TL.`, ru: `Минимальный заказ для применения этого кода: ${found.minOrder.toLocaleString(localeOf(language))} TL.`, tr: `Bu kodu uygulamak için minimum tutar ${found.minOrder.toLocaleString(localeOf(language))} TL.` });
 
       addNotification(errorMsg, 'error');
       return;
@@ -132,10 +123,7 @@ export default function ReservationsTab({
 
     setAppliedCoupon(found);
     addNotification(
-      language === 'fa' ? 'کد تخفیف اعمال شد!' :
-      language === 'en' ? 'Discount code applied!' :
-      language === 'ru' ? 'Промокод успешно применен!' :
-      'İndirim kodu uygulandı!',
+      L(language, { fa: 'کد تخفیف اعمال شد!', en: 'Discount code applied!', ru: 'Промокод успешно применен!', tr: 'İndirim kodu uygulandı!' }),
       'success'
     );
   };
@@ -143,10 +131,7 @@ export default function ReservationsTab({
   const handleReserve = async () => {
     if (!selectedSystem) {
       addNotification(
-        language === 'fa' ? 'لطفاً ابتدا یک سیستم یا صندلی خالی انتخاب کنید.' :
-        language === 'en' ? 'Please select an available system or seat first.' :
-        language === 'ru' ? 'Пожалуйста, сначала выберите свободную систему или место.' :
-        'Lütfen önce boş bir sistem veya koltuk seçin.',
+        L(language, { fa: 'لطفاً ابتدا یک سیستم یا صندلی خالی انتخاب کنید.', en: 'Please select an available system or seat first.', ru: 'Пожалуйста, сначала выберите свободную систему или место.', tr: 'Lütfen önce boş bir sistem veya koltuk seçin.' }),
         'error'
       );
       return;
@@ -156,58 +141,22 @@ export default function ReservationsTab({
     const discount = getDiscountAmount();
     const finalAmount = subtotal - discount;
 
-    // Calculate points: 1 point per 10,000 Tomans
-    const pointsEarned = Math.floor(finalAmount / 10000);
+    const descMsg = L(language, { fa: `رزرو آنلاین ${selectedSystem.name} به مدت ${hours} ساعت`, en: `Online booking of ${selectedSystem.name} for ${hours} hours`, ru: `Онлайн бронирование ${selectedSystem.name} на ${hours} ч.`, tr: `${selectedSystem.name} için ${hours} saatlik online rezervasyon` });
 
-    const descMsg = language === 'fa'
-      ? `رزرو آنلاین ${selectedSystem.name} به مدت ${hours} ساعت`
-      : language === 'en'
-      ? `Online booking of ${selectedSystem.name} for ${hours} hours`
-      : language === 'ru'
-      ? `Онлайн бронирование ${selectedSystem.name} на ${hours} ч.`
-      : `${selectedSystem.name} sisteminin ${hours} saatlik online rezervasyonu`;
+    // تسک ۱۳: انتخاب روش پرداخت (کیف پول / در محل / آنلاین اگر فعال) — مستقل از قالب؛
+    // رزرو و امتیاز را سرور پس از تأیید روش ثبت می‌کند.
+    setCheckout({ params: { systemId: selectedSystem.id, startTime: '14:00', endTime: `${14 + hours}:00`, date: 'امروز', couponCode: appliedCoupon?.code || '' }, amount: finalAmount, title: descMsg });
+  };
 
-    try {
-      const response = await fetch('/api/systems/reserve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemId: selectedSystem.id,
-          startTime: '14:00',
-          endTime: `${14 + hours}:00`,
-          totalPrice: finalAmount,
-          pointsEarned,
-          date: 'امروز'
-        })
-      });
-
-      if (response.ok) {
-        onAddLoyaltyPoints(pointsEarned, descMsg);
-
-        const successMsg = language === 'fa'
-          ? `رزرو سیستم ${selectedSystem.name} با موفقیت انجام شد! ${pointsEarned} امتیاز وفاداری به شما تعلق گرفت.`
-          : language === 'en'
-          ? `Successfully booked ${selectedSystem.name}! You earned ${pointsEarned} loyalty points.`
-          : language === 'ru'
-          ? `Система ${selectedSystem.name} успешно забронирована! Вам начислено ${pointsEarned} баллов.`
-          : `${selectedSystem.name} rezervasyonu başarıyla yapıldı! ${pointsEarned} sadakat puanı kazandınız.`;
-
-        addNotification(successMsg, 'success');
-        fetchReservations();
-      } else {
-        const errData = await response.json();
-        addNotification(errData.error || 'Error', 'error');
-      }
-    } catch (err) {
-      console.error("Reserve error:", err);
-      onAddLoyaltyPoints(pointsEarned, descMsg);
-      addNotification(
-        language === 'fa' ? `رزرو سیستم ${selectedSystem.name} با موفقیت انجام شد!` : `Successfully booked ${selectedSystem.name}!`,
-        'success'
-      );
+  const onCheckoutDone = (r: CheckoutResult) => {
+    setCheckout(null);
+    if (r.method === 'wallet') {
+      addNotification(L(language, { fa: `رزرو ${selectedSystem?.name ?? ''} با کیف پول انجام شد. ${r.result?.points ?? 0} امتیاز گرفتید؛ موجودی: ${(r.balance ?? 0).toLocaleString()} TL`, en: `${selectedSystem?.name ?? 'System'} booked with your wallet. You earned ${r.result?.points ?? 0} points; balance: ${(r.balance ?? 0).toLocaleString()} TL`, ru: `${selectedSystem?.name ?? 'Система'} забронирована из кошелька. Начислено ${r.result?.points ?? 0} баллов; баланс: ${(r.balance ?? 0).toLocaleString()} TL`, tr: `${selectedSystem?.name ?? 'Sistem'} cüzdanla rezerve edildi. ${r.result?.points ?? 0} puan kazandınız; bakiye: ${(r.balance ?? 0).toLocaleString()} TL` }), 'success');
+    } else {
+      const due = formatDue(r.dueAt, language);
+      addNotification(L(language, { fa: `رزرو ثبت شد. لطفاً حداکثر تا ${due} (۱۰ دقیقه قبل از سانس) در کلاب حاضر شده و حضوری پرداخت کنید؛ در غیر این صورت رزرو باطل می‌شود.`, en: `Booking registered. Please arrive and pay at the club by ${due} (10 minutes before the session); otherwise it will be cancelled.`, ru: `Бронь оформлена. Придите и оплатите в клубе до ${due} (за 10 минут до сеанса); иначе она будет аннулирована.`, tr: `Rezervasyon kaydedildi. Lütfen en geç ${due} (seanstan 10 dakika önce) kulübe gelip ödeme yapın; aksi hâlde iptal edilir.` }), 'info');
     }
-
-    // Reset fields
+    fetchReservations();
     setSelectedSystemId(null);
     setHours(2);
     setAppliedCoupon(null);
@@ -229,7 +178,7 @@ export default function ReservationsTab({
   );
 
   const formatTimestamp = (isoString?: string) => {
-    if (!isoString) return language === 'fa' ? 'نامشخص' : 'N/A';
+    if (!isoString) return L(language, { fa: 'نامشخص', en: 'N/A', ru: 'Н/Д', tr: 'Belirsiz' });
     try {
       const dateObj = new Date(isoString);
       if (language === 'fa') {
@@ -259,6 +208,7 @@ export default function ReservationsTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
+      {checkout && <CheckoutModal kind="reservation" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onDone={onCheckoutDone} onClose={() => { setCheckout(null); fetchReservations(); }} />}
       
       {/* Grid of systems & Interactive Map */}
       <div className="lg:col-span-3 flex flex-col gap-6">
@@ -350,15 +300,15 @@ export default function ReservationsTab({
                   <div className="text-center">
                     <span className="text-white text-xs font-bold block font-display">{sys.name}</span>
                     <span className="text-[10px] text-gray-500 mt-1 block font-bold">
-                      {sys.type === 'PC' && (language === 'fa' ? 'سیستم PC' : language === 'en' ? 'PC Gaming' : language === 'ru' ? 'Игровой ПК' : 'PC Sistemi')}
-                      {sys.type === 'PS5' && (language === 'fa' ? 'پی‌اس ۵' : 'PS5')}
-                      {sys.type === 'Xbox' && (language === 'fa' ? 'ایکس‌باکس' : 'Xbox')}
+                      {sys.type === 'PC' && (L(language, { fa: 'سیستم PC', en: 'PC Gaming', ru: 'Игровой ПК', tr: 'PC Sistemi' }))}
+                      {sys.type === 'PS5' && (L(language, { fa: 'پی‌اس ۵', en: 'PS5', ru: 'PS5', tr: 'PS5' }))}
+                      {sys.type === 'Xbox' && (L(language, { fa: 'ایکس‌باکس', en: 'Xbox', ru: 'Xbox', tr: 'Xbox' }))}
                     </span>
                   </div>
 
                   <div className="border-t border-white/5 pt-2.5 w-full text-center">
                     <span className="text-xs font-bold text-primary font-mono">
-                      {sys.hourlyRate.toLocaleString()} {t('common.currency', 'تومان')} / {language === 'fa' ? 'ساعت' : language === 'en' ? 'hour' : language === 'ru' ? 'ч.' : 'saat'}
+                      {sys.hourlyRate.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')} / {L(language, { fa: 'ساعت', en: 'hour', ru: 'ч.', tr: 'saat' })}
                     </span>
                   </div>
 
@@ -446,12 +396,12 @@ export default function ReservationsTab({
                             {isCheckedIn ? (
                               <span className="flex items-center gap-1">
                                 <UserCheck className="w-2.5 h-2.5" />
-                                {language === 'fa' ? 'پذیرش شده' : language === 'en' ? 'Checked-In' : language === 'ru' ? 'Зарегистрирован' : 'Giriş Yapıldı'}
+                                {L(language, { fa: 'پذیرش شده', en: 'Checked-In', ru: 'Зарегистрирован', tr: 'Giriş Yapıldı' })}
                               </span>
                             ) : (
                               <span className="flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5 text-amber-400" />
-                                {language === 'fa' ? 'در انتظار ورود' : language === 'en' ? 'Pending Check-In' : language === 'ru' ? 'Ожидание' : 'Bekliyor'}
+                                {L(language, { fa: 'در انتظار ورود', en: 'Pending Check-In', ru: 'Ожидание', tr: 'Giriş Bekleniyor' })}
                               </span>
                             )}
                           </span>
@@ -459,12 +409,12 @@ export default function ReservationsTab({
                         
                         <div className="grid grid-cols-2 gap-2 mt-4 text-[10px] text-gray-400 font-mono">
                           <div>
-                            <span className="text-gray-600 block text-[10px] uppercase">{language === 'fa' ? 'سانس رزرو:' : 'Time slot:'}</span>
+                            <span className="text-gray-600 block text-[10px] uppercase">{L(language, { fa: 'سانس رزرو:', en: 'Time slot:', ru: 'Слот времени:', tr: 'Zaman dilimi:' })}</span>
                             <span className="text-gray-300 font-bold">{res.startTime} - {res.endTime}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600 block text-[10px] uppercase">{language === 'fa' ? 'هزینه پرداخت شده:' : 'Price:'}</span>
-                            <span className="text-primary font-black">{(res.totalPrice || 0).toLocaleString()} {t('common.currency', 'تومان')}</span>
+                            <span className="text-gray-600 block text-[10px] uppercase">{L(language, { fa: 'هزینه پرداخت شده:', en: 'Price:', ru: 'Оплачено:', tr: 'Ödenen tutar:' })}</span>
+                            <span className="text-primary font-black">{(res.totalPrice || 0).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                           </div>
                         </div>
                       </div>
@@ -475,18 +425,18 @@ export default function ReservationsTab({
                           <button
                             onClick={() => handleSimulateCheckIn(res.id)}
                             disabled={scanningId !== null}
-                            className="w-full py-2 bg-[#A855F7]/10 hover:bg-[#A855F7] text-[#A855F7] hover:text-white border border-[#A855F7]/20 hover:border-[#A855F7] rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            className="w-full py-2 bg-violet-token/10 hover:bg-violet-token text-violet-token hover:text-white border border-violet-token/20 hover:border-violet-token rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
                           >
                             <ScanLine className="w-3.5 h-3.5" />
                             <span>
-                              {language === 'fa' ? 'شبیه‌ساز اسکنر مسئول کانتر' : 'Simulate Counter Scanner'}
+                              {L(language, { fa: 'شبیه‌ساز اسکنر مسئول کانتر', en: 'Simulate Counter Scanner', ru: 'Симулятор сканера на стойке', tr: 'Resepsiyon Tarayıcı Simülasyonu' })}
                             </span>
                           </button>
                         ) : (
                           <div className="w-full py-2 bg-emerald-500/5 text-emerald-400 border border-emerald-500/10 rounded-lg text-[10px] font-black text-center flex items-center justify-center gap-1.5 select-none">
                             <Check className="w-3.5 h-3.5" />
                             <span>
-                              {language === 'fa' ? 'ورود با موفقیت ثبت شد' : 'Seat is successfully active'}
+                              {L(language, { fa: 'ورود با موفقیت ثبت شد', en: 'Seat is successfully active', ru: 'Вход успешно зарегистрирован', tr: 'Giriş başarıyla kaydedildi' })}
                             </span>
                           </div>
                         )}
@@ -501,12 +451,12 @@ export default function ReservationsTab({
 
         {/* Booking History View */}
         <div className="rounded-2xl border border-white/10 bg-dark-card p-6 mt-6 relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#A855F7]/5 blur-3xl pointer-events-none"></div>
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-violet-token/5 blur-3xl pointer-events-none"></div>
           
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-white/5 pb-4">
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
-                <History className="w-5 h-5 text-[#A855F7]" />
+                <History className="w-5 h-5 text-violet-token" />
                 <span>
                   {language === 'fa' && 'تاریخچه رزروهای شما'}
                   {language === 'en' && 'Your Booking History'}
@@ -589,7 +539,7 @@ export default function ReservationsTab({
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-center font-bold text-primary font-mono">
-                          {(res.totalPrice || 0).toLocaleString()} {t('common.currency', 'تومان')}
+                          {(res.totalPrice || 0).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}
                         </td>
                         <td className="py-3.5 px-4 text-end">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
@@ -600,12 +550,12 @@ export default function ReservationsTab({
                             {res.checkedIn ? (
                               <>
                                 <Check className="w-3 h-3 text-emerald-400" />
-                                {language === 'fa' ? 'پذیرش شده' : language === 'en' ? 'Checked-In' : language === 'ru' ? 'Занят' : 'Giriş Yapıldı'}
+                                {L(language, { fa: 'پذیرش شده', en: 'Checked-In', ru: 'Занят', tr: 'Giriş Yapıldı' })}
                               </>
                             ) : (
                               <>
                                 <Clock className="w-3 h-3 text-amber-400" />
-                                {language === 'fa' ? 'در انتظار' : language === 'en' ? 'Pending' : language === 'ru' ? 'В ожидании' : 'Bekliyor'}
+                                {L(language, { fa: 'در انتظار', en: 'Pending', ru: 'В ожидании', tr: 'Beklemede' })}
                               </>
                             )}
                           </span>
@@ -651,7 +601,7 @@ export default function ReservationsTab({
 
       {/* Dynamic Cyberpunk Scanner Simulation Overlay */}
       {showScannerSim && (
-        <div className="fixed inset-0 bg-[#070913]/90 backdrop-blur-md z-[9999] flex items-center justify-center font-sans">
+        <div className="fixed inset-0 bg-surface-2/90 backdrop-blur-md z-[9999] flex items-center justify-center font-sans">
           <div className="max-w-md w-full mx-4 bg-dark-card border-2 border-primary/40 rounded-2xl p-6 relative overflow-hidden shadow-[0_0_50px_rgba(0,240,255,0.15)] animate-fade-in">
             <div className="absolute top-0 left-0 w-full h-1 bg-primary/20">
               <div className="h-full bg-primary animate-pulse" style={{ width: '100%' }}></div>
@@ -667,10 +617,10 @@ export default function ReservationsTab({
               <div>
                 <h4 className="text-white text-sm font-black font-display uppercase tracking-widest flex items-center justify-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
-                  {language === 'fa' ? 'در حال اسکن بارکد...' : 'Scanning QR Entry Code...'}
+                  {L(language, { fa: 'در حال اسکن بارکد...', en: 'Scanning QR Entry Code...', ru: 'Сканирование QR-кода входа...', tr: 'Giriş QR kodu taranıyor...' })}
                 </h4>
                 <p className="text-gray-400 text-xs mt-1.5 font-medium">
-                  {language === 'fa' ? 'کد ورود شما با موفقیت شناسایی و پردازش شد.' : 'Capturing credentials from optical frame matrices...'}
+                  {L(language, { fa: 'کد ورود شما با موفقیت شناسایی و پردازش شد.', en: 'Capturing credentials from optical frame matrices...', ru: 'Ваш код входа успешно распознан и обработан.', tr: 'Giriş kodunuz başarıyla tanındı ve işlendi.' })}
                 </p>
               </div>
 
@@ -680,7 +630,7 @@ export default function ReservationsTab({
                 <p className="text-gray-400">{"[CONNECTING] Connecting to FrontDesk Scanner..."}</p>
                 <p className="animate-pulse">{"[SCANNING] Initializing optical sensor laser sweeps..."}</p>
                 <p className="text-primary">{"[INFO] Capturing raw QR matrix codes..."}</p>
-                <p className="text-[#A855F7] animate-pulse">{"[DB] Querying secure reservation records database..."}</p>
+                <p className="text-violet-token animate-pulse">{"[DB] Querying secure reservation records database..."}</p>
                 <p className="text-white">{"[SUCCESS] Verification successful! Seat activated."}</p>
               </div>
 
@@ -727,12 +677,12 @@ export default function ReservationsTab({
             <div className="flex flex-col gap-4">
               
               {/* Selected info card */}
-              <div className="bg-[#0d122b] p-4 rounded-xl border border-white/5">
+              <div className="bg-card-2 p-4 rounded-xl border border-white/5">
                 <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide font-mono">{t('booking.selectedSys', 'سیستم انتخاب شده:')}</span>
                 <h4 className="text-white text-sm font-bold mt-1 font-display">{selectedSystem.name}</h4>
                 <div className="flex justify-between items-center text-xs text-primary font-bold mt-2 pt-2 border-t border-white/5 font-mono">
                   <span>{t('booking.hourlyRate', 'نرخ ساعتی:')}</span>
-                  <span>{selectedSystem.hourlyRate.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span>{selectedSystem.hourlyRate.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
               </div>
 
@@ -740,7 +690,7 @@ export default function ReservationsTab({
               <div className="space-y-2">
                 <div className="flex justify-between text-xs text-gray-400">
                   <span className="font-bold">{t('booking.hoursLabel', 'مدت زمان رزرو (ساعت):')}</span>
-                  <span className="font-bold text-primary font-mono">{hours} {language === 'fa' ? 'ساعت' : language === 'en' ? 'Hours' : language === 'ru' ? 'ч.' : 'Saat'}</span>
+                  <span className="font-bold text-primary font-mono">{hours} {L(language, { fa: 'ساعت', en: 'Hours', ru: 'ч.', tr: 'Saat' })}</span>
                 </div>
                 <div className="grid grid-cols-4 gap-1.5 font-mono">
                   {[1, 2, 3, 4].map((h) => (
@@ -757,7 +707,7 @@ export default function ReservationsTab({
                           : 'border-white/10 bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
                       }`}
                     >
-                      {h}{language === 'fa' ? 'س' : language === 'en' ? 'H' : language === 'ru' ? 'ч' : 'S'}
+                      {h}{L(language, { fa: 'س', en: 'H', ru: 'ч', tr: 'S' })}
                     </button>
                   ))}
                 </div>
@@ -769,7 +719,7 @@ export default function ReservationsTab({
                   <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg text-xs font-mono">
                     <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
                       <Check className="w-4 h-4 animate-pulse" />
-                      <span>{language === 'fa' ? 'اعمال شد:' : 'Applied:'} {appliedCoupon.code}</span>
+                      <span>{L(language, { fa: 'اعمال شد:', en: 'Applied:', ru: 'Применено:', tr: 'Uygulandı:' })} {appliedCoupon.code}</span>
                     </div>
                     <button 
                       onClick={() => setAppliedCoupon(null)}
@@ -785,7 +735,7 @@ export default function ReservationsTab({
                       placeholder={t('booking.promoLabel', 'کد تخفیف (در صورت وجود):')}
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
-                      className="flex-1 px-3.5 py-2.5 bg-[#0d122b] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
+                      className="flex-1 px-3.5 py-2.5 bg-card-2 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
                     <button
                       onClick={handleApplyCoupon}
@@ -806,7 +756,7 @@ export default function ReservationsTab({
                     {language === 'ru' && 'Подитог стоимости:'}
                     {language === 'tr' && 'Rezervasyon Toplamı:'}
                   </span>
-                  <span className="text-gray-200">{subtotal.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-400 font-bold">
@@ -816,12 +766,12 @@ export default function ReservationsTab({
                       {language === 'ru' && 'Сумма скидки:'}
                       {language === 'tr' && 'İndirim Tutarı:'}
                     </span>
-                    <span>-{discount.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                    <span>-{discount.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-white/5 pt-2.5 text-sm font-black text-white font-sans">
                   <span>{t('booking.totalPrice', 'مبلغ کل فاکتور:')}</span>
-                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
 
                 {/* Loyalty points display */}
@@ -832,10 +782,10 @@ export default function ReservationsTab({
                     <span>{t('booking.pointsToEarn', 'امتیاز وفاداری دریافتی:')}</span>
                   </div>
                   <span className="relative z-10 block text-[10px] leading-relaxed text-gray-400 font-medium">
-                    {language === 'fa' && <>با نهایی کردن این رزرو، <strong className="text-white font-bold">{Math.floor(total / 10000)} امتیاز</strong> به باشگاه مشتریان شما واریز می‌شود.</>}
-                    {language === 'en' && <>By completing this booking, <strong className="text-white font-bold">{Math.floor(total / 10000)} points</strong> will be added to your loyalty club.</>}
-                    {language === 'ru' && <>Завершив бронь, вы получите <strong className="text-white font-bold">{Math.floor(total / 10000)} баллов</strong> на баланс клуба.</>}
-                    {language === 'tr' && <>Bu rezervasyonu tamamladığınızda, <strong className="text-white font-bold">{Math.floor(total / 10000)} puan</strong> sadakat kulübünüze yüklenecektir.</>}
+                    {language === 'fa' && <>با نهایی کردن این رزرو، <strong className="text-white font-bold">{Math.floor(total / 10)} امتیاز</strong> به باشگاه مشتریان شما واریز می‌شود.</>}
+                    {language === 'en' && <>By completing this booking, <strong className="text-white font-bold">{Math.floor(total / 10)} points</strong> will be added to your loyalty club.</>}
+                    {language === 'ru' && <>Завершив бронь, вы получите <strong className="text-white font-bold">{Math.floor(total / 10)} баллов</strong> на баланс клуба.</>}
+                    {language === 'tr' && <>Bu rezervasyonu tamamladığınızda, <strong className="text-white font-bold">{Math.floor(total / 10)} puan</strong> sadakat kulübünüze yüklenecektir.</>}
                   </span>
                 </div>
               </div>

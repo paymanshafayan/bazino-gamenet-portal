@@ -10,7 +10,7 @@
  */
 import { suite, test, assert, run } from './harness.mts';
 import {
-  setupDom, teardownDom, loadModule, mount, act, getDocument,
+  setupDom, teardownDom, loadModule, mount, act, getDocument, getWindow,
   installIntersectionObserver, removeIntersectionObserver, stubFetch,
 } from './dom.mts';
 
@@ -184,7 +184,7 @@ test('HudSquareButton shows its badge only when there is one', async () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
-   31. AuthModal — فرم ورود/ثبت‌نام
+   31. AuthModal — ورود با کد پیامکی (OTP) / رمز عبور
    ═══════════════════════════════════════════════════════════════════════ */
 suite('31. UI — AuthModal');
 
@@ -209,76 +209,123 @@ test('renders nothing while closed', async () => {
   await el.unmount();
 });
 
-test('renders username and password fields when open', async () => {
-  const el = await mountAuthModal({
-    isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {},
-  });
-  assert.ok(el.findAll('input').length >= 2, 'login form should have at least 2 inputs');
-  assert.ok(el.find('input[type="password"]'), 'no password field');
+const Ev = () => getDocument().defaultView.Event;
+const setInput = async (input: any, value: string) => act(async () => {
+  const setter = Object.getOwnPropertyDescriptor(getDocument().defaultView.HTMLInputElement.prototype, 'value')!.set!;
+  setter.call(input, value);
+  input.dispatchEvent(new (Ev())('input', { bubbles: true }));
+});
+const submit = async (form: any) => { await act(async () => { form.dispatchEvent(new (Ev())('submit', { bubbles: true, cancelable: true })); }); await act(async () => { await new Promise(r => setTimeout(r, 30)); }); };
+const clickTab = async (el: any, i: number) => act(async () => { el.findAll('[role=tab]')[i].click(); });
+
+test('opens on the SMS-code tab with a phone field; no registration tab exists', async () => {
+  const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {} });
+  assert.ok(el.find('[data-otp-step="phone"]'), 'phone step not rendered');
+  assert.ok(el.find('#auth-phone'), 'no phone input');
+  assert.equal(el.findAll('[role=tab]').length, 2, 'exactly two tabs: SMS code / password');
+  assert.ok(!el.find('input[type="email"]'), 'no e-mail/registration form anymore');
   await el.unmount();
 });
 
-test('a successful login stores the JWT and reports the user', async () => {
+test('requesting a code moves to the code step and shows a countdown from the server retryAfter', async () => {
   const calls = stubFetch((url) => {
-    if (url.includes('/api/auth/login')) {
-      return { status: 200, body: { success: true, token: 'jwt-from-test', user: { username: 'tester', role: 'admin' } } };
+    if (url.includes('/api/auth/otp/request')) return { status: 200, body: { success: true, phone: '+905321112233', retryAfter: 45, expiresIn: 300 } };
+    return { status: 200, body: {} };
+  });
+  try {
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {} });
+    await setInput(el.find('#auth-phone'), '0532 111 22 33');
+    await submit(el.find('form'));
+    const req = calls.find(c => c.url.includes('/api/auth/otp/request'));
+    assert.ok(req, 'otp/request was not called');
+    assert.equal(JSON.parse(req!.init.body).phone, '0532 111 22 33');
+    assert.ok(el.find('[data-otp-step="code"]'), 'did not advance to the code step');
+    assert.ok(el.text().includes('+905321112233'), 'normalised phone from the server should be shown');
+    assert.ok(el.find('[data-otp-resend]').textContent.includes('00:45'), `countdown should start at 00:45, got: ${el.find('[data-otp-resend]').textContent}`);
+    await el.unmount();
+  } finally { restoreFetch(); }
+});
+
+test('a 429 from the server is shown with its retryAfter countdown (cooldown is server-driven)', async () => {
+  stubFetch((url) => {
+    if (url.includes('/api/auth/otp/request')) return { status: 429, body: { error: 'Too soon', code: 'OTP_TOO_SOON', retryAfter: 37 } };
+    return { status: 200, body: {} };
+  });
+  try {
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: () => {} });
+    await setInput(el.find('#auth-phone'), '05321112233');
+    await submit(el.find('form'));
+    assert.ok(el.find('[role=alert]')?.textContent.includes('Too soon'), 'server error not displayed');
+    assert.ok(el.find('[data-otp-step="code"]'), 'OTP_TOO_SOON should still let the user type the code they already got');
+    assert.ok(el.find('[data-otp-resend]').textContent.includes('00:37'));
+    await el.unmount();
+  } finally { restoreFetch(); }
+});
+
+test('verifying the code stores the JWT and reports the user; wrong code shows the error', async () => {
+  const { clearAuthToken, getAuthToken } = await loadModule('/src/services/authToken.ts');
+  clearAuthToken();
+  const calls = stubFetch((url, init) => {
+    if (url.includes('/api/auth/otp/request')) return { status: 200, body: { success: true, phone: '+905321112233', retryAfter: 60 } };
+    if (url.includes('/api/auth/otp/verify')) {
+      const { code } = JSON.parse(init.body);
+      if (code === '123456') return { status: 200, body: { success: true, isNew: true, token: 'jwt-otp', user: { username: '905321112233', role: 'gamer', loyaltyPoints: 100 } } };
+      return { status: 400, body: { error: 'Incorrect code (4 attempts left).', code: 'OTP_WRONG', attemptsLeft: 4 } };
     }
     return { status: 200, body: {} };
   });
   try {
     let authed: any = null;
-    const el = await mountAuthModal({
-      isOpen: true, onClose: () => {}, onAuthSuccess: (u: any) => { authed = u; }, addNotification: () => {},
-    });
-
-    const inputs = el.findAll('input');
-    const pwd = el.find('input[type="password"]');
-    const user = inputs.find((i: any) => i !== pwd);
-
-    await act(async () => {
-      user.value = 'tester';
-      user.dispatchEvent(new (getDocument().defaultView.Event)('input', { bubbles: true }));
-      pwd.value = 'secret';
-      pwd.dispatchEvent(new (getDocument().defaultView.Event)('input', { bubbles: true }));
-    });
-
-    const form = el.find('form');
-    assert.ok(form, 'no form element to submit');
-    await act(async () => {
-      form.dispatchEvent(new (getDocument().defaultView.Event)('submit', { bubbles: true, cancelable: true }));
-    });
-    await act(async () => { await new Promise(r => setTimeout(r, 30)); });
-
-    assert.ok(calls.some(c => c.url.includes('/api/auth/login')), 'login endpoint was never called');
-    assert.ok(authed, 'onAuthSuccess was not called');
-    assert.equal(authed.username, 'tester');
-
-    const { getAuthToken } = await loadModule('/src/services/authToken.ts');
-    assert.equal(getAuthToken(), 'jwt-from-test',
-      'the JWT was not persisted — the admin panel would be locked out');
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: (u: any) => { authed = u; }, addNotification: () => {} });
+    await setInput(el.find('#auth-phone'), '05321112233');
+    await submit(el.find('form'));
+    await setInput(el.find('#auth-code'), '000000');
+    await submit(el.find('form'));
+    assert.ok(el.find('[role=alert]')?.textContent.includes('4 attempts'), 'wrong-code error not shown');
+    assert.equal(getAuthToken(), null);
+    await setInput(el.find('#auth-code'), '123456');
+    await submit(el.find('form'));
+    const verify = calls.filter(c => c.url.includes('/api/auth/otp/verify'));
+    assert.equal(verify.length, 2);
+    assert.equal(JSON.parse(verify[1].init.body).phone, '+905321112233', 'verify must use the server-normalised phone');
+    assert.ok(authed && authed.username === '905321112233', 'onAuthSuccess not called with the user');
+    assert.equal(getAuthToken(), 'jwt-otp');
     await el.unmount();
   } finally { restoreFetch(); }
 });
 
-test('a failed login surfaces the server error and stores no token', async () => {
+test('the password tab still logs in with username/password (admin path)', async () => {
+  const calls = stubFetch((url) => {
+    if (url.includes('/api/auth/login')) return { status: 200, body: { success: true, token: 'jwt-from-test', user: { username: 'tester', role: 'admin' } } };
+    return { status: 200, body: {} };
+  });
+  try {
+    let authed: any = null;
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: (u: any) => { authed = u; }, addNotification: () => {} });
+    await clickTab(el, 1);
+    assert.ok(el.find('[data-password-login]'), 'password form not shown');
+    await setInput(el.find('#auth-username'), 'tester');
+    await setInput(el.find('#auth-password'), 'secret');
+    await submit(el.find('form'));
+    assert.ok(calls.some(c => c.url.includes('/api/auth/login')), 'login endpoint was never called');
+    assert.equal(authed?.username, 'tester');
+    const { getAuthToken } = await loadModule('/src/services/authToken.ts');
+    assert.equal(getAuthToken(), 'jwt-from-test');
+    await el.unmount();
+  } finally { restoreFetch(); }
+});
+
+test('a failed password login surfaces the server error and stores no token', async () => {
   const { clearAuthToken, getAuthToken } = await loadModule('/src/services/authToken.ts');
   clearAuthToken();
   stubFetch(() => ({ status: 400, body: { error: 'نام کاربری یا کلمه عبور اشتباه است.' } }));
   try {
     let notified = '';
-    const el = await mountAuthModal({
-      isOpen: true, onClose: () => {}, onAuthSuccess: () => {},
-      addNotification: (m: string) => { notified = m; },
-    });
-    const form = el.find('form');
-    await act(async () => {
-      form.dispatchEvent(new (getDocument().defaultView.Event)('submit', { bubbles: true, cancelable: true }));
-    });
-    await act(async () => { await new Promise(r => setTimeout(r, 30)); });
-
-    assert.ok(el.text().includes('اشتباه') || notified.includes('اشتباه'),
-      `the error was not shown to the user (notified: "${notified}")`);
-    assert.equal(getAuthToken(), null, 'a token was stored despite a failed login');
+    const el = await mountAuthModal({ isOpen: true, onClose: () => {}, onAuthSuccess: () => {}, addNotification: (m: string) => { notified = m; } });
+    await clickTab(el, 1);
+    await submit(el.find('form'));
+    assert.ok(el.text().includes('اشتباه') || notified.includes('اشتباه'), `the error was not shown (notified: "${notified}")`);
+    assert.equal(getAuthToken(), null);
     await el.unmount();
   } finally { restoreFetch(); }
 });
@@ -474,6 +521,166 @@ test('does not crash when mounting a tournament with an empty bracket', async ()
 
   await el.unmount();
   restoreFetch();
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   38. Theme SDK — خروجی render (DOM خام / html) و LocationFrame
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('38. UI — Theme SDK render outputs & LocationFrame');
+
+const sdk = await loadModule('/src/themeSdk/sdk.ts');
+const { LocationFrame, locationFrom } = await loadModule('/src/themeSdk/LocationFrame.tsx');
+
+const baseProps = () => ({ language: 'tr', dir: 'ltr', t: (k: string) => k, ts: (k: string) => k, tokens: {}, slides: [], onNavigate: () => {}, featuredGames: [], tournaments: [], settings: {}, logoUrl: '/logo.png', assetsBase: '/x', themeId: 't', region: 'header' });
+
+test('a theme render() that returns a raw DOM node is mounted inside the region host', async () => {
+  const doc = getDocument();
+  sdk.registerComponent('header', { apiVersion: 2, render: () => { const d = doc.createElement('div'); d.id = 'raw-dom-header'; d.textContent = 'RAW'; return d; } });
+  const host = doc.createElement('div'); doc.body.appendChild(host);
+  await act(() => { sdk.mountComponent('header', host, baseProps()); });
+  assert.ok(host.querySelector('#raw-dom-header'), 'raw DOM output was not rendered');
+  assert.equal(host.textContent, 'RAW');
+  await act(() => { sdk.unregisterComponent('header'); });
+  host.remove();
+});
+
+test('a theme render() that returns { html } is injected; unsupported values render nothing without throwing', async () => {
+  const doc = getDocument();
+  sdk.registerComponent('footer', { apiVersion: 2, render: () => ({ html: '<b id="html-footer">HTML</b>' }) });
+  const host = doc.createElement('div'); doc.body.appendChild(host);
+  await act(() => { sdk.mountComponent('footer', host, { ...baseProps(), region: 'footer' }); });
+  assert.ok(host.querySelector('#html-footer'));
+  sdk.registerComponent('footer', { apiVersion: 2, render: () => 42n as any });
+  await act(() => { sdk.mountComponent('footer', host, { ...baseProps(), region: 'footer' }); });
+  assert.equal(host.textContent, '');
+  sdk.registerComponent('footer', { apiVersion: 2, render: () => { throw new Error('boom'); } });
+  await act(() => { sdk.mountComponent('footer', host, { ...baseProps(), region: 'footer' }); });
+  assert.equal(host.textContent, '', 'a throwing render must not break the host');
+  await act(() => { sdk.unregisterComponent('footer'); });
+  host.remove();
+});
+
+test('locationFrom normalises admin settings and falls back to the real club coordinates', () => {
+  const loc = locationFrom({ club_address: 'A', club_phone: '+90 1', club_hours: '24/7', club_map_lat: '35.1', club_map_lng: '33.9', club_map_url: 'https://maps.app.goo.gl/x' });
+  assert.equal(loc.lat, 35.1); assert.equal(loc.lng, 33.9); assert.equal(loc.mapUrl, 'https://maps.app.goo.gl/x');
+  assert.match(loc.embedUrl, /openstreetmap\.org\/export\/embed\.html\?bbox=.*marker=35\.1%2C33\.9/);
+  assert.match(loc.directionsUrl, /destination=35\.1,33\.9/);
+  const def = locationFrom({});
+  assert.equal(def.lat, 35.2628); assert.equal(def.lng, 33.9084);
+  assert.match(def.mapUrl, /google\.com\/maps\?q=35\.2628,33\.9084/);
+});
+
+test('LocationFrame renders address/phone/hours/map from settings in all three variants', async () => {
+  const settings = { club_address: 'Vista Mare No.5', club_phone: '+90 539 133 37 47', club_hours: '24/7', club_map_lat: '35.2628', club_map_lng: '33.9084' };
+  for (const variant of ['card', 'map', 'inline'] as const) {
+    const m = await mount(LocationFrame, { settings, language: 'tr', variant });
+    const html = m.container.innerHTML;
+    if (variant !== 'map') { assert.ok(html.includes('Vista Mare No.5'), `${variant}: address`); assert.ok(html.includes('+90 539 133 37 47'), `${variant}: phone`); }
+    if (variant !== 'inline') assert.ok(m.container.querySelector('iframe[src*="openstreetmap.org"]'), `${variant}: map iframe`);
+    if (variant === 'card') { assert.ok(html.includes('Bizi bulun'), 'tr title'); assert.ok(html.includes('24/7')); }
+    await m.unmount();
+  }
+});
+
+test('the theme SDK exposes LocationFrame and locationFrom to theme.js', () => {
+  const w = getWindow();
+  assert.equal(typeof w.BazinoThemeSDK?.LocationFrame, 'function');
+  assert.equal(typeof w.BazinoThemeSDK?.locationFrom, 'function');
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   39. CheckoutModal — انتخاب روش پرداخت (کیف پول / در محل) — تسک ۱۳
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('39. UI — CheckoutModal (wallet / pay-on-site)');
+
+const CheckoutMod = await loadModule('/src/legal/CheckoutModal.tsx');
+const METHODS = { online: false, currency: 'TL', methods: { reservation: ['wallet', 'onsite'], tournament: ['wallet', 'onsite'], cafe: ['onsite'], shop: ['onsite'] }, onsiteLeadMinutes: { reservation: 10, tournament: 2880 } };
+
+async function mountCheckout(props: any, balance = 0) {
+  const calls: any[] = [];
+  (globalThis as any).fetch = async (input: any, init?: any) => {
+    const url = typeof input === 'string' ? input : String(input?.url ?? input);
+    calls.push({ url, init });
+    if (url.endsWith('/api/payments/methods')) return { ok: true, status: 200, json: async () => METHODS };
+    if (url.endsWith('/api/me/wallet')) return { ok: true, status: 200, json: async () => ({ balance, currency: 'TL', transactions: [] }) };
+    if (url.endsWith('/api/checkout/onsite')) return { ok: true, status: 200, json: async () => ({ success: true, orderId: 'OS-1', amount: 200, status: 'pending_onsite', dueAt: '2026-10-15T09:00:00.000Z', startsAt: '2026-10-17T09:00:00.000Z', result: {} }) };
+    if (url.endsWith('/api/checkout/wallet')) return { ok: true, status: 200, json: async () => ({ success: true, orderId: 'WL-1', amount: 200, balance: balance - 200, result: { points: 20 } }) };
+    return { ok: false, status: 404, json: async () => ({ error: 'nf' }) };
+  };
+  const Wrapper = () => withLanguage(React.createElement(CheckoutMod.CheckoutModal, { isLoggedIn: true, onDone: () => {}, onClose: () => {}, ...props }));
+  const mounted = await mount(Wrapper, {});
+  await act(async () => { await new Promise(r => setTimeout(r, 30)); });
+  // مودال با createPortal داخل document.body رندر می‌شود؛ پس روی سند جست‌وجو می‌کنیم
+  const doc = getDocument();
+  const root = () => { const all = doc.querySelectorAll('[data-checkout-modal]'); return all[all.length - 1] as Element; };
+  const el = { find: (sel: string) => (root()?.querySelector(sel) ?? null) as any, html: () => root()?.outerHTML ?? '', unmount: async () => { await mounted.unmount(); doc.querySelectorAll('[data-checkout-modal]').forEach(n => n.remove()); } };
+  return { el, calls };
+}
+
+test('reservation: shows wallet + on-site with the 10-minute rule; low balance pre-selects on-site and disables wallet', async () => {
+  const { el, calls } = await mountCheckout({ kind: 'reservation', params: { systemId: 's1' }, estimatedAmount: 200 }, 50);
+  assert.ok(el.find('[data-pay-method="wallet"]'), 'wallet option missing');
+  assert.ok(el.find('[data-pay-method="onsite"]'), 'on-site option missing');
+  assert.match(el.html(), /10 minutes|۱۰ دقیقه|10 dakika|10 минут/);
+  assert.match(el.html(), /cancelled automatically|خودکار باطل|otomatik olarak iptal|аннулируется автоматически/i);
+  const onsiteRadio = el.find('[data-pay-method="onsite"] input[type=radio]') as HTMLInputElement;
+  assert.equal(onsiteRadio.checked, true, 'on-site must be pre-selected when balance < amount');
+  assert.ok(el.find('[data-onsite-accept]'), 'deadline acknowledgement checkbox missing');
+  // بدون تیک قانون، تأیید خطای «باید بپذیرید» می‌دهد و درخواستی به سرور نمی‌رود
+  const btn = el.find('[data-checkout-confirm]') as HTMLButtonElement;
+  await act(async () => { btn.click(); await new Promise(r => setTimeout(r, 20)); });
+  assert.ok(el.find('[data-error]'), 'expected an error asking to accept the rule');
+  assert.equal(calls.filter(c => c.url.includes('/api/checkout/')).length, 0);
+  // با تیک قانون → POST /api/checkout/onsite
+  const cb = el.find('[data-onsite-accept] input[type=checkbox]') as HTMLInputElement;
+  await act(async () => { cb.click(); await new Promise(r => setTimeout(r, 10)); });
+  await act(async () => { btn.click(); await new Promise(r => setTimeout(r, 30)); });
+  const post = calls.find(c => c.url.endsWith('/api/checkout/onsite'));
+  assert.ok(post, 'on-site checkout must POST /api/checkout/onsite');
+  assert.equal(JSON.parse(post.init.body).kind, 'reservation');
+  await el.unmount(); restoreFetch();
+});
+
+test('tournament with enough balance pre-selects wallet and shows the 48-hour rule', async () => {
+  const { el, calls } = await mountCheckout({ kind: 'tournament', params: { tournamentId: 't2' }, estimatedAmount: 600 }, 1000);
+  const walletRadio = el.find('[data-pay-method="wallet"] input[type=radio]') as HTMLInputElement;
+  assert.equal(walletRadio.checked, true);
+  assert.match(el.html(), /48 hours|۴۸ ساعت|48 saat|48 часов/);
+  assert.match(el.find('[data-wallet-balance]').textContent || '', /1,000|1000|۱٬۰۰۰/);
+  const btn = el.find('[data-checkout-confirm]') as HTMLButtonElement;
+  assert.equal(btn.disabled, false);
+  await act(async () => { btn.click(); await new Promise(r => setTimeout(r, 30)); });
+  const post = calls.find(c => c.url.endsWith('/api/checkout/wallet'));
+  assert.ok(post, 'wallet checkout must POST /api/checkout/wallet');
+  assert.equal(JSON.parse(post.init.body).kind, 'tournament');
+  await el.unmount(); restoreFetch();
+});
+
+test('cafe and shop: only pay-on-site is offered (no wallet, no online) and no deadline checkbox', async () => {
+  for (const kind of ['cafe', 'shop']) {
+    const { el } = await mountCheckout({ kind, params: {}, estimatedAmount: 120 }, 5000);
+    assert.equal(el.find('[data-pay-method="wallet"]'), null, `${kind}: wallet must not be offered`);
+    assert.equal(el.find('[data-pay-method="online"]'), null, `${kind}: online must not be offered`);
+    assert.ok(el.find('[data-pay-method="onsite"]'), `${kind}: on-site missing`);
+    assert.equal(el.find('[data-onsite-accept]'), null, `${kind}: no deadline rule for cafe/shop`);
+    assert.equal((el.find('[data-checkout-confirm]') as HTMLButtonElement).disabled, false);
+    await el.unmount();
+  }
+  restoreFetch();
+});
+
+test('logged-out user sees a login hint instead of the confirm action', async () => {
+  const { el } = await mountCheckout({ kind: 'reservation', params: {}, estimatedAmount: 100, isLoggedIn: false });
+  assert.ok(el.find('[data-login-hint]'), 'login hint missing');
+  await el.unmount(); restoreFetch();
+});
+
+test('formatDue renders a readable local date/time and onsiteRuleText mentions the correct lead time', () => {
+  assert.match(CheckoutMod.formatDue('2026-10-15T09:00:00.000Z', 'en'), /2026/);
+  assert.match(CheckoutMod.onsiteRuleText('reservation', 'en'), /10 minutes/);
+  assert.match(CheckoutMod.onsiteRuleText('tournament', 'tr'), /48 saat/);
+  assert.match(CheckoutMod.onsiteRuleText('cafe', 'en'), /venue|club|delivery/i);
 });
 
 await run({ title: 'Bazino — UI component tests', jsonOut: 'tests/reports/ui.json' });

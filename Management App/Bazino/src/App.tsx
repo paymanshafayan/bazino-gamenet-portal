@@ -26,6 +26,8 @@ import { WebSyncModal } from './components/WebSyncModal';
 import { ManageStationModal } from './components/ManageStationModal';
 import { ManageTariffsModal } from './components/ManageTariffsModal';
 import { HardwareRelayModal } from './components/HardwareRelayModal';
+import { WebWalletPanel } from './components/WebWalletPanel';
+import { enqueueWalletOp, flushWalletQueue } from './utils/walletSync';
 
 export default function App() {
   // Application Data States (Persisted safely in local storage & server-side)
@@ -526,6 +528,20 @@ export default function App() {
       operatorName: activeOperator.name,
     };
     setWalletTransactions((prev) => [newTx, ...prev]);
+
+    // تسک ۱۳: آینهٔ تراکنش روی سرور سایت (منبع حقیقت). BONUS_DISCOUNT شارژ محلی است و به سایت نمی‌رود.
+    if (customer.phone && type !== 'BONUS_DISCOUNT') {
+      enqueueWalletOp({
+        type: delta >= 0 ? 'topup' : 'charge',
+        phone: customer.phone,
+        amount: Math.abs(delta),
+        operator: activeOperator.name,
+        note: description,
+      });
+      void flushWalletQueue({ webServerUrl: webSyncStatus.webServerUrl, apiKey: webSyncStatus.apiKey })
+        .then(r => setWebSyncStatus(prev => ({ ...prev, walletQueueCount: r.remaining.length, isConnected: r.failed === 0 ? true : prev.isConnected })))
+        .catch(() => {});
+    }
   };
 
   // Expense Handler
@@ -834,13 +850,21 @@ export default function App() {
 
         {/* Customers View */}
         {activeTab === 'customers' && (
-          <CustomerManagement
-            customers={customersWithBirthdayFlags}
-            walletTransactions={walletTransactions}
-            currency={currency}
-            onAddCustomer={handleAddCustomer}
-            onUpdateWallet={handleUpdateWallet}
-          />
+          <div className="space-y-4">
+            <WebWalletPanel
+              status={webSyncStatus}
+              currency={currency}
+              operatorName={activeOperator.name}
+              onQueueChange={(n) => setWebSyncStatus(prev => ({ ...prev, walletQueueCount: n }))}
+            />
+            <CustomerManagement
+              customers={customersWithBirthdayFlags}
+              walletTransactions={walletTransactions}
+              currency={currency}
+              onAddCustomer={handleAddCustomer}
+              onUpdateWallet={handleUpdateWallet}
+            />
+          </div>
         )}
 
         {/* Accounting Reports View */}

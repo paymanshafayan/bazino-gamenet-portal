@@ -40,3 +40,4 @@ tests/reports/
 
 # Runtime-generated optimized mobile images (auto-made by admin panel via sharp)
 public/images/mobile/generated/
+tmp-shots/

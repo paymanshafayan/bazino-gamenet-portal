@@ -35,6 +35,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { vimg } from '../utils/assetVersion';
+import { L, localeOf, formatJalaliForLanguage } from '../utils/i18n';
 
 export default function DarkGoldHome({ 
   featuredGames, 
@@ -212,12 +213,12 @@ export default function DarkGoldHome({
                 <span className="text-primary">THE HARDER WE GO</span>
               </h1>
               <p className="text-gray-300 mt-6 text-lg max-w-lg transform skew-x-12">
-                {language === 'fa' ? 'پیشرفته‌ترین تجهیزات گیمینگ و حرفه‌ای‌ترین محیط برای مسابقات و تمرین‌های گروهی شما در بازینو.' : 'Experience the most advanced gaming equipment and professional environments for your matches and team practices at Bazino.'}
+                {L(language, { fa: 'پیشرفته‌ترین تجهیزات گیمینگ و حرفه‌ای‌ترین محیط برای مسابقات و تمرین‌های گروهی شما در بازینو.', en: 'Experience the most advanced gaming equipment and professional environments for your matches and team practices at Bazino.', ru: 'Самое современное игровое оборудование и профессиональная среда для ваших матчей и командных тренировок в Bazino.', tr: 'Maçlarınız ve takım antrenmanlarınız için Bazino’da en gelişmiş oyun ekipmanları ve en profesyonel ortam.' })}
               </p>
               
               <div className="flex gap-4 mt-8 transform skew-x-12">
                 <button onClick={() => onNavigate('reservations')} className="bg-primary text-black px-8 py-4 font-black uppercase text-sm -skew-x-12 hover:bg-white transition-colors border-none">
-                  <span className="block skew-x-12">{language === 'fa' ? 'همین حالا رزرو کن' : 'GET STARTED'}</span>
+                  <span className="block skew-x-12">{L(language, { fa: 'همین حالا رزرو کن', en: 'GET STARTED', ru: 'ЗАБРОНИРОВАТЬ СЕЙЧАС', tr: 'HEMEN REZERVE ET' })}</span>
                 </button>
               </div>
             </div>
@@ -241,17 +242,17 @@ export default function DarkGoldHome({
               NEON FUTURE
             </h1>
             <h2 className="text-3xl md:text-5xl font-black text-[#ff003c] uppercase leading-tight mb-8 font-display tracking-widest text-shadow-[2px_2px_0px_#00f0ff]">
-              {language === 'fa' ? 'سایبرپانک آرنا' : 'CYBERPUNK ARENA'}
+              {L(language, { fa: 'سایبرپانک آرنا', en: 'CYBERPUNK ARENA', ru: 'КИБЕРПАНК-АРЕНА', tr: 'SİBERPUNK ARENA' })}
             </h2>
             <p className="text-gray-300 max-w-xl text-sm md:text-base border-l border-dashed border-[#00f0ff]/50 pl-4 mb-10 bg-black/40 p-4 font-mono">
-              {language === 'fa' ? 'پیشرفته‌ترین تکنولوژی گیمینگ در فضای سایبرپانک. آینده همین الان اینجاست.' : 'The most advanced gaming tech in a cyberpunk environment. The future is now.'}
+              {L(language, { fa: 'پیشرفته‌ترین تکنولوژی گیمینگ در فضای سایبرپانک. آینده همین الان اینجاست.', en: 'The most advanced gaming tech in a cyberpunk environment. The future is now.', ru: 'Передовые игровые технологии в киберпанк-пространстве. Будущее уже здесь.', tr: 'Siberpunk ortamında en ileri oyun teknolojisi. Gelecek şimdi burada.' })}
             </p>
             
             <div className="flex flex-wrap gap-6">
               <button onClick={() => onNavigate('reservations')} className="theme-btn px-10 py-4 bg-[#00f0ff] text-black font-black uppercase text-sm hover:bg-white hover:text-black transition-colors relative group overflow-hidden">
-                <span className="relative z-10">{language === 'fa' ? 'شروع هک سیستم' : 'INITIATE PROTOCOL'}</span>
+                <span className="relative z-10">{L(language, { fa: 'شروع هک سیستم', en: 'INITIATE PROTOCOL', ru: 'ЗАПУСТИТЬ ПРОТОКОЛ', tr: 'PROTOKOLÜ BAŞLAT' })}</span>
                 <div className="absolute inset-0 bg-[#ff003c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-in-out z-0"></div>
-                <span className="relative z-10 group-hover:text-white transition-colors duration-300"> {language === 'fa' ? 'شروع هک سیستم' : 'INITIATE PROTOCOL'}</span>
+                <span className="relative z-10 group-hover:text-white transition-colors duration-300"> {L(language, { fa: 'شروع هک سیستم', en: 'INITIATE PROTOCOL', ru: 'ЗАПУСТИТЬ ПРОТОКОЛ', tr: 'PROTOKOLÜ BAŞLAT' })}</span>
               </button>
             </div>
           </div>
@@ -286,7 +287,7 @@ export default function DarkGoldHome({
               <div className="absolute inset-0 flex items-center">
                 <div className="px-6 md:px-16 lg:px-24 w-full max-w-7xl mx-auto transform -translate-y-4">
                   <span className="text-primary font-bold text-xs uppercase tracking-[0.2em] mb-4 block font-display">
-                    {language === 'fa' ? 'ویژه فصل' : 'SEASONAL FEATURED'}
+                    {L(language, { fa: 'ویژه فصل', en: 'SEASONAL FEATURED', ru: 'ХИТ СЕЗОНА', tr: 'SEZONUN ÖNE ÇIKANI' })}
                   </span>
 
                   <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white uppercase tracking-tight leading-[1.1] mb-4 max-w-2xl font-display">
@@ -336,10 +337,10 @@ export default function DarkGoldHome({
       <section className="space-y-8">
         <div className={`flex flex-col gap-2 ${themeId === 'cyberpunk-cyan' ? 'items-center text-center' : ''}`}>
           <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-            {themeId === 'cyberpunk-cyan' ? 'GAMESITE TEMPLATE' : (language === 'fa' ? 'انتخاب داستان شما' : 'CHOOSE YOUR STORY')}
+            {themeId === 'cyberpunk-cyan' ? 'GAMESITE TEMPLATE' : (L(language, { fa: 'انتخاب داستان شما', en: 'CHOOSE YOUR STORY', ru: 'ВЫБЕРИ СВОЮ ИСТОРИЮ', tr: 'HİKAYENİ SEÇ' }))}
           </span>
           <h2 className="text-3xl md:text-4xl font-black text-white uppercase font-display tracking-tight">
-            {themeId === 'cyberpunk-cyan' ? 'IN THE SPOTLIGHT' : (language === 'fa' ? 'ژانرها و محبوب‌ترین‌ها' : 'GAME GENRES')}
+            {themeId === 'cyberpunk-cyan' ? 'IN THE SPOTLIGHT' : (L(language, { fa: 'ژانرها و محبوب‌ترین‌ها', en: 'GAME GENRES', ru: 'ЖАНРЫ ИГР', tr: 'OYUN TÜRLERİ' }))}
           </h2>
         </div>
 
@@ -386,7 +387,7 @@ export default function DarkGoldHome({
                     onClick={() => onNavigate('reservations')}
                     className="mt-4 w-full py-2.5 bg-primary/20 hover:bg-primary text-primary hover:text-black font-black text-xs border border-primary/40 hover:border-primary transition-all duration-200 cursor-pointer flex items-center justify-center gap-1 notched-clip-sm"
                   >
-                    <span>{language === 'fa' ? 'مشاهده رزروها' : 'Launch Session'}</span>
+                    <span>{L(language, { fa: 'مشاهده رزروها', en: 'Launch Session', ru: 'Начать сессию', tr: 'Seansı Başlat' })}</span>
                   </button>
                 </div>
               </div>
@@ -400,7 +401,7 @@ export default function DarkGoldHome({
       <section className="space-y-8">
         <div className="flex flex-col gap-2">
           <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-            {language === 'fa' ? 'سالن‌ها و سرویس‌های ویژه' : 'PREMIUM SERVICES'}
+            {L(language, { fa: 'سالن‌ها و سرویس‌های ویژه', en: 'PREMIUM SERVICES', ru: 'ПРЕМИУМ-УСЛУГИ', tr: 'PREMIUM HİZMETLER' })}
           </span>
           <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
             <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(27,194,202,0.8)]"></span>
@@ -474,7 +475,7 @@ export default function DarkGoldHome({
       <section className="space-y-8">
         <div className="flex flex-col gap-2">
           <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-            {language === 'fa' ? 'نتایج نبردهای سایبری کلوپ' : 'LIVE ARENA MATCHBOARD'}
+            {L(language, { fa: 'نتایج نبردهای سایبری کلوپ', en: 'LIVE ARENA MATCHBOARD', ru: 'ЖИВОЕ ТАБЛО АРЕНЫ', tr: 'CANLI ARENA SKOR TABLOSU' })}
           </span>
           <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
             <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(27,194,202,0.8)]"></span>
@@ -497,7 +498,7 @@ export default function DarkGoldHome({
             <div className="flex items-center gap-2">
               <Sword className="w-5 h-5 text-primary" />
               <span className="text-xs font-bold font-display uppercase text-white">
-                {language === 'fa' ? 'جدول زنده مسابقات و نبردها' : 'Esports Live Matchboard'}
+                {L(language, { fa: 'جدول زنده مسابقات و نبردها', en: 'Esports Live Matchboard', ru: 'Живое табло киберспортивных матчей', tr: 'Espor Canlı Skor Tablosu' })}
               </span>
             </div>
             <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold uppercase">
@@ -536,17 +537,17 @@ export default function DarkGoldHome({
                   {match.status === 'Live' && (
                     <span className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase rounded-md">
                       <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                      <span>{language === 'fa' ? 'در حال پخش زنده' : 'LIVE'}</span>
+                      <span>{L(language, { fa: 'در حال پخش زنده', en: 'LIVE', ru: 'В ЭФИРЕ', tr: 'CANLI' })}</span>
                     </span>
                   )}
                   {match.status === 'Finished' && (
                     <span className="px-3 py-1 bg-gray-500/10 border border-gray-500/30 text-gray-400 text-[10px] font-black uppercase rounded-md">
-                      {language === 'fa' ? 'پایان یافته' : 'Finished'}
+                      {L(language, { fa: 'پایان یافته', en: 'Finished', ru: 'Завершён', tr: 'Tamamlandı' })}
                     </span>
                   )}
                   {match.status === 'Scheduled' && (
                     <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase rounded-md">
-                      {language === 'fa' ? 'برنامه‌ریزی شده' : 'Scheduled'}
+                      {L(language, { fa: 'برنامه‌ریزی شده', en: 'Scheduled', ru: 'Запланирован', tr: 'Planlandı' })}
                     </span>
                   )}
                   <button 
@@ -569,7 +570,7 @@ export default function DarkGoldHome({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-              {language === 'fa' ? 'مسابقات بزرگ قهرمانی' : 'CHAMPIONSHIP BRACKETS'}
+              {L(language, { fa: 'مسابقات بزرگ قهرمانی', en: 'CHAMPIONSHIP BRACKETS', ru: 'ЧЕМПИОНСКИЕ СЕТКИ', tr: 'ŞAMPİYONA TABLOLARI' })}
             </span>
             <h2 className="text-3xl font-black text-white flex items-center gap-3 font-display uppercase tracking-tight">
               <span className="w-3 h-8 bg-primary rounded-none shadow-[0_0_15px_rgba(27,194,202,0.8)]"></span>
@@ -645,9 +646,9 @@ export default function DarkGoldHome({
                         ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                         : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
                     }`}>
-                      {tournament.status === 'Active' && (language === 'fa' ? 'در حال برگزاری' : language === 'en' ? 'Active' : language === 'ru' ? 'Идет' : 'Devam Ediyor')}
-                      {tournament.status === 'Upcoming' && (language === 'fa' ? 'ثبت‌نام باز است' : language === 'en' ? 'Upcoming' : language === 'ru' ? 'Скоро' : 'Yaklaşan')}
-                      {tournament.status === 'Completed' && (language === 'fa' ? 'پایان یافته' : language === 'en' ? 'Completed' : language === 'ru' ? 'Завершен' : 'Tamamlandı')}
+                      {tournament.status === 'Active' && (L(language, { fa: 'در حال برگزاری', en: 'Active', ru: 'Идет', tr: 'Devam Ediyor' }))}
+                      {tournament.status === 'Upcoming' && (L(language, { fa: 'ثبت‌نام باز است', en: 'Upcoming', ru: 'Скоро', tr: 'Kayıt Açık' }))}
+                      {tournament.status === 'Completed' && (L(language, { fa: 'پایان یافته', en: 'Completed', ru: 'Завершен', tr: 'Tamamlandı' }))}
                     </span>
 
                     {/* Game badge */}
@@ -672,7 +673,7 @@ export default function DarkGoldHome({
                             {language === 'tr' && 'Giriş Ücreti'}
                           </span>
                           <span className="font-mono text-primary font-black text-xs">
-                            {tournament.registrationFee.toLocaleString()} {language === 'fa' ? 'تومان' : 'Tümen'}
+                            {tournament.registrationFee.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}
                           </span>
                         </div>
                         <div className="space-y-1">
@@ -683,7 +684,7 @@ export default function DarkGoldHome({
                             {language === 'tr' && 'Kapasite'}
                           </span>
                           <span className="font-mono font-bold text-white text-xs">
-                            {tournament.registeredTeamsCount} / {tournament.maxTeams} {language === 'fa' ? 'تیم' : 'Teams'}
+                            {tournament.registeredTeamsCount} / {tournament.maxTeams} {L(language, { fa: 'تیم', en: 'Teams', ru: 'команд', tr: 'Takım' })}
                           </span>
                         </div>
                       </div>
@@ -691,10 +692,7 @@ export default function DarkGoldHome({
                       <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">
                         <Calendar className="w-3.5 h-3.5 text-primary" />
                         <span>
-                          {language === 'fa' && `تاریخ شروع: ${tournament.startDate}`}
-                          {language === 'en' && `Start Date: ${tournament.startDate}`}
-                          {language === 'ru' && `Старт: ${tournament.startDate}`}
-                          {language === 'tr' && `Başlangıç: ${tournament.startDate}`}
+                          {L(language, { fa: 'تاریخ شروع:', en: 'Start Date:', ru: 'Старт:', tr: 'Başlangıç:' })} {formatJalaliForLanguage(tournament.startDate, language)}
                         </span>
                       </div>
                     </div>
@@ -725,7 +723,7 @@ export default function DarkGoldHome({
       <section className="space-y-8">
         <div className="flex flex-col gap-2 text-center items-center">
           <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-            {language === 'fa' ? 'پیشنهادهای ویژه ساعات بازی' : 'CHOOSE YOUR ARENA PASS'}
+            {L(language, { fa: 'پیشنهادهای ویژه ساعات بازی', en: 'CHOOSE YOUR ARENA PASS', ru: 'ВЫБЕРИ СВОЙ АБОНЕМЕНТ', tr: 'ARENA PASINI SEÇ' })}
           </span>
           <h2 className="text-3xl font-black text-white flex items-center gap-3 justify-center font-display uppercase tracking-tight">
             <span>
@@ -748,7 +746,7 @@ export default function DarkGoldHome({
               <div key={pack.id} className={`theme-box border flex flex-col justify-between bg-dark-card transition-all duration-300 ${pack.popular ? 'border-primary shadow-[0_0_30px_rgba(27,194,202,0.15)] -translate-y-2 relative' : 'border-white/10 hover:border-white/20'}`}>
                 {pack.popular && (
                   <span className="absolute top-4 right-4 bg-primary text-black font-black text-[10px] px-3 py-1 theme-btn uppercase tracking-widest font-display">
-                    {language === 'fa' ? 'محبوب‌ترین پیشنهاد' : 'RECOMMENDED'}
+                    {L(language, { fa: 'محبوب‌ترین پیشنهاد', en: 'RECOMMENDED', ru: 'РЕКОМЕНДУЕМ', tr: 'ÖNERİLEN' })}
                   </span>
                 )}
                 
@@ -756,8 +754,8 @@ export default function DarkGoldHome({
                   <h3 className="text-md font-black text-white font-display uppercase">{getLocText(pack.title)}</h3>
                   <p className="text-gray-400 text-xs mt-1.5 font-bold">{getLocText(pack.duration)}</p>
                   <div className="mt-4 flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-primary font-mono">{pack.price.toLocaleString()}</span>
-                    <span className="text-xs text-gray-500 font-bold">{language === 'fa' ? 'تومان' : 'Tümen'}</span>
+                    <span className="text-3xl font-black text-primary font-mono">{pack.price.toLocaleString(localeOf(language))}</span>
+                    <span className="text-xs text-gray-500 font-bold">{L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
                   </div>
                 </div>
                 <div className="p-6 flex-1 flex flex-col gap-4">
@@ -770,7 +768,7 @@ export default function DarkGoldHome({
                     ))}
                   </ul>
                   <button onClick={() => onNavigate('reservations')} className="w-full py-3 btn btn-primary-outline display-4 text-xs flex items-center justify-center theme-btn">
-                    {language === 'fa' ? 'شارژ حساب و خرید پکیج' : 'Purchase Pass Ticket'}
+                    {L(language, { fa: 'شارژ حساب و خرید پکیج', en: 'Purchase Pass Ticket', ru: 'Купить абонемент', tr: 'Pass Satın Al' })}
                   </button>
                 </div>
               </div>
@@ -788,10 +786,10 @@ export default function DarkGoldHome({
             <div className="lg:col-span-7 space-y-6">
               <div className="flex flex-col gap-2 mb-8">
                 <span className="text-primary font-bold text-xs uppercase tracking-widest block font-display neon-text-glow">
-                  {language === 'fa' ? 'سوالات شما' : 'QUESTIONS'}
+                  {L(language, { fa: 'سوالات شما', en: 'QUESTIONS', ru: 'ВОПРОСЫ', tr: 'SORULAR' })}
                 </span>
                 <h2 className="text-3xl md:text-4xl font-black text-white uppercase font-display tracking-tight">
-                  {language === 'fa' ? 'سوالات متداول (FAQ)' : 'FREQUENTLY ASKED'}
+                  {L(language, { fa: 'سوالات متداول (FAQ)', en: 'FREQUENTLY ASKED', ru: 'ЧАСТЫЕ ВОПРОСЫ (FAQ)', tr: 'SIKÇA SORULAN SORULAR' })}
                 </h2>
               </div>
 
@@ -838,17 +836,17 @@ export default function DarkGoldHome({
               <div className="bg-dark-card border border-primary/20 notched-clip p-6 md:p-8 sticky top-24 shadow-[0_0_40px_rgba(27,194,202,0.1)]">
                 <div className="flex flex-col gap-2 mb-6">
                   <h3 className="text-2xl font-black text-white uppercase font-display">
-                    {language === 'fa' ? 'ارتباط مستقیم' : 'TRANSMIT SIGNAL'}
+                    {L(language, { fa: 'ارتباط مستقیم', en: 'TRANSMIT SIGNAL', ru: 'ПРЯМАЯ СВЯЗЬ', tr: 'DOĞRUDAN İLETİŞİM' })}
                   </h3>
                   <p className="text-gray-400 text-xs">
-                    {language === 'fa' ? 'پشتیبانی ۲۴ ساعته کلوپ' : '24/7 priority support for club members'}
+                    {L(language, { fa: 'پشتیبانی ۲۴ ساعته کلوپ', en: '24/7 priority support for club members', ru: 'Приоритетная поддержка 24/7 для участников клуба', tr: 'Kulüp üyeleri için 7/24 öncelikli destek' })}
                   </p>
                 </div>
 
                 <form onSubmit={handleContactSubmit} className="space-y-4 relative z-10">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
-                      {language === 'fa' ? 'نام شما' : 'IDENTIFICATION'}
+                      {L(language, { fa: 'نام شما', en: 'IDENTIFICATION', ru: 'ВАШЕ ИМЯ', tr: 'ADINIZ' })}
                     </label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -856,14 +854,14 @@ export default function DarkGoldHome({
                         type="text"
                         required
                         className="w-full bg-dark-bg border border-white/10 notched-clip-sm pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
-                        placeholder={language === 'fa' ? 'نام و نام خانوادگی' : 'Player Name'}
+                        placeholder={L(language, { fa: 'نام و نام خانوادگی', en: 'Player Name', ru: 'Имя игрока', tr: 'Oyuncu Adı' })}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
-                      {language === 'fa' ? 'اطلاعات تماس' : 'COMMLINK'}
+                      {L(language, { fa: 'اطلاعات تماس', en: 'COMMLINK', ru: 'КОНТАКТ', tr: 'İLETİŞİM' })}
                     </label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -871,20 +869,20 @@ export default function DarkGoldHome({
                         type="text"
                         required
                         className="w-full bg-dark-bg border border-white/10 notched-clip-sm pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
-                        placeholder={language === 'fa' ? 'ایمیل یا شماره تماس' : 'Email or Phone'}
+                        placeholder={L(language, { fa: 'ایمیل یا شماره تماس', en: 'Email or Phone', ru: 'Email или телефон', tr: 'E-posta veya Telefon' })}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
-                      {language === 'fa' ? 'متن پیام' : 'MESSAGE PAYLOAD'}
+                      {L(language, { fa: 'متن پیام', en: 'MESSAGE PAYLOAD', ru: 'СООБЩЕНИЕ', tr: 'MESAJ' })}
                     </label>
                     <textarea
                       required
                       rows={4}
                       className="w-full bg-dark-bg border border-white/10 notched-clip-sm px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors resize-none"
-                      placeholder={language === 'fa' ? 'چگونه می‌توانیم کمک کنیم؟' : 'How can we assist you?'}
+                      placeholder={L(language, { fa: 'چگونه می‌توانیم کمک کنیم؟', en: 'How can we assist you?', ru: 'Чем мы можем помочь?', tr: 'Size nasıl yardımcı olabiliriz?' })}
                     ></textarea>
                   </div>
 
@@ -896,12 +894,12 @@ export default function DarkGoldHome({
                     {contactSubmitting ? (
                       <>
                         <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
-                        <span>{language === 'fa' ? 'در حال ارسال پیام...' : 'TRANSMITTING...'}</span>
+                        <span>{L(language, { fa: 'در حال ارسال پیام...', en: 'TRANSMITTING...', ru: 'ОТПРАВКА...', tr: 'GÖNDERİLİYOR...' })}</span>
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        <span>{language === 'fa' ? 'ارسال تیکت' : 'SEND TRANSMISSION'}</span>
+                        <span>{L(language, { fa: 'ارسال تیکت', en: 'SEND TRANSMISSION', ru: 'ОТПРАВИТЬ', tr: 'GÖNDER' })}</span>
                       </>
                       )}
                       </button>
@@ -946,8 +944,7 @@ export default function DarkGoldHome({
                     {language === 'en' && 'Lounge Location'}
                   </span>
                   <p className="leading-relaxed text-xs font-semibold">
-                    {language === 'fa' && 'تهران، اتوبان صدر، خیابان شریعتی، بن‌بست پلاک ۲۴، مجتمع تجاری بازینو، طبقه منفی ۱'}
-                    {language === 'en' && 'Level -1, BAZINO Plaza, No. 24, Shariati St., Sadr Hwy, Tehran, Iran'}
+                    {L(language, { fa: 'درویش ایزیگیل سوکاک، شماره ۱۲، اسکله (İskele) — لابی اصلی Vista Mare، مغازه شماره ۵', en: 'Derviş İzzigil Sokak No.12, İskele — Vista Mare Main Lobby, Shop No.5', ru: 'Derviş İzzigil Sokak No.12, Искеле — главное лобби Vista Mare, магазин №5', tr: 'Derviş İzzigil Sokak No.12, İskele adresinde kain Vista Mare Ana Lobi dükkan No.5 olarak tasniflendirilmiş dükkan' })}
                   </p>
                 </div>
               </div>
@@ -975,7 +972,7 @@ export default function DarkGoldHome({
                       {language === 'en' && 'Support Phone Line'}
                     </span>
                     <span className="text-white font-mono text-xs font-black" style={{ direction: 'ltr' }}>
-                      ۰۲۱-۲۲۴۴۶۶۸۸
+                      +90 539 133 37 47
                     </span>
                   </div>
                 </div>
@@ -991,7 +988,7 @@ export default function DarkGoldHome({
             
             <iframe
               title="Bazino Lounge Location Map"
-              src="https://www.openstreetmap.org/export/embed.html?bbox=51.4285%2C35.7760%2C51.4395%2C35.7860&amp;layer=mapnik&amp;marker=35.7810%2C51.4340"
+              src="https://www.openstreetmap.org/export/embed.html?bbox=33.9034%2C35.2588%2C33.9134%2C35.2668&amp;layer=mapnik&amp;marker=35.2628%2C33.9084"
               className="w-full h-full border-0 rounded-2xl"
               style={{
                 filter: 'invert(93%) hue-rotate(185deg) brightness(90%) contrast(100%)',
@@ -1007,7 +1004,7 @@ export default function DarkGoldHome({
             </div>
             
             <div className="absolute bottom-4 left-4 bg-black/90 border border-white/10 px-3 py-1.5 text-[10px] font-medium text-gray-400 flex items-center gap-1.5 backdrop-blur-sm pointer-events-none shadow-md font-mono rounded-md">
-              <span>Lat: 35.7810° N | Lon: 51.4340° E</span>
+              <span>Lat: 35.2628° N | Lon: 33.9084° E</span>
             </div>
           </div>
 

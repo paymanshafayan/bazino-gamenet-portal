@@ -6,6 +6,7 @@ import {
   User, Play, Star, MessageSquare, ShieldAlert, Plus, ArrowRight, ArrowLeft
 } from 'lucide-react';
 import { vimg } from '../utils/assetVersion';
+import { L } from '../utils/i18n';
 
 export default function GecoPurpleHome({ 
   featuredGames, 
@@ -72,19 +73,17 @@ export default function GecoPurpleHome({
             <div className="h-[1px] w-12 bg-[#ffb800]"></div>
           </div>
           <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter mb-6 font-display">
-            <span className="text-white">{language === 'fa' ? 'کلوپ بازی' : 'GAMING'}</span> <span className="text-[#ffb800]">{language === 'fa' ? 'بازینو' : 'BAZINO'}</span>
+            <span className="text-white">{L(language, { fa: 'کلوپ بازی', en: 'GAMING', ru: 'ИГРОВОЙ', tr: 'OYUN' })}</span> <span className="text-[#ffb800]">{L(language, { fa: 'بازینو', en: 'BAZINO', ru: 'BAZINO', tr: 'BAZINO' })}</span>
           </h1>
           <p className="text-gray-300 text-base md:text-lg font-medium mb-10 max-w-2xl leading-relaxed">
-            {language === 'fa' 
-              ? 'مدرن‌ترین مرکز گیمینگ و ورزش‌های الکترونیکی. مجهز به سیستم‌های فوق قدرتمند، اتاق‌های VIP مجهز به PS5، بوفه هوشمند آنلاین و مسابقات هفتگی با جوایز نفیس.' 
-              : 'The most advanced gaming and esports center. Equipped with high-end RTX workstations, custom VIP PS5 booths, smart online café ordering, and pro tournaments.'}
+            {L(language, { fa: 'مدرن‌ترین مرکز گیمینگ و ورزش‌های الکترونیکی. مجهز به سیستم‌های فوق قدرتمند، اتاق‌های VIP مجهز به PS5، بوفه هوشمند آنلاین و مسابقات هفتگی با جوایز نفیس.', en: 'The most advanced gaming and esports center. Equipped with high-end RTX workstations, custom VIP PS5 booths, smart online café ordering, and pro tournaments.', ru: 'Самый современный центр гейминга и киберспорта: мощные RTX-станции, VIP-комнаты с PS5, умный онлайн-заказ из кафе и еженедельные турниры с ценными призами.', tr: 'En modern oyun ve espor merkezi: üst düzey RTX sistemler, PS5’li özel VIP odalar, akıllı online kafe siparişi ve değerli ödüllü haftalık turnuvalar.' })}
           </p>
           <button 
             onClick={() => onNavigate('reservations')} 
             className="bg-[#ffb800] hover:bg-white text-black font-black uppercase tracking-wider px-10 py-4 transform -skew-x-12 hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,184,0,0.3)] cursor-pointer"
           >
             <span className="transform skew-x-12 inline-block">
-              {language === 'fa' ? 'رزرو سریع سیستم ها' : 'BOOK STATION NOW'}
+              {L(language, { fa: 'رزرو سریع سیستم ها', en: 'BOOK STATION NOW', ru: 'БЫСТРАЯ БРОНЬ', tr: 'HEMEN İSTASYON AYIRT' })}
             </span>
           </button>
         </div>
@@ -116,16 +115,16 @@ export default function GecoPurpleHome({
         <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
             <span className="text-xs text-[#ffb800] uppercase tracking-widest font-black block mb-2">
-              {language === 'fa' ? 'سخت‌افزار ممتاز کلوپ' : 'PREMIUM HARDWARE'}
+              {L(language, { fa: 'سخت‌افزار ممتاز کلوپ', en: 'PREMIUM HARDWARE', ru: 'ПРЕМИУМ-ОБОРУДОВАНИЕ', tr: 'PREMIUM DONANIM' })}
             </span>
             <h2 className="text-3xl md:text-5xl font-black uppercase">
-              {language === 'fa' ? 'سیستم‌ها و مانیتورها' : 'Stations &'} <span className="text-[#ffb800]">{language === 'fa' ? 'فوق‌حرفه‌ای' : 'Equipment'}</span>
+              {L(language, { fa: 'سیستم‌ها و مانیتورها', en: 'Stations &', ru: 'Станции и', tr: 'İstasyonlar ve' })} <span className="text-[#ffb800]">{L(language, { fa: 'فوق‌حرفه‌ای', en: 'Equipment', ru: 'оборудование', tr: 'Ekipman' })}</span>
             </h2>
           </div>
           <div className="flex gap-2">
             <button onClick={() => onNavigate('reservations')} className="px-5 py-2.5 bg-white/5 border border-white/10 hover:border-[#ffb800] text-[#ffb800] font-black text-xs uppercase tracking-wider transform -skew-x-12 hover:scale-105 transition-transform cursor-pointer">
               <span className="transform skew-x-12 inline-block">
-                {language === 'fa' ? 'مشاهده کاتالوگ' : 'VIEW ALL'}
+                {L(language, { fa: 'مشاهده کاتالوگ', en: 'VIEW ALL', ru: 'СМОТРЕТЬ ВСЕ', tr: 'TÜMÜNÜ GÖR' })}
               </span>
             </button>
           </div>
@@ -147,8 +146,8 @@ export default function GecoPurpleHome({
                 {getLocText(game.desc)}
               </p>
               <p className="text-sm font-bold text-gray-400 uppercase tracking-wider pt-3 border-t border-white/5 flex justify-between items-center">
-                <span>{language === 'fa' ? 'حداقل رزرو :' : 'MINIMUM RESERVATION :'}</span>
-                <span className="text-[#ffb800] font-black">{i === 0 ? (language === 'fa' ? '۱ ساعت' : '1 HR') : (language === 'fa' ? '۲ ساعت' : '2 HRS')}</span>
+                <span>{L(language, { fa: 'حداقل رزرو :', en: 'MINIMUM RESERVATION :', ru: 'МИНИМАЛЬНАЯ БРОНЬ :', tr: 'MİNİMUM REZERVASYON :' })}</span>
+                <span className="text-[#ffb800] font-black">{i === 0 ? (L(language, { fa: '۱ ساعت', en: '1 HR', ru: '1 ЧАС', tr: '1 SAAT' })) : (L(language, { fa: '۲ ساعت', en: '2 HRS', ru: '2 ЧАСА', tr: '2 SAAT' }))}</span>
               </p>
             </div>
           ))}
@@ -162,11 +161,11 @@ export default function GecoPurpleHome({
         <div className="max-w-7xl mx-auto px-4 flex flex-col lg:flex-row gap-16 items-center">
           <div className="w-full lg:w-1/2">
             <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-2">
-              {language === 'fa' ? 'درباره کلوپ ما' : 'ABOUT STORY'}
+              {L(language, { fa: 'درباره کلوپ ما', en: 'ABOUT STORY', ru: 'О НАШЕМ КЛУБЕ', tr: 'HAKKIMIZDA' })}
             </span>
             <h2 className="text-4xl md:text-5xl font-black uppercase mb-6 leading-none">
-              {language === 'fa' ? 'بستری برای رشد' : 'Bazino Premium'}<br/>
-              <span className="text-[#ffb800]">{language === 'fa' ? 'ورزش‌های الکترونیکی' : 'Tournaments Area'}</span>
+              {L(language, { fa: 'بستری برای رشد', en: 'Bazino Premium', ru: 'Bazino Premium', tr: 'Bazino Premium' })}<br/>
+              <span className="text-[#ffb800]">{L(language, { fa: 'ورزش‌های الکترونیکی', en: 'Tournaments Area', ru: 'Турнирная зона', tr: 'Turnuva Alanı' })}</span>
             </h2>
             <div className="flex items-center gap-4 mb-6">
                <div className="h-[2px] flex-1 bg-white/10"></div>
@@ -174,22 +173,20 @@ export default function GecoPurpleHome({
                <div className="h-[2px] flex-1 bg-white/10"></div>
             </div>
             <p className="text-gray-400 mb-8 leading-relaxed font-medium">
-              {language === 'fa'
-                ? 'کلوپ بازینو با گردآوری به‌روزترین تجهیزات گیمینگ و ایجاد محیطی آرام، پرنشاط و دنج، پذیرای تمامی علاقه‌مندان به گیمینگ حرفه‌ای و تفریحی است. در بوفه آنلاین سفارش ثبت کنید، امتیاز وفاداری بگیرید و در تورنمنت‌های ما شرکت کنید.'
-                : 'BAZINO Club serves the elite gaming communities with custom designed liquid-cooled machines and luxury console rooms. Order snacks directly at your desk, join our loyalty ladder, and participate in tournaments.'}
+              {L(language, { fa: 'کلوپ بازینو با گردآوری به‌روزترین تجهیزات گیمینگ و ایجاد محیطی آرام، پرنشاط و دنج، پذیرای تمامی علاقه‌مندان به گیمینگ حرفه‌ای و تفریحی است. در بوفه آنلاین سفارش ثبت کنید، امتیاز وفاداری بگیرید و در تورنمنت‌های ما شرکت کنید.', en: 'BAZINO Club serves the elite gaming communities with custom designed liquid-cooled machines and luxury console rooms. Order snacks directly at your desk, join our loyalty ladder, and participate in tournaments.', ru: 'Клуб BAZINO принимает всех любителей профессионального и развлекательного гейминга: новейшее оборудование, спокойная и уютная атмосфера. Заказывайте в онлайн-буфете, копите баллы лояльности и участвуйте в турнирах.', tr: 'BAZINO Kulübü, en güncel oyun ekipmanları ve huzurlu, keyifli bir ortamla profesyonel ve eğlence amaçlı tüm oyunseverleri ağırlıyor. Online büfeden sipariş verin, sadakat puanı biriktirin ve turnuvalara katılın.' })}
             </p>
             <div className="grid grid-cols-2 gap-4 mb-8">
               <div className="border border-white/5 bg-[#1a1c29] p-4">
                 <div className="text-2xl font-black text-[#ffb800] mb-1">360Hz</div>
-                <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">{language === 'fa' ? 'مانیتورهای گیمینگ' : 'PRO MONITORS'}</div>
+                <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">{L(language, { fa: 'مانیتورهای گیمینگ', en: 'PRO MONITORS', ru: 'ПРО-МОНИТОРЫ', tr: 'PRO MONİTÖRLER' })}</div>
               </div>
               <div className="border border-white/5 bg-[#1a1c29] p-4">
                 <div className="text-2xl font-black text-[#ffb800] mb-1">RTX 5080</div>
-                <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">{language === 'fa' ? 'قدرتمندترین کارت گرافیک' : 'ULTIMATE GRAPHICS'}</div>
+                <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">{L(language, { fa: 'قدرتمندترین کارت گرافیک', en: 'ULTIMATE GRAPHICS', ru: 'МАКСИМАЛЬНАЯ ГРАФИКА', tr: 'EN GÜÇLÜ EKRAN KARTI' })}</div>
               </div>
             </div>
             <button onClick={() => onNavigate('reservations')} className="bg-[#ffb800] hover:bg-white text-black font-black uppercase tracking-wider px-8 py-3.5 transform -skew-x-12 hover:scale-105 transition-transform cursor-pointer">
-              <span className="transform skew-x-12 inline-block">{language === 'fa' ? 'همین حالا رزرو کنید' : 'BOOK A STATION'}</span>
+              <span className="transform skew-x-12 inline-block">{L(language, { fa: 'همین حالا رزرو کنید', en: 'BOOK A STATION', ru: 'ЗАБРОНИРОВАТЬ СТАНЦИЮ', tr: 'HEMEN REZERVE EDİN' })}</span>
             </button>
           </div>
           <div className="w-full lg:w-1/2 relative group cursor-pointer" onClick={() => onNavigate('tournaments')}>
@@ -210,10 +207,10 @@ export default function GecoPurpleHome({
       <section className="max-w-7xl mx-auto px-4 mb-24">
         <div className="text-center mb-16">
           <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-2">
-            {language === 'fa' ? 'بزرگترین رقابت‌های کلوپ' : 'COME THE END OF THE WORLD'}
+            {L(language, { fa: 'بزرگترین رقابت‌های کلوپ', en: 'COME THE END OF THE WORLD', ru: 'ГЛАВНЫЕ БИТВЫ КЛУБА', tr: 'KULÜBÜN EN BÜYÜK MÜCADELELERİ' })}
           </span>
           <h2 className="text-3xl md:text-5xl font-black uppercase mb-6">
-            {language === 'fa' ? 'تمرکز و مدیریت' : 'Focus And Game'} <span className="text-[#ffb800]">{language === 'fa' ? 'رقابت‌ها' : 'Manage'}</span>
+            {L(language, { fa: 'تمرکز و مدیریت', en: 'Focus And Game', ru: 'Фокус и', tr: 'Odaklan ve' })} <span className="text-[#ffb800]">{L(language, { fa: 'رقابت‌ها', en: 'Manage', ru: 'Игра', tr: 'Yönet' })}</span>
           </h2>
           <div className="flex items-center gap-4 max-w-xs mx-auto">
              <div className="h-[2px] flex-1 bg-white/10"></div>
@@ -254,11 +251,11 @@ export default function GecoPurpleHome({
 
               <div className="flex gap-4 mb-8 w-full">
                 <button onClick={() => onNavigate('tournaments')} className="flex-1 bg-[#ffb800] text-black font-black text-xs uppercase tracking-wider py-3 transform -skew-x-12 hover:scale-105 transition-transform flex items-center justify-center cursor-pointer">
-                  <span className="transform skew-x-12">{language === 'fa' ? 'جزئیات مسابقه' : 'VIEW DETAILS'}</span>
+                  <span className="transform skew-x-12">{L(language, { fa: 'جزئیات مسابقه', en: 'VIEW DETAILS', ru: 'ПОДРОБНЕЕ', tr: 'DETAYLARI GÖR' })}</span>
                 </button>
                 <button onClick={() => onNavigate('chat')} className="flex-1 border border-white/20 hover:border-[#ffb800] text-white font-black text-xs uppercase tracking-wider py-3 transform -skew-x-12 hover:bg-white/5 transition-all flex items-center justify-center cursor-pointer">
                   <span className="transform skew-x-12 flex items-center gap-2">
-                    <MessageSquare className="w-3 h-3" /> {language === 'fa' ? 'چت روم' : 'CHAT ROOM'}
+                    <MessageSquare className="w-3 h-3" /> {L(language, { fa: 'چت روم', en: 'CHAT ROOM', ru: 'ЧАТ', tr: 'SOHBET ODASI' })}
                   </span>
                 </button>
               </div>
@@ -267,22 +264,22 @@ export default function GecoPurpleHome({
               <div className="flex justify-between w-full text-center px-4">
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.days)}</span>
-                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'روز' : 'DAYS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{L(language, { fa: 'روز', en: 'DAYS', ru: 'ДН', tr: 'GÜN' })}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.hours)}</span>
-                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ساعت' : 'HRS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{L(language, { fa: 'ساعت', en: 'HRS', ru: 'ЧАС', tr: 'SAAT' })}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.mins)}</span>
-                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'دقیقه' : 'MINS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{L(language, { fa: 'دقیقه', en: 'MINS', ru: 'МИН', tr: 'DK' })}</span>
                 </div>
                 <span className="text-white/20 font-black text-xl">:</span>
                 <div className="flex flex-col">
                   <span className="text-[#ffb800] font-black text-xl">{padZero(timeLeft.secs)}</span>
-                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{language === 'fa' ? 'ثانیه' : 'SECS'}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{L(language, { fa: 'ثانیه', en: 'SECS', ru: 'СЕК', tr: 'SN' })}</span>
                 </div>
               </div>
             </div>
@@ -297,11 +294,11 @@ export default function GecoPurpleHome({
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 border-b border-white/10 pb-4">
             <h2 className="text-4xl md:text-5xl font-black uppercase mb-4 md:mb-0">
-              {language === 'fa' ? 'ثبت نام و ورود به' : 'Joining'} <span className="text-[#ffb800]">{language === 'fa' ? 'مسابقات فعال' : 'Tournament'}</span>
+              {L(language, { fa: 'ثبت نام و ورود به', en: 'Joining', ru: 'Регистрация в', tr: 'Kayıt ve Katılım:' })} <span className="text-[#ffb800]">{L(language, { fa: 'مسابقات فعال', en: 'Tournament', ru: 'турнирах', tr: 'Aktif Turnuvalar' })}</span>
             </h2>
             <div className="flex gap-6 text-xs font-bold uppercase tracking-widest overflow-x-auto w-full md:w-auto">
-              <span className="text-[#ffb800] border-b-2 border-[#ffb800] pb-4 cursor-pointer whitespace-nowrap">{language === 'fa' ? 'همه مسابقات کلوپ' : 'ALL ACTIVE'}</span>
-              <span onClick={() => onNavigate('tournaments')} className="text-gray-400 hover:text-[#ffb800] pb-4 cursor-pointer whitespace-nowrap">{language === 'fa' ? 'مشاهده جدول زمانی' : 'SCHEDULE'}</span>
+              <span className="text-[#ffb800] border-b-2 border-[#ffb800] pb-4 cursor-pointer whitespace-nowrap">{L(language, { fa: 'همه مسابقات کلوپ', en: 'ALL ACTIVE', ru: 'ВСЕ АКТИВНЫЕ', tr: 'TÜM AKTİF' })}</span>
+              <span onClick={() => onNavigate('tournaments')} className="text-gray-400 hover:text-[#ffb800] pb-4 cursor-pointer whitespace-nowrap">{L(language, { fa: 'مشاهده جدول زمانی', en: 'SCHEDULE', ru: 'РАСПИСАНИЕ', tr: 'PROGRAM' })}</span>
             </div>
           </div>
 
@@ -323,26 +320,24 @@ export default function GecoPurpleHome({
                       {tournament.game}
                     </span>
                     <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">
-                      {tournament.status === 'active' ? (language === 'fa' ? 'در حال ثبت‌نام' : 'ACTIVE') : (language === 'fa' ? 'به زودی' : 'UPCOMING')}
+                      {tournament.status === 'active' ? (L(language, { fa: 'در حال ثبت‌نام', en: 'ACTIVE', ru: 'ИДЁТ РЕГИСТРАЦИЯ', tr: 'KAYIT AÇIK' })) : (L(language, { fa: 'به زودی', en: 'UPCOMING', ru: 'СКОРО', tr: 'YAKINDA' }))}
                     </span>
                   </div>
                   <h3 className="text-2xl font-black uppercase tracking-wider group-hover:text-[#ffb800] transition-colors">
                     {tournament.title}
                   </h3>
                   <p className="text-sm text-gray-400 mt-2">
-                    {language === 'fa' 
-                      ? `جایزه بزرگ مسابقات با ارزش ${tournament.prizePool || 'نامشخص'} به صورت نقد و تخفیف‌های ویژه کلوپ وفاداری.` 
-                      : `Grand tournament prize pool valued at ${tournament.prizePool || 'TBA'} with loyalty rewards.`}
+                    {L(language, { fa: `جایزه بزرگ مسابقات با ارزش ${tournament.prizePool || 'نامشخص'} به صورت نقد و تخفیف‌های ویژه کلوپ وفاداری.`, en: `Grand tournament prize pool valued at ${tournament.prizePool || 'TBA'} with loyalty rewards.`, ru: `Главный призовой фонд турнира ${tournament.prizePool || 'уточняется'} плюс бонусы лояльности.`, tr: `${tournament.prizePool || 'Açıklanacak'} değerinde büyük turnuva ödül havuzu ve sadakat ödülleri.` })}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-8 shrink-0 flex-col sm:flex-row">
                   <div className="text-sm font-black uppercase tracking-wider text-gray-300">
-                    {language === 'fa' ? 'هزینه ورودی:' : 'ENTRY FEE:'} <span className="text-[#ffb800]">{tournament.registrationFee > 0 ? `$${tournament.registrationFee}` : (language === 'fa' ? 'رایگان' : 'FREE')}</span>
+                    {L(language, { fa: 'هزینه ورودی:', en: 'ENTRY FEE:', ru: 'ВЗНОС:', tr: 'GİRİŞ ÜCRETİ:' })} <span className="text-[#ffb800]">{tournament.registrationFee > 0 ? `$${tournament.registrationFee}` : (L(language, { fa: 'رایگان', en: 'FREE', ru: 'БЕСПЛАТНО', tr: 'ÜCRETSİZ' }))}</span>
                   </div>
                   <button onClick={() => onNavigate('tournaments')} className="bg-[#ffb800] hover:bg-white text-black text-xs font-black uppercase tracking-widest px-6 py-3 transition-colors flex items-center gap-2 transform -skew-x-12 cursor-pointer">
                     <span className="transform skew-x-12 flex items-center gap-1.5">
-                      {language === 'fa' ? 'ورود به جدول' : 'JOIN NOW'} <ArrowRight className="w-4 h-4" />
+                      {L(language, { fa: 'ورود به جدول', en: 'JOIN NOW', ru: 'УЧАСТВОВАТЬ', tr: 'HEMEN KATIL' })} <ArrowRight className="w-4 h-4" />
                     </span>
                   </button>
                 </div>
@@ -358,10 +353,10 @@ export default function GecoPurpleHome({
       <section className="max-w-7xl mx-auto px-4 mb-24">
         <div className="text-center mb-16">
           <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-2">
-            {language === 'fa' ? 'خدمات ویژه ما به گیمرها' : 'WHAT WE GIVE PLAYERS'}
+            {L(language, { fa: 'خدمات ویژه ما به گیمرها', en: 'WHAT WE GIVE PLAYERS', ru: 'ЧТО МЫ ДАЁМ ИГРОКАМ', tr: 'OYUNCULARA SUNDUKLARIMIZ' })}
           </span>
           <h2 className="text-3xl md:text-5xl font-black uppercase mb-6">
-            {language === 'fa' ? 'چرا کلوپ بازی' : 'Why Choose'} <span className="text-[#ffb800]">{language === 'fa' ? 'بازینو ؟' : 'Bazino'}</span>
+            {L(language, { fa: 'چرا کلوپ بازی', en: 'Why Choose', ru: 'Почему выбирают', tr: 'Neden' })} <span className="text-[#ffb800]">{L(language, { fa: 'بازینو ؟', en: 'Bazino', ru: 'Bazino', tr: 'Bazino?' })}</span>
           </h2>
           <div className="flex items-center gap-4 max-w-xs mx-auto">
              <div className="h-[2px] flex-1 bg-white/10"></div>
@@ -373,21 +368,21 @@ export default function GecoPurpleHome({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
           {[
             {
-              tag: language === 'fa' ? 'سخت‌افزار' : 'HARDWARE',
-              title: language === 'fa' ? 'سیستم‌های بسیار قدرتمند گیمینگ' : 'High-end Gaming Rigs',
-              desc: language === 'fa' ? 'تمام سیستم‌های کلوپ بازینو مجهز به جدیدترین کارت‌های گرافیک RTX و مانیتورهای ۳۶۰ هرتز هستند.' : 'All Bazino systems are equipped with the latest RTX graphic cards and 360Hz ultra-fast gaming monitors.',
+              tag: L(language, { fa: 'سخت‌افزار', en: 'HARDWARE', ru: 'ОБОРУДОВАНИЕ', tr: 'DONANIM' }),
+              title: L(language, { fa: 'سیستم‌های بسیار قدرتمند گیمینگ', en: 'High-end Gaming Rigs', ru: 'Мощнейшие игровые системы', tr: 'Üst Düzey Oyun Sistemleri' }),
+              desc: L(language, { fa: 'تمام سیستم‌های کلوپ بازینو مجهز به جدیدترین کارت‌های گرافیک RTX و مانیتورهای ۳۶۰ هرتز هستند.', en: 'All Bazino systems are equipped with the latest RTX graphic cards and 360Hz ultra-fast gaming monitors.', ru: 'Все системы Bazino оснащены новейшими видеокартами RTX и мониторами 360 Гц.', tr: 'Tüm Bazino sistemleri en yeni RTX ekran kartları ve 360Hz oyun monitörleriyle donatılmıştır.' }),
               targetTab: 'reservations'
             },
             {
-              tag: language === 'fa' ? 'کافه بوفه' : 'BUFFET',
-              title: language === 'fa' ? 'بوفه و کافه هوشمند با سفارش آنلاین' : 'Smart Cafe & Buffet Online',
-              desc: language === 'fa' ? 'در حین بازی، سفارش بوفه خود را به صورت کاملاً آنلاین ثبت کرده و در محل سیستم خود تحویل بگیرید.' : 'Order your favorite gaming snacks and drinks online and have them delivered directly to your station.',
+              tag: L(language, { fa: 'کافه بوفه', en: 'BUFFET', ru: 'БУФЕТ', tr: 'BÜFE' }),
+              title: L(language, { fa: 'بوفه و کافه هوشمند با سفارش آنلاین', en: 'Smart Cafe & Buffet Online', ru: 'Умное кафе и буфет с онлайн-заказом', tr: 'Online Siparişli Akıllı Kafe ve Büfe' }),
+              desc: L(language, { fa: 'در حین بازی، سفارش بوفه خود را به صورت کاملاً آنلاین ثبت کرده و در محل سیستم خود تحویل بگیرید.', en: 'Order your favorite gaming snacks and drinks online and have them delivered directly to your station.', ru: 'Заказывайте любимые закуски и напитки онлайн прямо во время игры и получайте их к своей станции.', tr: 'Oyun sırasında büfe siparişinizi tamamen online verin ve doğrudan istasyonunuza teslim alın.' }),
               targetTab: 'cafe'
             },
             {
-              tag: language === 'fa' ? 'وفاداری' : 'LOYALTY',
-              title: language === 'fa' ? 'سیستم امتیازدهی و باشگاه مشتریان' : 'Premium Loyalty Program',
-              desc: language === 'fa' ? 'با هر دقیقه بازی کردن و ثبت سفارش در کافه امتیاز جمع کنید و کدهای تخفیف شگفت‌انگیز بگیرید.' : 'Collect loyalty points with every minute of gameplay or cafe orders to redeem for high-value discount coupons.',
+              tag: L(language, { fa: 'وفاداری', en: 'LOYALTY', ru: 'ЛОЯЛЬНОСТЬ', tr: 'SADAKAT' }),
+              title: L(language, { fa: 'سیستم امتیازدهی و باشگاه مشتریان', en: 'Premium Loyalty Program', ru: 'Программа лояльности и клуб', tr: 'Puan Sistemi ve Sadakat Kulübü' }),
+              desc: L(language, { fa: 'با هر دقیقه بازی کردن و ثبت سفارش در کافه امتیاز جمع کنید و کدهای تخفیف شگفت‌انگیز بگیرید.', en: 'Collect loyalty points with every minute of gameplay or cafe orders to redeem for high-value discount coupons.', ru: 'Копите баллы за каждую минуту игры и заказы в кафе и обменивайте их на выгодные промокоды.', tr: 'Her oyun dakikası ve kafe siparişinizle puan biriktirin, harika indirim kodları kazanın.' }),
               targetTab: 'loyalty'
             }
           ].map((item: any, i) => (
@@ -406,7 +401,7 @@ export default function GecoPurpleHome({
               <div className="flex items-center gap-4 pt-6 border-t border-white/5">
                  <div className="flex-1">
                    <span className="text-[#ffb800] border border-[#ffb800] text-[10px] font-black uppercase px-2 py-0.5 mb-2 inline-block">BAZINO</span>
-                   <h4 className="text-sm font-bold leading-tight">{language === 'fa' ? 'کلیک کنید و کشف کنید' : 'Click to discover'}</h4>
+                   <h4 className="text-sm font-bold leading-tight">{L(language, { fa: 'کلیک کنید و کشف کنید', en: 'Click to discover', ru: 'Нажмите, чтобы узнать больше', tr: 'Keşfetmek için tıklayın' })}</h4>
                  </div>
                  <div className="w-12 h-12 bg-[#1a1c29] border border-white/10 shrink-0 flex items-center justify-center rounded-full">
                     <ArrowRight className="w-5 h-5 text-[#ffb800]" />
@@ -422,28 +417,28 @@ export default function GecoPurpleHome({
             <Trophy className="w-12 h-12 text-[#ffb800]" />
             <div>
               <div className="text-4xl font-black mb-1">50+</div>
-              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{language === 'fa' ? 'سیستم گیمینگ' : 'GAMING SYSTEMS'}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{L(language, { fa: 'سیستم گیمینگ', en: 'GAMING SYSTEMS', ru: 'ИГРОВЫХ СИСТЕМ', tr: 'OYUN SİSTEMİ' })}</div>
             </div>
           </div>
           <div className="flex items-center gap-4 justify-center">
             <User className="w-12 h-12 text-[#ffb800]" />
             <div>
               <div className="text-4xl font-black mb-1">2,000+</div>
-              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{language === 'fa' ? 'گیمر فعال' : 'ACTIVE GAMERS'}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{L(language, { fa: 'گیمر فعال', en: 'ACTIVE GAMERS', ru: 'АКТИВНЫХ ИГРОКОВ', tr: 'AKTİF OYUNCU' })}</div>
             </div>
           </div>
           <div className="flex items-center gap-4 justify-center">
             <Clock className="w-12 h-12 text-[#ffb800]" />
             <div>
               <div className="text-4xl font-black mb-1">24/7</div>
-              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{language === 'fa' ? 'ساعت کاری' : 'OPEN HOURS'}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{L(language, { fa: 'ساعت کاری', en: 'OPEN HOURS', ru: 'ЧАСЫ РАБОТЫ', tr: 'ÇALIŞMA SAATİ' })}</div>
             </div>
           </div>
           <div className="flex items-center gap-4 justify-center">
             <Gamepad2 className="w-12 h-12 text-[#ffb800]" />
             <div>
               <div className="text-4xl font-black mb-1">100+</div>
-              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{language === 'fa' ? 'بازی نصب شده' : 'INSTALLED GAMES'}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">{L(language, { fa: 'بازی نصب شده', en: 'INSTALLED GAMES', ru: 'УСТАНОВЛЕННЫХ ИГР', tr: 'YÜKLÜ OYUN' })}</div>
             </div>
           </div>
         </div>
@@ -455,10 +450,10 @@ export default function GecoPurpleHome({
       <section className="max-w-7xl mx-auto px-4 mb-24">
         <div className="text-center mb-16">
           <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-2">
-            {language === 'fa' ? 'تجهیزات گیمینگ با کیفیت' : 'GAMING ACCESSORIES'}
+            {L(language, { fa: 'تجهیزات گیمینگ با کیفیت', en: 'GAMING ACCESSORIES', ru: 'ИГРОВЫЕ АКСЕССУАРЫ', tr: 'KALİTELİ OYUN AKSESUARLARI' })}
           </span>
           <h2 className="text-4xl md:text-5xl font-black uppercase mb-6">
-            {language === 'fa' ? 'فروشگاه لوازم' : 'Gaming Products'} <span className="text-[#ffb800]">{language === 'fa' ? 'جانبی' : 'Corner'}</span>
+            {L(language, { fa: 'فروشگاه لوازم', en: 'Gaming Products', ru: 'Магазин игровых', tr: 'Aksesuar' })} <span className="text-[#ffb800]">{L(language, { fa: 'جانبی', en: 'Corner', ru: 'товаров', tr: 'Mağazası' })}</span>
           </h2>
           <div className="flex items-center gap-4 max-w-xs mx-auto">
              <div className="h-[2px] flex-1 bg-white/10"></div>

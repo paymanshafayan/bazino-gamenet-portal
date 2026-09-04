@@ -19,7 +19,7 @@ export default function LandingHero({ onNavigate }: LandingHeroProps) {
   const image = vimg('/images/home/esports-960.webp');
 
   return (
-    <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-[#050608] shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
+    <section className="relative w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] -mx-4 md:-mx-8 overflow-hidden bg-surface-2 shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-[21/9] min-h-[340px] group border-b-4 border-primary">
       <img
         loading="eager"
         fetchPriority="high"

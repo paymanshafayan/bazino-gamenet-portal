@@ -1,4 +1,5 @@
 import path from 'path';
+import { dataPath, installConfigPath as installConfigFile } from './paths';
 import bcrypt from 'bcryptjs';
 import { createRequire } from 'module';
 
@@ -46,7 +47,7 @@ export function logDbQuery(provider: string, type: DBLog['type'], command: strin
     provider,
     type,
     command,
-    timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
   };
   dbQueryLogs.unshift(log);
   if (dbQueryLogs.length > 100) dbQueryLogs.pop();
@@ -77,25 +78,63 @@ export interface UserRow {
   phone: string;
   loyaltyPoints: number;
   role: string;
+  /** پروفایل (تسک ۱۲) — همه اختیاری؛ ردیف‌های قدیمی خالی‌اند */
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+  gamerTag?: string;
+  city?: string;
+  birthDate?: string;
+  /** شماره‌ی تأییدشده با OTP (E.164) — خالی = تأیید نشده */
+  phoneVerifiedAt?: string;
+  /** 1 = کاربر رمز دائمی تنظیم کرده (کاربران OTP-only رمز تصادفی دارند) */
+  hasPassword?: number;
+  /** تسک ۱۳ — موجودی کیف پول (لیر)، کش دفتر کل */
+  walletBalance?: number;
+  createdAt?: string;
 }
+/** ستون‌های قابل ویرایش پروفایل توسط خود کاربر */
+export const USER_PROFILE_COLUMNS = new Set(['displayName', 'avatarUrl', 'bio', 'gamerTag', 'city', 'birthDate', 'email', 'phone', 'phoneVerifiedAt', 'hasPassword', 'passwordHash', 'createdAt', 'walletBalance']);
+
+/** کد یک‌بارمصرف پیامکی */
+export interface OtpCodeRow { id: string; phone: string; codeHash: string; ip: string; purpose: string; createdAt: string; expiresAt: string; attempts: number; consumedAt: string; }
+/** تیکت پشتیبانی */
+/** تسک ۱۳ — کیف پول: دفتر کل تراکنش‌ها (مبلغ به لیر؛ مثبت شارژ، منفی برداشت). موجودی = جمع ردیف‌ها و در users.walletBalance کش می‌شود. */
+export interface WalletTxRow { id: string; username: string; amount: number; type: string; ref: string; operator: string; note: string; idempotencyKey: string; balanceAfter: number; createdAt: string; }
+/** تسک ۱۳ — سفارش‌های «پرداخت در محل»: رزرو/تورنمنت با مهلت (dueAt) و بوفه/فروشگاه بدون مهلت. payload همان payload پیش‌فاکتور است. */
+export interface OnsiteOrderRow { id: string; kind: string; username: string; amount: number; status: string; dueAt: string; payload: string; description: string; result: string; createdAt: string; updatedAt: string; settledAt: string; settledBy: string; }
+export const ONSITE_ORDER_COLUMNS = new Set(['status', 'result', 'updatedAt', 'settledAt', 'settledBy', 'dueAt']);
+
+export interface TicketRow { id: string; username: string; subject: string; category: string; priority: string; status: string; createdAt: string; updatedAt: string; lastStaffReplyAt: string; userSeenAt: string; }
+export interface TicketMessageRow { id: string; ticketId: string; author: string; isStaff: number; body: string; createdAt: string; }
+export const TICKET_COLUMNS = new Set(['subject', 'category', 'priority', 'status', 'updatedAt', 'lastStaffReplyAt', 'userSeenAt']);
 export interface ChatMessageRow { id: string; room: string; username: string; message: string; timestamp: string; }
 /** username: صاحب تراکنش. رشته‌ی خالی = ردیف میراث (قبل از افزودن این ستون). */
 export interface TransactionRow { id: string; points: number; description: string; type: string; date: string; username?: string; }
 /** ownerUsername: رشته‌ی خالی = کد تبلیغاتی عمومی؛ نام کاربری = کد شخصیِ حاصل از تبدیل امتیاز
  *  که فقط خودِ آن کاربر باید ببیند و خرج کند. */
 export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; ownerUsername?: string; }
-export interface SystemRow { id: string; name: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
+export interface SystemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
 export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; }
 export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; }
-export interface CafeOrderRow { id: string; items: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; tableNumber: string; date: string; status: string; }
+export interface CafeOrderRow { id: string; items: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; tableNumber: string; date: string; status: string; username?: string; }
 export interface AccessoryRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; description: string; descriptionFa?: string; descriptionEn?: string; descriptionRu?: string; descriptionTr?: string; price: number; imageUrl: string; mobileImageUrl?: string; stock: number; category: string; }
-export interface ShopOrderRow { id: string; cart: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; date: string; status: string; }
+export interface ShopOrderRow { id: string; cart: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; date: string; status: string; username?: string; }
 export interface TournamentRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; game: string; registrationFee: number; startDate: string; maxTeams: number; status: string; registeredTeamsCount: number; teams: string; bracket: string; }
 export interface ArticleRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; content: string; contentFa?: string; contentEn?: string; contentRu?: string; contentTr?: string; category: string; imageUrl: string; mobileImageUrl?: string; author: string; authorFa?: string; authorEn?: string; authorRu?: string; authorTr?: string; date: string; comments: string; }
 export interface UserMessageRow { id: string; sender: string; recipient: string; title: string; body: string; date: string; isRead: boolean; type: string; }
 export interface ThemeRow { id: string; name: string; nameEn: string; primaryColor: string; primaryHover: string; darkBg: string; darkCard: string; accentRed: string; }
-export interface SliderRow { id: string; imageUrl: string; mobileImageUrl?: string; target: string; titleFa: string; titleEn: string; titleRu: string; titleTr: string; }
+export interface SliderRow { id: string; imageUrl: string; mobileImageUrl?: string; target: string; titleFa: string; titleEn: string; titleRu: string; titleTr: string; descFa?: string; descEn?: string; descRu?: string; descTr?: string; }
 export interface SettingRow { key: string; value: string; }
+/** سفارش پرداخت آنلاین (PayTR). مبالغ به کوروش (×100). payload = JSON اطلاعات لازم برای تکمیل سفارش بعد از تأیید. */
+export interface PaymentOrderRow {
+  merchantOid: string; kind: string; username: string; email: string; amountKurus: number; currency: string;
+  status: string; provider: string; payload: string; result: string; totalAmountKurus: number;
+  failedCode: string; failedMsg: string; createdAt: string; updatedAt: string;
+}
+
+/** ستون‌های قابل به‌روزرسانی payment_orders (برای پرووایدرهایی که SET را پویا می‌سازند). */
+export const PAYMENT_ORDER_COLUMNS = new Set(['status', 'totalAmountKurus', 'failedCode', 'failedMsg', 'result', 'updatedAt', 'email', 'username', 'payload']);
 
 export interface AdminSeedInput { username: string; password: string; email: string; phone: string; }
 
@@ -129,6 +168,12 @@ export interface IDataStore {
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
   listSettings(): Promise<SettingRow[]>;
+
+  // Online payments (PayTR)
+  createPaymentOrder(o: PaymentOrderRow): Promise<void>;
+  getPaymentOrder(merchantOid: string): Promise<PaymentOrderRow | undefined>;
+  updatePaymentOrder(merchantOid: string, fields: Partial<PaymentOrderRow>): Promise<void>;
+  listPaymentOrders(limit?: number): Promise<PaymentOrderRow[]>;
 
   // Chat
   listChatRooms(): Promise<string[]>;
@@ -238,6 +283,34 @@ export interface IDataStore {
   deleteSlider(id: string): Promise<void>;
 
   countReservationLogs(): Promise<number>;
+
+  // Profile / OTP / Tickets (task 12)
+  updateUserFields(username: string, fields: Partial<UserRow>): Promise<void>;
+  getUserByPhone(phone: string): Promise<UserRow | undefined>;
+  createOtp(o: OtpCodeRow): Promise<void>;
+  /** آخرین کدهای این شماره یا این IP از زمان since (برای نرخ‌سنجی سمت سرور) */
+  listRecentOtps(filter: { phone?: string; ip?: string; since: string }): Promise<OtpCodeRow[]>;
+  getLatestActiveOtp(phone: string, purpose: string): Promise<OtpCodeRow | undefined>;
+  updateOtp(id: string, fields: Partial<OtpCodeRow>): Promise<void>;
+  createTicket(t: TicketRow): Promise<void>;
+  getTicketById(id: string): Promise<TicketRow | undefined>;
+  listTicketsFor(username: string): Promise<TicketRow[]>;
+  listTickets(status?: string): Promise<TicketRow[]>;
+  updateTicket(id: string, fields: Partial<TicketRow>): Promise<void>;
+  addTicketMessage(m: TicketMessageRow): Promise<void>;
+  listTicketMessages(ticketId: string): Promise<TicketMessageRow[]>;
+  countOpenTickets(): Promise<number>;
+
+  // ---- Wallet + on-site orders (task 13) ----
+  /** ثبت اتمیک تراکنش کیف پول: موجودی را می‌خواند، اگر منفی می‌شد خطای INSUFFICIENT_FUNDS، وگرنه ردیف + کش را می‌نویسد و ردیف را برمی‌گرداند. */
+  appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow>;
+  getWalletTxByIdempotencyKey(key: string): Promise<WalletTxRow | undefined>;
+  listWalletTxFor(username: string, limit?: number): Promise<WalletTxRow[]>;
+  listWalletTx(limit?: number): Promise<WalletTxRow[]>;
+  createOnsiteOrder(o: OnsiteOrderRow): Promise<void>;
+  getOnsiteOrder(id: string): Promise<OnsiteOrderRow | undefined>;
+  listOnsiteOrders(filter?: { status?: string; username?: string; kind?: string }): Promise<OnsiteOrderRow[]>;
+  updateOnsiteOrder(id: string, fields: Partial<OnsiteOrderRow>): Promise<void>;
 }
 
 // -----------------------------------------------------------------------------
@@ -275,7 +348,7 @@ export class SqliteStore implements IDataStore {
   private db: any;
 
   private getDbPath(): string {
-    return this.config.filePath || path.join(process.cwd(), 'bazino.sqlite3');
+    return this.config.filePath || dataPath('bazino.sqlite3');
   }
 
   async connect(): Promise<{ success: boolean; message: string }> {
@@ -306,7 +379,19 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS articles (id TEXT PRIMARY KEY, title TEXT, content TEXT, category TEXT, imageUrl TEXT, mobileImageUrl TEXT, author TEXT, date TEXT, comments TEXT);
       CREATE TABLE IF NOT EXISTS user_messages (id TEXT PRIMARY KEY, sender TEXT, recipient TEXT, title TEXT, body TEXT, date TEXT, isRead INTEGER DEFAULT 0, type TEXT);
       CREATE TABLE IF NOT EXISTS themes (id TEXT PRIMARY KEY, name TEXT, nameEn TEXT, primaryColor TEXT, primaryHover TEXT, darkBg TEXT, darkCard TEXT, accentRed TEXT);
-      CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, mobileImageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT);
+      CREATE TABLE IF NOT EXISTS app_sliders (id TEXT PRIMARY KEY, imageUrl TEXT, mobileImageUrl TEXT, target TEXT, titleFa TEXT, titleEn TEXT, titleRu TEXT, titleTr TEXT, descFa TEXT, descEn TEXT, descRu TEXT, descTr TEXT);
+      CREATE TABLE IF NOT EXISTS otp_codes (id TEXT PRIMARY KEY, phone TEXT, codeHash TEXT, ip TEXT, purpose TEXT, createdAt TEXT, expiresAt TEXT, attempts INTEGER DEFAULT 0, consumedAt TEXT DEFAULT '');
+      CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_codes(phone, createdAt);
+      CREATE INDEX IF NOT EXISTS idx_otp_ip ON otp_codes(ip, createdAt);
+      CREATE TABLE IF NOT EXISTS wallet_transactions (id TEXT PRIMARY KEY, username TEXT, amount REAL, type TEXT, ref TEXT DEFAULT '', operator TEXT DEFAULT '', note TEXT DEFAULT '', idempotencyKey TEXT DEFAULT '', balanceAfter REAL, createdAt TEXT);
+      CREATE INDEX IF NOT EXISTS idx_wallet_user ON wallet_transactions(username, createdAt);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_idem ON wallet_transactions(idempotencyKey) WHERE idempotencyKey <> '';
+      CREATE TABLE IF NOT EXISTS onsite_orders (id TEXT PRIMARY KEY, kind TEXT, username TEXT, amount REAL, status TEXT, dueAt TEXT DEFAULT '', payload TEXT, description TEXT, result TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT, settledAt TEXT DEFAULT '', settledBy TEXT DEFAULT '');
+      CREATE INDEX IF NOT EXISTS idx_onsite_status ON onsite_orders(status, dueAt);
+      CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, username TEXT, subject TEXT, category TEXT, priority TEXT, status TEXT, createdAt TEXT, updatedAt TEXT, lastStaffReplyAt TEXT DEFAULT '', userSeenAt TEXT DEFAULT '');
+      CREATE TABLE IF NOT EXISTS ticket_messages (id TEXT PRIMARY KEY, ticketId TEXT, author TEXT, isStaff INTEGER DEFAULT 0, body TEXT, createdAt TEXT);
+      CREATE INDEX IF NOT EXISTS idx_ticket_msgs ON ticket_messages(ticketId, createdAt);
+      CREATE TABLE IF NOT EXISTS payment_orders (merchantOid TEXT PRIMARY KEY, kind TEXT, username TEXT, email TEXT, amountKurus INTEGER, currency TEXT, status TEXT, provider TEXT, payload TEXT, result TEXT, totalAmountKurus INTEGER DEFAULT 0, failedCode TEXT DEFAULT '', failedMsg TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT);
     `);
     logDbQuery(this.name, 'SQL', 'CREATE TABLE IF NOT EXISTS ... (17 tables verified)');
     this.addMissingColumns();
@@ -322,9 +407,27 @@ export class SqliteStore implements IDataStore {
       { table: 'accessories', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'articles', column: 'mobileImageUrl', type: 'TEXT' },
       { table: 'app_sliders', column: 'mobileImageUrl', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descFa', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descEn', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descRu', type: 'TEXT' },
+      { table: 'app_sliders', column: 'descTr', type: 'TEXT' },
       // مالکیت: تراکنش امتیاز و کد تخفیف شخصی به یک کاربر تعلق دارند.
       { table: 'transactions', column: 'username', type: "TEXT NOT NULL DEFAULT ''" },
       { table: 'active_coupons', column: 'ownerUsername', type: "TEXT NOT NULL DEFAULT ''" },
+      // پروفایل کاربر + OTP (تسک ۱۲)
+      { table: 'users', column: 'displayName', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'avatarUrl', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'bio', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'gamerTag', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'city', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'birthDate', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'phoneVerifiedAt', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'hasPassword', type: "INTEGER DEFAULT 1" },
+      { table: 'users', column: 'createdAt', type: "TEXT DEFAULT ''" },
+      { table: 'users', column: 'walletBalance', type: "REAL DEFAULT 0" },
+      // مالکیت سفارش‌ها برای «سفارش‌های من»
+      { table: 'cafe_orders', column: 'username', type: "TEXT DEFAULT ''" },
+      { table: 'shop_orders', column: 'username', type: "TEXT DEFAULT ''" },
     ];
     for (const { table, column, type } of wanted) {
       try {
@@ -499,10 +602,101 @@ export class SqliteStore implements IDataStore {
   async listCafeOrders() { return this.db.prepare(`SELECT * FROM cafe_orders`).all() as CafeOrderRow[]; }
   async getCafeOrderById(id: string) { return this.db.prepare(`SELECT * FROM cafe_orders WHERE id = ?`).get(id) as CafeOrderRow | undefined; }
   async addCafeOrder(o: CafeOrderRow) {
-    this.db.prepare(`INSERT INTO cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(o.id, o.items, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.tableNumber, o.date, o.status);
+    this.db.prepare(`INSERT INTO cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.items, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.tableNumber, o.date, o.status, o.username || '');
   }
   async setCafeOrderStatus(id: string, status: string) { this.db.prepare(`UPDATE cafe_orders SET status = ? WHERE id = ?`).run(status, id); }
+
+  // ---- Payment orders (PayTR) ----
+  async createPaymentOrder(o: PaymentOrderRow) {
+    this.db.prepare(`INSERT INTO payment_orders (merchantOid, kind, username, email, amountKurus, currency, status, provider, payload, result, totalAmountKurus, failedCode, failedMsg, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.merchantOid, o.kind, o.username, o.email, o.amountKurus, o.currency, o.status, o.provider, o.payload, o.result, o.totalAmountKurus, o.failedCode, o.failedMsg, o.createdAt, o.updatedAt);
+  }
+  async getPaymentOrder(merchantOid: string) { return this.db.prepare(`SELECT * FROM payment_orders WHERE merchantOid = ?`).get(merchantOid) as PaymentOrderRow | undefined; }
+  async updatePaymentOrder(merchantOid: string, f: Partial<PaymentOrderRow>) {
+    const keys = Object.keys(f).filter(k => k !== 'merchantOid');
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE payment_orders SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE merchantOid = ?`).run(...keys.map(k => (f as any)[k]), merchantOid);
+  }
+  async listPaymentOrders(limit = 200) { return this.db.prepare(`SELECT * FROM payment_orders ORDER BY createdAt DESC LIMIT ?`).all(limit) as PaymentOrderRow[]; }
+
+  // ---- Profile / OTP / Tickets (task 12) ----
+  async updateUserFields(username: string, f: Partial<UserRow>) {
+    const keys = Object.keys(f).filter(k => USER_PROFILE_COLUMNS.has(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE users SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE username = ?`).run(...keys.map(k => (f as any)[k]), username);
+  }
+  async getUserByPhone(phone: string) { return this.db.prepare(`SELECT * FROM users WHERE phone = ?`).get(phone) as UserRow | undefined; }
+  async createOtp(o: OtpCodeRow) {
+    this.db.prepare(`INSERT INTO otp_codes (id, phone, codeHash, ip, purpose, createdAt, expiresAt, attempts, consumedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.phone, o.codeHash, o.ip, o.purpose, o.createdAt, o.expiresAt, o.attempts, o.consumedAt);
+  }
+  async listRecentOtps(fl: { phone?: string; ip?: string; since: string }) {
+    if (fl.phone && fl.ip) return this.db.prepare(`SELECT * FROM otp_codes WHERE (phone = ? OR ip = ?) AND createdAt >= ? ORDER BY createdAt DESC`).all(fl.phone, fl.ip, fl.since) as OtpCodeRow[];
+    if (fl.phone) return this.db.prepare(`SELECT * FROM otp_codes WHERE phone = ? AND createdAt >= ? ORDER BY createdAt DESC`).all(fl.phone, fl.since) as OtpCodeRow[];
+    return this.db.prepare(`SELECT * FROM otp_codes WHERE ip = ? AND createdAt >= ? ORDER BY createdAt DESC`).all(fl.ip || '', fl.since) as OtpCodeRow[];
+  }
+  async getLatestActiveOtp(phone: string, purpose: string) {
+    return this.db.prepare(`SELECT * FROM otp_codes WHERE phone = ? AND purpose = ? AND consumedAt = '' ORDER BY createdAt DESC LIMIT 1`).get(phone, purpose) as OtpCodeRow | undefined;
+  }
+  async updateOtp(id: string, f: Partial<OtpCodeRow>) {
+    const keys = Object.keys(f).filter(k => k === 'attempts' || k === 'consumedAt');
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE otp_codes SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => (f as any)[k]), id);
+  }
+  async createTicket(t: TicketRow) {
+    this.db.prepare(`INSERT INTO tickets (id, username, subject, category, priority, status, createdAt, updatedAt, lastStaffReplyAt, userSeenAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(t.id, t.username, t.subject, t.category, t.priority, t.status, t.createdAt, t.updatedAt, t.lastStaffReplyAt, t.userSeenAt);
+  }
+  async getTicketById(id: string) { return this.db.prepare(`SELECT * FROM tickets WHERE id = ?`).get(id) as TicketRow | undefined; }
+  async listTicketsFor(username: string) { return this.db.prepare(`SELECT * FROM tickets WHERE username = ? ORDER BY updatedAt DESC`).all(username) as TicketRow[]; }
+  async listTickets(status?: string) {
+    return (status ? this.db.prepare(`SELECT * FROM tickets WHERE status = ? ORDER BY updatedAt DESC`).all(status) : this.db.prepare(`SELECT * FROM tickets ORDER BY updatedAt DESC`).all()) as TicketRow[];
+  }
+  async updateTicket(id: string, f: Partial<TicketRow>) {
+    const keys = Object.keys(f).filter(k => TICKET_COLUMNS.has(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE tickets SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => (f as any)[k]), id);
+  }
+  async addTicketMessage(m: TicketMessageRow) {
+    this.db.prepare(`INSERT INTO ticket_messages (id, ticketId, author, isStaff, body, createdAt) VALUES (?, ?, ?, ?, ?, ?)`).run(m.id, m.ticketId, m.author, m.isStaff, m.body, m.createdAt);
+  }
+  async listTicketMessages(ticketId: string) { return this.db.prepare(`SELECT * FROM ticket_messages WHERE ticketId = ? ORDER BY createdAt ASC`).all(ticketId) as TicketMessageRow[]; }
+  async countOpenTickets() { return (this.db.prepare(`SELECT COUNT(*) as c FROM tickets WHERE status IN ('open','customer_reply')`).get() as any).c; }
+
+  // ---- Wallet + on-site orders (task 13) ----
+  async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    const run = this.db.transaction((t: Omit<WalletTxRow, 'balanceAfter'>) => {
+      const row = this.db.prepare(`SELECT COALESCE(SUM(amount), 0) as bal FROM wallet_transactions WHERE username = ?`).get(t.username) as any;
+      const balanceAfter = Math.round(((row?.bal || 0) + t.amount) * 100) / 100;
+      if (balanceAfter < -0.000001) throw Object.assign(new Error('INSUFFICIENT_FUNDS'), { code: 'INSUFFICIENT_FUNDS', statusCode: 402, balance: row?.bal || 0 });
+      this.db.prepare(`INSERT INTO wallet_transactions (id, username, amount, type, ref, operator, note, idempotencyKey, balanceAfter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(t.id, t.username, t.amount, t.type, t.ref || '', t.operator || '', t.note || '', t.idempotencyKey || '', balanceAfter, t.createdAt);
+      this.db.prepare(`UPDATE users SET walletBalance = ? WHERE username = ?`).run(balanceAfter, t.username);
+      return { ...t, balanceAfter } as WalletTxRow;
+    });
+    return run(tx);
+  }
+  async getWalletTxByIdempotencyKey(key: string) { if (!key) return undefined; return this.db.prepare(`SELECT * FROM wallet_transactions WHERE idempotencyKey = ?`).get(key) as WalletTxRow | undefined; }
+  async listWalletTxFor(username: string, limit = 100) { return this.db.prepare(`SELECT * FROM wallet_transactions WHERE username = ? ORDER BY createdAt DESC, rowid DESC LIMIT ?`).all(username, limit) as WalletTxRow[]; }
+  async listWalletTx(limit = 300) { return this.db.prepare(`SELECT * FROM wallet_transactions ORDER BY createdAt DESC, rowid DESC LIMIT ?`).all(limit) as WalletTxRow[]; }
+  async createOnsiteOrder(o: OnsiteOrderRow) {
+    this.db.prepare(`INSERT INTO onsite_orders (id, kind, username, amount, status, dueAt, payload, description, result, createdAt, updatedAt, settledAt, settledBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.kind, o.username, o.amount, o.status, o.dueAt || '', o.payload, o.description, o.result || '', o.createdAt, o.updatedAt, o.settledAt || '', o.settledBy || '');
+  }
+  async getOnsiteOrder(id: string) { return this.db.prepare(`SELECT * FROM onsite_orders WHERE id = ?`).get(id) as OnsiteOrderRow | undefined; }
+  async listOnsiteOrders(fl: { status?: string; username?: string; kind?: string } = {}) {
+    const where: string[] = []; const vals: any[] = [];
+    if (fl.status) { where.push('status = ?'); vals.push(fl.status); }
+    if (fl.username) { where.push('username = ?'); vals.push(fl.username); }
+    if (fl.kind) { where.push('kind = ?'); vals.push(fl.kind); }
+    return this.db.prepare(`SELECT * FROM onsite_orders ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY createdAt DESC`).all(...vals) as OnsiteOrderRow[];
+  }
+  async updateOnsiteOrder(id: string, f: Partial<OnsiteOrderRow>) {
+    const keys = Object.keys(f).filter(k => ONSITE_ORDER_COLUMNS.has(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE onsite_orders SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => (f as any)[k]), id);
+  }
 
   // ---- Accessories / shop ----
   async listAccessories() { return this.db.prepare(`SELECT * FROM accessories`).all() as AccessoryRow[]; }
@@ -527,8 +721,8 @@ export class SqliteStore implements IDataStore {
   async listShopOrders() { return this.db.prepare(`SELECT * FROM shop_orders`).all() as ShopOrderRow[]; }
   async getShopOrderById(id: string) { return this.db.prepare(`SELECT * FROM shop_orders WHERE id = ?`).get(id) as ShopOrderRow | undefined; }
   async addShopOrder(o: ShopOrderRow) {
-    this.db.prepare(`INSERT INTO shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(o.id, o.cart, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.date, o.status);
+    this.db.prepare(`INSERT INTO shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.cart, o.totalPrice, o.discountApplied, o.finalAmount, o.couponCode, o.date, o.status, o.username || '');
   }
   async setShopOrderStatus(id: string, status: string) { this.db.prepare(`UPDATE shop_orders SET status = ? WHERE id = ?`).run(status, id); }
 
@@ -577,7 +771,7 @@ export class SqliteStore implements IDataStore {
   // ---- Themes ----
   async listThemes() { return this.db.prepare(`SELECT * FROM themes`).all() as ThemeRow[]; }
   async createTheme(t: ThemeRow) {
-    this.db.prepare(`INSERT INTO themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    this.db.prepare(`INSERT OR IGNORE INTO themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(t.id, t.name, t.nameEn, t.primaryColor, t.primaryHover, t.darkBg, t.darkCard, t.accentRed);
   }
 
@@ -585,15 +779,15 @@ export class SqliteStore implements IDataStore {
   async listSliders() { return this.db.prepare(`SELECT * FROM app_sliders`).all() as SliderRow[]; }
   async getSliderById(id: string) { return this.db.prepare(`SELECT * FROM app_sliders WHERE id = ?`).get(id) as SliderRow | undefined; }
   async createSlider(s: SliderRow) {
-    this.db.prepare(`INSERT INTO app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(s.id, s.imageUrl, s.mobileImageUrl ?? null, s.target, s.titleFa, s.titleEn, s.titleRu, s.titleTr);
+    this.db.prepare(`INSERT INTO app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(s.id, s.imageUrl, s.mobileImageUrl ?? null, s.target, s.titleFa, s.titleEn, s.titleRu, s.titleTr, s.descFa ?? '', s.descEn ?? '', s.descRu ?? '', s.descTr ?? '');
   }
   async updateSlider(id: string, f: Partial<SliderRow>) {
     const current = await this.getSliderById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    this.db.prepare(`UPDATE app_sliders SET imageUrl=?, mobileImageUrl=?, target=?, titleFa=?, titleEn=?, titleRu=?, titleTr=? WHERE id=?`)
-      .run(m.imageUrl, m.mobileImageUrl ?? null, m.target, m.titleFa, m.titleEn, m.titleRu, m.titleTr, id);
+    this.db.prepare(`UPDATE app_sliders SET imageUrl=?, mobileImageUrl=?, target=?, titleFa=?, titleEn=?, titleRu=?, titleTr=?, descFa=?, descEn=?, descRu=?, descTr=? WHERE id=?`)
+      .run(m.imageUrl, m.mobileImageUrl ?? null, m.target, m.titleFa, m.titleEn, m.titleRu, m.titleTr, m.descFa ?? '', m.descEn ?? '', m.descRu ?? '', m.descTr ?? '', id);
   }
   async deleteSlider(id: string) { this.db.prepare(`DELETE FROM app_sliders WHERE id = ?`).run(id); }
 
@@ -694,6 +888,7 @@ export class SqlServerStore implements IDataStore {
       IF OBJECT_ID('dbo.articles','U') IS NULL CREATE TABLE dbo.articles (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(300), content NVARCHAR(MAX), category NVARCHAR(50), imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), author NVARCHAR(100), date NVARCHAR(50), comments NVARCHAR(MAX));
       IF OBJECT_ID('dbo.user_messages','U') IS NULL CREATE TABLE dbo.user_messages (id NVARCHAR(50) PRIMARY KEY, sender NVARCHAR(100), recipient NVARCHAR(100), title NVARCHAR(200), body NVARCHAR(MAX), date NVARCHAR(50), isRead BIT DEFAULT 0, type NVARCHAR(50));
       IF OBJECT_ID('dbo.themes','U') IS NULL CREATE TABLE dbo.themes (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), nameEn NVARCHAR(100), primaryColor NVARCHAR(20), primaryHover NVARCHAR(20), darkBg NVARCHAR(20), darkCard NVARCHAR(20), accentRed NVARCHAR(20));
+      IF OBJECT_ID('dbo.payment_orders','U') IS NULL CREATE TABLE dbo.payment_orders (merchantOid NVARCHAR(64) PRIMARY KEY, kind NVARCHAR(50), username NVARCHAR(100), email NVARCHAR(200), amountKurus BIGINT, currency NVARCHAR(10), status NVARCHAR(30), provider NVARCHAR(30), payload NVARCHAR(MAX), result NVARCHAR(MAX), totalAmountKurus BIGINT DEFAULT 0, failedCode NVARCHAR(20) DEFAULT '', failedMsg NVARCHAR(500) DEFAULT '', createdAt NVARCHAR(50), updatedAt NVARCHAR(50));
       IF OBJECT_ID('dbo.app_sliders','U') IS NULL CREATE TABLE dbo.app_sliders (id NVARCHAR(50) PRIMARY KEY, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), target NVARCHAR(50), titleFa NVARCHAR(300), titleEn NVARCHAR(300), titleRu NVARCHAR(300), titleTr NVARCHAR(300));
     `);
     logDbQuery(this.name, 'SQL', `Schema verified on database [${dbName}] (17 tables).`);
@@ -704,6 +899,27 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.accessories','mobileImageUrl') IS NULL ALTER TABLE dbo.accessories ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.articles','mobileImageUrl') IS NULL ALTER TABLE dbo.articles ADD mobileImageUrl NVARCHAR(500) NULL;
       IF COL_LENGTH('dbo.app_sliders','mobileImageUrl') IS NULL ALTER TABLE dbo.app_sliders ADD mobileImageUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descFa') IS NULL ALTER TABLE dbo.app_sliders ADD descFa NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descEn') IS NULL ALTER TABLE dbo.app_sliders ADD descEn NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descRu') IS NULL ALTER TABLE dbo.app_sliders ADD descRu NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.app_sliders','descTr') IS NULL ALTER TABLE dbo.app_sliders ADD descTr NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.users','displayName') IS NULL ALTER TABLE dbo.users ADD displayName NVARCHAR(100) NULL;
+      IF COL_LENGTH('dbo.users','avatarUrl') IS NULL ALTER TABLE dbo.users ADD avatarUrl NVARCHAR(500) NULL;
+      IF COL_LENGTH('dbo.users','bio') IS NULL ALTER TABLE dbo.users ADD bio NVARCHAR(1000) NULL;
+      IF COL_LENGTH('dbo.users','gamerTag') IS NULL ALTER TABLE dbo.users ADD gamerTag NVARCHAR(60) NULL;
+      IF COL_LENGTH('dbo.users','city') IS NULL ALTER TABLE dbo.users ADD city NVARCHAR(100) NULL;
+      IF COL_LENGTH('dbo.users','birthDate') IS NULL ALTER TABLE dbo.users ADD birthDate NVARCHAR(20) NULL;
+      IF COL_LENGTH('dbo.users','phoneVerifiedAt') IS NULL ALTER TABLE dbo.users ADD phoneVerifiedAt NVARCHAR(50) NULL;
+      IF COL_LENGTH('dbo.users','hasPassword') IS NULL ALTER TABLE dbo.users ADD hasPassword INT DEFAULT 1;
+      IF COL_LENGTH('dbo.users','createdAt') IS NULL ALTER TABLE dbo.users ADD createdAt NVARCHAR(50) NULL;
+      IF COL_LENGTH('dbo.users','walletBalance') IS NULL ALTER TABLE dbo.users ADD walletBalance FLOAT DEFAULT 0;
+      IF OBJECT_ID('dbo.wallet_transactions','U') IS NULL CREATE TABLE dbo.wallet_transactions (id NVARCHAR(40) PRIMARY KEY, username NVARCHAR(100), amount FLOAT, type NVARCHAR(20), ref NVARCHAR(100) DEFAULT '', operator NVARCHAR(100) DEFAULT '', note NVARCHAR(500) DEFAULT '', idempotencyKey NVARCHAR(100) DEFAULT '', balanceAfter FLOAT, createdAt NVARCHAR(50));
+      IF OBJECT_ID('dbo.onsite_orders','U') IS NULL CREATE TABLE dbo.onsite_orders (id NVARCHAR(40) PRIMARY KEY, kind NVARCHAR(20), username NVARCHAR(100), amount FLOAT, status NVARCHAR(30), dueAt NVARCHAR(50) DEFAULT '', payload NVARCHAR(MAX), description NVARCHAR(500), result NVARCHAR(MAX), createdAt NVARCHAR(50), updatedAt NVARCHAR(50), settledAt NVARCHAR(50) DEFAULT '', settledBy NVARCHAR(100) DEFAULT '');
+      IF COL_LENGTH('dbo.cafe_orders','username') IS NULL ALTER TABLE dbo.cafe_orders ADD username NVARCHAR(100) NULL;
+      IF COL_LENGTH('dbo.shop_orders','username') IS NULL ALTER TABLE dbo.shop_orders ADD username NVARCHAR(100) NULL;
+      IF OBJECT_ID('dbo.otp_codes','U') IS NULL CREATE TABLE dbo.otp_codes (id NVARCHAR(40) PRIMARY KEY, phone NVARCHAR(30), codeHash NVARCHAR(128), ip NVARCHAR(64), purpose NVARCHAR(20), createdAt NVARCHAR(50), expiresAt NVARCHAR(50), attempts INT DEFAULT 0, consumedAt NVARCHAR(50) DEFAULT '');
+      IF OBJECT_ID('dbo.tickets','U') IS NULL CREATE TABLE dbo.tickets (id NVARCHAR(40) PRIMARY KEY, username NVARCHAR(100), subject NVARCHAR(200), category NVARCHAR(30), priority NVARCHAR(20), status NVARCHAR(30), createdAt NVARCHAR(50), updatedAt NVARCHAR(50), lastStaffReplyAt NVARCHAR(50) DEFAULT '', userSeenAt NVARCHAR(50) DEFAULT '');
+      IF OBJECT_ID('dbo.ticket_messages','U') IS NULL CREATE TABLE dbo.ticket_messages (id NVARCHAR(40) PRIMARY KEY, ticketId NVARCHAR(40), author NVARCHAR(100), isStaff INT DEFAULT 0, body NVARCHAR(MAX), createdAt NVARCHAR(50));
       IF COL_LENGTH('dbo.transactions','username') IS NULL ALTER TABLE dbo.transactions ADD username NVARCHAR(100) NOT NULL DEFAULT '';
       IF COL_LENGTH('dbo.active_coupons','ownerUsername') IS NULL ALTER TABLE dbo.active_coupons ADD ownerUsername NVARCHAR(100) NOT NULL DEFAULT '';
     `);
@@ -904,12 +1120,110 @@ export class SqlServerStore implements IDataStore {
   async addCafeOrder(o: CafeOrderRow) {
     await this.r().input('id', this.sql.NVarChar, o.id).input('items', this.sql.NVarChar, o.items).input('tp', this.sql.Float, o.totalPrice)
       .input('da', this.sql.Float, o.discountApplied).input('fa', this.sql.Float, o.finalAmount).input('cc', this.sql.NVarChar, o.couponCode)
-      .input('tn', this.sql.NVarChar, o.tableNumber).input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status)
-      .query(`INSERT INTO dbo.cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status) VALUES (@id, @items, @tp, @da, @fa, @cc, @tn, @d, @s)`);
+      .input('tn', this.sql.NVarChar, o.tableNumber).input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status).input('u', this.sql.NVarChar, o.username || '')
+      .query(`INSERT INTO dbo.cafe_orders (id, items, totalPrice, discountApplied, finalAmount, couponCode, tableNumber, date, status, username) VALUES (@id, @items, @tp, @da, @fa, @cc, @tn, @d, @s, @u)`);
   }
   async setCafeOrderStatus(id: string, status: string) {
     await this.r().input('s', this.sql.NVarChar, status).input('id', this.sql.NVarChar, id).query(`UPDATE dbo.cafe_orders SET status = @s WHERE id = @id`);
   }
+
+  // ---- Payment orders (PayTR) ----
+  async createPaymentOrder(o: PaymentOrderRow) {
+    await this.r().input('oid', this.sql.NVarChar, o.merchantOid).input('k', this.sql.NVarChar, o.kind).input('u', this.sql.NVarChar, o.username)
+      .input('e', this.sql.NVarChar, o.email).input('a', this.sql.BigInt, o.amountKurus).input('c', this.sql.NVarChar, o.currency)
+      .input('s', this.sql.NVarChar, o.status).input('p', this.sql.NVarChar, o.provider).input('pl', this.sql.NVarChar, o.payload)
+      .input('r', this.sql.NVarChar, o.result).input('t', this.sql.BigInt, o.totalAmountKurus).input('fc', this.sql.NVarChar, o.failedCode)
+      .input('fm', this.sql.NVarChar, o.failedMsg).input('ca', this.sql.NVarChar, o.createdAt).input('ua', this.sql.NVarChar, o.updatedAt)
+      .query(`INSERT INTO dbo.payment_orders (merchantOid, kind, username, email, amountKurus, currency, status, provider, payload, result, totalAmountKurus, failedCode, failedMsg, createdAt, updatedAt) VALUES (@oid, @k, @u, @e, @a, @c, @s, @p, @pl, @r, @t, @fc, @fm, @ca, @ua)`);
+  }
+  async getPaymentOrder(merchantOid: string) { return (await this.r().input('oid', this.sql.NVarChar, merchantOid).query(`SELECT * FROM dbo.payment_orders WHERE merchantOid = @oid`)).recordset[0]; }
+  async updatePaymentOrder(merchantOid: string, f: Partial<PaymentOrderRow>) {
+    // فقط نام ستون‌های شناخته‌شده وارد متن کوئری می‌شوند؛ مقادیر همگی پارامتری‌اند.
+    const keys = Object.keys(f).filter(k => k !== 'merchantOid' && PAYMENT_ORDER_COLUMNS.has(k));
+    if (!keys.length) return;
+    const req = this.r().input('oid', this.sql.NVarChar, merchantOid);
+    keys.forEach((k, i) => { const v = (f as any)[k]; req.input(`v${i}`, typeof v === 'number' ? this.sql.BigInt : this.sql.NVarChar, v); });
+    const columnSet = keys.map((k, i) => k + ' = @v' + i).join(', ');
+    await req.query(`UPDATE dbo.payment_orders SET ${columnSet} WHERE merchantOid = @oid`);
+  }
+  async listPaymentOrders(limit = 200) { return (await this.r().input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.payment_orders ORDER BY createdAt DESC`)).recordset as PaymentOrderRow[]; }
+
+  // ---- Profile / OTP / Tickets (task 12) ----
+  private async dynUpdate(table: string, allowed: Set<string>, keyCol: string, keyVal: string, f: Record<string, any>) {
+    const keys = Object.keys(f).filter(k => allowed.has(k));
+    if (!keys.length) return;
+    const req = this.r().input('key', this.sql.NVarChar, keyVal);
+    keys.forEach((k, i) => { const v = f[k]; req.input(`v${i}`, typeof v === 'number' ? this.sql.BigInt : this.sql.NVarChar, v); });
+    const columnSet = keys.map((k, i) => k + ' = @v' + i).join(', ');
+    const tableName = 'dbo.' + table; const column = keyCol;
+    await req.query(`UPDATE ${tableName} SET ${columnSet} WHERE ${column} = @key`);
+  }
+  async updateUserFields(username: string, f: Partial<UserRow>) { await this.dynUpdate('users', USER_PROFILE_COLUMNS, 'username', username, f as any); }
+  async getUserByPhone(phone: string) { return (await this.r().input('p', this.sql.NVarChar, phone).query(`SELECT * FROM dbo.users WHERE phone = @p`)).recordset[0]; }
+  async createOtp(o: OtpCodeRow) {
+    await this.r().input('id', this.sql.NVarChar, o.id).input('p', this.sql.NVarChar, o.phone).input('h', this.sql.NVarChar, o.codeHash).input('ip', this.sql.NVarChar, o.ip)
+      .input('pu', this.sql.NVarChar, o.purpose).input('c', this.sql.NVarChar, o.createdAt).input('e', this.sql.NVarChar, o.expiresAt).input('a', this.sql.Int, o.attempts).input('co', this.sql.NVarChar, o.consumedAt)
+      .query(`INSERT INTO dbo.otp_codes (id, phone, codeHash, ip, purpose, createdAt, expiresAt, attempts, consumedAt) VALUES (@id, @p, @h, @ip, @pu, @c, @e, @a, @co)`);
+  }
+  async listRecentOtps(fl: { phone?: string; ip?: string; since: string }) {
+    return (await this.r().input('p', this.sql.NVarChar, fl.phone || '').input('ip', this.sql.NVarChar, fl.ip || '').input('s', this.sql.NVarChar, fl.since)
+      .query(`SELECT * FROM dbo.otp_codes WHERE (phone = @p OR ip = @ip) AND createdAt >= @s ORDER BY createdAt DESC`)).recordset as OtpCodeRow[];
+  }
+  async getLatestActiveOtp(phone: string, purpose: string) {
+    return (await this.r().input('p', this.sql.NVarChar, phone).input('pu', this.sql.NVarChar, purpose).query(`SELECT TOP 1 * FROM dbo.otp_codes WHERE phone = @p AND purpose = @pu AND consumedAt = '' ORDER BY createdAt DESC`)).recordset[0];
+  }
+  async updateOtp(id: string, f: Partial<OtpCodeRow>) { await this.dynUpdate('otp_codes', new Set(['attempts', 'consumedAt']), 'id', id, f as any); }
+  async createTicket(t: TicketRow) {
+    await this.r().input('id', this.sql.NVarChar, t.id).input('u', this.sql.NVarChar, t.username).input('s', this.sql.NVarChar, t.subject).input('c', this.sql.NVarChar, t.category)
+      .input('p', this.sql.NVarChar, t.priority).input('st', this.sql.NVarChar, t.status).input('ca', this.sql.NVarChar, t.createdAt).input('ua', this.sql.NVarChar, t.updatedAt)
+      .input('ls', this.sql.NVarChar, t.lastStaffReplyAt).input('us', this.sql.NVarChar, t.userSeenAt)
+      .query(`INSERT INTO dbo.tickets (id, username, subject, category, priority, status, createdAt, updatedAt, lastStaffReplyAt, userSeenAt) VALUES (@id, @u, @s, @c, @p, @st, @ca, @ua, @ls, @us)`);
+  }
+  async getTicketById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.tickets WHERE id = @id`)).recordset[0]; }
+  async listTicketsFor(username: string) { return (await this.r().input('u', this.sql.NVarChar, username).query(`SELECT * FROM dbo.tickets WHERE username = @u ORDER BY updatedAt DESC`)).recordset as TicketRow[]; }
+  async listTickets(status?: string) {
+    if (status) return (await this.r().input('s', this.sql.NVarChar, status).query(`SELECT * FROM dbo.tickets WHERE status = @s ORDER BY updatedAt DESC`)).recordset as TicketRow[];
+    return (await this.r().query(`SELECT * FROM dbo.tickets ORDER BY updatedAt DESC`)).recordset as TicketRow[];
+  }
+  async updateTicket(id: string, f: Partial<TicketRow>) { await this.dynUpdate('tickets', TICKET_COLUMNS, 'id', id, f as any); }
+  async addTicketMessage(m: TicketMessageRow) {
+    await this.r().input('id', this.sql.NVarChar, m.id).input('t', this.sql.NVarChar, m.ticketId).input('a', this.sql.NVarChar, m.author).input('s', this.sql.Int, m.isStaff).input('b', this.sql.NVarChar, m.body).input('c', this.sql.NVarChar, m.createdAt)
+      .query(`INSERT INTO dbo.ticket_messages (id, ticketId, author, isStaff, body, createdAt) VALUES (@id, @t, @a, @s, @b, @c)`);
+  }
+  async listTicketMessages(ticketId: string) { return (await this.r().input('t', this.sql.NVarChar, ticketId).query(`SELECT * FROM dbo.ticket_messages WHERE ticketId = @t ORDER BY createdAt ASC`)).recordset as TicketMessageRow[]; }
+  async countOpenTickets() { return (await this.r().query(`SELECT COUNT(*) as c FROM dbo.tickets WHERE status IN ('open','customer_reply')`)).recordset[0].c; }
+
+  // ---- Wallet + on-site orders (task 13) ----
+  async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    const bal = (await this.r().input('u', this.sql.NVarChar, tx.username).query(`SELECT COALESCE(SUM(amount), 0) as bal FROM dbo.wallet_transactions WHERE username = @u`)).recordset[0]?.bal || 0;
+    const balanceAfter = Math.round((bal + tx.amount) * 100) / 100;
+    if (balanceAfter < -0.000001) throw Object.assign(new Error('INSUFFICIENT_FUNDS'), { code: 'INSUFFICIENT_FUNDS', statusCode: 402, balance: bal });
+    await this.r().input('id', this.sql.NVarChar, tx.id).input('u', this.sql.NVarChar, tx.username).input('a', this.sql.Float, tx.amount).input('t', this.sql.NVarChar, tx.type)
+      .input('r', this.sql.NVarChar, tx.ref || '').input('o', this.sql.NVarChar, tx.operator || '').input('n', this.sql.NVarChar, tx.note || '').input('k', this.sql.NVarChar, tx.idempotencyKey || '')
+      .input('b', this.sql.Float, balanceAfter).input('c', this.sql.NVarChar, tx.createdAt)
+      .query(`INSERT INTO dbo.wallet_transactions (id, username, amount, type, ref, operator, note, idempotencyKey, balanceAfter, createdAt) VALUES (@id, @u, @a, @t, @r, @o, @n, @k, @b, @c)`);
+    await this.r().input('b', this.sql.Float, balanceAfter).input('u', this.sql.NVarChar, tx.username).query(`UPDATE dbo.users SET walletBalance = @b WHERE username = @u`);
+    return { ...tx, balanceAfter } as WalletTxRow;
+  }
+  async getWalletTxByIdempotencyKey(key: string) { if (!key) return undefined; return (await this.r().input('k', this.sql.NVarChar, key).query(`SELECT * FROM dbo.wallet_transactions WHERE idempotencyKey = @k`)).recordset[0]; }
+  async listWalletTxFor(username: string, limit = 100) { return (await this.r().input('u', this.sql.NVarChar, username).input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.wallet_transactions WHERE username = @u ORDER BY createdAt DESC`)).recordset as WalletTxRow[]; }
+  async listWalletTx(limit = 300) { return (await this.r().input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.wallet_transactions ORDER BY createdAt DESC`)).recordset as WalletTxRow[]; }
+  async createOnsiteOrder(o: OnsiteOrderRow) {
+    await this.r().input('id', this.sql.NVarChar, o.id).input('k', this.sql.NVarChar, o.kind).input('u', this.sql.NVarChar, o.username).input('a', this.sql.Float, o.amount)
+      .input('s', this.sql.NVarChar, o.status).input('d', this.sql.NVarChar, o.dueAt || '').input('p', this.sql.NVarChar, o.payload).input('de', this.sql.NVarChar, o.description)
+      .input('r', this.sql.NVarChar, o.result || '').input('ca', this.sql.NVarChar, o.createdAt).input('ua', this.sql.NVarChar, o.updatedAt).input('sa', this.sql.NVarChar, o.settledAt || '').input('sb', this.sql.NVarChar, o.settledBy || '')
+      .query(`INSERT INTO dbo.onsite_orders (id, kind, username, amount, status, dueAt, payload, description, result, createdAt, updatedAt, settledAt, settledBy) VALUES (@id, @k, @u, @a, @s, @d, @p, @de, @r, @ca, @ua, @sa, @sb)`);
+  }
+  async getOnsiteOrder(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.onsite_orders WHERE id = @id`)).recordset[0]; }
+  async listOnsiteOrders(fl: { status?: string; username?: string; kind?: string } = {}) {
+    // فیلترهای اختیاری با الگوی «NULL یا برابر» — کوئری ایستا و کاملاً پارامتری
+    const req = this.r()
+      .input('s', this.sql.NVarChar, fl.status || null)
+      .input('u', this.sql.NVarChar, fl.username || null)
+      .input('k', this.sql.NVarChar, fl.kind || null);
+    return (await req.query(`SELECT * FROM dbo.onsite_orders WHERE (@s IS NULL OR status = @s) AND (@u IS NULL OR username = @u) AND (@k IS NULL OR kind = @k) ORDER BY createdAt DESC`)).recordset as OnsiteOrderRow[];
+  }
+  async updateOnsiteOrder(id: string, f: Partial<OnsiteOrderRow>) { await this.dynUpdate('onsite_orders', ONSITE_ORDER_COLUMNS, 'id', id, f as any); }
 
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.r().query(`SELECT * FROM dbo.accessories`)).recordset as AccessoryRow[]; }
@@ -939,8 +1253,8 @@ export class SqlServerStore implements IDataStore {
   async addShopOrder(o: ShopOrderRow) {
     await this.r().input('id', this.sql.NVarChar, o.id).input('cart', this.sql.NVarChar, o.cart).input('tp', this.sql.Float, o.totalPrice)
       .input('da', this.sql.Float, o.discountApplied).input('fa', this.sql.Float, o.finalAmount).input('cc', this.sql.NVarChar, o.couponCode)
-      .input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status)
-      .query(`INSERT INTO dbo.shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status) VALUES (@id, @cart, @tp, @da, @fa, @cc, @d, @s)`);
+      .input('d', this.sql.NVarChar, o.date).input('s', this.sql.NVarChar, o.status).input('u', this.sql.NVarChar, o.username || '')
+      .query(`INSERT INTO dbo.shop_orders (id, cart, totalPrice, discountApplied, finalAmount, couponCode, date, status, username) VALUES (@id, @cart, @tp, @da, @fa, @cc, @d, @s, @u)`);
   }
   async setShopOrderStatus(id: string, status: string) {
     await this.r().input('s', this.sql.NVarChar, status).input('id', this.sql.NVarChar, id).query(`UPDATE dbo.shop_orders SET status = @s WHERE id = @id`);
@@ -1002,7 +1316,7 @@ export class SqlServerStore implements IDataStore {
     await this.r().input('id', this.sql.NVarChar, t.id).input('n', this.sql.NVarChar, t.name).input('ne', this.sql.NVarChar, t.nameEn)
       .input('pc', this.sql.NVarChar, t.primaryColor).input('ph', this.sql.NVarChar, t.primaryHover).input('db', this.sql.NVarChar, t.darkBg)
       .input('dc', this.sql.NVarChar, t.darkCard).input('ar', this.sql.NVarChar, t.accentRed)
-      .query(`INSERT INTO dbo.themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (@id, @n, @ne, @pc, @ph, @db, @dc, @ar)`);
+      .query(`IF NOT EXISTS (SELECT 1 FROM dbo.themes WHERE id = @id) INSERT INTO dbo.themes (id, name, nameEn, primaryColor, primaryHover, darkBg, darkCard, accentRed) VALUES (@id, @n, @ne, @pc, @ph, @db, @dc, @ar)`);
   }
 
   // ---- App sliders ----
@@ -1011,7 +1325,8 @@ export class SqlServerStore implements IDataStore {
   async createSlider(s: SliderRow) {
     await this.r().input('id', this.sql.NVarChar, s.id).input('img', this.sql.NVarChar, s.imageUrl).input('mimg', this.sql.NVarChar, s.mobileImageUrl ?? null).input('t', this.sql.NVarChar, s.target)
       .input('fa', this.sql.NVarChar, s.titleFa).input('en', this.sql.NVarChar, s.titleEn).input('ru', this.sql.NVarChar, s.titleRu).input('tr', this.sql.NVarChar, s.titleTr)
-      .query(`INSERT INTO dbo.app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr) VALUES (@id, @img, @mimg, @t, @fa, @en, @ru, @tr)`);
+      .input('dfa', this.sql.NVarChar, s.descFa ?? '').input('den', this.sql.NVarChar, s.descEn ?? '').input('dru', this.sql.NVarChar, s.descRu ?? '').input('dtr', this.sql.NVarChar, s.descTr ?? '')
+      .query(`INSERT INTO dbo.app_sliders (id, imageUrl, mobileImageUrl, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr) VALUES (@id, @img, @mimg, @t, @fa, @en, @ru, @tr, @dfa, @den, @dru, @dtr)`);
   }
   async updateSlider(id: string, f: Partial<SliderRow>) {
     const current = await this.getSliderById(id);
@@ -1019,7 +1334,8 @@ export class SqlServerStore implements IDataStore {
     const m = { ...current, ...f };
     await this.r().input('id', this.sql.NVarChar, id).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('t', this.sql.NVarChar, m.target)
       .input('fa', this.sql.NVarChar, m.titleFa).input('en', this.sql.NVarChar, m.titleEn).input('ru', this.sql.NVarChar, m.titleRu).input('tr', this.sql.NVarChar, m.titleTr)
-      .query(`UPDATE dbo.app_sliders SET imageUrl=@img, mobileImageUrl=@mimg, target=@t, titleFa=@fa, titleEn=@en, titleRu=@ru, titleTr=@tr WHERE id=@id`);
+      .input('dfa', this.sql.NVarChar, m.descFa ?? '').input('den', this.sql.NVarChar, m.descEn ?? '').input('dru', this.sql.NVarChar, m.descRu ?? '').input('dtr', this.sql.NVarChar, m.descTr ?? '')
+      .query(`UPDATE dbo.app_sliders SET imageUrl=@img, mobileImageUrl=@mimg, target=@t, titleFa=@fa, titleEn=@en, titleRu=@ru, titleTr=@tr, descFa=@dfa, descEn=@den, descRu=@dru, descTr=@dtr WHERE id=@id`);
   }
   async deleteSlider(id: string) { await this.r().input('id', this.sql.NVarChar, id).query(`DELETE FROM dbo.app_sliders WHERE id = @id`); }
 
@@ -1082,9 +1398,17 @@ export class MongoStore implements IDataStore {
       `mongodb://${this.config.username ? `${this.config.username}:${this.config.password}@` : ''}${this.config.host || 'localhost'}:${this.config.port || 27017}/?authSource=admin`;
     this.client = new MongoClient(uri);
     await this.client.connect();
-    this.db = this.client.db(this.config.dbName || 'bazino');
+    let dbName = this.config.dbName || 'bazino';
+    let hostLabel = this.config.host || 'localhost';
+    try {
+      const u = new URL(uri);
+      hostLabel = u.host;
+      const fromPath = u.pathname.replace(/^\//, '');
+      if (!this.config.dbName && fromPath) dbName = fromPath;
+    } catch { /* non-URL connection string */ }
+    this.db = this.client.db(dbName);
     this.isConnected = true;
-    logDbQuery(this.name, 'SYSTEM', `Connected to MongoDB: ${this.config.host || 'localhost'}/${this.config.dbName || 'bazino'}`);
+    logDbQuery(this.name, 'SYSTEM', `Connected to MongoDB: ${hostLabel}/${dbName}`);
     return { success: true, message: 'Connected to MongoDB successfully.' };
   }
 
@@ -1093,6 +1417,14 @@ export class MongoStore implements IDataStore {
     await this.col('settings').createIndex({ key: 1 }, { unique: true });
     await this.col('chat_rooms').createIndex({ name: 1 }, { unique: true });
     await this.col('active_coupons').createIndex({ code: 1 }, { unique: true });
+    await this.col('payment_orders').createIndex({ merchantOid: 1 }, { unique: true });
+    await this.col('wallet_transactions').createIndex({ username: 1, createdAt: -1 });
+    await this.col('wallet_transactions').createIndex({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $gt: '' } } });
+    await this.col('onsite_orders').createIndex({ status: 1, dueAt: 1 });
+    await this.col('otp_codes').createIndex({ phone: 1, createdAt: -1 });
+    await this.col('otp_codes').createIndex({ ip: 1, createdAt: -1 });
+    await this.col('tickets').createIndex({ username: 1, updatedAt: -1 });
+    await this.col('ticket_messages').createIndex({ ticketId: 1, createdAt: 1 });
     logDbQuery(this.name, 'NoSQL', 'db.createIndex(...) on users/settings/chat_rooms/active_coupons');
     return { success: true, message: `MongoDB collections/indexes verified on database [${this.config.dbName || 'bazino'}].` };
   }
@@ -1223,6 +1555,56 @@ export class MongoStore implements IDataStore {
   async addCafeOrder(o: CafeOrderRow) { await this.col('cafe_orders').insertOne({ ...o }); }
   async setCafeOrderStatus(id: string, status: string) { await this.col('cafe_orders').updateOne({ id }, { $set: { status } }); }
 
+  // ---- Payment orders (PayTR) ----
+  async createPaymentOrder(o: PaymentOrderRow) { await this.col('payment_orders').insertOne({ ...o }); }
+  async getPaymentOrder(merchantOid: string) { const row = await this.col('payment_orders').findOne({ merchantOid }); return row ? this.strip(row) : undefined; }
+  async updatePaymentOrder(merchantOid: string, f: Partial<PaymentOrderRow>) { const { merchantOid: _m, ...rest } = f; await this.col('payment_orders').updateOne({ merchantOid }, { $set: rest }); }
+  async listPaymentOrders(limit = 200) { return (await this.col('payment_orders').find({}).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
+
+  // ---- Profile / OTP / Tickets (task 12) ----
+  async updateUserFields(username: string, f: Partial<UserRow>) {
+    const set: Record<string, any> = {}; for (const k of Object.keys(f)) if (USER_PROFILE_COLUMNS.has(k)) set[k] = (f as any)[k];
+    if (Object.keys(set).length) await this.col('users').updateOne({ username }, { $set: set });
+  }
+  async getUserByPhone(phone: string) { const row = await this.col('users').findOne({ phone }); return row ? this.strip(row) : undefined; }
+  async createOtp(o: OtpCodeRow) { await this.col('otp_codes').insertOne({ ...o }); }
+  async listRecentOtps(fl: { phone?: string; ip?: string; since: string }) {
+    const or: any[] = []; if (fl.phone) or.push({ phone: fl.phone }); if (fl.ip) or.push({ ip: fl.ip });
+    return (await this.col('otp_codes').find({ $and: [{ $or: or.length ? or : [{ phone: '__none__' }] }, { createdAt: { $gte: fl.since } }] }).sort({ createdAt: -1 }).toArray()).map((r: any) => this.strip(r));
+  }
+  async getLatestActiveOtp(phone: string, purpose: string) { const row = await this.col('otp_codes').find({ phone, purpose, consumedAt: '' }).sort({ createdAt: -1 }).limit(1).next(); return row ? this.strip(row) : undefined; }
+  async updateOtp(id: string, f: Partial<OtpCodeRow>) { const { id: _i, ...rest } = f as any; await this.col('otp_codes').updateOne({ id }, { $set: rest }); }
+  async createTicket(t: TicketRow) { await this.col('tickets').insertOne({ ...t }); }
+  async getTicketById(id: string) { const row = await this.col('tickets').findOne({ id }); return row ? this.strip(row) : undefined; }
+  async listTicketsFor(username: string) { return (await this.col('tickets').find({ username }).sort({ updatedAt: -1 }).toArray()).map((r: any) => this.strip(r)); }
+  async listTickets(status?: string) { return (await this.col('tickets').find(status ? { status } : {}).sort({ updatedAt: -1 }).toArray()).map((r: any) => this.strip(r)); }
+  async updateTicket(id: string, f: Partial<TicketRow>) { const set: Record<string, any> = {}; for (const k of Object.keys(f)) if (TICKET_COLUMNS.has(k)) set[k] = (f as any)[k]; if (Object.keys(set).length) await this.col('tickets').updateOne({ id }, { $set: set }); }
+  async addTicketMessage(m: TicketMessageRow) { await this.col('ticket_messages').insertOne({ ...m }); }
+  async listTicketMessages(ticketId: string) { return (await this.col('ticket_messages').find({ ticketId }).sort({ createdAt: 1 }).toArray()).map((r: any) => this.strip(r)); }
+  async countOpenTickets() { return this.col('tickets').countDocuments({ status: { $in: ['open', 'customer_reply'] } }); }
+
+  // ---- Wallet + on-site orders (task 13) ----
+  async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    const agg = await this.col('wallet_transactions').aggregate([{ $match: { username: tx.username } }, { $group: { _id: null, bal: { $sum: '$amount' } } }]).toArray();
+    const bal = agg[0]?.bal || 0;
+    const balanceAfter = Math.round((bal + tx.amount) * 100) / 100;
+    if (balanceAfter < -0.000001) throw Object.assign(new Error('INSUFFICIENT_FUNDS'), { code: 'INSUFFICIENT_FUNDS', statusCode: 402, balance: bal });
+    const row = { ...tx, ref: tx.ref || '', operator: tx.operator || '', note: tx.note || '', idempotencyKey: tx.idempotencyKey || '', balanceAfter } as WalletTxRow;
+    await this.col('wallet_transactions').insertOne({ ...row });
+    await this.col('users').updateOne({ username: tx.username }, { $set: { walletBalance: balanceAfter } });
+    return row;
+  }
+  async getWalletTxByIdempotencyKey(key: string) { if (!key) return undefined; const row = await this.col('wallet_transactions').findOne({ idempotencyKey: key }); return row ? this.strip(row) : undefined; }
+  async listWalletTxFor(username: string, limit = 100) { return (await this.col('wallet_transactions').find({ username }).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
+  async listWalletTx(limit = 300) { return (await this.col('wallet_transactions').find({}).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
+  async createOnsiteOrder(o: OnsiteOrderRow) { await this.col('onsite_orders').insertOne({ ...o }); }
+  async getOnsiteOrder(id: string) { const row = await this.col('onsite_orders').findOne({ id }); return row ? this.strip(row) : undefined; }
+  async listOnsiteOrders(fl: { status?: string; username?: string; kind?: string } = {}) {
+    const q: Record<string, any> = {}; if (fl.status) q.status = fl.status; if (fl.username) q.username = fl.username; if (fl.kind) q.kind = fl.kind;
+    return (await this.col('onsite_orders').find(q).sort({ createdAt: -1 }).toArray()).map((r: any) => this.strip(r));
+  }
+  async updateOnsiteOrder(id: string, f: Partial<OnsiteOrderRow>) { const set: Record<string, any> = {}; for (const k of Object.keys(f)) if (ONSITE_ORDER_COLUMNS.has(k)) set[k] = (f as any)[k]; if (Object.keys(set).length) await this.col('onsite_orders').updateOne({ id }, { $set: set }); }
+
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.col('accessories').find({}).toArray()).map((r: any) => this.strip(r)); }
   async getAccessoryById(id: string) { const row = await this.col('accessories').findOne({ id }); return row ? this.strip(row) : undefined; }
@@ -1326,10 +1708,17 @@ export function setActiveDataProvider(provider: IDataStore) {
 
 export async function initializeActiveProvider(): Promise<IDataStore> {
   const fs = require('fs');
-  const installConfigPath = path.join(process.cwd(), 'install-config.json');
+  const installConfigPath = installConfigFile();
 
   let provider: IDataStore = new SqliteStore();
-  if (fs.existsSync(installConfigPath)) {
+  // اولویت ۱: متغیر محیطی MONGO_URL (Railway MongoDB) — بدون نیاز به صفحه‌ی نصب.
+  // اولویت ۲: install-config.json (ویزارد نصب). اولویت ۳: SQLite در DATA_DIR.
+  const envMongo = (process.env.MONGO_URL || process.env.MONGODB_URI || '').trim();
+  if (envMongo) {
+    provider = new MongoStore();
+    provider.config = { connectionString: envMongo, dbName: process.env.MONGO_DB_NAME || 'bazino', source: 'env' };
+    console.log('[Database Engine] MONGO_URL detected → using MongoDB (env-configured)');
+  } else if (fs.existsSync(installConfigPath)) {
     try {
       const configData = JSON.parse(fs.readFileSync(installConfigPath, 'utf8'));
       if (configData.isInstalled) {

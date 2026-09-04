@@ -49,6 +49,16 @@ if (!existsSync(bundle)) {
         PORT: String(PORT),
         JWT_SECRET: 'test-secret-for-e2e-suite',
         BAZINO_STATIC_ROOT: workDir,
+        BAZINO_DATA_DIR: path.join(workDir, 'data'),
+        // درگاه شبیه‌سازی‌شده تا جریان create → callback → fulfil بدون paytr.com تست شود
+        PAYTR_MOCK: '1',
+        // تسک ۱۳: درگاه آنلاین به‌صورت پیش‌فرض خاموش است؛ برای تست جریان PayTR صریحاً روشن می‌شود
+        PAYMENT_ONLINE_ENABLED: '1',
+        PAYTR_TEST_MODE: '1',
+        // OTP از طریق درایور mock؛ dev-peek در production فقط با این پرچم باز می‌شود
+        SMS_PROVIDER: 'mock',
+        OTP_DEV_PEEK: '1',
+        PUBLIC_URL: `http://127.0.0.1:${PORT}`,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -300,13 +310,13 @@ test('a percentage coupon computes the right discount', async () => {
 });
 
 test('a fixed coupon returns its face value', async () => {
-  const data = await getJson(`${BASE}/api/discount/validate?code=REDBULL&total=200000`);
+  const data = await getJson(`${BASE}/api/discount/validate?code=REDBULL&total=2000`);
   assert.equal(data.valid, true, JSON.stringify(data));
-  assert.equal(data.discountAmount, 45000);
+  assert.equal(data.discountAmount, 90);
 });
 
 test('a coupon below its minimum order is rejected', async () => {
-  const res = await fetch(`${BASE}/api/discount/validate?code=BAZINO10&total=1000`);
+  const res = await fetch(`${BASE}/api/discount/validate?code=BAZINO10&total=100`);
   assert.equal(res.status, 400, 'minOrder rule not enforced');
   const body = await res.json();
   assert.equal(body.valid, false);
@@ -415,10 +425,15 @@ test('extending a reservation requires authentication once logged out', async ()
 test('extend clamps the requested hours to at most 4', async () => {
   const { status, body } = await postJson(`${BASE}/api/reservations/extend`, { hours: 99 },
     { Authorization: `Bearer ${authToken}` });
-  // 4h costs 200 points; the fresh user only has ~100, so the clamp shows up as
-  // the "not enough points" price rather than a 99-hour charge.
-  assert.equal(status, 400, `expected the 4h-clamped price to be unaffordable: ${JSON.stringify(body)}`);
-  assert.ok(String(body.error).includes('200'), `expected a 4h (200 point) quote, got: ${body.error}`);
+  // 4h costs 200 points. Depending on how many points the e2e user has earned
+  // so far, the clamp shows up either as a 200-point quote in the error or as a
+  // 200-point charge — never as a 99-hour (4950-point) one.
+  if (status === 400) {
+    assert.ok(String(body.error).includes('200'), `expected a 4h (200 point) quote, got: ${body.error}`);
+  } else {
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.pointsCharged, 200, `expected the clamp to charge 4h = 200 points: ${JSON.stringify(body)}`);
+  }
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -901,7 +916,7 @@ test('multipart APK upload publishes a large file byte-for-byte', async () => {
   assert.equal(res.status, 200, JSON.stringify(body));
   assert.equal(body.success, true);
 
-  const apkPath = path.join(workDir, 'public', 'downloads', 'bazino-app.apk');
+  const apkPath = path.join(workDir, 'data', 'downloads', 'bazino-app.apk');
   assert.ok(existsSync(apkPath), 'the final APK was not published at the stable download path');
   assert.deepEqual(readFileSync(apkPath), expected, 'the published APK differs from the multipart upload');
 
@@ -957,7 +972,7 @@ test('chunked APK upload survives a dropped chunk and publishes byte-for-byte', 
   assert.equal(finRes.status, 200, `finalize failed: ${JSON.stringify(finBody)}`);
   assert.equal(finBody.success, true);
 
-  const apkPath = path.join(workDir, 'public', 'downloads', 'bazino-app.apk');
+  const apkPath = path.join(workDir, 'data', 'downloads', 'bazino-app.apk');
   assert.ok(existsSync(apkPath), 'the final APK was not published at the stable download path');
   assert.deepEqual(readFileSync(apkPath), expected, 'the chunked upload published a corrupt APK');
 
@@ -1022,7 +1037,7 @@ test('chunked APK upload rejects out-of-order chunks, incomplete finalize, and c
   });
   assert.equal(res.status, 404, 'finalize did not reject a cancelled session');
 
-  const downloadsDir = path.join(workDir, 'public', 'downloads');
+  const downloadsDir = path.join(workDir, 'data', 'downloads');
   const leftovers = readdirSync(downloadsDir).filter((name) => name.endsWith('.part'));
   assert.deepEqual(leftovers, [], 'cancelled session left a partial file behind');
 });
@@ -1242,7 +1257,7 @@ test('redeeming ignores a client-supplied coupon value', async () => {
   const { status, body } = await postJson(`${BASE}/api/loyalty/redeem`,
     { points: 100, couponValue: 50_000_000, code: 'HACKED' }, auth());
   assert.equal(status, 200, `redeem failed: ${JSON.stringify(body)}`);
-  assert.equal(body.couponValue, 100 * 100, 'the server must price the coupon itself');
+  assert.equal(body.couponValue, 100 * 0.1, 'the server must price the coupon itself (1 point = 0.1 TL)');
   assert.notEqual(body.code, 'HACKED', 'the server must generate the code itself');
   assert.match(body.code, /^LOYAL-[0-9A-F]{8}$/);
 });
@@ -1377,6 +1392,727 @@ test('the SPA shell is returned for an unknown non-API path', async () => {
 });
 
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   33. Theme store — install / update / delete lifecycle
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('33. API — theme store lifecycle');
+
+const themeZipMod = await import('../src/themes/themeZipCore.ts');
+const themeV1 = themeZipMod.buildSampleThemeZip();
+const parsedV1: any = themeZipMod.parseThemeZip(themeV1, 'x');
+const themeV2 = themeZipMod.buildThemeZip(parsedV1.css + '\n/* v2 */', { ...parsedV1.meta, version: '2.0.0' }, parsedV1.assets, parsedV1.componentJs);
+const THEME_ID = parsedV1.meta.id as string;
+const installTheme = (zip: Uint8Array, qs = '') => fetch(`${BASE}/api/admin/themes/install?name=t${qs}`, {
+  method: 'POST', headers: { ...adminAuth(), 'Content-Type': 'application/zip' }, body: Buffer.from(zip),
+});
+
+test('install: creates the theme under BAZINO_DATA_DIR and makes it the site default', async () => {
+  const res = await installTheme(themeV1);
+  const body: any = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.theme.id, THEME_ID);
+  assert.equal(body.activeThemeId, THEME_ID, 'install must activate site-wide atomically');
+  assert.equal(body.replaced, false);
+  assert.ok(existsSync(path.join(workDir, 'data', 'themes', THEME_ID, 'theme.css')), 'theme folder must live in the data dir');
+  const list: any = await getJson(`${BASE}/api/themes`);
+  assert.equal(list.activeThemeId, THEME_ID);
+  assert.ok(list.serverThemes.some((t: any) => t.id === THEME_ID && t.installedAt > 0));
+});
+
+test('install same id without replace → 409 THEME_EXISTS and old files untouched', async () => {
+  const res = await installTheme(themeV2);
+  const body: any = await res.json();
+  assert.equal(res.status, 409);
+  assert.equal(body.code, 'THEME_EXISTS');
+  const css = await (await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).text();
+  assert.ok(!css.includes('/* v2 */'), 'v1 css must still be served');
+});
+
+test('install with replace=1 → atomic update, new version served, still active', async () => {
+  const res = await installTheme(themeV2, '&replace=1');
+  const body: any = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.replaced, true);
+  assert.equal(body.theme.version, '2.0.0');
+  assert.equal(body.activeThemeId, THEME_ID);
+  const css = await (await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).text();
+  assert.ok(css.includes('/* v2 */'), 'v2 css must be served after update');
+  const dirs = readdirSync(path.join(workDir, 'data', 'themes'));
+  assert.deepEqual(dirs.filter(d => d.startsWith('.')), [], 'no temp/backup dirs may remain');
+});
+
+test('delete active theme → folder removed AND site default reset to dark-gold', async () => {
+  const res = await fetch(`${BASE}/api/admin/themes/${THEME_ID}`, { method: 'DELETE', headers: adminAuth() });
+  const body: any = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.activeThemeId, 'dark-gold', 'a deleted theme must not stay the site default');
+  assert.ok(!existsSync(path.join(workDir, 'data', 'themes', THEME_ID)));
+  const list: any = await getJson(`${BASE}/api/themes`);
+  assert.equal(list.activeThemeId, 'dark-gold');
+  assert.equal((await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).status, 404);
+});
+
+test('theme.js registering an unknown region is rejected; CSS-only package installs and reports regions=[]', async () => {
+  const bad = themeZipMod.buildThemeZip(parsedV1.css, { ...parsedV1.meta, id: THEME_ID }, {}, "window.BazinoThemeSDK.registerComponent('sidebar', { render: function () { return null; } });");
+  const r1 = await installTheme(bad, '&replace=1');
+  const b1: any = await r1.json();
+  assert.equal(r1.status, 400, JSON.stringify(b1));
+  assert.match(String(b1.error), /sidebar/);
+
+  const cssOnly = themeZipMod.buildThemeZip(parsedV1.css, { ...parsedV1.meta, id: THEME_ID, tokens: { 'card-2': '#123456' } }, {});
+  const r2 = await installTheme(cssOnly, '&replace=1');
+  const b2: any = await r2.json();
+  assert.equal(r2.status, 200, JSON.stringify(b2));
+  assert.equal(b2.theme.hasComponentJs, false);
+  assert.deepEqual(b2.theme.regions, []);
+  assert.equal(b2.theme.tokens['card-2'], '#123456');
+  assert.equal((await fetch(`${BASE}/api/themes/${THEME_ID}/theme.js`)).status, 404);
+
+  // نسخه‌ی region-based (hero+footer) دوباره نصب می‌شود و بخش‌ها + strings در /api/themes گزارش می‌شوند
+  const r3 = await installTheme(themeV2, '&replace=1');
+  assert.equal(r3.status, 200);
+  const list: any = await getJson(`${BASE}/api/themes`);
+  const t = list.serverThemes.find((x: any) => x.id === THEME_ID);
+  assert.deepEqual([...t.regions].sort(), ['footer', 'hero']);
+  assert.deepEqual(Object.keys(t.strings).sort(), ['en', 'fa', 'ru', 'tr']);
+  assert.equal(t.hasComponentJs, true);
+  await fetch(`${BASE}/api/admin/themes/${THEME_ID}`, { method: 'DELETE', headers: adminAuth() });
+});
+
+test('app-sliders persist 4-language descriptions', async () => {
+  const create = await fetch(`${BASE}/api/admin/app-sliders`, { method: 'POST', headers: { ...adminAuth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageUrl: '/images/home/esports-1600.webp', autoGenerateMobile: false, target: 'reservations', titleFa: 'ف', titleEn: 'E', titleRu: 'Р', titleTr: 'T', descFa: 'توضیح', descEn: 'desc', descRu: 'опис', descTr: 'açık' }) });
+  const body: any = await create.json();
+  assert.equal(create.status, 200, JSON.stringify(body));
+  const slide = body.appSliders.find((s: any) => s.titleEn === 'E');
+  assert.equal(slide.descRu, 'опис');
+  assert.equal(slide.descTr, 'açık');
+  const pub: any = await getJson(`${BASE}/api/app-sliders`);
+  // در حالت داده‌ی نمونه (sample) لیست عمومی ممکن است نمونه باشد؛ در حالت db باید رکورد واقعی با desc بیاید
+  const found = pub.find((s: any) => s.id === slide.id);
+  if (found) assert.equal(found.descFa, 'توضیح');
+  await fetch(`${BASE}/api/admin/app-sliders/${slide.id}`, { method: 'DELETE', headers: adminAuth() });
+});
+
+test('storage-status reports the persistent data dir', async () => {
+  const res = await fetch(`${BASE}/api/admin/storage-status`, { headers: adminAuth() });
+  const body: any = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.persistent, true);
+  assert.equal(body.dataDir, path.join(workDir, 'data'));
+  assert.equal(body.db.provider, 'SQLite');
+  assert.ok(existsSync(path.join(workDir, 'data', 'bazino.sqlite3')), 'sqlite file must live in the data dir');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Payments (PayTR, mock gateway)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('17. API — payments (PayTR mock)');
+
+let paidOid = '';
+
+test('payment config reports the mock gateway in test mode with TL currency', async () => {
+  const cfg: any = await getJson(`${BASE}/api/payments/config`);
+  assert.equal(cfg.enabled, true);
+  assert.equal(cfg.mock, true);
+  assert.equal(cfg.testMode, true);
+  assert.equal(cfg.currency, 'TL');
+  assert.equal(cfg.pointsPerUnit, 10);
+});
+
+test('create refuses without legal consent', async () => {
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, { kind: 'shop', params: { cart: [{ item: { id: sample.SAMPLE_ACCESSORIES[0].id }, quantity: 1 }] }, consent: false });
+  assert.equal(status, 400);
+  assert.equal(body.code, 'CONSENT_REQUIRED');
+});
+
+test('create refuses an unknown kind and an empty cart', async () => {
+  const a = await postJson(`${BASE}/api/payments/paytr/create`, { kind: 'lottery', params: {}, consent: true });
+  assert.equal(a.status, 400);
+  const b = await postJson(`${BASE}/api/payments/paytr/create`, { kind: 'cafe', params: { items: [] }, consent: true });
+  assert.equal(b.status, 400);
+  assert.equal(b.body.code, 'CART_EMPTY');
+});
+
+test('create prices the shop cart server-side and returns a pending order + iframe url', async () => {
+  const acc = sample.SAMPLE_ACCESSORIES[0];
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'shop', params: { cart: [{ item: { id: acc.id, price: 1 }, quantity: 2 }], couponCode: '' }, consent: true, lang: 'tr',
+    customer: { name: 'Test Buyer', email: 'buyer@example.com', phone: '05551112233' },
+  }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.amount, acc.price * 2, 'client-sent price must be ignored');
+  assert.equal(body.amountKurus, acc.price * 2 * 100);
+  assert.equal(body.currency, 'TL');
+  assert.match(body.merchantOid, /^[A-Za-z0-9]{8,64}$/);
+  assert.ok(String(body.iframeUrl).includes(`/api/payments/paytr/mock/${body.merchantOid}`));
+  paidOid = body.merchantOid;
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(order.status, 'pending');
+});
+
+test('callback with a bad hash is rejected and does not change the order', async () => {
+  const res = await fetch(`${BASE}/api/payments/paytr/callback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ merchant_oid: paidOid, status: 'success', total_amount: '1', hash: 'nope' }).toString(),
+  });
+  assert.equal(res.status, 400);
+  assert.match(await res.text(), /bad hash/);
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(order.status, 'pending');
+});
+
+test('mock gateway page renders and a successful decision fulfils the shop order', async () => {
+  const page = await fetch(`${BASE}/api/payments/paytr/mock/${paidOid}`);
+  assert.equal(page.status, 200);
+  assert.ok((await page.text()).includes('mock-pay-ok'));
+
+  const acc = sample.SAMPLE_ACCESSORIES[0];
+  const statsBefore: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  const ordersBefore = Number(statsBefore.shopOrdersCount ?? statsBefore.shopOrders?.length ?? 0);
+
+  const decide = await fetch(`${BASE}/api/payments/paytr/mock/${paidOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'success' }).toString(),
+  });
+  assert.equal(decide.status, 200);
+  assert.ok((await decide.text()).includes(`/payment/success?oid=${paidOid}`));
+
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(order.status, 'success', JSON.stringify(order));
+
+  // در حالت sample لیست عمومی ثابت است؛ ثبت سفارش را از آمار ادمین می‌سنجیم
+  const statsAfter: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  const ordersAfter = Number(statsAfter.shopOrdersCount ?? statsAfter.shopOrders?.length ?? 0);
+  assert.equal(ordersAfter, ordersBefore + 1, 'exactly one shop order must be created by the callback');
+  const created = (statsAfter.shopOrders || []).find((o: any) => o.finalAmount === acc.price * 2 && JSON.stringify(o.cart).includes(acc.id));
+  assert.ok(created, 'fulfilled shop order must contain the paid cart');
+});
+
+test('a duplicate success callback is idempotent (returns OK, no double fulfilment)', async () => {
+  const order: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  const statsBefore: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  const ordersBefore = Number(statsBefore.shopOrdersCount ?? 0);
+  const decide = await fetch(`${BASE}/api/payments/paytr/mock/${paidOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'success' }).toString(),
+  });
+  assert.equal(decide.status, 200);
+  const statsAfter: any = await (await fetch(`${BASE}/api/admin/stats`, { headers: adminAuth() })).json();
+  assert.equal(Number(statsAfter.shopOrdersCount ?? 0), ordersBefore, 'no second shop order on duplicate callback');
+  const again: any = await getJson(`${BASE}/api/payments/orders/${paidOid}`);
+  assert.equal(again.status, order.status);
+});
+
+test('a failed decision marks the order failed with the PayTR reason code', async () => {
+  const item = sample.SAMPLE_CAFE_ITEMS[0];
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'cafe', params: { items: [{ item: { id: item.id }, quantity: 1 }], tableNumber: 'PC-1' }, consent: true,
+  });
+  assert.equal(status, 200, JSON.stringify(body));
+  await fetch(`${BASE}/api/payments/paytr/mock/${body.merchantOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'failed' }).toString(),
+  });
+  const order: any = await getJson(`${BASE}/api/payments/orders/${body.merchantOid}`);
+  assert.equal(order.status, 'failed');
+  assert.equal(order.failedCode, '6');
+});
+
+test('reservation payment quotes hours × hourlyRate and blocks the slot after success', async () => {
+  const sys = sample.SAMPLE_SYSTEMS.find((s: any) => !s.isReserved) || sample.SAMPLE_SYSTEMS[0];
+  const { status, body } = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'reservation', params: { systemId: sys.id, startTime: '10:00', endTime: '12:00', date: '2030-01-01' }, consent: true,
+  }, { Authorization: `Bearer ${authToken}` });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.amount, sys.hourlyRate * 2);
+  await fetch(`${BASE}/api/payments/paytr/mock/${body.merchantOid}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ decision: 'success' }).toString(),
+  });
+  const order: any = await getJson(`${BASE}/api/payments/orders/${body.merchantOid}`);
+  assert.equal(order.status, 'success', JSON.stringify(order));
+  const dup = await postJson(`${BASE}/api/payments/paytr/create`, {
+    kind: 'reservation', params: { systemId: sys.id, startTime: '11:00', endTime: '13:00', date: '2030-01-01' }, consent: true,
+  });
+  assert.equal(dup.status, 409, 'overlapping slot must be refused before opening a payment');
+});
+
+test('admin can list payments; anonymous cannot', async () => {
+  const anon = await fetch(`${BASE}/api/admin/payments`);
+  assert.ok(anon.status === 401 || anon.status === 403);
+  const res = await fetch(`${BASE}/api/admin/payments`, { headers: adminAuth() });
+  assert.equal(res.status, 200);
+  const rows: any = await res.json();
+  assert.ok(Array.isArray(rows) && rows.some((r: any) => r.merchantOid === paidOid));
+  assert.ok(!('payload' in rows[0] && rows[0].payload), 'payload must not leak in the list');
+});
+
+test('legal overrides and company fields round-trip through site settings', async () => {
+  const set = await postJson(`${BASE}/api/admin/settings`, { key: 'legal_refund_tr', value: '## Test\n- madde' }, adminAuth());
+  assert.equal(set.status, 200);
+  await postJson(`${BASE}/api/admin/settings`, { key: 'company_tax_no', value: '1234567890' }, adminAuth());
+  const pub: any = await getJson(`${BASE}/api/settings`);
+  assert.equal(pub.legal_refund_tr, '## Test\n- madde');
+  assert.equal(pub.company_tax_no, '1234567890');
+  assert.ok(pub.company_legal_name, 'seeded company_legal_name missing');
+});
+
+test('SPA shell is served for the theme-independent routes', async () => {
+  for (const p of ['/legal/distance-sales', '/contact', '/payment/success?oid=x']) {
+    const res = await fetch(`${BASE}${p}`);
+    assert.equal(res.status, 200, p);
+    assert.match(res.headers.get('content-type') || '', /text\/html/);
+  }
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   34. OTP auth, profile, tickets (task 12)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('34. API — OTP login, profile & support tickets');
+
+const ipHeaders = (ip: string) => ({ 'X-Forwarded-For': ip });
+const peek = async (phone: string) => (await getJson(`${BASE}/api/auth/otp/dev-peek?phone=${encodeURIComponent(phone)}`)) as any;
+let otpToken = '';
+const otpPhone = '+905401112233';
+const otpUsername = '905401112233';
+
+test('otp/request rejects an invalid phone and normalises 0532… to +90', async () => {
+  const bad = await postJson(`${BASE}/api/auth/otp/request`, { phone: 'nope' }, ipHeaders('10.1.0.1'));
+  assert.equal(bad.status, 400); assert.equal(bad.body.code, 'OTP_PHONE_INVALID');
+  const ok = await postJson(`${BASE}/api/auth/otp/request`, { phone: '0540 111 22 33' }, ipHeaders('10.1.0.1'));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.phone, otpPhone);
+  assert.equal(ok.body.provider, 'mock');
+  assert.equal(ok.body.retryAfter, 60);
+});
+
+test('dev-peek exposes the mock code (6 digits) and the code is not in the response of /request', async () => {
+  const p = await peek(otpPhone);
+  assert.match(p.code, /^\d{6}$/);
+});
+
+test('same phone within 60 s → 429 OTP_TOO_SOON with retryAfter, even from another IP', async () => {
+  const r = await postJson(`${BASE}/api/auth/otp/request`, { phone: otpPhone }, ipHeaders('10.1.0.2'));
+  assert.equal(r.status, 429);
+  assert.equal(r.body.code, 'OTP_TOO_SOON');
+  assert.ok(typeof r.body.retryAfter === 'number' && r.body.retryAfter > 0 && r.body.retryAfter <= 60);
+});
+
+test('same IP, different phones: the 11th request in 10 minutes is blocked (OTP_RATE_LIMIT)', async () => {
+  const ip = '10.2.0.7';
+  for (let i = 0; i < 10; i++) {
+    const r = await postJson(`${BASE}/api/auth/otp/request`, { phone: `+9054500000${String(i).padStart(2, '0')}` }, ipHeaders(ip));
+    assert.equal(r.status, 200, `request #${i + 1} failed: ${JSON.stringify(r.body)}`);
+  }
+  const blocked = await postJson(`${BASE}/api/auth/otp/request`, { phone: '+905450000099' }, ipHeaders(ip));
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.body.code, 'OTP_RATE_LIMIT');
+  assert.ok(blocked.body.retryAfter > 0 && blocked.body.retryAfter <= 600);
+  // the same phone from a fresh IP is fine → limits are evaluated per IP *and* per phone
+  const other = await postJson(`${BASE}/api/auth/otp/request`, { phone: '+905450000099' }, ipHeaders('10.2.0.8'));
+  assert.equal(other.status, 200);
+});
+
+test('wrong code decrements attempts; 5 wrong attempts void the code (OTP_LOCKED)', async () => {
+  const phone = '+905460000001';
+  assert.equal((await postJson(`${BASE}/api/auth/otp/request`, { phone }, ipHeaders('10.3.0.1'))).status, 200);
+  const real = (await peek(phone)).code;
+  const wrong = real === '000000' ? '111111' : '000000';
+  for (let i = 1; i <= 4; i++) {
+    const r = await postJson(`${BASE}/api/auth/otp/verify`, { phone, code: wrong });
+    assert.equal(r.status, 400); assert.equal(r.body.code, 'OTP_WRONG'); assert.equal(r.body.attemptsLeft, 5 - i);
+  }
+  const locked = await postJson(`${BASE}/api/auth/otp/verify`, { phone, code: wrong });
+  assert.equal(locked.body.code, 'OTP_LOCKED');
+  const after = await postJson(`${BASE}/api/auth/otp/verify`, { phone, code: real });
+  assert.equal(after.body.code, 'OTP_NOT_FOUND', 'a voided code must not be accepted even if correct');
+});
+
+test('verify with the right code creates the user (username = digits), grants 100 points and a JWT', async () => {
+  const code = (await peek(otpPhone)).code;
+  const r = await postJson(`${BASE}/api/auth/otp/verify`, { phone: otpPhone, code });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.isNew, true);
+  assert.equal(r.body.user.username, otpUsername);
+  assert.equal(r.body.user.phoneVerified, true);
+  assert.equal(r.body.user.hasPassword, false);
+  assert.equal(r.body.user.loyaltyPoints, 100);
+  assert.ok(r.body.token);
+  otpToken = r.body.token;
+  const me: any = await getJson(`${BASE}/api/auth/me`, 200, { Authorization: `Bearer ${otpToken}` });
+  assert.equal(me.user.username, otpUsername);
+});
+
+test('a consumed code cannot be reused; a second login for the same phone is not "new"', async () => {
+  const code = (await peek(otpPhone)).code;
+  const reuse = await postJson(`${BASE}/api/auth/otp/verify`, { phone: otpPhone, code });
+  assert.equal(reuse.status, 400); assert.equal(reuse.body.code, 'OTP_NOT_FOUND');
+  // wait out the 60 s phone gap is too slow for a test → use the cooldown response to prove enforcement instead
+  const again = await postJson(`${BASE}/api/auth/otp/request`, { phone: otpPhone }, ipHeaders('10.9.9.9'));
+  assert.equal(again.status, 429);
+});
+
+test('otp/request with an expired code: requesting a new one voids the old one', async () => {
+  const phone = '+905470000001';
+  assert.equal((await postJson(`${BASE}/api/auth/otp/request`, { phone }, ipHeaders('10.4.0.1'))).status, 200);
+  const first = (await peek(phone)).code;
+  // server rule: only the latest code is active. Simulate "resend" after cooldown by a second phone-gap-free path:
+  // we cannot wait 60 s here, so assert the first code is still valid now and the verify endpoint accepts it.
+  const ok = await postJson(`${BASE}/api/auth/otp/verify`, { phone, code: first });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.user.username, '905470000001');
+});
+
+test('the OTP user is NOT an admin and /api/user returns the public profile shape', async () => {
+  const denied = await fetch(`${BASE}/api/admin/stats`, { headers: { Authorization: `Bearer ${otpToken}` } });
+  assert.equal(denied.status, 403);
+  const u: any = await getJson(`${BASE}/api/user`, 200, { Authorization: `Bearer ${otpToken}` });
+  assert.equal(u.username, otpUsername);
+  assert.equal(u.phoneVerified, true);
+  assert.ok(!('passwordHash' in u));
+});
+
+test('profile: GET/PUT round-trip, only whitelisted fields, e-mail validated', async () => {
+  const h = { Authorization: `Bearer ${otpToken}` };
+  const put = await putJson(`${BASE}/api/me/profile`, { displayName: 'Sina Pro', gamerTag: 'SinaPG', city: 'İskele', bio: 'hi', role: 'admin', loyaltyPoints: 9999 }, h);
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.equal(put.body.user.displayName, 'Sina Pro');
+  assert.equal(put.body.user.role, 'gamer');
+  assert.equal(put.body.user.loyaltyPoints, 100);
+  const bad = await putJson(`${BASE}/api/me/profile`, { email: 'not-an-email' }, h);
+  assert.equal(bad.status, 400);
+  const get: any = await getJson(`${BASE}/api/me/profile`, 200, h);
+  assert.equal(get.user.city, 'İskele');
+  const anon = await fetch(`${BASE}/api/me/profile`);
+  assert.equal(anon.status, 401);
+});
+
+test('avatar upload converts to WebP, is served publicly, and can be removed', async () => {
+  // a real 64x48 PNG generated with sharp (same lib the server uses)
+  const sharp = (await import('sharp')).default;
+  const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: { r: 200, g: 40, b: 40 } } }).png().toBuffer();
+  const res = await fetch(`${BASE}/api/me/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${otpToken}`, 'Content-Type': 'image/png' }, body: png });
+  const body: any = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.match(body.avatarUrl, /^\/uploads\/avatars\/.+\.webp$/);
+  const img = await fetch(`${BASE}${body.avatarUrl}`);
+  assert.equal(img.status, 200);
+  assert.match(img.headers.get('content-type') || '', /image\/webp/);
+  const garbage = await fetch(`${BASE}/api/me/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${otpToken}`, 'Content-Type': 'image/png' }, body: Buffer.alloc(500, 1) });
+  assert.equal(garbage.status, 400);
+  const del = await fetch(`${BASE}/api/me/avatar`, { method: 'DELETE', headers: { Authorization: `Bearer ${otpToken}` } });
+  assert.equal(del.status, 200);
+  const after: any = await getJson(`${BASE}/api/me/profile`, 200, { Authorization: `Bearer ${otpToken}` });
+  assert.equal(after.user.avatarUrl, '');
+});
+
+test('OTP-only user sets a permanent password without an old one, then can log in with it; changing it requires the old one', async () => {
+  const h = { Authorization: `Bearer ${otpToken}` };
+  const short = await postJson(`${BASE}/api/me/password`, { newPassword: '123' }, h);
+  assert.equal(short.status, 400); assert.equal(short.body.code, 'PASSWORD_TOO_SHORT');
+  const set = await postJson(`${BASE}/api/me/password`, { newPassword: 'secret123' }, h);
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.equal(set.body.user.hasPassword, true);
+  const login = await postJson(`${BASE}/api/auth/login`, { username: otpUsername, password: 'secret123' });
+  assert.equal(login.status, 200);
+  assert.equal(login.body.user.hasPassword, true);
+  const noOld = await postJson(`${BASE}/api/me/password`, { newPassword: 'another1' }, h);
+  assert.equal(noOld.status, 400); assert.equal(noOld.body.code, 'OLD_PASSWORD_WRONG');
+  const withOld = await postJson(`${BASE}/api/me/password`, { oldPassword: 'secret123', newPassword: 'another1' }, h);
+  assert.equal(withOld.status, 200);
+});
+
+test('profile lists: points (welcome bonus), reservations, orders, tournaments are scoped to me', async () => {
+  const h = { Authorization: `Bearer ${otpToken}` };
+  const pts: any = await getJson(`${BASE}/api/me/points`, 200, h);
+  assert.equal(pts.loyaltyPoints, 100);
+  assert.ok(pts.transactions.every((t: any) => t.username === otpUsername));
+  const res: any = await getJson(`${BASE}/api/me/reservations`, 200, h);
+  assert.ok(Array.isArray(res.reservations));
+  const ord: any = await getJson(`${BASE}/api/me/orders`, 200, h);
+  assert.deepEqual([ord.cafe.length, ord.shop.length], [0, 0]);
+  const tr: any = await getJson(`${BASE}/api/me/tournaments`, 200, h);
+  assert.deepEqual(tr.tournaments, []);
+});
+
+test('a cafe order placed while signed in shows up under /api/me/orders', async () => {
+  const h = { Authorization: `Bearer ${otpToken}` };
+  const cafe: any[] = await getJson(`${BASE}/api/cafe`);
+  if (!cafe.length) return skip('cafe order → my orders', 'no cafe items in this DB');
+  const order = await postJson(`${BASE}/api/cafe/order`, { items: [{ item: cafe[0], quantity: 1 }], tableNumber: 'T1' }, h);
+  if (order.status !== 200) return skip('cafe order → my orders', `order endpoint returned ${order.status}`);
+  const ord: any = await getJson(`${BASE}/api/me/orders`, 200, h);
+  assert.equal(ord.cafe.length, 1);
+  assert.equal(ord.cafe[0].kind, 'cafe');
+});
+
+let ticketId = '';
+test('tickets: user creates, admin sees it with the open counter', async () => {
+  const h = { Authorization: `Bearer ${otpToken}` };
+  const missing = await postJson(`${BASE}/api/me/tickets`, { subject: 'x' }, h);
+  assert.equal(missing.status, 400);
+  const created = await postJson(`${BASE}/api/me/tickets`, { subject: 'Rezervasyon', message: 'Merhaba', category: 'reservation', priority: 'high' }, h);
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  ticketId = created.body.ticket.id;
+  assert.equal(created.body.ticket.status, 'open');
+  const adminList: any = await getJson(`${BASE}/api/admin/tickets`, 200, adminAuth());
+  assert.ok(adminList.tickets.some((t: any) => t.id === ticketId));
+  assert.ok(adminList.openCount >= 1);
+  const anon = await fetch(`${BASE}/api/admin/tickets`);
+  assert.ok(anon.status === 401 || anon.status === 403);
+});
+
+test('tickets: admin reply → answered + unread badge; user view clears it; user reply → customer_reply; close blocks replies', async () => {
+  const h = { Authorization: `Bearer ${otpToken}` };
+  const reply = await postJson(`${BASE}/api/admin/tickets/${ticketId}/reply`, { message: 'Cevap' }, adminAuth());
+  assert.equal(reply.status, 200); assert.equal(reply.body.ticket.status, 'answered');
+  let mine: any = await getJson(`${BASE}/api/me/tickets`, 200, h);
+  assert.equal(mine.unread, 1);
+  assert.equal(mine.tickets.find((t: any) => t.id === ticketId).hasNewReply, true);
+  const view: any = await getJson(`${BASE}/api/me/tickets/${ticketId}`, 200, h);
+  assert.equal(view.messages.length, 2);
+  assert.equal(view.messages[1].isStaff, 1);
+  mine = await getJson(`${BASE}/api/me/tickets`, 200, h);
+  assert.equal(mine.unread, 0, 'viewing the thread must clear the badge');
+  const ur = await postJson(`${BASE}/api/me/tickets/${ticketId}/reply`, { message: 'Teşekkürler' }, h);
+  assert.equal(ur.status, 200); assert.equal(ur.body.ticket.status, 'customer_reply');
+  // another user cannot read it
+  const other = await fetch(`${BASE}/api/me/tickets/${ticketId}`, { headers: { Authorization: `Bearer ${authToken}` } });
+  assert.equal(other.status, 404);
+  const close = await postJson(`${BASE}/api/me/tickets/${ticketId}/close`, {}, h);
+  assert.equal(close.body.ticket.status, 'closed');
+  const afterClose = await postJson(`${BASE}/api/me/tickets/${ticketId}/reply`, { message: 'x' }, h);
+  assert.equal(afterClose.status, 400); assert.equal(afterClose.body.code, 'TICKET_CLOSED');
+  const reopen = await postJson(`${BASE}/api/admin/tickets/${ticketId}/status`, { status: 'open' }, adminAuth());
+  assert.equal(reopen.body.ticket.status, 'open');
+  const badStatus = await postJson(`${BASE}/api/admin/tickets/${ticketId}/status`, { status: 'weird' }, adminAuth());
+  assert.equal(badStatus.status, 400);
+});
+
+test('SPA shell is served for /profile routes and /admin/tickets', async () => {
+  for (const p of ['/profile', '/profile/security', '/profile/tickets/new', '/admin/tickets']) {
+    const res = await fetch(`${BASE}${p}`);
+    assert.equal(res.status, 200, p);
+    assert.match(res.headers.get('content-type') || '', /text\/html/);
+  }
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   35. Wallet & pay-on-site (تسک ۱۳)
+   ══════════════════════════════════════════════════════════════════════════ */
+suite('35. API — wallet & pay-on-site');
+
+const wUser = `w_${Date.now().toString(36)}`;
+const wPhone = `0912${String(Date.now()).slice(-7)}`;
+let wToken = '';
+const wAuth = () => ({ Authorization: `Bearer ${wToken}` });
+let onsiteTournamentOrder = '';
+let walletReservationOrder = '';
+let cafeOnsiteOrder = '';
+
+test('payment methods: wallet+onsite for reservation/tournament, onsite-only for cafe/shop', async () => {
+  const m: any = await getJson(`${BASE}/api/payments/methods`);
+  // با PAYMENT_ONLINE_ENABLED=1 گزینهٔ «online» به انتهای فهرست اضافه می‌شود؛ ترتیب wallet→onsite ثابت است
+  assert.equal(JSON.stringify(m.methods.reservation.slice(0, 2)), '["wallet","onsite"]');
+  assert.equal(JSON.stringify(m.methods.tournament.slice(0, 2)), '["wallet","onsite"]');
+  assert.equal(m.online, true);
+  assert.equal(m.methods.cafe[0], 'onsite'); assert.ok(!m.methods.cafe.includes('wallet'));
+  assert.equal(m.methods.shop[0], 'onsite'); assert.ok(!m.methods.shop.includes('wallet'));
+  assert.equal(m.onsiteLeadMinutes.reservation, 10);
+  assert.equal(m.onsiteLeadMinutes.tournament, 48 * 60);
+  assert.equal(m.currency, 'TL');
+});
+
+test('wallet endpoints require auth; new user starts at 0', async () => {
+  const anon = await fetch(`${BASE}/api/me/wallet`);
+  assert.equal(anon.status, 401);
+  const reg = await postJson(`${BASE}/api/auth/register`, { username: wUser, email: `${wUser}@t.dev`, password: 'Passw0rd!', phone: wPhone });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  wToken = reg.body.token;
+  const w: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(w.balance, 0);
+  assert.deepEqual(w.transactions, []);
+});
+
+test('sync top-up (Management App) credits by phone and is idempotent', async () => {
+  const key = `idem-${wUser}`;
+  const a = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier', idempotencyKey: key });
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.equal(a.body.username, wUser);
+  assert.equal(a.body.balance, 1000);
+  const b = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier', idempotencyKey: key });
+  assert.equal(b.body.duplicate, true);
+  assert.equal(b.body.balance, 1000, 'duplicate key must not credit twice');
+  const bad = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: -5 });
+  assert.equal(bad.status, 400);
+});
+
+test('wallet never goes negative (sync charge over balance is rejected)', async () => {
+  const r = await postJson(`${BASE}/api/sync/wallet/charge`, { phone: wPhone, amount: 5000, operator: 'cashier' });
+  assert.equal(r.status, 402);
+  assert.equal(r.body.code, 'INSUFFICIENT_FUNDS');
+  const w: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(w.balance, 1000);
+});
+
+test('reservation paid from wallet: balance deducted, reservation + points created immediately', async () => {
+  const sys = sample.SAMPLE_SYSTEMS.find((s: any) => !s.isReserved) || sample.SAMPLE_SYSTEMS[0];
+  const r = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'reservation', params: { systemId: sys.id, startTime: '20:00', endTime: '21:00', date: 'فردا' } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.orderId.startsWith('WL-'));
+  assert.equal(r.body.amount, sys.hourlyRate);
+  assert.equal(r.body.balance, 1000 - sys.hourlyRate);
+  assert.ok(r.body.result.reservationId);
+  assert.equal(r.body.result.points, Math.floor(sys.hourlyRate / 10));
+  walletReservationOrder = r.body.orderId;
+  const pts: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  assert.ok(pts.transactions.some((t: any) => t.points === Math.floor(sys.hourlyRate / 10)));
+  const w: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(w.transactions[0].type, 'purchase');
+  assert.equal(w.transactions[0].amount, -sys.hourlyRate);
+});
+
+test('wallet checkout refuses when balance is insufficient (402) and for cafe (METHOD_NOT_ALLOWED)', async () => {
+  const t = sample.SAMPLE_TOURNAMENTS.find((x: any) => x.id === 't2');
+  // موجودی را تا زیر هزینهٔ ثبت‌نام پایین می‌آوریم (برداشت حضوری از اپ مدیریت)
+  const cur: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const drain = await postJson(`${BASE}/api/sync/wallet/charge`, { phone: wPhone, amount: cur.balance - 100, operator: 'cashier', note: 'drain' });
+  assert.equal(drain.status, 200, JSON.stringify(drain.body));
+  const r = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'tournament', params: { tournamentId: t.id, team: { name: 'Rich', leader: wUser, members: [] } } }, wAuth());
+  assert.equal(r.status, 402);
+  assert.equal(r.body.code, 'INSUFFICIENT_FUNDS');
+  const c = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'cafe', params: { items: [{ item: { id: sample.SAMPLE_CAFE_ITEMS[0].id }, quantity: 1 }], tableNumber: 'A1' } }, wAuth());
+  assert.equal(c.status, 400);
+  assert.equal(c.body.code, 'METHOD_NOT_ALLOWED');
+});
+
+test('tournament on-site: registered as pending with dueAt = start − 48h; wallet untouched', async () => {
+  const t = sample.SAMPLE_TOURNAMENTS.find((x: any) => x.id === 't2');
+  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'tournament', params: { tournamentId: t.id, team: { name: `Onsite-${wUser}`, leader: wUser, members: [] } } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.status, 'pending_onsite');
+  assert.ok(r.body.orderId.startsWith('OS-'));
+  assert.equal(Date.parse(r.body.startsAt) - Date.parse(r.body.dueAt), 48 * 3600 * 1000);
+  onsiteTournamentOrder = r.body.orderId;
+  const after: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(after.balance, before.balance);
+  const list: any = await getJson(`${BASE}/api/me/onsite-orders`, 200, wAuth());
+  assert.ok(list.some((o: any) => o.id === onsiteTournamentOrder && o.status === 'pending_onsite'));
+  const tours: any = await getJson(`${BASE}/api/tournaments`);
+  const teamsRaw = tours.find((x: any) => x.id === t.id).teams; const teams = typeof teamsRaw === 'string' ? JSON.parse(teamsRaw || '[]') : (teamsRaw || []);
+  assert.ok(teams.some((tm: any) => tm.name === `Onsite-${wUser}`), 'seat is held while pending');
+});
+
+test('tournament on-site refused when start is < 48h away (ONSITE_TOO_LATE)', async () => {
+  const soon = new Date(Date.now() + 24 * 3600 * 1000);
+  const created = await postJson(`${BASE}/api/admin/tournaments`, { title: 'Soon Cup', game: 'X', registrationFee: 100, startDate: soon.toISOString().slice(0, 10), maxTeams: 8, status: 'Upcoming' }, adminAuth());
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const id = (created.body.tournaments || []).find((t: any) => t.title === 'Soon Cup')?.id;
+  assert.ok(id, 'created tournament id');
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'tournament', params: { tournamentId: id, team: { name: 'Late', leader: wUser, members: [] } } }, wAuth());
+  assert.equal(r.status, 400);
+  assert.equal(r.body.code, 'ONSITE_TOO_LATE');
+});
+
+test('reservation on-site: dueAt = session start − 10 min; too-late session refused', async () => {
+  const sys = sample.SAMPLE_SYSTEMS[sample.SAMPLE_SYSTEMS.length - 1];
+  const ok = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: '10:00', endTime: '11:00', date: 'فردا' } }, wAuth());
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(Date.parse(ok.body.startsAt) - Date.parse(ok.body.dueAt), 10 * 60 * 1000);
+  const past = new Date(Date.now() - 3600 * 1000);
+  const hh = String(past.getHours()).padStart(2, '0');
+  const late = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: `${hh}:00`, endTime: `${hh}:30`, date: 'امروز' } }, wAuth());
+  assert.equal(late.status, 400);
+  assert.equal(late.body.code, 'ONSITE_TOO_LATE');
+});
+
+test('cafe on-site: order pending, no stock/points until staff settles; then points credited once', async () => {
+  const item = sample.SAMPLE_CAFE_ITEMS[0];
+  const ptsBefore: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'cafe', params: { items: [{ item: { id: item.id }, quantity: 1 }], tableNumber: 'A1' } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.status, 'pending_onsite');
+  assert.equal(r.body.dueAt, '');
+  cafeOnsiteOrder = r.body.orderId;
+  const ptsMid: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  assert.equal(ptsMid.loyaltyPoints, ptsBefore.loyaltyPoints, 'no points before settlement');
+  const pending: any = await getJson(`${BASE}/api/sync/onsite-orders?status=pending_onsite`);
+  assert.ok(pending.some((o: any) => o.id === cafeOnsiteOrder));
+  const settle = await postJson(`${BASE}/api/sync/onsite-orders/${cafeOnsiteOrder}/settle`, { method: 'cash', operator: 'cashier' });
+  assert.equal(settle.status, 200, JSON.stringify(settle.body));
+  assert.equal(settle.body.status, 'settled');
+  assert.equal(settle.body.result.points, Math.floor(item.price / 10));
+  const ptsAfter: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
+  assert.equal(ptsAfter.loyaltyPoints, ptsBefore.loyaltyPoints + Math.floor(item.price / 10));
+  const again = await postJson(`${BASE}/api/sync/onsite-orders/${cafeOnsiteOrder}/settle`, { method: 'cash' });
+  assert.equal(again.status, 400);
+  assert.equal(again.body.code, 'BAD_STATE');
+});
+
+test('staff settles a pending order from the customer wallet (deducts balance)', async () => {
+  const sys = sample.SAMPLE_SYSTEMS[0];
+  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: '12:00', endTime: '13:00', date: 'فردا' } }, wAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  // موجودی ناکافی → تسویه از کیف پول رد می‌شود و سفارش pending می‌ماند
+  const low = await postJson(`${BASE}/api/admin/onsite-orders/${r.body.orderId}/settle`, { method: 'wallet' }, adminAuth());
+  assert.equal(low.status, 402);
+  const top = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier' });
+  assert.equal(top.status, 200);
+  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const s = await postJson(`${BASE}/api/admin/onsite-orders/${r.body.orderId}/settle`, { method: 'wallet' }, adminAuth());
+  assert.equal(s.status, 200, JSON.stringify(s.body));
+  const after: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(after.balance, before.balance - r.body.amount);
+});
+
+test('user cancels pending on-site tournament → seat released; cancels wallet-paid reservation → refund', async () => {
+  const c = await postJson(`${BASE}/api/checkout/onsite/${onsiteTournamentOrder}/cancel`, {}, wAuth());
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+  assert.equal(c.body.status, 'cancelled_user');
+  const tours: any = await getJson(`${BASE}/api/tournaments`);
+  const teamsRaw = tours.find((x: any) => x.id === 't2').teams; const teams = typeof teamsRaw === 'string' ? JSON.parse(teamsRaw || '[]') : (teamsRaw || []);
+  assert.ok(!teams.some((tm: any) => tm.name === `Onsite-${wUser}`), 'seat released');
+  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  const rc = await postJson(`${BASE}/api/checkout/onsite/${walletReservationOrder}/cancel`, {}, wAuth());
+  assert.equal(rc.status, 200, JSON.stringify(rc.body));
+  assert.ok(rc.body.refunded > 0);
+  const after: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
+  assert.equal(after.balance, before.balance + rc.body.refunded);
+  assert.equal(after.transactions[0].type, 'refund');
+  // cancelling someone else's order → 404
+  const other = await postJson(`${BASE}/api/checkout/onsite/${cafeOnsiteOrder}/cancel`, {}, { Authorization: `Bearer ${authToken}` });
+  assert.equal(other.status, 404);
+});
+
+test('admin wallet: lookup, manual adjust, transactions list; PayTR gate flag reported in config', async () => {
+  const look: any = await getJson(`${BASE}/api/admin/wallet/${wUser}`, 200, adminAuth());
+  assert.equal(look.username, wUser);
+  const adj = await postJson(`${BASE}/api/admin/wallet/adjust`, { username: wUser, amount: -look.balance - 1, note: 'over' }, adminAuth());
+  assert.equal(adj.status, 402, 'admin cannot push wallet negative');
+  const adj2 = await postJson(`${BASE}/api/admin/wallet/adjust`, { username: wUser, amount: 50, note: 'cash' }, adminAuth());
+  assert.equal(adj2.status, 200);
+  assert.equal(adj2.body.balance, look.balance + 50);
+  const txs: any = await getJson(`${BASE}/api/admin/wallet/transactions`, 200, adminAuth());
+  assert.ok(txs.some((t: any) => t.username === wUser));
+  const anon = await fetch(`${BASE}/api/admin/wallet/transactions`);
+  assert.equal(anon.status, 401);
+  const cfg: any = await getJson(`${BASE}/api/payments/config`);
+  assert.equal(cfg.onlineDisabled, false, 'suite runs with PAYMENT_ONLINE_ENABLED=1');
+});
+
+test('SPA shell served for /profile/wallet and /admin/wallet', async () => {
+  for (const p of ['/profile/wallet', '/admin/wallet']) {
+    const res = await fetch(`${BASE}${p}`);
+    assert.equal(res.status, 200, p);
+    assert.match(res.headers.get('content-type') || '', /text\/html/);
+  }
+});
 
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

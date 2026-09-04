@@ -111,7 +111,7 @@ try {
   if (!reparsed.componentJs || reparsed.componentJs.length === 0) throw new Error('zip round-trip: componentJs missing (theme.js is required)');
   console.log('zip round-trip (build → parse, incl. assets + theme.js): OK');
 
-  // CSS-only zip (بدون theme.js): حالا باید رد شود چون theme.js اجباری است
+  // CSS-only zip (بدون theme.js): از SDK v2 به بعد theme.js اختیاری است → باید پذیرفته شود با componentJs خالی
   const { zipSync } = await import('fflate');
   const { strToU8 } = await import('fflate');
   const cssOnlyZip = zipSync({
@@ -121,8 +121,10 @@ try {
     ),
   });
   const cssOnly = zip.parseThemeZip(cssOnlyZip, 'My Theme.zip');
-  if (!('error' in cssOnly) || cssOnly.code !== 'no-js') throw new Error('ZIP without theme.js must be rejected with no-js, got: ' + JSON.stringify(cssOnly));
-  console.log('zip بدون theme.js (فقط CSS): رد شد با کد no-js ✅ (theme.js اجباری است)');
+  if ('error' in cssOnly) throw new Error('CSS-only ZIP must be accepted (theme.js is optional since SDK v2), got: ' + JSON.stringify(cssOnly));
+  if (cssOnly.componentJs !== '') throw new Error('CSS-only ZIP must yield empty componentJs');
+  if (cssOnly.meta.id !== 'my-theme') throw new Error('CSS-only ZIP: id must derive from CSS selector');
+  console.log('zip بدون theme.js (فقط CSS): پذیرفته شد با componentJs خالی ✅ (theme.js اختیاری است)');
 
   // Metadata from CSS + filename (با وجود theme.js) — id/name/colors از CSS مشتق می‌شوند
   const fullZip = zipSync({

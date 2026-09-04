@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Article } from '../types/gamenet';
 import { MessageSquare, User, Calendar, Tag, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Sparkles, Send } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { L } from '../utils/i18n';
 
 interface Props {
   themeId?: string;
@@ -33,13 +34,7 @@ export default function BlogTab({
     e.preventDefault();
     if (!selectedArticleId) return;
     if (!commentGamerTag.trim() || !commentContent.trim()) {
-      const errorMsg = language === 'fa'
-        ? 'لطفاً گیمرتگ و متن دیدگاه خود را وارد کنید.'
-        : language === 'en'
-        ? 'Please enter both your gamertag and comment content.'
-        : language === 'ru'
-        ? 'Пожалуйста, введите ваш геймертег и текст комментария.'
-        : 'Lütfen oyuncu etiketini ve yorum alanını doldurun.';
+      const errorMsg = L(language, { fa: 'لطفاً گیمرتگ و متن دیدگاه خود را وارد کنید.', en: 'Please enter both your gamertag and comment content.', ru: 'Пожалуйста, введите ваш геймертег и текст комментария.', tr: 'Lütfen oyuncu adınızı ve yorum metnini girin.' });
       addNotification(errorMsg, 'error');
       return;
     }
@@ -77,7 +72,7 @@ export default function BlogTab({
           </button>
 
           {/* Article Header */}
-          <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-[#0d122b] border border-white/10 mb-6">
+          <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-card-2 border border-white/10 mb-6">
             <img loading="lazy" 
               src={selectedArticle.imageUrl} 
               alt={selectedArticle.title} 
@@ -87,8 +82,8 @@ export default function BlogTab({
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
             <div className="absolute bottom-6 right-6 left-6">
               <span className="px-3 py-1 bg-primary text-black rounded text-xs font-black border border-primary/30 font-display uppercase tracking-wide">
-                {selectedArticle.category === 'News' && (language === 'fa' ? 'دنیای گیم' : language === 'en' ? 'Gaming' : language === 'ru' ? 'Общие новости' : 'Oyun Dünyası')}
-                {selectedArticle.category === 'Hardware' && (language === 'fa' ? 'سخت‌افزار' : language === 'en' ? 'Hardware' : language === 'ru' ? 'Железо' : 'Donanım')}
+                {selectedArticle.category === 'News' && (L(language, { fa: 'دنیای گیم', en: 'Gaming', ru: 'Общие новости', tr: 'Oyun Dünyası' }))}
+                {selectedArticle.category === 'Hardware' && (L(language, { fa: 'سخت‌افزار', en: 'Hardware', ru: 'Железо', tr: 'Donanım' }))}
                 {selectedArticle.category !== 'News' && selectedArticle.category !== 'Hardware' && selectedArticle.category}
               </span>
               <h1 className="text-2xl md:text-3xl font-black text-white mt-3.5 leading-snug drop-shadow-md font-display tracking-wide">
@@ -156,7 +151,7 @@ export default function BlogTab({
                 </p>
               ) : (
                 selectedArticle.comments.map((comment) => (
-                  <div key={comment.id} className="bg-[#0d122b] p-4 rounded-lg border border-white/5 flex flex-col gap-2">
+                  <div key={comment.id} className="bg-card-2 p-4 rounded-lg border border-white/5 flex flex-col gap-2">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-bold text-primary font-mono">@{comment.gamerTag}</span>
                       <span className="text-gray-500 font-bold font-mono">{comment.date}</span>
@@ -168,7 +163,7 @@ export default function BlogTab({
             </div>
 
             {/* Comment Form */}
-            <form onSubmit={handlePostComment} className="bg-[#0f1326] p-6 rounded-xl border border-white/10 flex flex-col gap-4">
+            <form onSubmit={handlePostComment} className="bg-card-3 p-6 rounded-xl border border-white/10 flex flex-col gap-4">
               <h4 className="text-sm font-bold text-white flex items-center gap-1.5 font-display uppercase tracking-wide">
                 <Sparkles className="w-4 h-4 text-primary" />
                 <span>
@@ -193,7 +188,7 @@ export default function BlogTab({
                     placeholder="Gamer_Tag"
                     value={commentGamerTag}
                     onChange={(e) => setCommentGamerTag(e.target.value)}
-                    className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
+                    className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -208,14 +203,11 @@ export default function BlogTab({
                       type="text"
                       required
                       placeholder={
-                        language === 'fa' ? 'دیدگاه خود را وارد کنید...' :
-                        language === 'en' ? 'Type your comment here...' :
-                        language === 'ru' ? 'Введите комментарий...' :
-                        'Yorumunuzu yazın...'
+                        L(language, { fa: 'دیدگاه خود را وارد کنید...', en: 'Type your comment here...', ru: 'Введите комментарий...', tr: 'Yorumunuzu buraya yazın...' })
                       }
                       value={commentContent}
                       onChange={(e) => setCommentContent(e.target.value)}
-                      className="flex-1 bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
+                      className="flex-1 bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
                     />
                     <button
                       type="submit"
@@ -243,12 +235,12 @@ export default function BlogTab({
                 className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all cursor-pointer uppercase tracking-wider border ${
                   activeCategory === cat
                     ? 'bg-primary text-black border-primary shadow-[0_0_15px_rgba(0,240,255,0.25)]'
-                    : 'text-gray-400 hover:text-white bg-[#0f1326] hover:bg-white/5 border-white/10'
+                    : 'text-gray-400 hover:text-white bg-card-3 hover:bg-white/5 border-white/10'
                 }`}
               >
-                {cat === 'All' && (language === 'fa' ? 'همه خبرها' : language === 'en' ? 'All News' : language === 'ru' ? 'Все новости' : 'Tüm Haberler')}
-                {cat === 'News' && (language === 'fa' ? 'دنیای گیم' : language === 'en' ? 'Gaming' : language === 'ru' ? 'Игры' : 'Oyun')}
-                {cat === 'Hardware' && (language === 'fa' ? 'سخت‌افزار' : language === 'en' ? 'Hardware' : language === 'ru' ? 'Железо' : 'Donanım')}
+                {cat === 'All' && (L(language, { fa: 'همه خبرها', en: 'All News', ru: 'Все новости', tr: 'Tüm Haberler' }))}
+                {cat === 'News' && (L(language, { fa: 'دنیای گیم', en: 'Gaming', ru: 'Игры', tr: 'Oyun Dünyası' }))}
+                {cat === 'Hardware' && (L(language, { fa: 'سخت‌افزار', en: 'Hardware', ru: 'Железо', tr: 'Donanım' }))}
                 {cat !== 'All' && cat !== 'News' && cat !== 'Hardware' && cat}
               </button>
             ))}
@@ -261,7 +253,7 @@ export default function BlogTab({
                 key={article.id}
                 className="rounded-2xl border border-white/10 bg-dark-card overflow-hidden flex flex-col group hover:border-primary/50 hover:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all duration-300"
               >
-                <div className="relative aspect-[16/9] w-full bg-[#0d122b] overflow-hidden">
+                <div className="relative aspect-[16/9] w-full bg-card-2 overflow-hidden">
                   <img loading="lazy" 
                     src={article.imageUrl} 
                     alt={article.title} 
@@ -269,8 +261,8 @@ export default function BlogTab({
                     referrerPolicy="no-referrer"
                   />
                   <span className="absolute top-3 right-3 px-2.5 py-1 bg-primary text-black text-[10px] font-black border border-primary/30 backdrop-blur-sm rounded font-display uppercase tracking-wider">
-                    {article.category === 'News' && (language === 'fa' ? 'دنیای گیم' : language === 'en' ? 'Gaming' : language === 'ru' ? 'Игры' : 'Oyun')}
-                    {article.category === 'Hardware' && (language === 'fa' ? 'سخت‌افزار' : language === 'en' ? 'Hardware' : language === 'ru' ? 'Железо' : 'Donanım')}
+                    {article.category === 'News' && (L(language, { fa: 'دنیای گیم', en: 'Gaming', ru: 'Игры', tr: 'Oyun Dünyası' }))}
+                    {article.category === 'Hardware' && (L(language, { fa: 'سخت‌افزار', en: 'Hardware', ru: 'Железо', tr: 'Donanım' }))}
                     {article.category !== 'News' && article.category !== 'Hardware' && article.category}
                   </span>
                 </div>

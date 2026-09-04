@@ -3,6 +3,8 @@ import { Accessory, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Tag, CreditCard, ChevronRight, Check, X, Sparkles, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { postJson, errorMessage, toServerCart } from '../services/postJson';
+import { CheckoutModal, type CheckoutResult } from '../legal/CheckoutModal';
+import { L, localeOf } from '../utils/i18n';
 
 interface Props {
   themeId?: string;
@@ -35,13 +37,7 @@ export default function ShopTab({
     const existing = cart.find(c => c.item.id === accessory.id);
     if (existing) {
       if (existing.qty >= accessory.stock) {
-        const errorStock = language === 'fa'
-          ? `موجودی کالا (${accessory.stock}) کافی نیست.`
-          : language === 'en'
-          ? `Insufficient product stock (${accessory.stock}).`
-          : language === 'ru'
-          ? `Недостаточно товара на складе (${accessory.stock} шт.).`
-          : `Yetersiz ürün stoğu (${accessory.stock} adet).`;
+        const errorStock = L(language, { fa: `موجودی کالا (${accessory.stock}) کافی نیست.`, en: `Insufficient product stock (${accessory.stock}).`, ru: `Недостаточно товара на складе (${accessory.stock} шт.).`, tr: `Ürün stoğu (${accessory.stock}) yetersiz.` });
         addNotification(errorStock, 'error');
         return;
       }
@@ -50,13 +46,7 @@ export default function ShopTab({
       setCart([...cart, { item: accessory, qty: 1 }]);
     }
 
-    const successAdd = language === 'fa'
-      ? `${accessory.name} به سبد خرید اضافه شد.`
-      : language === 'en'
-      ? `${accessory.name} added to your shopping cart.`
-      : language === 'ru'
-      ? `${accessory.name} добавлен в корзину.`
-      : `${accessory.name} sepete eklendi.`;
+    const successAdd = L(language, { fa: `${accessory.name} به سبد خرید اضافه شد.`, en: `${accessory.name} added to your shopping cart.`, ru: `${accessory.name} добавлен в корзину.`, tr: `${accessory.name} sepetinize eklendi.` });
 
     addNotification(successAdd, 'success');
   };
@@ -70,13 +60,7 @@ export default function ShopTab({
       setCart(cart.filter(c => c.item.id !== id));
     } else {
       if (newQty > current.item.stock) {
-        const maxLimit = language === 'fa'
-          ? `حداکثر موجودی (${current.item.stock}) است.`
-          : language === 'en'
-          ? `Maximum available stock limit is (${current.item.stock}).`
-          : language === 'ru'
-          ? `Максимальный лимит на складе (${current.item.stock} шт.).`
-          : `Maksimum ürün stoğu (${current.item.stock}) adettir.`;
+        const maxLimit = L(language, { fa: `حداکثر موجودی (${current.item.stock}) است.`, en: `Maximum available stock limit is (${current.item.stock}).`, ru: `Максимальный лимит на складе (${current.item.stock} шт.).`, tr: `Maksimum stok (${current.item.stock}).` });
         addNotification(maxLimit, 'error');
         return;
       }
@@ -110,10 +94,7 @@ export default function ShopTab({
     
     if (!found) {
       addNotification(
-        language === 'fa' ? 'کد تخفیف معتبر نیست یا منقضی شده است.' :
-        language === 'en' ? 'Discount code is invalid or expired.' :
-        language === 'ru' ? 'Промокод недействителен или истек.' :
-        'İndirim kodu geçersiz veya süresi dolmuş.',
+        L(language, { fa: 'کد تخفیف معتبر نیست یا منقضی شده است.', en: 'Discount code is invalid or expired.', ru: 'Промокод недействителен или истек.', tr: 'İndirim kodu geçersiz veya süresi dolmuş.' }),
         'error'
       );
       return;
@@ -121,23 +102,14 @@ export default function ShopTab({
 
     const subtotal = getSubtotal();
     if (subtotal < found.minOrder) {
-      const errorMin = language === 'fa'
-        ? `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString()} تومان است.`
-        : language === 'en'
-        ? `Minimum order value to apply this code is ${found.minOrder.toLocaleString()} Tomans.`
-        : language === 'ru'
-        ? `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString()} томанов.`
-        : `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString()} Tümen'dir.`;
+      const errorMin = L(language, { fa: `حداقل خرید جهت اعمال این کد ${found.minOrder.toLocaleString(localeOf(language))} لیر است.`, en: `Minimum order value to apply this code is ${found.minOrder.toLocaleString(localeOf(language))} TL.`, ru: `Минимальный заказ для применения кода: ${found.minOrder.toLocaleString(localeOf(language))} TL.`, tr: `Bu kodu uygulamak için minimum sipariş tutarı ${found.minOrder.toLocaleString(localeOf(language))} TL.` });
       addNotification(errorMin, 'error');
       return;
     }
 
     setAppliedCoupon(found);
     addNotification(
-      language === 'fa' ? 'کد تخفیف با موفقیت اعمال شد!' :
-      language === 'en' ? 'Discount coupon applied successfully!' :
-      language === 'ru' ? 'Промокод успешно применен!' :
-      'İndirim kuponu uygulandı!',
+      L(language, { fa: 'کد تخفیف با موفقیت اعمال شد!', en: 'Discount coupon applied successfully!', ru: 'Промокод успешно применен!', tr: 'İndirim kuponu başarıyla uygulandı!' }),
       'success'
     );
   };
@@ -147,9 +119,15 @@ export default function ShopTab({
   // خرید واقعاً به بک‌اند فرستاده می‌شود (POST /api/accessories/order). شماره‌ی
   // فاکتور، مبلغ نهایی، کسر موجودی و امتیاز همه از پاسخ سرور می‌آیند — قبلاً
   // شماره‌ی فاکتور با Math.random ساخته می‌شد و هیچ سفارشی ثبت نمی‌شد.
+  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number } | null>(null);
+
   const handleCheckout = async () => {
     if (cart.length === 0 || isSubmitting) return;
 
+    // تسک ۱۳: فروشگاه فقط «پرداخت در محل» — کالا در کلاب تحویل و تسویه می‌شود
+    setCheckout({ params: { cart: toServerCart(cart), couponCode: appliedCoupon?.code || '' }, amount: getSubtotal() - getDiscountAmount() });
+    return;
+    // eslint-disable-next-line no-unreachable
     setIsSubmitting(true);
     try {
       const data = await postJson('/api/accessories/order', {
@@ -160,14 +138,8 @@ export default function ShopTab({
       onServerState(data);
 
       const invoice = data?.order?.id ? ` (${data.order.id})` : '';
-      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10000);
-      const successMsg = language === 'fa'
-        ? `پرداخت با موفقیت انجام شد${invoice}! ${pointsEarned} امتیاز وفاداری به حساب شما اضافه گردید.`
-        : language === 'en'
-        ? `Payment completed successfully${invoice}! ${pointsEarned} loyalty points have been added to your account.`
-        : language === 'ru'
-        ? `Оплата прошла успешно${invoice}! Вам начислено ${pointsEarned} баллов лояльности.`
-        : `Ödeme başarıyla tamamlandı${invoice}! Hesabınıza ${pointsEarned} sadakat puanı eklendi.`;
+      const pointsEarned = Math.floor((data?.order?.finalAmount ?? 0) / 10);
+      const successMsg = L(language, { fa: `پرداخت با موفقیت انجام شد${invoice}! ${pointsEarned} امتیاز وفاداری به حساب شما اضافه گردید.`, en: `Payment completed successfully${invoice}! ${pointsEarned} loyalty points have been added to your account.`, ru: `Оплата прошла успешно${invoice}! Вам начислено ${pointsEarned} баллов лояльности.`, tr: `Ödeme başarıyla tamamlandı${invoice}! ${pointsEarned} sadakat puanı hesabınıza eklendi.` });
 
       addNotification(successMsg, 'success');
 
@@ -176,10 +148,7 @@ export default function ShopTab({
       setCouponCode('');
     } catch (e) {
       addNotification(errorMessage(e,
-        language === 'fa' ? 'پرداخت انجام نشد. دوباره تلاش کنید.' :
-        language === 'en' ? 'Payment failed. Please try again.' :
-        language === 'ru' ? 'Оплата не прошла. Попробуйте снова.' :
-        'Ödeme başarısız. Lütfen tekrar deneyin.'
+        L(language, { fa: 'پرداخت انجام نشد. دوباره تلاش کنید.', en: 'Payment failed. Please try again.', ru: 'Оплата не прошла. Попробуйте снова.', tr: 'Ödeme başarısız. Lütfen tekrar deneyin.' })
       ), 'error');
     } finally {
       setIsSubmitting(false);
@@ -192,6 +161,12 @@ export default function ShopTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
+      {checkout && <CheckoutModal kind="shop" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)}
+        onDone={(r: CheckoutResult) => {
+          setCheckout(null);
+          addNotification(L(language, { fa: `سفارش شما ثبت شد (${r.orderId}). کالا در کلاب تحویل و هزینه حضوری تسویه می‌شود؛ امتیاز پس از پرداخت داده می‌شود.`, en: `Order registered (${r.orderId}). Pick up and pay at the club; points are credited after payment.`, ru: `Заказ оформлен (${r.orderId}). Получение и оплата в клубе; баллы начисляются после оплаты.`, tr: `Sipariş kaydedildi (${r.orderId}). Ürün kulüpte teslim edilir ve ödeme yerinde yapılır; puanlar ödemeden sonra eklenir.` }), 'success');
+          setCart([]); setAppliedCoupon(null); setCouponCode('');
+        }} />}
       
       {/* Products list area */}
       <div className="lg:col-span-3 flex flex-col gap-6">
@@ -207,14 +182,14 @@ export default function ShopTab({
                 className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all cursor-pointer uppercase tracking-wider border ${
                   selectedCategory === cat
                     ? 'bg-primary text-black border-primary shadow-[0_0_15px_rgba(0,240,255,0.25)]'
-                    : 'text-gray-400 hover:text-white bg-[#0f1326] hover:bg-white/5 border-white/10'
+                    : 'text-gray-400 hover:text-white bg-card-3 hover:bg-white/5 border-white/10'
                 }`}
               >
-                {cat === 'All' && (language === 'fa' ? 'همه محصولات' : language === 'en' ? 'All Products' : language === 'ru' ? 'Все товары' : 'Tüm Ürünler')}
-                {cat === 'Keyboard' && (language === 'fa' ? 'کیبورد' : language === 'en' ? 'Keyboards' : language === 'ru' ? 'Клавиатуры' : 'Klavyeler')}
-                {cat === 'Mouse' && (language === 'fa' ? 'موس' : language === 'en' ? 'Mice' : language === 'ru' ? 'Мыши' : 'Fareler')}
-                {cat === 'Headset' && (language === 'fa' ? 'هدست' : language === 'en' ? 'Headsets' : language === 'ru' ? 'Наушники' : 'Kulaklıklar')}
-                {cat === 'Controller' && (language === 'fa' ? 'دسته بازی' : language === 'en' ? 'Controllers' : language === 'ru' ? 'Геймпады' : 'Oyun Kolları')}
+                {cat === 'All' && (L(language, { fa: 'همه محصولات', en: 'All Products', ru: 'Все товары', tr: 'Tüm Ürünler' }))}
+                {cat === 'Keyboard' && (L(language, { fa: 'کیبورد', en: 'Keyboards', ru: 'Клавиатуры', tr: 'Klavyeler' }))}
+                {cat === 'Mouse' && (L(language, { fa: 'موس', en: 'Mice', ru: 'Мыши', tr: 'Fareler' }))}
+                {cat === 'Headset' && (L(language, { fa: 'هدست', en: 'Headsets', ru: 'Наушники', tr: 'Kulaklıklar' }))}
+                {cat === 'Controller' && (L(language, { fa: 'دسته بازی', en: 'Controllers', ru: 'Геймпады', tr: 'Oyun Kolları' }))}
               </button>
             ))}
           </div>
@@ -257,7 +232,7 @@ export default function ShopTab({
                 className="rounded-2xl border border-white/10 bg-dark-card overflow-hidden flex flex-col group hover:border-primary/50 hover:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all duration-300"
               >
                 {/* Product Image */}
-                <div className="relative aspect-video w-full bg-[#0d122b] overflow-hidden">
+                <div className="relative aspect-video w-full bg-card-2 overflow-hidden">
                   <img loading="lazy" 
                     src={accessory.imageUrl} 
                     alt={translatedName}
@@ -265,10 +240,10 @@ export default function ShopTab({
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-3 right-3 px-2.5 py-1 rounded bg-black/80 text-[10px] text-gray-300 font-bold border border-white/10 font-mono uppercase tracking-wide">
-                    {accessory.category === 'Keyboard' && (language === 'fa' ? 'کیبورد' : language === 'en' ? 'Keyboard' : language === 'ru' ? 'Клавиатура' : 'Klavye')}
-                    {accessory.category === 'Mouse' && (language === 'fa' ? 'موس' : language === 'en' ? 'Mouse' : language === 'ru' ? 'Мышь' : 'Fare')}
-                    {accessory.category === 'Headset' && (language === 'fa' ? 'هدست' : language === 'en' ? 'Headset' : language === 'ru' ? 'Наушники' : 'Kulaklık')}
-                    {accessory.category === 'Controller' && (language === 'fa' ? 'کنترلر' : language === 'en' ? 'Gamepad' : language === 'ru' ? 'Геймпад' : 'Oyun Kolu')}
+                    {accessory.category === 'Keyboard' && (L(language, { fa: 'کیبورد', en: 'Keyboard', ru: 'Клавиатура', tr: 'Klavye' }))}
+                    {accessory.category === 'Mouse' && (L(language, { fa: 'موس', en: 'Mouse', ru: 'Мышь', tr: 'Fare' }))}
+                    {accessory.category === 'Headset' && (L(language, { fa: 'هدست', en: 'Headset', ru: 'Наушники', tr: 'Kulaklık' }))}
+                    {accessory.category === 'Controller' && (L(language, { fa: 'کنترلر', en: 'Gamepad', ru: 'Геймпад', tr: 'Oyun Kolu' }))}
                   </div>
                 </div>
 
@@ -284,14 +259,15 @@ export default function ShopTab({
                   <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-gray-500 block font-bold font-mono uppercase">
-                        {language === 'fa' ? 'قیمت ویژه:' : 'Special Price:'}
+                        {L(language, { fa: 'قیمت ویژه:', en: 'Special Price:', ru: 'Спеццена:', tr: 'Özel Fiyat:' })}
                       </span>
-                      <strong className="text-primary font-black font-mono text-lg">{accessory.price.toLocaleString()}</strong>
-                      <span className="text-gray-400 text-[10px] mr-1 font-bold">{t('common.currency', 'تومان')}</span>
+                      <strong className="text-primary font-black font-mono text-lg">{accessory.price.toLocaleString(localeOf(language))}</strong>
+                      <span className="text-gray-400 text-[10px] mr-1 font-bold">{t('common.currency', 'لیر')}</span>
                     </div>
 
                     <button
                       onClick={() => addToCart(accessory)}
+                      data-shop-add
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-primary text-primary font-black text-[10px] uppercase tracking-wider hover:bg-primary hover:text-black transition-all font-display cursor-pointer"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
@@ -345,8 +321,8 @@ export default function ShopTab({
                   }
 
                   return (
-                    <div key={item.item.id} className="flex gap-3 bg-[#0d122b] p-2.5 rounded-xl border border-white/5 relative group">
-                      <div className="w-12 h-12 bg-[#0f1326] rounded overflow-hidden shrink-0">
+                    <div key={item.item.id} className="flex gap-3 bg-card-2 p-2.5 rounded-xl border border-white/5 relative group">
+                      <div className="w-12 h-12 bg-card-3 rounded overflow-hidden shrink-0">
                         <img loading="lazy" src={item.item.imageUrl} alt={mappedItemName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       
@@ -354,11 +330,11 @@ export default function ShopTab({
                         <h4 className="text-white text-xs font-bold truncate font-display">{mappedItemName}</h4>
                         <div className="flex items-center justify-between mt-1 font-mono">
                           <span className="text-primary font-bold text-xs">
-                            {(item.item.price * item.qty).toLocaleString()} {t('common.currency', 'تومان')}
+                            {(item.item.price * item.qty).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}
                           </span>
 
                           {/* Qty actions */}
-                          <div className="flex items-center gap-1.5 bg-[#0f1326] rounded border border-white/10 px-1 py-0.5">
+                          <div className="flex items-center gap-1.5 bg-card-3 rounded border border-white/10 px-1 py-0.5">
                             <button 
                               onClick={() => updateQty(item.item.id, -1)}
                               className="text-gray-400 hover:text-white px-1.5 text-xs font-bold cursor-pointer"
@@ -393,7 +369,7 @@ export default function ShopTab({
                   <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg text-xs font-mono">
                     <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
                       <Check className="w-4 h-4 animate-pulse" />
-                      <span>{language === 'fa' ? 'تخفیف اعمال شد:' : 'Discount applied:'} {appliedCoupon.code}</span>
+                      <span>{L(language, { fa: 'تخفیف اعمال شد:', en: 'Discount applied:', ru: 'Скидка применена:', tr: 'İndirim uygulandı:' })} {appliedCoupon.code}</span>
                     </div>
                     <button 
                       onClick={() => setAppliedCoupon(null)}
@@ -409,7 +385,7 @@ export default function ShopTab({
                       placeholder={t('booking.promoLabel', 'کد تخفیف')}
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
-                      className="flex-1 px-3.5 py-2.5 bg-[#0d122b] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
+                      className="flex-1 px-3.5 py-2.5 bg-card-2 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono"
                     />
                     <button
                       onClick={handleApplyCoupon}
@@ -430,7 +406,7 @@ export default function ShopTab({
                     {language === 'ru' && 'Подитог товаров:'}
                     {language === 'tr' && 'Ekipmanlar Toplamı:'}
                   </span>
-                  <span className="text-gray-200">{subtotal.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-400 font-bold">
@@ -440,12 +416,12 @@ export default function ShopTab({
                       {language === 'ru' && 'Сумма скидки:'}
                       {language === 'tr' && 'İndirim Tutarı:'}
                     </span>
-                    <span>-{discount.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                    <span>-{discount.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-white/5 pt-2.5 text-sm font-black text-white font-sans">
                   <span>{t('booking.totalPrice', 'مبلغ قابل پرداخت:')}</span>
-                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString()} {t('common.currency', 'تومان')}</span>
+                  <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
 
                 {/* Loyalty points display */}
@@ -456,10 +432,10 @@ export default function ShopTab({
                     <span>{t('booking.pointsToEarn', 'کسب امتیاز باشگاه:')}</span>
                   </div>
                   <span className="relative z-10 block text-[10px] leading-relaxed text-gray-400 font-medium font-sans">
-                    {language === 'fa' && <>با نهایی کردن خرید، <strong className="text-white font-bold">{Math.floor(total / 10000)} امتیاز</strong> به باشگاه مشتریان شما افزوده می‌شود.</>}
-                    {language === 'en' && <>By confirming this purchase, you will receive <strong className="text-white font-bold">{Math.floor(total / 10000)} points</strong>.</>}
-                    {language === 'ru' && <>После покупки вы получите <strong className="text-white font-bold">{Math.floor(total / 10000)} баллов</strong> на клубную карту.</>}
-                    {language === 'tr' && <>Satın alma işlemini tamamladığınızda, <strong className="text-white font-bold">{Math.floor(total / 10000)} puan</strong> kazanırsınız.</>}
+                    {language === 'fa' && <>با نهایی کردن خرید، <strong className="text-white font-bold">{Math.floor(total / 10)} امتیاز</strong> به باشگاه مشتریان شما افزوده می‌شود.</>}
+                    {language === 'en' && <>By confirming this purchase, you will receive <strong className="text-white font-bold">{Math.floor(total / 10)} points</strong>.</>}
+                    {language === 'ru' && <>После покупки вы получите <strong className="text-white font-bold">{Math.floor(total / 10)} баллов</strong> на клубную карту.</>}
+                    {language === 'tr' && <>Satın alma işlemini tamamladığınızda, <strong className="text-white font-bold">{Math.floor(total / 10)} puan</strong> kazanırsınız.</>}
                   </span>
                 </div>
               </div>
@@ -467,6 +443,7 @@ export default function ShopTab({
               {/* Purchase button */}
               <button
                 onClick={handleCheckout}
+                data-shop-checkout
                 disabled={isSubmitting}
                 className="w-full mt-2 py-4 bg-primary text-black font-black uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:bg-primary-hover border-2 border-primary transition-all flex items-center justify-center gap-2 cursor-pointer font-display text-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >

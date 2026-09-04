@@ -3,6 +3,7 @@ import InitialAvatar from './InitialAvatar';
 import { useLanguage } from '../context/LanguageContext';
 import { MessageSquare, Send, Plus, Users, Hash, Gamepad2, Smile, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { UserState } from '../types/gamenet';
+import { L } from '../utils/i18n';
 
 interface Message {
   id: string;
@@ -182,7 +183,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
 
     if (user.username === 'Guest') {
       addNotification(
-        language === 'fa' ? 'برای ارسال پیام در چت‌روم ابتدا باید وارد حساب خود شوید.' : 'Please login/register to send chat messages.',
+        L(language, { fa: 'برای ارسال پیام در چت‌روم ابتدا باید وارد حساب خود شوید.', en: 'Please login/register to send chat messages.', ru: 'Чтобы писать в чат, сначала войдите в аккаунт.', tr: 'Sohbette mesaj göndermek için önce giriş yapmalısınız.' }),
         'info'
       );
       onOpenAuth();
@@ -245,7 +246,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
       // Rollback optimistic update on error
       setMessages((prev) => prev.filter(m => m.id !== tempId));
       addNotification(
-        language === 'fa' ? 'ارسال پیام با خطا مواجه شد.' : 'Failed to send message.',
+        L(language, { fa: 'ارسال پیام با خطا مواجه شد.', en: 'Failed to send message.', ru: 'Не удалось отправить сообщение.', tr: 'Mesaj gönderilemedi.' }),
         'error'
       );
     }
@@ -258,7 +259,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
 
     if (user.username === 'Guest') {
       addNotification(
-        language === 'fa' ? 'تنها گیمرهای عضو قادر به ساخت اتاق گفتگو هستند.' : 'Only registered users can create new rooms.',
+        L(language, { fa: 'تنها گیمرهای عضو قادر به ساخت اتاق گفتگو هستند.', en: 'Only registered users can create new rooms.', ru: 'Создавать комнаты могут только зарегистрированные игроки.', tr: 'Yalnızca kayıtlı oyuncular yeni oda oluşturabilir.' }),
         'info'
       );
       onOpenAuth();
@@ -279,7 +280,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
         setNewRoomName('');
         setShowAddRoom(false);
         addNotification(
-          language === 'fa' ? `اتاق جدید "${newRoomName}" با موفقیت ایجاد شد.` : `Room "${newRoomName}" created successfully.`,
+          L(language, { fa: `اتاق جدید "${newRoomName}" با موفقیت ایجاد شد.`, en: `Room "${newRoomName}" created successfully.`, ru: `Комната "${newRoomName}" успешно создана.`, tr: `"${newRoomName}" odası başarıyla oluşturuldu.` }),
           'success'
         );
       } else {
@@ -292,7 +293,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
   };
 
   return (
-    <div className="bg-[#0f132a] border border-white/10 rounded-3xl overflow-hidden min-h-[600px] flex flex-col lg:flex-row h-[calc(100vh-220px)]" dir={dir}>
+    <div className="bg-card-3 border border-white/10 rounded-3xl overflow-hidden min-h-[600px] flex flex-col lg:flex-row h-[calc(100vh-220px)]" dir={dir}>
       
       {/* Side list of rooms */}
       <div className={`w-full lg:w-80 border-r lg:border-r-0 lg:border-l border-white/10 flex flex-col shrink-0 ${isMobileSidebarOpen ? 'flex' : 'hidden lg:flex'}`}>
@@ -301,13 +302,13 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
           <div className="flex items-center gap-2">
             <Gamepad2 className="w-5 h-5 text-primary" />
             <span className="font-black text-xs text-white uppercase tracking-wider">
-              {language === 'fa' ? 'اتاق‌های گفتگوی بازی' : 'Game Chat Rooms'}
+              {L(language, { fa: 'اتاق‌های گفتگوی بازی', en: 'Game Chat Rooms', ru: 'Игровые чат-комнаты', tr: 'Oyun Sohbet Odaları' })}
             </span>
           </div>
           <button 
             onClick={() => setShowAddRoom(!showAddRoom)}
             className="p-1.5 rounded-lg bg-primary text-black hover:bg-primary-hover transition-all cursor-pointer"
-            title={language === 'fa' ? 'ساخت اتاق جدید' : 'Create Room'}
+            title={L(language, { fa: 'ساخت اتاق جدید', en: 'Create Room', ru: 'Создать комнату', tr: 'Yeni Oda Oluştur' })}
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -321,14 +322,14 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
               required
               value={newRoomName}
               onChange={(e) => setNewRoomName(e.target.value)}
-              placeholder={language === 'fa' ? 'نام اتاق جدید...' : 'Room name...'}
+              placeholder={L(language, { fa: 'نام اتاق جدید...', en: 'Room name...', ru: 'Название комнаты...', tr: 'Oda adı...' })}
               className="flex-grow px-3 py-1.5 bg-black/50 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-primary font-bold"
             />
             <button 
               type="submit"
               className="bg-primary text-black px-3 py-1.5 rounded-xl text-xs font-black hover:bg-primary-hover transition-all cursor-pointer shrink-0"
             >
-              {language === 'fa' ? 'ثبت' : 'Add'}
+              {L(language, { fa: 'ثبت', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}
             </button>
           </form>
         )}
@@ -370,15 +371,15 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
               'bg-rose-500'
             }`} />
             <span className="text-gray-400">
-              {wsStatus === 'connected' && (language === 'fa' ? 'شبکه زنده فعال' : 'Live WebSocket active')}
-              {wsStatus === 'connecting' && (language === 'fa' ? 'اتصال به کلاود...' : 'Connecting to cloud...')}
-              {wsStatus === 'disconnected' && (language === 'fa' ? 'حالت آفلاین (پشتیبان)' : 'Offline mode (Backup)')}
+              {wsStatus === 'connected' && (L(language, { fa: 'شبکه زنده فعال', en: 'Live WebSocket active', ru: 'Live-соединение активно', tr: 'Canlı bağlantı etkin' }))}
+              {wsStatus === 'connecting' && (L(language, { fa: 'اتصال به کلاود...', en: 'Connecting to cloud...', ru: 'Подключение к облаку...', tr: 'Buluta bağlanıyor...' }))}
+              {wsStatus === 'disconnected' && (L(language, { fa: 'حالت آفلاین (پشتیبان)', en: 'Offline mode (Backup)', ru: 'Офлайн-режим (резерв)', tr: 'Çevrimdışı mod (Yedek)' }))}
             </span>
           </div>
           <button 
             onClick={() => { fetchRooms(); fetchMessages(activeRoom); }}
             className="text-gray-500 hover:text-primary transition-colors cursor-pointer"
-            title={language === 'fa' ? 'بروزرسانی' : 'Refresh'}
+            title={L(language, { fa: 'بروزرسانی', en: 'Refresh', ru: 'Обновить', tr: 'Yenile' })}
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
@@ -403,7 +404,7 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
                 <h4 className="text-xs font-black text-white">{activeRoom}</h4>
               </div>
               <span className="text-[10px] text-gray-500 font-bold block mt-0.5">
-                {language === 'fa' ? 'گفتگوی آنی و هماهنگی هم‌تیمی‌ها' : 'Instant group chat and strategy sync'}
+                {L(language, { fa: 'گفتگوی آنی و هماهنگی هم‌تیمی‌ها', en: 'Instant group chat and strategy sync', ru: 'Мгновенный групповой чат и координация команды', tr: 'Anlık grup sohbeti ve takım koordinasyonu' })}
               </span>
             </div>
           </div>
@@ -420,8 +421,8 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
             <div className="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-60">
               <MessageSquare className="w-10 h-10 text-primary animate-bounce" />
               <div>
-                <p className="text-white text-xs font-black">{language === 'fa' ? 'پیامی در این اتاق وجود ندارد' : 'No messages yet'}</p>
-                <p className="text-gray-400 text-[10px] mt-1 font-medium">{language === 'fa' ? 'اولین نفری باشید که گفتگو را آغاز می‌کند!' : 'Be the first to start the conversation!'}</p>
+                <p className="text-white text-xs font-black">{L(language, { fa: 'پیامی در این اتاق وجود ندارد', en: 'No messages yet', ru: 'В этой комнате пока нет сообщений', tr: 'Bu odada henüz mesaj yok' })}</p>
+                <p className="text-gray-400 text-[10px] mt-1 font-medium">{L(language, { fa: 'اولین نفری باشید که گفتگو را آغاز می‌کند!', en: 'Be the first to start the conversation!', ru: 'Начните разговор первым!', tr: 'Sohbeti başlatan ilk kişi siz olun!' })}</p>
               </div>
             </div>
           ) : (
@@ -486,8 +487,8 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder={
                 user.username === 'Guest'
-                  ? (language === 'fa' ? 'برای ارسال پیام ابتدا وارد شوید...' : 'Login to write messages...')
-                  : (language === 'fa' ? `ارسال پیام در ${activeRoom}...` : `Type a message in ${activeRoom}...`)
+                  ? (L(language, { fa: 'برای ارسال پیام ابتدا وارد شوید...', en: 'Login to write messages...', ru: 'Войдите, чтобы писать сообщения...', tr: 'Mesaj yazmak için giriş yapın...' }))
+                  : (L(language, { fa: `ارسال پیام در ${activeRoom}...`, en: `Type a message in ${activeRoom}...`, ru: `Сообщение в ${activeRoom}...`, tr: `${activeRoom} odasına mesaj yazın...` }))
               }
               disabled={user.username === 'Guest'}
               className="flex-grow px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-primary font-bold disabled:opacity-50"
@@ -506,16 +507,14 @@ export default function ChatTab({ user, addNotification, onOpenAuth }: Props) {
             <div className="flex items-center gap-1.5 text-[10px] text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-xl">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>
-                {language === 'fa' 
-                  ? 'شما به عنوان مهمان وارد شده‌اید. برای چت کردن لطفاً وارد شوید.' 
-                  : 'You are viewing as a guest. Please login/register to participate in discussions.'}
+                {L(language, { fa: 'شما به عنوان مهمان وارد شده‌اید. برای چت کردن لطفاً وارد شوید.', en: 'You are viewing as a guest. Please login/register to participate in discussions.', ru: 'Вы вошли как гость. Чтобы участвовать в чате, войдите или зарегистрируйтесь.', tr: 'Misafir olarak görüntülüyorsunuz. Sohbete katılmak için lütfen giriş yapın veya kayıt olun.' })}
               </span>
               <button 
                 type="button" 
                 onClick={onOpenAuth}
                 className="underline font-black mr-auto cursor-pointer"
               >
-                {language === 'fa' ? 'ورود / ثبت‌نام' : 'Login / Register'}
+                {L(language, { fa: 'ورود / ثبت‌نام', en: 'Login / Register', ru: 'Войти / Регистрация', tr: 'Giriş / Kayıt' })}
               </button>
             </div>
           )}

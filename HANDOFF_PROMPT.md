@@ -4,8 +4,10 @@
 > هدف: از صفر تا «سرور زنده + مرورگر واقعی که فارسی را درست رندر می‌کند»، بدون آزمون‌وخطا.
 > هر چیزی که در این سند آمده **واقعاً اجرا و تأیید شده است** — نه فرض، نه نقل‌قول.
 >
-> تاریخ تنظیم: ۱۴۰۵/۰۶/۱۰ (2026-09-01) · ریپو: `paymanshafayan/bazino-gamenet-portal`
-> برنچ: `arena/01a05e95-bazino-gamenet-portal`
+> تاریخ تنظیم: ۱۴۰۵/۰۶/۱۰ (2026-09-01) · آخرین به‌روزرسانی: ۱۴۰۵/۰۶/۱۴ (2026-09-05) · ریپو: `paymanshafayan/bazino-gamenet-portal`
+> برنچ فعلی: **`arena/01a067ac-bazino-gamenet-portal`** (برنچ قبلی `arena/01a05e95-…` در این برنچ ادغام و ادامه یافته است)
+>
+> **اول بخش ۸ («وضعیت پروژه تا ۱۴۰۵/۰۶/۱۴») را بخوانید** — خلاصه‌ی همه‌ی تسک‌های انجام‌شده، تصمیم‌های قطعی کاربر و کار بعدی آن‌جاست.
 
 ---
 
@@ -14,7 +16,9 @@
 ```bash
 # ── ۱) همگام‌سازی گیت (سندباکس ری‌ست می‌شود؛ حتماً انجام دهید) ──────────────
 cd /home/user/bazino-gamenet-portal
-git fetch origin arena/01a05e95-bazino-gamenet-portal && git reset FETCH_HEAD
+git fetch origin arena/01a067ac-bazino-gamenet-portal && git reset --hard FETCH_HEAD && git clean -fd
+# ⚠️ سندباکس گاهی درخت کاری را به یک اسنپ‌شات قدیمی برمی‌گرداند در حالی که remote جلوتر است؛
+#    همیشه اول `git ls-remote --heads origin arena/01a067ac-bazino-gamenet-portal` را با HEAD مقایسه کنید.
 
 # ── ۲) وابستگی‌ها + کامپایل ماژول native (بدون هیچ دانلود خارجی) ───────────
 npm install --ignore-scripts --no-audit --no-fund
@@ -460,7 +464,11 @@ done
 5. فایل zip هرگز commit نشود (`.gitignore` شامل `*.zip` است).
 6. هرگاه فایل workflow باید روی GitHub جایگزین شود، **محتوای کامل فایل داخل باکس کد در چت** گذاشته شود؛
    فقط ارجاع به مسیر کافی نیست.
-7. فقط روی برنچ `arena/01a05e95-bazino-gamenet-portal` کار و push شود.
+7. فقط روی برنچ **`arena/01a067ac-bazino-gamenet-portal`** کار و push شود.
+8. **ایمیل (میل‌باکس واقعی روی bazino.pro):** کاربر گفته «فعلاً دست نگه دار» — تا دستور صریح، هیچ کار SMTP/ایمیل انجام نشود.
+9. **درگاه پرداخت آنلاین پیشنهاد نشود** (حسابدار کاربر: هیچ درگاه قابل‌اتکایی در KKTC نیست). PayTR حذف نشود؛ فقط با `PAYMENT_ONLINE_ENABLED` خاموش بماند.
+10. UI پرداخت/قانونی/تماس/پروفایل باید کاملاً مستقل از قالب باشد (خارج از ThemeRegion، غیرقابل بازنویسی از ZIP قالب).
+11. کاربر نهایی نباید بتواند قالب انتخاب کند (قالب = انتخاب ادمین). منوی زبان فقط پرچم + کد زبان.
 
 ---
 
@@ -480,3 +488,62 @@ done
 | اسکرین‌شات بخش **«پرزنتیشن»** پنل ادمین | `page.screenshot` سه بار تایم‌اوت خورد | ابتدا پله‌ی ۱: منبع سنگین آن بخش را پیدا و در هارنس abort کن |
 
 هر ادعایی درباره‌ی این موارد باید صریحاً با «**تست‌نشده**» علامت‌گذاری شود — نه «کار می‌کند»، نه «خراب است».
+
+---
+
+## ۸. وضعیت پروژه تا ۱۴۰۵/۰۶/۱۴ — همه‌ی کارهای انجام‌شده روی `arena/01a067ac-…`
+
+> این بخش جایگزین «قدم بعدی» بخش ۵ است. هر مورد commit شده، تست شده و در Chromium بازبینی بصری شده مگر این‌که «تست‌نشده» نوشته باشد.
+
+### ۸٫۱ فهرست کامیت‌ها (از پایه‌ی `4af6155` تا `a403c2d`)
+
+| SHA | تسک | خلاصه |
+|---|---|---|
+| `4e78eb4` … `8df8e62` | ۱–۴ (i18n) | زبان پیش‌فرض بر اساس GeoIP (IR→fa, TR/CY→tr, RU→ru, بقیه→en؛ انتخاب دستی برنده)، منوی زبان فقط پرچم+کد، ترجمه‌ی کامل ru/tr برای UI مشتری و پنل ادمین و راهنمای بصری، پیام‌های خطای API محلی‌شده |
+| `77a4287`, `7152a11`, `1a3559f`, `f997adb`, `d296242` | ۵–۷ (قالب‌ها) | پوشه‌ی داده‌ی ماندگار `BAZINO_DATA_DIR`/`MONGO_URL`، نصب اتمیک قالب، SDK v2 (regionهای header/hero/home.*/footer/mobileNav، design-token bridge، رشته‌های ۴زبانه، theme.js اختیاری)، README قالب بازنویسی شد (hero و هر region یک اسلات آزاد است؛ اسلایدهای ادمین هرگز hero ثبت‌شده‌ی قالب را جایگزین نمی‌کنند؛ `props.slides` اختیاری) |
+| `9274d41` | ۸ | مسیرهای URL برای تب‌ها/بخش‌های ادمین (refresh-safe)، جست‌وجوی سریع بخش‌ها (نتایج = فهرست لینک)، آدرس/تلفن/نقشه‌ی واقعی İskele |
+| `be84276` | ۹ | تصاویر واقعی لانژ (WebP ریسپانسیو با sharp) |
+| `e3df9ce`, `a3f58f6`, `a466e23` | ۱۰ (PayTR + قانونی) | تحقیق و مستند PayTR، پیاده‌سازی iFrame API/callback/mock، صفحات قانونی/تماس/پرداخت مستقل از قالب (`src/legal/`)، واحد پول TL، ویرایشگر قانونی ادمین، نشان‌های پرداخت به‌صورت SVG ایزوله |
+| `6935b53` | ۱۱ | حذف انتخاب قالب توسط کاربر (فقط ادمین)، رفع باگ SDK که خروجی DOM خامِ `render()` را نادیده می‌گرفت (هدر جایگزین نمی‌شد)، `SDK.LocationFrame` |
+| `393e622`, `4c7b468` | ۱۲ (OTP/پروفایل/تیکت) | ورود با کد پیامکی (`server/sms/`: smsto/easysendsms/mock؛ محدودیت سمت سرور روی شماره+IP هم‌زمان؛ cooldown ارسال مجدد سمت سرور)، رمز دائمی اختیاری از پروفایل، `/profile[/tab]`، تیکت پشتیبانی کاربر + `/admin/tickets`، وضعیت‌ها «در حال بررسی → پاسخ داده شده → بسته‌شده خودکار پس از ۴۸ ساعت» (E.85) |
+| `7955a49` | E.86 | ZIP قالب با پوشه‌ی ریشه (theme.js حذف می‌شد) رفع شد؛ قالب فعال در HTML bootstrap می‌شود؛ بدون فلش اسلایدر پیش‌فرض قبل از hero قالب |
+| `a403c2d` | **۱۳ (کیف پول + در محل)** | جزئیات در ۸٫۲ |
+
+### ۸٫۲ تسک ۱۳ — کیف پول بازینو و پرداخت در محل (آخرین کار، کامل)
+
+**تصمیم کاربر (قطعی):** هیچ درگاه آنلاینی استفاده نمی‌شود؛ PayTR **حذف نشود ولی خاموش باشد**. رزرو/تورنمنت = کیف پول **یا** پرداخت در محل؛ بوفه/فروشگاه = فقط در محل. شارژ کیف پول فقط حضوری. پیش‌فرض‌های پذیرفته‌شده: واحد TL، پرداخت با کیف پول فوراً قطعی می‌شود، لغو کاربر قبل از مهلت → بازگشت کامل وجه.
+
+**قوانین اعلام‌شده به کاربر (۴ زبان، با تیک پذیرش در مودال):**
+- رزرو ایستگاه: حضور و پرداخت در کلاب حداقل **۱۰ دقیقه قبل از شروع سانس**؛ وگرنه رزرو خودکار باطل می‌شود.
+- تورنمنت: پرداخت حضوری حداقل **۴۸ ساعت قبل از شروع**؛ وگرنه ثبت‌نام خودکار باطل می‌شود.
+
+**بک‌اند** (`server/wallet/routes.ts`, `server/dataProviders.ts`, `server.ts`, `server/payments/paytr.ts`):
+- جدول‌های `wallet_transactions` (دفتر کل append-only، `balanceAfter`، `idempotencyKey` یکتا) و `onsite_orders` در SQLite/SQL Server/Mongo. موجودی هرگز منفی نمی‌شود (بررسی اتمیک؛ 402 `INSUFFICIENT_FUNDS`).
+- `paymentFulfil` پرچم‌های `__noPoints` (رزرو جا بدون امتیاز) و `__pointsOnly` (فقط امتیاز هنگام تسویه) دارد؛ `paymentUnfulfil` رزرو/تیم را آزاد می‌کند.
+- `expireOnsiteOrders` هر ۶۰ ثانیه + هنگام خواندن فهرست‌ها: pending با `dueAt` گذشته → `cancelled_unpaid` + آزادسازی.
+- `isOnlinePaymentEnabled()` ← `PAYMENT_ONLINE_ENABLED` (پیش‌فرض خاموش؛ `1/true/yes/on`). بدون آن `readPaytrConfig()` → `null`، `/api/payments/config` → `onlineDisabled:true`.
+- API: `GET /api/payments/methods`، `GET /api/me/wallet`، `GET /api/me/onsite-orders`، `POST /api/checkout/wallet|onsite`، `POST /api/checkout/onsite/:id/cancel`، sync: `POST /api/sync/wallet/topup|charge`، `GET /api/sync/wallet/:phone`، `GET /api/sync/onsite-orders`، `POST /api/sync/onsite-orders/:id/settle|cancel`، ادمین: `/api/admin/wallet/*`، `/api/admin/onsite-orders*`. جدول کامل در `docs/payments/WALLET.md`.
+- `userForPhone`: شماره را نرمال می‌کند (+90 پیش‌فرض) و برای رکوردهای قدیمی ۱۰ رقم آخر را تطبیق می‌دهد (E.89).
+
+**فرانت (مستقل از قالب):** `src/legal/CheckoutModal.tsx` (createPortal روی body؛ اگر موجودی کم باشد «در محل» پیش‌فرض می‌شود؛ رویداد `bazino:open-auth` برای ورود و `bazino:refresh-data` برای تازه‌سازی داده در App)، در `CafeTab/ShopTab/ReservationsTab/TournamentsTab` جایگزین `PaymentCheckout` شد؛ `/profile/wallet` (`ProfileWallet.tsx`)؛ `/admin/wallet` (`AdminWalletSection.tsx`)؛ `LegalAdminSection` و `LegalFooter` وضعیت «موقتاً غیرفعال» را نشان می‌دهند. باگ تبدیل جلالی در `TournamentsTab` رفع شد (E.91).
+
+**اپ مدیریت** (`Management App/Bazino/src/utils/walletSync.ts`, `components/WebWalletPanel.tsx`): هر شارژ/برداشت در «اعضا و کیف پول» به صف localStorage (`bazino_wallet_sync_queue`) با `idempotencyKey` ثابت می‌رود و بلافاصله/با رویداد `online`/باز شدن تب flush می‌شود؛ پنل فهرست سفارش‌های حضوری با دکمه‌های نقدی/کارت/کیف پول/لغو. آزمایش زنده روی `/management-app/` (co-located؛ loopback بدون کلید).
+
+**تست‌ها:** `npm test` → **۳۵۴/۳۵۴** (API ۱۶۳، Unit ۸۷، UI ۴۲، DB ۳۶، Providers ۲۶). سوئیت‌های جدید: API ۳۵، Unit ۱۳، UI ۳۹. سوئیت PayTR (۱۷) با `PAYMENT_ONLINE_ENABLED=1` در env تست اجرا می‌شود.
+**اسکرین‌شات‌های بازبینی‌شده:** مودال رزرو (EN دسکتاپ، موجودی کم/کافی)، تورنمنت در محل + نوتیفیکیشن مهلت (EN)، بوفه (TR موبایل ۳۹۰px)، `/profile/wallet` (EN دسکتاپ، TR موبایل)، `/admin/wallet` (TR)، کارت PayTR در `/admin/customization` (EN)، اپ مدیریت تب اعضا (FA).
+**تست‌نشده:** اجرای واقعی روی SQL Server/Mongo؛ فونت فارسی در Chromium sandbox؛ Railway.
+
+### ۸٫۳ نکات محیطی جدید (علاوه بر بخش‌های ۱–۴)
+
+- `npm ci` روی better-sqlite3 می‌شکند → `npm_config_nodedir=/usr/local NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci` یا نصب با `--ignore-scripts` و rebuild دستی (بخش ۰).
+- `npx tsc` بسته‌ی جعلی `tsc@2.0.4` نصب می‌کند → همیشه `node_modules/.bin/tsc`.
+- بیلد production: `node_modules/.bin/vite build` سپس `node_modules/.bin/esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs` (vite پوشه‌ی dist را پاک می‌کند؛ ترتیب مهم است). سرور production `index.html` را در بوت کش می‌کند → بعد از هر بیلد ری‌استارت.
+- سرور smoke: `NODE_ENV=production PORT=3901 JWT_SECRET=s BAZINO_DATA_DIR=/tmp/wt SMS_PROVIDER=mock OTP_DEV_PEEK=1 node dist/server.cjs` (با `start_process`؛ `nohup … &` در bash می‌میرد). نصب: `POST /api/install/setup {dbType:"sqlite", installSampleData:true, adminUsername, adminPassword, adminEmail}`.
+- Chromium بدون Playwright CDN: `npm i puppeteer-core @sparticuz/chromium` در `/tmp/chrtools`، `chromium.executablePath()` باینری را به `/tmp/chromium` می‌دهد ولی کتابخانه‌ها را نه → `bin/al2023.tar.br` را با brotli باز کنید و `LD_LIBRARY_PATH=/tmp/al2023/lib` بدهید. توکن ورود در `localStorage['bazino.authToken']`، زبان در `localStorage.cyber_lang`. یک زبان در هر اجرای مرورگر.
+- تاریخ‌های نمونه‌ی تورنمنت‌ها به آینده (۱۴۰۵/۰۷/۱۵ …) منتقل شده تا قانون ۴۸ ساعت قابل تست باشد.
+
+### ۸٫۴ کارهای باز / بعدی
+
+1. **ایمیل** — متوقف به دستور کاربر. تحقیق انجام‌شده: Purelymail (~$10/سال)، Migadu، Namecheap Private Email، Google Workspace/Microsoft 365 trial؛ اجرای mail server روی Railway ناممکن (پورت 25 بسته، بدون PTR). فقط وقتی کاربر گفت ادامه دهید.
+2. اجرای واقعی پرووایدرهای SQL Server/Mongo برای جدول‌های جدید (فقط شکل کوئری تست شده).
+3. اپ Flutter (تست‌ناپذیر در sandbox؛ CI موجود)، اپ دسکتاپ Electron، GTmetrix واقعی — بدون تغییر نسبت به بخش ۷.

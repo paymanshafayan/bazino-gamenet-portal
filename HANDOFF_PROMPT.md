@@ -542,6 +542,11 @@ done
 - Chromium بدون Playwright CDN: `npm i puppeteer-core @sparticuz/chromium` در `/tmp/chrtools`، `chromium.executablePath()` باینری را به `/tmp/chromium` می‌دهد ولی کتابخانه‌ها را نه → `bin/al2023.tar.br` را با brotli باز کنید و `LD_LIBRARY_PATH=/tmp/al2023/lib` بدهید. توکن ورود در `localStorage['bazino.authToken']`، زبان در `localStorage.cyber_lang`. یک زبان در هر اجرای مرورگر.
 - تاریخ‌های نمونه‌ی تورنمنت‌ها به آینده (۱۴۰۵/۰۷/۱۵ …) منتقل شده تا قانون ۴۸ ساعت قابل تست باشد.
 
+### ۸٫۳٫۱ وضعیت مرج
+
+- PR #16 (`arena/01a067ac-bazino-gamenet-portal` → `main`) باز است؛ `main` اجداد HEAD است (fast-forward، بدون تداخل).
+- چک CI «Typecheck & Theme tests» از `6935b53` قرمز بود (اسکریپت قدیمی `verify-themes.ts` که theme.js را اجباری می‌دانست — E.93)؛ در `docs+ci` کامیت بعد از `35f5113` رفع شد. دو چک دیگر (Vite build، Backend boot) سبز بودند.
+
 ### ۸٫۴ کارهای باز / بعدی
 
 1. **ایمیل** — متوقف به دستور کاربر. تحقیق انجام‌شده: Purelymail (~$10/سال)، Migadu، Namecheap Private Email، Google Workspace/Microsoft 365 trial؛ اجرای mail server روی Railway ناممکن (پورت 25 بسته، بدون PTR). فقط وقتی کاربر گفت ادامه دهید.

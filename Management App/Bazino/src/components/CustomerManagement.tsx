@@ -8,7 +8,8 @@ interface CustomerManagementProps {
   walletTransactions: WalletTransaction[];
   currency: CurrencyCode;
   onAddCustomer: (customer: Omit<Customer, 'id' | 'rank' | 'registeredAt'>) => void;
-  onUpdateWallet: (customerId: string, amount: number, type: 'CHARGE' | 'PAYMENT' | 'DEBT_SETTLEMENT' | 'BONUS_DISCOUNT', description: string) => void;
+  onUpdateWallet: (customerId: string, amount: number, type: 'CHARGE' | 'PAYMENT' | 'DEBT_SETTLEMENT' | 'BONUS_DISCOUNT' | 'CASHOUT', description: string) => void;
+  onAttachAffiliate?: (phone: string, code: string) => void;
 }
 
 export const CustomerManagement: React.FC<CustomerManagementProps> = ({
@@ -17,6 +18,7 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({
   currency,
   onAddCustomer,
   onUpdateWallet,
+  onAttachAffiliate,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -31,7 +33,8 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({
 
   // Wallet Tx Modal State
   const [txAmount, setTxAmount] = useState(100);
-  const [txType, setTxType] = useState<'CHARGE' | 'DEBT_SETTLEMENT'>('CHARGE');
+  const [txType, setTxType] = useState<'CHARGE' | 'DEBT_SETTLEMENT' | 'CASHOUT'>('CHARGE');
+  const [refCode, setRefCode] = useState('');
   const [txDescription, setTxDescription] = useState('');
 
   // Filtered
@@ -70,9 +73,13 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({
       showWalletModal.id,
       txAmount,
       txType,
-      txDescription || (txType === 'CHARGE' ? 'شارژ دستی کیف‌پول' : 'تسویه بدهی حساب')
+      txDescription || (txType === 'CHARGE' ? 'شارژ دستی کیف‌پول' : txType === 'CASHOUT' ? 'نقد حضوری کیف‌پول' : 'تسویه بدهی حساب')
     );
-
+    const code = refCode.trim();
+    if (code && showWalletModal.phone && onAttachAffiliate) {
+      onAttachAffiliate(showWalletModal.phone, code);
+    }
+    setRefCode('');
     setShowWalletModal(null);
   };
 
@@ -372,6 +379,27 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({
                 >
                   تسویه بدهی
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTxType('CASHOUT')}
+                  data-cashout
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                    txType === 'CASHOUT' ? 'bg-rose-500 text-zinc-950' : 'bg-zinc-800 text-zinc-300'
+                  }`}
+                >
+                  نقد حضوری (−)
+                </button>
+              </div>
+              <div>
+                <label className="text-zinc-300 block mb-1">کد معرفی همکار (اختیاری، جدا از تخفیف):</label>
+                <input
+                  type="text"
+                  data-walkin-ref
+                  value={refCode}
+                  onChange={(e) => setRefCode(e.target.value)}
+                  placeholder="مثلا ALI12"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-zinc-200 focus:outline-none focus:border-amber-500 font-mono"
+                />
               </div>
 
               <div>

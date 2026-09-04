@@ -14,6 +14,7 @@ import type { UserState } from '../../types/gamenet';
 import { ProfileOverview } from './ProfileOverview';
 import { ProfilePoints, ProfileReservations, ProfileOrders, ProfileTournaments } from './ProfileLists';
 import ProfileWallet from './ProfileWallet';
+import ProfileAffiliate from './ProfileAffiliate';
 import { ProfileTickets } from './ProfileTickets';
 import { ProfileSecurity } from './ProfileSecurity';
 
@@ -36,6 +37,7 @@ export const PROFILE_TAB_LABELS: Record<ProfileTab, { fa: string; en: string; ru
   orders: { fa: 'سفارش‌ها', en: 'Orders', ru: 'Заказы', tr: 'Siparişler' },
   tournaments: { fa: 'تورنمنت‌ها', en: 'Tournaments', ru: 'Турниры', tr: 'Turnuvalar' },
   tickets: { fa: 'پشتیبانی', en: 'Support', ru: 'Поддержка', tr: 'Destek' },
+  affiliate: { fa: 'همکاری در فروش', en: 'Affiliate', ru: 'Партнёрка', tr: 'Satış ortaklığı' },
   security: { fa: 'امنیت', en: 'Security', ru: 'Безопасность', tr: 'Güvenlik' },
 };
 
@@ -132,6 +134,7 @@ export default function ProfilePage(props: ProfilePageProps) {
         {tab === 'orders' && <ProfileOrders />}
         {tab === 'tournaments' && <ProfileTournaments />}
         {tab === 'tickets' && <ProfileTickets ticketId={props.ticketId} onNavigate={onNavigate} addNotification={props.addNotification} onUnreadChange={setUnread} />}
+        {tab === 'affiliate' && <ProfileAffiliate />}
         {tab === 'security' && <ProfileSecurity {...props} user={user} />}
       </div>
     </LegalShell>

@@ -13,6 +13,9 @@ export function walletTxLabel(type: string, language: string) {
     purchase: { fa: 'پرداخت', en: 'Payment', ru: 'Оплата', tr: 'Ödeme' },
     refund: { fa: 'بازگشت وجه', en: 'Refund', ru: 'Возврат', tr: 'İade' },
     adjust: { fa: 'اصلاح', en: 'Adjustment', ru: 'Корректировка', tr: 'Düzeltme' },
+    commission: { fa: 'کمیسیون همکاری', en: 'Affiliate commission', ru: 'Партнёрская комиссия', tr: 'Satış ortaklığı komisyonu' },
+    commission_reversal: { fa: 'برگشت کمیسیون', en: 'Commission reversal', ru: 'Возврат комиссии', tr: 'Komisyon iptali' },
+    cashout: { fa: 'نقد حضوری', en: 'In-person cash-out', ru: 'Вывод наличными', tr: 'Mekânda nakit çekim' },
   };
   return L(language, map[type] || { fa: type, en: type, ru: type, tr: type });
 }

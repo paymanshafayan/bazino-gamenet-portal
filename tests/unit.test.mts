@@ -934,5 +934,166 @@ test('Management App wallet queue: enqueue → flush with idempotency key; failu
   delete (globalThis as any).localStorage;
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   14. Affiliate marketing
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('14. Affiliate marketing — settings, codes, engine');
+
+const affSettings = await import('../server/affiliate/settings.ts');
+const affEngine = await import('../server/affiliate/engine.ts');
+
+function memAffStore() {
+  const settings: Record<string, string> = {};
+  const affiliates: any[] = [];
+  const clicks: any[] = [];
+  const atts: any[] = [];
+  const comms: any[] = [];
+  const audits: any[] = [];
+  const orders: any[] = [];
+  const wallet: any[] = [];
+  return {
+    getSetting: async (k: string) => settings[k],
+    setSetting: async (k: string, v: string) => { settings[k] = v; },
+    listAffiliates: async () => affiliates,
+    getAffiliateById: async (id: string) => affiliates.find(a => a.id === id),
+    getAffiliateByCode: async (c: string) => affiliates.find(a => a.code === c),
+    getAffiliateByUsername: async (u: string) => affiliates.find(a => a.username === u),
+    createAffiliate: async (a: any) => { affiliates.push({ ...a }); },
+    updateAffiliate: async (id: string, f: any) => { Object.assign(affiliates.find(a => a.id === id) || {}, f); },
+    createAffiliateClick: async (c: any) => { clicks.push(c); },
+    countRecentAffiliateClicks: async (code: string, ip: string, ua: string, since: string) =>
+      clicks.filter(c => c.code === code && c.ipHash === ip && c.uaHash === ua && c.createdAt >= since).length,
+    countAffiliateClicks: async (code: string, since?: string) =>
+      clicks.filter(c => c.code === code && (!since || c.createdAt >= since)).length,
+    upsertAffiliateAttribution: async (a: any) => {
+      for (let i = atts.length - 1; i >= 0; i--) {
+        if ((a.username && atts[i].username === a.username) || (a.visitorId && a.visitorId && atts[i].visitorId === a.visitorId)) atts.splice(i, 1);
+      }
+      atts.push(a);
+    },
+    getAttributionForUser: async (u: string) => atts.filter(a => a.username === u).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0],
+    getAttributionForVisitor: async (v: string) => atts.find(a => a.visitorId === v),
+    listAttributionsByCode: async (c: string) => atts.filter(a => a.code === c),
+    createAffiliateCommission: async (c: any) => { comms.push({ ...c }); },
+    getAffiliateCommissionById: async (id: string) => comms.find(c => c.id === id),
+    listAffiliateCommissions: async (f: any = {}) => comms.filter(c =>
+      (!f.affiliateId || c.affiliateId === f.affiliateId) &&
+      (!f.username || c.username === f.username) &&
+      (!f.orderId || c.orderId === f.orderId) &&
+      (!f.status || c.status === f.status)),
+    updateAffiliateCommission: async (id: string, f: any) => { Object.assign(comms.find(c => c.id === id) || {}, f); },
+    createAffiliateAudit: async (a: any) => { audits.push(a); },
+    listAffiliateAudit: async () => audits,
+    listOnsiteOrders: async (f: any = {}) => orders.filter(o => !f.username || o.username === f.username),
+    getOnsiteOrder: async (id: string) => orders.find(o => o.id === id),
+    appendWalletTx: async (tx: any) => { const row = { ...tx, balanceAfter: (wallet.at(-1)?.balanceAfter || 0) + tx.amount }; wallet.push(row); return row; },
+    _settings: settings, _affiliates: affiliates, _clicks: clicks, _comms: comms, _wallet: wallet, _orders: orders,
+  };
+}
+
+test('normalizeCode / isValidCode: upper alnum 4–16, strips junk', () => {
+  assert.equal(affEngine.normalizeCode(' ali-12 '), 'ALI12');
+  assert.equal(affEngine.normalizeCode('ab'), 'AB');
+  assert.equal(affEngine.isValidCode('ALI12'), true);
+  assert.equal(affEngine.isValidCode('AB'), false);
+  assert.equal(affEngine.isValidCode('ali12'), false);
+});
+
+test('seedAffiliateSettings inserts missing keys once and never overwrites stored values', async () => {
+  const store = memAffStore();
+  const n1 = await affSettings.seedAffiliateSettings(store as any);
+  assert.equal(n1, affSettings.AFFILIATE_SETTING_KEYS.length);
+  assert.equal(store._settings.affiliate_new_pct, '10');
+  assert.equal(store._settings.affiliate_return_pct, '5');
+  assert.equal(store._settings.affiliate_tournament_pct, '10');
+  assert.equal(store._settings.affiliate_override_pct, '0');
+  assert.equal(store._settings.affiliate_window_days, '30');
+  assert.equal(store._settings.wallet_cashout_min_tl, '0');
+  store._settings.affiliate_new_pct = '12';
+  const n2 = await affSettings.seedAffiliateSettings(store as any);
+  assert.equal(n2, 0);
+  assert.equal(store._settings.affiliate_new_pct, '12', 'seed must not overwrite an existing row');
+  const read = await affSettings.readAffiliateSettings(store as any);
+  assert.equal(read.affiliate_new_pct, '12');
+  assert.equal(read.affiliate_return_pct, '5');
+});
+
+test('parsePct / parseDays reject out-of-range and fall back', () => {
+  assert.equal(affSettings.parsePct('10', 1), 10);
+  assert.equal(affSettings.parsePct('101', 5), 5);
+  assert.equal(affSettings.parsePct('nope', 7), 7);
+  assert.equal(affSettings.parseDays('30', 1), 30);
+  assert.equal(affSettings.parseDays('0', 14), 14);
+});
+
+test('onOrderPaid: reservation new=10%, cafe skipped, self-referral skipped, duplicate order reused', async () => {
+  const store = memAffStore();
+  await affSettings.seedAffiliateSettings(store as any);
+  const aff = { id: 'AFF1', code: 'ALI12', username: 'partner', name: 'Ali', type: 'gamer', language: 'tr', destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1, notes: '', createdAt: 't', updatedAt: 't' };
+  await store.createAffiliate(aff);
+  const cafe = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'OS-c', kind: 'cafe', amount: 80, payload: { referralCode: 'ALI12' } });
+  assert.equal(cafe.length, 0);
+  const created = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'WL-1', kind: 'reservation', amount: 200, dueAt: '2999-01-01T00:00:00.000Z', payload: { referralCode: 'ALI12' } });
+  assert.equal(created.length, 1);
+  assert.equal(created[0].eventType, 'new');
+  assert.equal(created[0].ratePct, 10);
+  assert.equal(created[0].commissionAmount, 20);
+  assert.equal(created[0].status, 'pending');
+  const again = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'WL-1', kind: 'reservation', amount: 200, payload: { referralCode: 'ALI12' } });
+  assert.equal(again[0].id, created[0].id);
+  const self = await affEngine.onOrderPaid(store as any, { username: 'partner', orderId: 'WL-self', kind: 'reservation', amount: 100, payload: { referralCode: 'ALI12' } });
+  assert.equal(self.length, 0);
+  const adminBuy = await affEngine.onOrderPaid(store as any, { username: 'adminish', orderId: 'WL-ad', kind: 'reservation', amount: 100, userRole: 'admin', payload: { referralCode: 'ALI12' } });
+  assert.equal(adminBuy.length, 0);
+});
+
+test('approveDueCommissions credits wallet; reverse after payout writes commission_reversal', async () => {
+  const store = memAffStore();
+  await affSettings.seedAffiliateSettings(store as any);
+  await store.createAffiliate({ id: 'AFF1', code: 'ALI12', username: 'partner', name: 'Ali', type: 'gamer', language: 'tr', destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1, notes: '', createdAt: 't', updatedAt: 't' });
+  const created = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'WL-2', kind: 'reservation', amount: 100, dueAt: '2000-01-01T00:00:00.000Z', payload: { referralCode: 'ALI12' } });
+  const n = await affEngine.approveDueCommissions(store as any);
+  assert.equal(n, 1);
+  assert.equal(store._comms[0].status, 'paid_out');
+  assert.equal(store._wallet[0].type, 'commission');
+  assert.equal(store._wallet[0].amount, 10);
+  const rev = await affEngine.onOrderReversed(store as any, 'WL-2', 'test');
+  assert.equal(rev, 1);
+  assert.equal(store._comms[0].status, 'reversed');
+  assert.equal(store._wallet[1].type, 'commission_reversal');
+  assert.equal(store._wallet[1].amount, -10);
+});
+
+test('click de-dupes same IP+UA within 15 minutes', async () => {
+  const store = memAffStore();
+  await store.createAffiliate({ id: 'AFF1', code: 'ALI12', username: 'partner', name: 'Ali', type: 'gamer', language: 'tr', destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1, notes: '', createdAt: 't', updatedAt: 't' });
+  const a = await affEngine.recordClick(store as any, { code: 'ALI12', path: '/', ip: '1.1.1.1', ua: 'ua', visitorId: 'v1' });
+  const b = await affEngine.recordClick(store as any, { code: 'ALI12', path: '/', ip: '1.1.1.1', ua: 'ua', visitorId: 'v1' });
+  assert.equal(a.ok, true); assert.equal(a.duplicate, undefined);
+  assert.equal(b.duplicate, true);
+  assert.equal(store._clicks.length, 1);
+});
+
+test('routes + legal slug expose affiliate surfaces', () => {
+  assert.ok(routes.ADMIN_SECTIONS.includes('affiliates'));
+  assert.equal(routes.adminSectionFromPath('/admin/affiliates'), 'affiliates');
+  assert.ok(routes.PROFILE_TABS.includes('affiliate'));
+  assert.equal(routes.pathFromProfileTab('affiliate'), '/profile/affiliate');
+  assert.ok(legal.LEGAL_SLUGS.includes('affiliate'));
+  assert.ok(legal.LEGAL_TITLES.affiliate.fa);
+  assert.ok(legal.LEGAL_DEFAULTS.affiliate.tr.length > 100);
+});
+
+test('admin settings form keys match AFFILIATE_SETTING_KEYS; cashout is a wallet op type', () => {
+  const adminSrc = read('src/components/AdminAffiliatesSection.tsx');
+  for (const k of affSettings.AFFILIATE_SETTING_KEYS) {
+    assert.ok(adminSrc.includes(`'${k}'`) || adminSrc.includes(`"${k}"`), `admin form missing ${k}`);
+  }
+  const wsSrc = read('Management App/Bazino/src/utils/walletSync.ts');
+  assert.ok(wsSrc.includes("'cashout'"));
+  assert.ok(read('server/wallet/routes.ts').includes('onOrderPaid'));
+  assert.ok(read('server.ts').includes('seedAffiliateSettings'));
+});
+
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });
 await vite.close();

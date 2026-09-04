@@ -27,7 +27,7 @@ import { ManageStationModal } from './components/ManageStationModal';
 import { ManageTariffsModal } from './components/ManageTariffsModal';
 import { HardwareRelayModal } from './components/HardwareRelayModal';
 import { WebWalletPanel } from './components/WebWalletPanel';
-import { enqueueWalletOp, flushWalletQueue } from './utils/walletSync';
+import { enqueueWalletOp, flushWalletQueue, attachAffiliateCode } from './utils/walletSync';
 
 export default function App() {
   // Application Data States (Persisted safely in local storage & server-side)
@@ -499,19 +499,14 @@ export default function App() {
   const handleUpdateWallet = (
     customerId: string,
     amount: number,
-    type: 'CHARGE' | 'PAYMENT' | 'DEBT_SETTLEMENT' | 'BONUS_DISCOUNT',
+    type: 'CHARGE' | 'PAYMENT' | 'DEBT_SETTLEMENT' | 'BONUS_DISCOUNT' | 'CASHOUT',
     description: string
   ) => {
     const customer = customers.find((c) => c.id === customerId);
     if (!customer) return;
 
-    // CHARGE (manual top-up), DEBT_SETTLEMENT (customer pays off existing
-    // debt), and BONUS_DISCOUNT (staff-granted credit) all move the balance
-    // UP. Only PAYMENT (spending wallet credit, e.g. at checkout) moves it
-    // DOWN. `amount` is always given as a positive number by the caller —
-    // the sign is decided here, once, so it can never be applied
-    // inconsistently again.
-    const delta = type === 'PAYMENT' ? -amount : amount;
+    // CHARGE / DEBT_SETTLEMENT / BONUS_DISCOUNT → موجودی بالا؛ PAYMENT و CASHOUT → پایین.
+    const delta = (type === 'PAYMENT' || type === 'CASHOUT') ? -amount : amount;
 
     setCustomers((prev) =>
       prev.map((c) => (c.id === customerId ? { ...c, walletBalance: c.walletBalance + delta } : c))
@@ -532,7 +527,7 @@ export default function App() {
     // تسک ۱۳: آینهٔ تراکنش روی سرور سایت (منبع حقیقت). BONUS_DISCOUNT شارژ محلی است و به سایت نمی‌رود.
     if (customer.phone && type !== 'BONUS_DISCOUNT') {
       enqueueWalletOp({
-        type: delta >= 0 ? 'topup' : 'charge',
+        type: type === 'CASHOUT' ? 'cashout' : (delta >= 0 ? 'topup' : 'charge'),
         phone: customer.phone,
         amount: Math.abs(delta),
         operator: activeOperator.name,
@@ -1018,6 +1013,21 @@ export default function App() {
           currency={currency}
           onClose={() => setShowManageTariffsModal(false)}
           onAddTariff={handleAddTariff}
+          onUpdateTariff={handleUpdateTariff}
+          onDeleteTariff={handleDeleteTariff}
+        />
+      )}
+
+      {showHardwareModal && (
+        <HardwareRelayModal
+          stations={stations}
+          onClose={() => setShowHardwareModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+dleAddTariff}
           onUpdateTariff={handleUpdateTariff}
           onDeleteTariff={handleDeleteTariff}
         />

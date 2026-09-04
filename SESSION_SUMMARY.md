@@ -935,3 +935,14 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - سند: `docs/payments/WALLET.md`. ISSUES E.87–E.92.
 - تست‌ها: API ۱۶۳/۱۶۳ (۱۳ جدید)، Unit ۸۷/۸۷ (۵ جدید)، UI ۴۲/۴۲ (۵ جدید)، DB ۳۶/۳۶، Providers ۲۶/۲۶ → **۳۵۴/۳۵۴**. Chromium: مودال رزرو (EN دسکتاپ)، تورنمنت در محل (EN)، بوفه (TR موبایل)، پروفایل کیف پول (EN دسکتاپ+موبایل)، ادمین (TR)، اپ مدیریت (FA).
 - تست‌نشده: اجرای واقعی روی SQL Server/Mongo؛ فونت فارسی در Chromium sandbox؛ Railway.
+
+## ۱۴۰۵/۰۶/۱۴ — Affiliate Marketing (batch کامل)
+
+- اعداد طرح به‌صورت ردیف واقعی `settings` seed می‌شوند (`affiliate_new_pct=10`, `return=5`, `tournament=10`, `override=0`, `window_days=30`, `wallet_cashout_min_tl=0`, `excluded_roles=admin`, `program_open=1`) و بازنویسی نمی‌شوند.
+- موتور: کلیک/claim/کمیسیون pending تا مهلت لغو، تأیید+شارژ کیف پول، برگشت، حضور، گزارش.
+- هوک: checkout/settle → `onOrderPaid`؛ cancel/expire → `onOrderReversed`؛ checkin → `onReservationAttended`.
+- UI: ادمین، پروفایل، `?ref=`، فیلد کد معرفی رزرو/تورنمنت، متن قانونی، نقد حضوری اپ مدیریت.
+- سند: `docs/payments/AFFILIATE.md`.
+- تست: unit seed/normalize/engine، SQLite جداول+CRUD، Mongo round-trip، API click/checkout/cashout.
+- تست (اجرا شد): unit 95/95، database 37/37، providers 27/27، ui 42/42، api 167/167 (سوئیت ۳۶ افیلیت سبز). Chromium این batch اجرا نشد.
+- هوک تسویهٔ حضوری `settleOnsite` هم `onOrderPaid` را صدا می‌زند.

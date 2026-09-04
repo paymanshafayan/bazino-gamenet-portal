@@ -11,7 +11,7 @@
  */
 import { buildSyncUrl, syncHeaders } from './syncClient';
 
-export type WalletOpType = 'topup' | 'charge';
+export type WalletOpType = 'topup' | 'charge' | 'cashout';
 export interface WalletQueueItem {
   idempotencyKey: string;
   type: WalletOpType;
@@ -103,6 +103,15 @@ export async function fetchPendingOnsiteOrders(cfg: SyncConfig, fetchImpl: typeo
 export async function settleOnsiteOrder(cfg: SyncConfig, id: string, method: 'cash' | 'pos' | 'wallet', operator: string, fetchImpl: typeof fetch = fetch): Promise<any> {
   const res = await fetchImpl(buildSyncUrl(cfg.webServerUrl, `/api/sync/onsite-orders/${encodeURIComponent(id)}/settle`), {
     method: 'POST', headers: syncHeaders(cfg.apiKey, true), body: JSON.stringify({ method, operator }),
+  });
+  const d: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+  return d;
+}
+
+export async function attachAffiliateCode(cfg: SyncConfig, phone: string, code: string, operator: string, fetchImpl: typeof fetch = fetch): Promise<any> {
+  const res = await fetchImpl(buildSyncUrl(cfg.webServerUrl, '/api/sync/affiliate/attach'), {
+    method: 'POST', headers: syncHeaders(cfg.apiKey, true), body: JSON.stringify({ phone, code, operator }),
   });
   const d: any = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);

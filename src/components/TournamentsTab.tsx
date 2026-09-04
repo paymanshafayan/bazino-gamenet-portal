@@ -3,6 +3,7 @@ import { Tournament } from '../types/gamenet';
 import { Trophy, Calendar, Users, Plus, UserPlus, Trash2, Check, Star, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
+import { storedRef } from '../utils/affiliateCapture';
 import { L, localeOf, formatJalaliForLanguage, jalaliToGregorianDate } from '../utils/i18n';
 
 // Jalali Date Helpers
@@ -88,6 +89,7 @@ export default function TournamentsTab({
   const { t, dir, language } = useLanguage();
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>(tournaments[0]?.id || '');
   const [teamName, setTeamName] = useState('');
+  const [referralCode, setReferralCode] = useState(() => storedRef());
   const [leaderName, setLeaderName] = useState('');
   const [memberInput, setMemberInput] = useState('');
   const [members, setMembers] = useState<string[]>([]);
@@ -338,7 +340,7 @@ export default function TournamentsTab({
     const allMembers = [leaderName, ...members];
     // تسک ۱۳: هزینهٔ ثبت‌نام > 0 → انتخاب روش پرداخت (کیف پول / در محل با مهلت ۴۸ ساعت)؛ ثبت تیم را سرور انجام می‌دهد
     if (selectedTournament.registrationFee > 0) {
-      setCheckout({ params: { tournamentId: selectedTournament.id, team: { name: teamName, leader: leaderName, members: allMembers } }, amount: selectedTournament.registrationFee, title: selectedTournament.title });
+      setCheckout({ params: { tournamentId: selectedTournament.id, team: { name: teamName, leader: leaderName, members: allMembers }, referralCode: referralCode.trim() }, amount: selectedTournament.registrationFee, title: selectedTournament.title });
       return;
     }
     setIsSubmitting(true);
@@ -850,6 +852,18 @@ export default function TournamentsTab({
                   value={leaderName}
                   onChange={(e) => setLeaderName(e.target.value)}
                   className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'کد معرفی همکار (اختیاری، جدا از تخفیف)', en: 'Affiliate code (optional, not a coupon)', ru: 'Код партнёра (не промокод)', tr: 'Satış ortağı kodu (kupon değil)' })}</label>
+                <input
+                  type="text"
+                  data-referral-code
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                  placeholder="e.g. ALI12"
+                  className="w-full bg-card-2 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
                 />
               </div>
 

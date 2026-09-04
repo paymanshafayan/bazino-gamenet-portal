@@ -2114,5 +2114,100 @@ test('SPA shell served for /profile/wallet and /admin/wallet', async () => {
   }
 });
 
+suite('36. API — affiliate marketing');
+
+const affUser = `aff_${Date.now().toString(36)}`;
+const affPhone = `0533${String(Date.now()).slice(-7)}`;
+const buyerUser = `buy_${Date.now().toString(36)}`;
+const buyerPhone = `0532${String(Date.now()).slice(-7)}`;
+let buyerToken = '';
+const buyerAuth = () => ({ Authorization: `Bearer ${buyerToken}` });
+let affId = '';
+const AFF_CODE = 'ALI12';
+
+test('boot seed writes real affiliate settings rows (10/5/10) visible to admin', async () => {
+  const s: any = await getJson(`${BASE}/api/admin/affiliate-settings`, 200, adminAuth());
+  assert.equal(s.affiliate_new_pct, '10');
+  assert.equal(s.affiliate_return_pct, '5');
+  assert.equal(s.affiliate_tournament_pct, '10');
+  assert.equal(s.affiliate_window_days, '30');
+  const put = await putJson(`${BASE}/api/admin/affiliate-settings`, { affiliate_new_pct: '10' }, adminAuth());
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.equal(put.body.settings.affiliate_new_pct, '10');
+});
+
+test('admin creates affiliate; click records once then de-dupes; invalid code 404', async () => {
+  const reg = await postJson(`${BASE}/api/auth/register`, { username: affUser, email: `${affUser}@t.dev`, password: 'Passw0rd!', phone: affPhone });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  const created = await postJson(`${BASE}/api/admin/affiliates`, { code: AFF_CODE, username: affUser, name: 'Ali Test' }, adminAuth());
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  affId = created.body.affiliate.id;
+  assert.equal(created.body.affiliate.code, AFF_CODE);
+  const bad = await postJson(`${BASE}/api/affiliate/click`, { code: 'NOPE' });
+  assert.equal(bad.status, 404);
+  const c1 = await postJson(`${BASE}/api/affiliate/click`, { code: AFF_CODE, path: '/', visitorId: 'v-e2e' });
+  assert.equal(c1.status, 200, JSON.stringify(c1.body));
+  assert.equal(c1.body.duplicate, false);
+  const c2 = await postJson(`${BASE}/api/affiliate/click`, { code: AFF_CODE, path: '/', visitorId: 'v-e2e' });
+  assert.equal(c2.status, 200);
+  assert.equal(c2.body.duplicate, true);
+  const look: any = await getJson(`${BASE}/api/affiliate/lookup?code=${AFF_CODE}`);
+  assert.equal(look.code, AFF_CODE);
+});
+
+test('wallet checkout with referralCode creates pending commission; cafe does not; self-referral skipped', async () => {
+  const reg = await postJson(`${BASE}/api/auth/register`, { username: buyerUser, email: `${buyerUser}@t.dev`, password: 'Passw0rd!', phone: buyerPhone });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  buyerToken = reg.body.token;
+  const top = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: buyerPhone, amount: 5000, operator: 'cashier', idempotencyKey: `aff-${buyerUser}` });
+  assert.equal(top.status, 200, JSON.stringify(top.body));
+  const sys = sample.SAMPLE_SYSTEMS.find((s: any) => !s.isReserved) || sample.SAMPLE_SYSTEMS[0];
+  const r = await postJson(`${BASE}/api/checkout/wallet`, {
+    kind: 'reservation',
+    params: { systemId: sys.id, startTime: '22:00', endTime: '23:00', date: 'فردا', referralCode: AFF_CODE },
+  }, buyerAuth());
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const detail: any = await getJson(`${BASE}/api/admin/affiliates/${affId}`, 200, adminAuth());
+  const comm = (detail.commissions || []).filter((c: any) => c.orderId === r.body.orderId);
+  assert.equal(comm.length, 1, JSON.stringify(detail.commissions));
+  assert.equal(comm[0].status, 'pending');
+  assert.equal(comm[0].eventType, 'new');
+  assert.equal(comm[0].ratePct, 10);
+  assert.equal(comm[0].commissionAmount, Math.round(r.body.amount * 10) / 100);
+  const cafe = await postJson(`${BASE}/api/checkout/onsite`, {
+    kind: 'cafe',
+    params: { items: [{ item: { id: sample.SAMPLE_CAFE_ITEMS[0].id }, quantity: 1 }], tableNumber: 'A9', referralCode: AFF_CODE },
+  }, buyerAuth());
+  assert.equal(cafe.status, 200, JSON.stringify(cafe.body));
+  await postJson(`${BASE}/api/admin/onsite-orders/${cafe.body.orderId}/settle`, { method: 'cash' }, adminAuth());
+  const afterCafe: any = await getJson(`${BASE}/api/admin/affiliates/${affId}`, 200, adminAuth());
+  assert.equal((afterCafe.commissions || []).filter((c: any) => c.kind === 'cafe').length, 0);
+  const selfTop = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: affPhone, amount: 2000, operator: 'cashier', idempotencyKey: `aff-self-${affUser}` });
+  assert.equal(selfTop.status, 200, JSON.stringify(selfTop.body));
+  const affTok = (await postJson(`${BASE}/api/auth/login`, { username: affUser, password: 'Passw0rd!' })).body.token;
+  const sys2 = sample.SAMPLE_SYSTEMS.find((s: any) => s.id !== sys.id) || sys;
+  const selfPay = await postJson(`${BASE}/api/checkout/wallet`, {
+    kind: 'reservation',
+    params: { systemId: sys2.id, startTime: '10:00', endTime: '11:00', date: 'فردا', referralCode: AFF_CODE },
+  }, { Authorization: `Bearer ${affTok}` });
+  assert.ok(selfPay.status === 200 || selfPay.status === 409, JSON.stringify(selfPay.body));
+  const afterSelf: any = await getJson(`${BASE}/api/admin/affiliates/${affId}`, 200, adminAuth());
+  assert.equal((afterSelf.commissions || []).filter((c: any) => c.username === affUser).length, 0);
+});
+
+test('sync cashout deducts wallet; SPA shells for affiliate pages', async () => {
+  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, buyerAuth());
+  const out = await postJson(`${BASE}/api/sync/wallet/cashout`, { phone: buyerPhone, amount: 10, operator: 'cashier', note: 'cash', idempotencyKey: `cash-${buyerUser}` });
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.equal(out.body.balance, before.balance - 10);
+  const dup = await postJson(`${BASE}/api/sync/wallet/cashout`, { phone: buyerPhone, amount: 10, operator: 'cashier', idempotencyKey: `cash-${buyerUser}` });
+  assert.equal(dup.body.duplicate, true);
+  for (const p of ['/admin/affiliates', '/profile/affiliate', '/legal/affiliate']) {
+    const res = await fetch(`${BASE}${p}`);
+    assert.equal(res.status, 200, p);
+    assert.match(res.headers.get('content-type') || '', /text\/html/);
+  }
+});
+
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

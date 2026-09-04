@@ -6,9 +6,9 @@
  * ⚠️ این متن‌ها پیش‌نویس عمومی بر اساس الزامات رایج سانال‌پوز ترکیه هستند و توصیهٔ حقوقی
  * نیستند؛ پیش از انتشار باید توسط مشاور حقوقی شرکت (KKTC) بازبینی شوند.
  */
-export type LegalSlug = 'privacy' | 'kvkk' | 'terms' | 'distance-sales' | 'pre-information' | 'refund' | 'delivery' | 'cookies';
+export type LegalSlug = 'privacy' | 'kvkk' | 'terms' | 'distance-sales' | 'pre-information' | 'refund' | 'delivery' | 'cookies' | 'affiliate';
 
-export const LEGAL_SLUGS: LegalSlug[] = ['privacy', 'kvkk', 'terms', 'distance-sales', 'pre-information', 'refund', 'delivery', 'cookies'];
+export const LEGAL_SLUGS: LegalSlug[] = ['privacy', 'kvkk', 'terms', 'distance-sales', 'pre-information', 'refund', 'delivery', 'cookies', 'affiliate'];
 
 export type Lang4 = 'fa' | 'en' | 'ru' | 'tr';
 
@@ -21,6 +21,7 @@ export const LEGAL_TITLES: Record<LegalSlug, Record<Lang4, string>> = {
   refund: { fa: 'شرایط لغو، انصراف و بازگشت وجه', en: 'Cancellation, Withdrawal & Refund Policy', ru: 'Условия отмены и возврата средств', tr: 'İptal, Cayma ve İade Koşulları' },
   delivery: { fa: 'شرایط ارائهٔ خدمات و تحویل', en: 'Service & Delivery Terms', ru: 'Условия оказания услуг и доставки', tr: 'Hizmet ve Teslimat Koşulları' },
   cookies: { fa: 'سیاست کوکی‌ها', en: 'Cookie Policy', ru: 'Политика использования cookie', tr: 'Çerez Politikası' },
+  affiliate: { fa: 'طرح همکاری در فروش', en: 'Affiliate Program', ru: 'Партнёрская программа', tr: 'Satış Ortaklığı Programı' },
 };
 
 /** متن‌ها با Markdown ساده: `## عنوان`، `- مورد`، پاراگراف. */
@@ -604,6 +605,32 @@ You can delete or block cookies in your browser settings; your session and prefe
 Страница оплаты предоставляется PayTR во фрейме; PayTR может устанавливать собственные cookie безопасности (см. политику paytr.com).
 
 Вы можете удалить или заблокировать cookie в настройках браузера; тогда сессия и предпочтения не сохранятся.`,
+  },
+  affiliate: {
+    tr: `## Satış ortaklığı
+{{site}} satış ortaklığı programı, gamer / yayıncı / kafe ortaklarının getirdiği **ödenmiş rezervasyon ve turnuva kayıtları** üzerinden komisyon verir. Kafe ve mağaza siparişleri kapsama girmez.
+
+Varsayılan oranlar ayarlar tablosunda tutulur ve yönetim panelinden değiştirilir (yeni müşteri rezervasyonu, geri dönen müşteri, turnuva, 2. seviye override). Komisyon, iptal penceresi (rezervasyon için seans − 10 dk, turnuva için başlangıç − 48 saat) dolana kadar bekletilir; sonra ortağa ait cüzdana yazılır. Cüzdan bakiyesi yalnızca mekânda nakit olarak çekilir.
+
+Kendini referans göstermek, yönetici rollerini hedeflemek ve sahte tıklama yasaktır. Referans kodu kupon değildir.`,
+    en: `## Affiliate program
+The {{site}} affiliate program pays commission on **paid station bookings and tournament registrations** referred by partners (gamers, streamers, cafés). Café and shop orders are out of scope.
+
+Default rates live as real rows in the settings table and are edited in the admin panel (new booking, returning booking, tournament, level-2 override). Commission is held until the cancellation window ends (booking: 10 minutes before the session; tournament: 48 hours before start), then credited to the partner’s wallet. Wallet cash-out is recorded in person at the venue.
+
+Self-referral, targeting excluded roles, and fake clicks are forbidden. A referral code is not a coupon.`,
+    fa: `## طرح همکاری در فروش
+طرح همکاری {{site}} فقط روی **رزرو ایستگاه و ثبت‌نام تورنمنتِ پرداخت‌شده** کمیسیون می‌دهد. سفارش بوفه و فروشگاه مشمول نیست.
+
+نرخ‌های پیش‌فرض به‌صورت ردیف واقعی در جدول تنظیمات ذخیره می‌شوند و از پنل مدیریت ویرایش می‌گردند (مشتری جدید، بازگشتی، تورنمنت، بالاسری سطح ۲). کمیسیون تا پایان مهلت لغو (رزرو: ۱۰ دقیقه قبل از سانس؛ تورنمنت: ۴۸ ساعت قبل از شروع) نگه داشته و سپس به کیف پول همکار واریز می‌شود. نقد کردن کیف پول فقط حضوری در گیم‌نت ثبت می‌شود.
+
+خودمعرفی، هدف‌گیری نقش‌های مستثنی و کلیک ساختگی ممنوع است. کد معرفی کوپن تخفیف نیست.`,
+    ru: `## Партнёрская программа
+Программа {{site}} платит комиссию только с **оплаченных броней станций и регистраций на турниры**. Заказы кафе и магазина не входят.
+
+Ставки хранятся строками настроек и правятся в админке. Комиссия удерживается до конца окна отмены, затем зачисляется на кошелёк партнёра. Вывод — только на месте.
+
+Самореферал и накрутка кликов запрещены. Реферальный код — не промокод.`,
   },
 };
 

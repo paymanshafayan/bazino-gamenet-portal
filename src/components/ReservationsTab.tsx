@@ -5,6 +5,7 @@ import QrCodeImage from './QrCodeImage';
 import { useLanguage } from '../context/LanguageContext';
 import { L, localeOf } from '../utils/i18n';
 import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
+import { storedRef } from '../utils/affiliateCapture';
 
 interface Props {
   themeId?: string;
@@ -25,6 +26,7 @@ export default function ReservationsTab({
   const [hours, setHours] = useState<number>(2);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<DiscountCode | null>(null);
+  const [referralCode, setReferralCode] = useState(() => storedRef());
 
   // QR Code check-in and active reservations states
   const [reservations, setReservations] = useState<any[]>([]);
@@ -145,7 +147,7 @@ export default function ReservationsTab({
 
     // تسک ۱۳: انتخاب روش پرداخت (کیف پول / در محل / آنلاین اگر فعال) — مستقل از قالب؛
     // رزرو و امتیاز را سرور پس از تأیید روش ثبت می‌کند.
-    setCheckout({ params: { systemId: selectedSystem.id, startTime: '14:00', endTime: `${14 + hours}:00`, date: 'امروز', couponCode: appliedCoupon?.code || '' }, amount: finalAmount, title: descMsg });
+    setCheckout({ params: { systemId: selectedSystem.id, startTime: '14:00', endTime: `${14 + hours}:00`, date: 'امروز', couponCode: appliedCoupon?.code || '', referralCode: referralCode.trim() }, amount: finalAmount, title: descMsg });
   };
 
   const onCheckoutDone = (r: CheckoutResult) => {
@@ -711,6 +713,11 @@ export default function ReservationsTab({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="border-t border-white/5 pt-4">
+                <label className="text-[10px] text-gray-500 font-bold block mb-1">{L(language, { fa: 'کد معرفی همکار (اختیاری، جدا از تخفیف)', en: 'Affiliate code (optional, not a coupon)', ru: 'Код партнёра (не промокод)', tr: 'Satış ortağı kodu (kupon değil)' })}</label>
+                <input type="text" data-referral-code value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="e.g. ALI12" className="w-full px-3.5 py-2.5 bg-card-2 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono" />
               </div>
 
               {/* Promo code field */}

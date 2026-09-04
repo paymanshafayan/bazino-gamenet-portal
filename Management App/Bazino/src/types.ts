@@ -98,7 +98,7 @@ export interface WalletTransaction {
   customerId: string;
   customerName: string;
   amount: number; // positive for charge, negative for usage/debt
-  type: 'CHARGE' | 'PAYMENT' | 'DEBT_SETTLEMENT' | 'BONUS_DISCOUNT';
+  type: 'CHARGE' | 'PAYMENT' | 'DEBT_SETTLEMENT' | 'BONUS_DISCOUNT' | 'CASHOUT';
   description: string;
   date: string; // ISO string
   operatorName: string;

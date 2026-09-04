@@ -23,6 +23,7 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 import React from 'react';
+import { LocationFrame, locationFrom } from './LocationFrame';
 import { createRoot, type Root } from 'react-dom/client';
 
 export type ThemeTab = 'home' | 'loyalty' | 'reservations' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'csharp' | 'chat' | 'presentation' | 'admin';
@@ -182,13 +183,47 @@ export function mountComponent(
   }
 
   const def = reg.factory();
-  const el = React.createElement(
-    React.Fragment,
-    null,
-    def.render ? def.render(props) : (def.create ? def.create(props).render() : null)
-  );
-  root.render(el);
+  let out: unknown = null;
+  try {
+    out = def.render ? def.render(props) : (def.create ? def.create(props).render() : null);
+  } catch (e) {
+    console.error(`[ThemeSDK] render() of region "${name}" threw:`, e);
+    out = null;
+  }
+  root.render(React.createElement(React.Fragment, null, normalizeRenderOutput(name, out)));
   return true;
+}
+
+/**
+ * خروجی render قالب را به چیزی که React می‌فهمد تبدیل می‌کند:
+ *  - React element / string / number / null → همان
+ *  - HTMLElement / DocumentFragment (DOM خام) → داخل یک host تزریق می‌شود
+ *  - { html: '<div>…</div>' } → innerHTML (فقط برای قالب‌های ساده)
+ * پیش از این DOM خام بی‌صدا «هیچ» رندر می‌شد و نویسنده‌ی قالب فکر می‌کرد بخش قابل تغییر نیست.
+ */
+function normalizeRenderOutput(name: string, out: unknown): React.ReactNode {
+  if (out == null || typeof out === 'string' || typeof out === 'number' || typeof out === 'boolean') return out as React.ReactNode;
+  if (React.isValidElement(out) || Array.isArray(out)) return out as React.ReactNode;
+  if (typeof Node !== 'undefined' && out instanceof Node) {
+    const node = out;
+    return React.createElement(DomHost, { key: 'dom', node });
+  }
+  if (typeof out === 'object' && typeof (out as any).html === 'string') {
+    return React.createElement('div', { 'data-theme-html': name, dangerouslySetInnerHTML: { __html: (out as any).html } });
+  }
+  console.warn(`[ThemeSDK] region "${name}" render() returned an unsupported value; expected a React element (SDK.React.createElement), a DOM node or { html }.`, out);
+  return null;
+}
+
+function DomHost({ node }: { node: Node }) {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  React.useLayoutEffect(() => {
+    const host = ref.current;
+    if (!host) return;
+    host.replaceChildren(node);
+    return () => { try { host.replaceChildren(); } catch { /* ignore */ } };
+  }, [node]);
+  return React.createElement('div', { ref, 'data-theme-dom': '' });
 }
 
 export function unmountComponent(name: string): void {
@@ -222,6 +257,10 @@ declare global {
       THEME_COMPONENT_API_VERSION: number;
       THEME_REGIONS: readonly string[];
       React: typeof React;
+      /** فریم آماده‌ی لوکیشن واقعی کلاب (داده از تنظیمات ادمین) */
+      LocationFrame: typeof LocationFrame;
+      /** داده‌ی نرمال‌شده‌ی لوکیشن از settings */
+      locationFrom: typeof locationFrom;
     };
   }
 }
@@ -235,5 +274,7 @@ if (typeof window !== 'undefined' && !window.BazinoThemeSDK) {
     THEME_COMPONENT_API_VERSION,
     THEME_REGIONS,
     React,
+    LocationFrame,
+    locationFrom,
   };
 }

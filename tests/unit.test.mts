@@ -732,5 +732,12 @@ test('no Toman/تومان currency string survives in the frontend', () => {
   assert.deepEqual(offenders.map(f => path.relative(ROOT, f)), []);
 });
 
+test('the public header has no theme-selector button and personal theme choice is not honoured', () => {
+  const app = read('src/App.tsx');
+  assert.ok(!app.includes('ThemeSelectorModal'), 'ThemeSelectorModal must not be referenced by App.tsx');
+  assert.ok(!/<Palette\b/.test(app), 'palette (theme picker) button must not be in the header');
+  assert.ok(!app.includes("getItem('themeChoice')"), 'personal themeChoice must no longer override the site default');
+});
+
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });
 await vite.close();

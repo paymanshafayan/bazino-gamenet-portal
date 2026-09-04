@@ -159,11 +159,65 @@ theme.zip
 | ۵ | **Hero** (طراحی آزاد: ویدئو/بنر/اسلایدر…) | `hero` | ⬜ اختیاری | پیش‌فرض سایت اسلایدر ادمین است؛ قالب هر چیزی می‌تواند بگذارد | `slides` اختیاری (fallback: `featuredGames`) |
 | ۶ | **تعرفه‌ها / پاس‌ها** | `home.pricing` | ⬜ اختیاری | پلن‌های قیمت‌گذاری | `pricingPackages` |
 | ۷ | **مربیان و تیم** | `home.staff` | ⬜ اختیاری | معرفی کادر/مربیان | `staffTeam` |
-| ۸ | **تماس، آدرس و نقشه** | `home.location` | ⬜ اختیاری | اطلاعات تماس، شبکه‌های اجتماعی، نقشه | `settings` |
+| ۸ | **تماس، آدرس و نقشه** | `home.location` | ⬜ اختیاری | اطلاعات تماس، نقشه — از **`SDK.LocationFrame`** استفاده کنید (پایین) | `settings` |
 | ۹ | **هدر / ناوبری** | `header` | — | لوگو (`logoUrl`)، منوی تب‌ها (`activeTab`, `onNavigate`)، کاربر (`user`) | `t`, `settings` |
 | ۱۰ | **فوتر** | `footer` | — | اطلاعات کلوپ، لینک‌ها | `settings` |
 | ۱۱ | **نوار پایین موبایل** | `mobileNav` | — | ناوبری موبایل | `activeTab`, `onNavigate` |
 | ۱۲ | **چرا ما / درباره / محصولات / CTA** | (داخل `home`) | ⬜ اختیاری | بخش‌های آزاد | `settings`, `onNavigate` |
+
+
+### 📍 لوکیشن واقعی کلاب — فریم آماده‌ی `SDK.LocationFrame`
+
+آدرس، تلفن، ساعت کار و مختصات کلاب را **ادمین** در پنل (شخصی‌سازی) تنظیم می‌کند و در `props.settings` به قالب می‌رسد:
+
+| کلید تنظیمات | مثال |
+|---|---|
+| `club_address` | `Derviş İzzigil Sokak No.12, İskele … dükkan No.5` |
+| `club_phone` | `+90 539 133 37 47` |
+| `club_hours` | `24/7` |
+| `club_map_lat` / `club_map_lng` | `35.2628` / `33.9084` |
+| `club_map_url` | لینک Google Maps (اختیاری) |
+
+**قالب هرگز این مقادیر را هاردکد نمی‌کند.** به‌جای ساختن نقشه از صفر، فریم آماده را در هر region (معمولاً `home.location`، یا داخل `home`/`footer`) رندر کنید:
+
+```js
+var SDK = window.BazinoThemeSDK, R = SDK.React;
+
+SDK.registerComponent('home.location', { apiVersion: 2, render: function (p) {
+  return R.createElement('section', { className: 'my-theme-location' },
+    R.createElement(SDK.LocationFrame, {
+      settings: p.settings,      // اجباری — داده‌ی واقعی کلاب
+      language: p.language,      // fa/en/ru/tr → برچسب‌ها خودکار ترجمه می‌شوند
+      dir: p.dir,
+      variant: 'card',           // 'card' (نقشه + کارت اطلاعات) | 'map' (فقط نقشه) | 'inline' (یک خط برای فوتر)
+      mapHeight: 360,            // اختیاری
+      title: p.ts('location.title', 'Bizi bulun'), // اختیاری
+      hideActions: false         // اختیاری — دکمه‌های مسیریابی/Google Maps
+    })
+  );
+}});
+```
+
+- استایل‌دهی از `theme.css` با کلاس‌های `bz-loc`, `bz-loc-card`, `bz-loc-map`, `bz-loc-info`, `bz-loc-title`, `bz-loc-address`, `bz-loc-phone`, `bz-loc-hours`, `bz-loc-btn`, `bz-loc-btn-primary` (دکمه‌ی اصلی از `--primary-color` قالب رنگ می‌گیرد).
+- اگر می‌خواهید نقشه/چیدمان کاملاً اختصاصی بسازید، فقط داده‌ی نرمال‌شده را بگیرید:
+  ```js
+  var loc = SDK.locationFrom(p.settings);
+  // { lat, lng, address, phone, hours, name, mapUrl, embedUrl, directionsUrl }
+  R.createElement('iframe', { src: loc.embedUrl });   // نقشه‌ی OSM بدون کلید API
+  R.createElement('a', { href: loc.directionsUrl }, 'مسیریابی');
+  ```
+- نقشه از OpenStreetMap embed (بدون کلید) بارگذاری می‌شود؛ لینک‌های مسیریابی به Google Maps می‌روند.
+
+### 🧱 خروجی `render` — سه شکل مجاز
+
+`render(props)` می‌تواند برگرداند:
+1. **React element** (`SDK.React.createElement(...)`) — توصیه‌شده؛
+2. **DOM خام** (`document.createElement(...)` یا `DocumentFragment`) — داخل یک host تزریق می‌شود؛
+3. `{ html: '<div>…</div>' }` — برای قالب‌های خیلی ساده (innerHTML؛ بدون رویداد).
+
+هر خروجی دیگر با هشدار در کنسول نادیده گرفته می‌شود (`[ThemeSDK] region "…" render() returned an unsupported value`). اگر `render` استثنا بدهد، خطا در کنسول لاگ و بخش خالی می‌ماند (سایت نمی‌شکند).
+
+> ⚠️ **صفحات مستقل از قالب**: `/legal/*`، `/contact`، `/payment/*`، نوار قانونی پایین صفحه و مودال پرداخت هیچ region ندارند و توسط قالب قابل تغییر نیستند (الزام قانونی/درگاه).
 
 ### قرارداد داده (props) — نسخه ۲ (سازگار با نسخه ۱)
 
@@ -397,6 +451,9 @@ cd my-theme && zip -r ../my-theme.zip theme.json theme.css theme.js assets
 ---
 
 ## 🔌 نحوه استفاده
+
+> از این نسخه، انتخاب قالب فقط توسط ادمین (پنل → قالب‌ها → «قالب پیش‌فرض سایت») انجام می‌شود؛ دکمه‌ی انتخاب قالب از هدر کاربران حذف شده و انتخاب شخصی (`themeChoice`) دیگر اعمال نمی‌شود.
+
 
 ```ts
 import { BUILT_IN_THEMES, loadThemeStylesheet } from './themes';

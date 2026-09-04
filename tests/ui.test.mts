@@ -10,7 +10,7 @@
  */
 import { suite, test, assert, run } from './harness.mts';
 import {
-  setupDom, teardownDom, loadModule, mount, act, getDocument,
+  setupDom, teardownDom, loadModule, mount, act, getDocument, getWindow,
   installIntersectionObserver, removeIntersectionObserver, stubFetch,
 } from './dom.mts';
 
@@ -474,6 +474,71 @@ test('does not crash when mounting a tournament with an empty bracket', async ()
 
   await el.unmount();
   restoreFetch();
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   38. Theme SDK — خروجی render (DOM خام / html) و LocationFrame
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('38. UI — Theme SDK render outputs & LocationFrame');
+
+const sdk = await loadModule('/src/themeSdk/sdk.ts');
+const { LocationFrame, locationFrom } = await loadModule('/src/themeSdk/LocationFrame.tsx');
+
+const baseProps = () => ({ language: 'tr', dir: 'ltr', t: (k: string) => k, ts: (k: string) => k, tokens: {}, slides: [], onNavigate: () => {}, featuredGames: [], tournaments: [], settings: {}, logoUrl: '/logo.png', assetsBase: '/x', themeId: 't', region: 'header' });
+
+test('a theme render() that returns a raw DOM node is mounted inside the region host', async () => {
+  const doc = getDocument();
+  sdk.registerComponent('header', { apiVersion: 2, render: () => { const d = doc.createElement('div'); d.id = 'raw-dom-header'; d.textContent = 'RAW'; return d; } });
+  const host = doc.createElement('div'); doc.body.appendChild(host);
+  await act(() => { sdk.mountComponent('header', host, baseProps()); });
+  assert.ok(host.querySelector('#raw-dom-header'), 'raw DOM output was not rendered');
+  assert.equal(host.textContent, 'RAW');
+  await act(() => { sdk.unregisterComponent('header'); });
+  host.remove();
+});
+
+test('a theme render() that returns { html } is injected; unsupported values render nothing without throwing', async () => {
+  const doc = getDocument();
+  sdk.registerComponent('footer', { apiVersion: 2, render: () => ({ html: '<b id="html-footer">HTML</b>' }) });
+  const host = doc.createElement('div'); doc.body.appendChild(host);
+  await act(() => { sdk.mountComponent('footer', host, { ...baseProps(), region: 'footer' }); });
+  assert.ok(host.querySelector('#html-footer'));
+  sdk.registerComponent('footer', { apiVersion: 2, render: () => 42n as any });
+  await act(() => { sdk.mountComponent('footer', host, { ...baseProps(), region: 'footer' }); });
+  assert.equal(host.textContent, '');
+  sdk.registerComponent('footer', { apiVersion: 2, render: () => { throw new Error('boom'); } });
+  await act(() => { sdk.mountComponent('footer', host, { ...baseProps(), region: 'footer' }); });
+  assert.equal(host.textContent, '', 'a throwing render must not break the host');
+  await act(() => { sdk.unregisterComponent('footer'); });
+  host.remove();
+});
+
+test('locationFrom normalises admin settings and falls back to the real club coordinates', () => {
+  const loc = locationFrom({ club_address: 'A', club_phone: '+90 1', club_hours: '24/7', club_map_lat: '35.1', club_map_lng: '33.9', club_map_url: 'https://maps.app.goo.gl/x' });
+  assert.equal(loc.lat, 35.1); assert.equal(loc.lng, 33.9); assert.equal(loc.mapUrl, 'https://maps.app.goo.gl/x');
+  assert.match(loc.embedUrl, /openstreetmap\.org\/export\/embed\.html\?bbox=.*marker=35\.1%2C33\.9/);
+  assert.match(loc.directionsUrl, /destination=35\.1,33\.9/);
+  const def = locationFrom({});
+  assert.equal(def.lat, 35.2628); assert.equal(def.lng, 33.9084);
+  assert.match(def.mapUrl, /google\.com\/maps\?q=35\.2628,33\.9084/);
+});
+
+test('LocationFrame renders address/phone/hours/map from settings in all three variants', async () => {
+  const settings = { club_address: 'Vista Mare No.5', club_phone: '+90 539 133 37 47', club_hours: '24/7', club_map_lat: '35.2628', club_map_lng: '33.9084' };
+  for (const variant of ['card', 'map', 'inline'] as const) {
+    const m = await mount(LocationFrame, { settings, language: 'tr', variant });
+    const html = m.container.innerHTML;
+    if (variant !== 'map') { assert.ok(html.includes('Vista Mare No.5'), `${variant}: address`); assert.ok(html.includes('+90 539 133 37 47'), `${variant}: phone`); }
+    if (variant !== 'inline') assert.ok(m.container.querySelector('iframe[src*="openstreetmap.org"]'), `${variant}: map iframe`);
+    if (variant === 'card') { assert.ok(html.includes('Bizi bulun'), 'tr title'); assert.ok(html.includes('24/7')); }
+    await m.unmount();
+  }
+});
+
+test('the theme SDK exposes LocationFrame and locationFrom to theme.js', () => {
+  const w = getWindow();
+  assert.equal(typeof w.BazinoThemeSDK?.LocationFrame, 'function');
+  assert.equal(typeof w.BazinoThemeSDK?.locationFrom, 'function');
 });
 
 await run({ title: 'Bazino — UI component tests', jsonOut: 'tests/reports/ui.json' });

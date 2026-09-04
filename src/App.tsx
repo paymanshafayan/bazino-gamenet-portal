@@ -36,7 +36,6 @@ const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
 const AuthModal = lazy(() => import('./components/AuthModal'));
 const InstallPage = lazy(() => import('./components/InstallPage'));
 const ChatTab = lazy(() => import('./components/ChatTab'));
-const ThemeSelectorModal = lazy(() => import('./components/ThemeSelectorModal'));
 const ConsoleHubView = lazy(() => import('./components/ConsoleHubView'));
 const ConsoleGridClassic = lazy(() => import('./components/ConsoleGridClassic'));
 const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
@@ -47,7 +46,7 @@ import { L, localizeList, localeOf } from './utils/i18n';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
   Sparkles, Home, Instagram, Send, Youtube, Twitter, Facebook, Settings, ChevronDown,
-  Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight, Palette
+  Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { tabFromPath, pathFromTab, standalonePageFromPath } from './utils/routes';
 // صفحات قانونی/تماس/پرداخت عمداً lazy نیستند تا هرگز به قالب و ThemeRegion وابسته نباشند
@@ -110,9 +109,6 @@ export default function App() {
   // بازنویسی می‌کند و بعد از هر رفرش قالب به پیش‌فرض برمی‌گردد. اعتبارسنجی
   // نهایی بعد از دریافت لیست سرور انجام می‌شود.
   const [themeId, setThemeId] = useState(() => getStoredThemeId() || 'dark-gold');
-  const hasStoredThemeChoice = useRef<boolean>((() => {
-    try { return !!localStorage.getItem('themeId'); } catch { return false; }
-  })());
   const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
   const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
     ...BUILT_IN_THEMES,
@@ -151,14 +147,6 @@ export default function App() {
   const [themeStoreVersion, setThemeStoreVersion] = useState(0);
   const refreshServerThemes = useCallback(() => setThemeStoreVersion(v => v + 1), []);
   const [serverActiveThemeId, setServerActiveThemeId] = useState<string>('dark-gold');
-  /** انتخاب شخصی کاربر از ThemeSelector (بر قالب پیش‌فرض سایت غالب است) */
-  const chooseThemePersonally = useCallback((id: string) => {
-    try {
-      if (id === serverActiveThemeId) localStorage.removeItem('themeChoice');
-      else localStorage.setItem('themeChoice', 'personal');
-    } catch { /* private mode */ }
-    setThemeId(id);
-  }, [serverActiveThemeId]);
 
   // دریافت قالب‌های نصب‌شده روی سرور (هر قالب پوشه اختصاصی خودش را دارد)
   useEffect(() => {
@@ -200,8 +188,9 @@ export default function App() {
             // خودش آگاهانه قالب دیگری را از ThemeSelector انتخاب کرده باشد
             // (themeChoice=personal). انتخاب‌های قدیمی/ضمنی localStorage دیگر
             // انتخاب سراسری ادمین را بلوکه نمی‌کنند.
-            const personal = (() => { try { return localStorage.getItem('themeChoice') === 'personal'; } catch { return false; } })();
-            if (serverActive && knownIds.has(serverActive) && (!personal || !hasStoredThemeChoice.current)) return serverActive;
+            // انتخاب شخصی قالب توسط کاربر حذف شده است (E.72): قالب پیش‌فرض سایت (ادمین) همیشه غالب است.
+            try { localStorage.removeItem('themeChoice'); } catch { /* ignore */ }
+            if (serverActive && knownIds.has(serverActive)) return serverActive;
             if (knownIds.has(current)) return current;
             // قالب ذخیره‌شده‌ی کاربر دیگر روی سرور وجود ندارد (حذف شده یا فایل‌سیستم سرور
             // موقتی بوده). به‌جای سقوط بی‌صدا، هشدار بده تا علت دیده شود.
@@ -334,7 +323,6 @@ export default function App() {
   const [activeCoupons, setActiveCoupons] = useState<DiscountCode[]>([]);
 
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; type: 'success' | 'error' | 'info' }>>([]);
-  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   const addNotification = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -847,9 +835,6 @@ export default function App() {
                >
                  <HelpCircle className="w-4 h-4 text-primary" />
                </button>
-               <button onClick={() => setIsThemeModalOpen(true)} className="p-2 text-white bg-white/5 rounded-full hover:bg-white/10">
-                 <Palette className="w-4 h-4"/>
-               </button>
                <LanguageMenu language={language} setLanguage={setLanguage} open={langDropdownOpen} setOpen={setLangDropdownOpen} />
             </div>
           </header>
@@ -898,9 +883,9 @@ export default function App() {
       {/* Modals — lazy: چانک هر مودال فقط هنگام «اولین باز شدن» دانلود و اجرا می‌شود.
           قبلاً بدون شرط mount می‌شدند (چون داخلاً return null می‌کنند) و React همین که
           کامپوننت lazy رندر شود، چانکش را در startup دانلود/اجرا می‌کرد — همین باعث
-          TBT بالا و دانلود ThemeSelectorModal/AuthModal/VisualHelpGuide در بار اول
+          TBT بالا و دانلود AuthModal/VisualHelpGuide در بار اول
           می‌شد (مشاهده‌شده در Waterfall گزارش GTmetrix). با شرطی کردن، این چانک‌ها
-          (شامل motion که فقط داخل ThemeSelectorModal است) از مسیر بحرانی حذف شدند. */}
+          (شامل motion) از مسیر بحرانی حذف شدند. */}
       <Suspense fallback={null}>
         {isHelpOpen && (
           <VisualHelpGuide
@@ -917,17 +902,6 @@ export default function App() {
             isOpen={isAuthModalOpen}
             onClose={() => setIsAuthModalOpen(false)}
             onAuthSuccess={setUser}
-          />
-        )}
-        {isThemeModalOpen && (
-          <ThemeSelectorModal
-            isOpen={isThemeModalOpen}
-            onClose={() => setIsThemeModalOpen(false)}
-            availableThemes={availableThemes}
-            themeId={themeId}
-            setThemeId={chooseThemePersonally}
-            siteDefaultThemeId={serverActiveThemeId}
-            language={language}
           />
         )}
       </Suspense>

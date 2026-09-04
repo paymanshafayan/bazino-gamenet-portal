@@ -905,3 +905,10 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - واحد پول TL در کل سایت؛ امتیاز = مبلغ/10.
 - تست‌ها: ۲۸۳/۲۸۳ (۲۴ تست جدید: امضاهای PayTR، محتوای قانونی، استقلال از قالب، جریان create→mock→callback، idempotency، هش نامعتبر، رزرو/هم‌پوشانی، فهرست ادمین، تنظیمات).
 - تست‌نشده: درگاه واقعی PayTR، رندر فونت فارسی در sandbox، Railway.
+
+## ۱۴۰۵/۰۶/۱۳ — انتخاب قالب فقط توسط ادمین، رفع باگ SDK هدر، `SDK.LocationFrame`
+
+- هدر: دکمه‌ی انتخاب قالب و `ThemeSelectorModal` حذف؛ قالب سایت همیشه = انتخاب ادمین.
+- علت «قالب جدید هدر را تغییر نمی‌دهد»: باگ سیستم قالب (خروجی DOM خام از `render()` نادیده گرفته می‌شد). رفع در `src/themeSdk/sdk.ts` (`normalizeRenderOutput`).
+- `src/themeSdk/LocationFrame.tsx`: فریم آماده‌ی لوکیشن (card/map/inline) + `locationFrom`؛ روی `window.BazinoThemeSDK` در دسترس theme.js؛ مستند در README قالب‌ها (+ سه شکل مجاز خروجی render).
+- تست‌ها ۲۸۹/۲۸۹ (۶ جدید).

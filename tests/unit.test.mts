@@ -801,6 +801,26 @@ test('the web AuthModal has no registration form; OTP + password only; profile p
   assert.ok(!profile.includes('ThemeRegion'));
 });
 
+test('theme ZIP packed inside a root folder (my-theme/theme.js) still installs theme.js/theme.json (E.86)', async () => {
+  const { zipSync, strToU8 } = await import('fflate');
+  const css = readFileSync(path.join(ROOT, 'src/themes/dark-gold.css'), 'utf8').replace(/dark-gold/g, 'boxed');
+  const js = "window.BazinoThemeSDK.registerComponent('header', { render: function () { return null; } });";
+  const zip = zipSync({ 'my-theme/theme.json': strToU8(JSON.stringify({ id: 'boxed', name: 'Boxed', regions: ['header'] })), 'my-theme/theme.css': strToU8(css), 'my-theme/theme.js': strToU8(js), 'my-theme/assets/a.svg': strToU8('<svg/>') });
+  const parsed = parseThemeZip(zip, 'boxed.zip') as any;
+  assert.ok(!isZipParseError(parsed), parsed.error);
+  assert.equal(parsed.componentJs, js, 'theme.js must not be silently dropped');
+  assert.equal(parsed.meta.name, 'Boxed');
+  assert.deepEqual(Object.keys(parsed.assets), ['a.svg']);
+});
+
+test('server bootstrap carries the active theme and App renders the first frame with it (E.86)', () => {
+  const srv = read('server.ts');
+  assert.ok(srv.includes('activeThemeId,\n          theme: activeServerTheme,'), 'bootstrap has activeThemeId + theme');
+  const app = read('src/App.tsx');
+  assert.ok(app.includes('const __initialThemeId = __bootstrapActiveId || getStoredThemeId();'));
+  assert.ok(app.includes("themeRegistered.includes('hero') || themeRegistered.includes('home')"), 'default slider is not painted when the theme owns hero/home');
+});
+
 test('ticket status wording: open/customer_reply = under review, answered, closed; auto-close after 48 h', () => {
   const pp = read('src/components/profile/ProfilePage.tsx');
   assert.ok(/open: \{ fa: 'در حال بررسی'/.test(pp) && /customer_reply: \{ fa: 'در حال بررسی'/.test(pp));

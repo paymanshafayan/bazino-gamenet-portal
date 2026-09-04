@@ -4553,7 +4553,14 @@ Example format:
           if (typeof v !== "string") return v ?? fallback;
           try { return JSON.parse(v); } catch { return fallback; }
         };
+        // قالب فعال سایت هم داخل HTML می‌رود تا اولین رندر با همان قالب (و theme.js آن)
+        // شروع شود — قبلاً کلاینت با dark-gold رندر می‌شد و بعد از /api/themes سوییچ می‌کرد
+        // (فلش هدر/اسلایدر پیش‌فرض قبل از بخش‌های قالب — E.86).
+        const activeThemeId = (await getActiveDataProvider().getSetting("activeThemeId")) || "dark-gold";
+        const activeServerTheme = listInstalledThemes().find(t => t.id === activeThemeId) || null;
         const bootstrap = {
+          activeThemeId,
+          theme: activeServerTheme,
           tournaments: rawTournaments.map(t => ({ ...t, teams: parseJson(t.teams, []), bracket: parseJson(t.bracket, {}) })),
           assetVersion: ASSET_VERSION,
           // زبان پیشنهادی بر اساس کشور IP — بدون رفت‌وبرگشت اضافه در اولین رندر

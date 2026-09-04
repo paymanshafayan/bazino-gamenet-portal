@@ -113,6 +113,30 @@ function isSafeEntryPath(p: string): boolean {
 }
 
 /** نرمال‌سازی مسیر ورودی ZIP (حذف ./ و پشت‌slash) */
+/**
+ * اگر همه‌ی فایل‌های ZIP داخل یک پوشه‌ی ریشه‌ی مشترک باشند (مثل «my-theme/theme.css»
+ * که اکثر ابزارهای فشرده‌سازی می‌سازند)، آن پوشه حذف می‌شود. قبلاً در این حالت
+ * theme.css با fallback «هر فایل .css» پیدا می‌شد ولی theme.js/theme.json بی‌صدا
+ * نادیده گرفته می‌شدند → قالب «CSS-only» نصب می‌شد و هیچ بخشی (header/hero) جایگزین نمی‌شد.
+ */
+export function stripCommonRootFolder(files: Record<string, Uint8Array>): Record<string, Uint8Array> {
+  const keys = Object.keys(files).map(k => normalizeEntryPath(k)).filter(k => k && !k.startsWith('__MACOSX/') && !/(^|\/)\.DS_Store$/.test(k));
+  if (keys.length === 0) return files;
+  if (keys.some(k => /^(theme\.css|theme\.json|theme\.js)$/i.test(k))) return files;
+  const roots = new Set(keys.map(k => k.split('/')[0]));
+  if (roots.size !== 1) return files;
+  const root = [...roots][0] + '/';
+  if (!keys.some(k => k.startsWith(root) && k.length > root.length)) return files;
+  const out: Record<string, Uint8Array> = {};
+  for (const raw of Object.keys(files)) {
+    const norm = normalizeEntryPath(raw);
+    if (!norm || norm.startsWith('__MACOSX/')) continue;
+    if (norm === root.slice(0, -1)) continue; // خودِ پوشه
+    out[norm.startsWith(root) ? norm.slice(root.length) : norm] = files[raw];
+  }
+  return out;
+}
+
 function normalizeEntryPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
 }
@@ -123,7 +147,7 @@ function normalizeEntryPath(p: string): string {
 export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZipTheme | ZipParseError {
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(data);
+    files = stripCommonRootFolder(unzipSync(data));
   } catch (e) {
     return { error: 'فایل ZIP معتبر نیست یا خراب است', code: 'invalid-zip' };
   }

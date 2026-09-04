@@ -62,9 +62,48 @@ import { LegalFooter } from './legal/LegalFooter';
    فایل CSS قالب ذخیره‌شده را قبل از paint اولیه اعمال می‌کند تا
    هنگام بارگذاری صفحه هیچ پرش ظاهری (flash) رخ ندهد.
    ──────────────────────────────────────────────────────────────── */
+// ── داده‌ی اولیه‌ی تزریق‌شده در HTML توسط سرور ────────────────────────────
+// سرور در production، لیست مسابقات را به‌صورت window.__BAZINO_BOOTSTRAP__
+// داخل خودِ HTML می‌گذارد تا اولین رندر منتظر یک رفت‌وبرگشت اضافه‌ی /api
+// نماند — یعنی /api/tournaments از زنجیره‌ی بحرانی LCP (HTML → JS → API) که
+// Lighthouse گزارش کرده بود حذف می‌شود. در dev (Vite) این متغیر وجود ندارد
+// و کد همان مسیر fetch قبلی را می‌رود.
+type BgRequestInit = RequestInit & { priority?: 'high' | 'low' | 'auto' };
+const BOOTSTRAP = (typeof window !== 'undefined'
+  ? (window as unknown as { __BAZINO_BOOTSTRAP__?: { tournaments?: Tournament[]; activeThemeId?: string; theme?: unknown } }).__BAZINO_BOOTSTRAP__
+  : undefined);
+const BOOTSTRAP_TOURNAMENTS: Tournament[] | null = Array.isArray(BOOTSTRAP?.tournaments) ? (BOOTSTRAP!.tournaments as Tournament[]) : null;
+
+/** تبدیل رکورد قالب سروری (/api/themes یا bootstrap) به ThemeInfo کلاینت */
+function serverThemeToInfo(t: any): ThemeInfo {
+  return {
+    id: t.id,
+    name: t.name,
+    type: 'custom',
+    kind: 'server',
+    version: t.version,
+    description: t.description,
+    colors: t.colors,
+    cssUrl: t.cssUrl,
+    hasAssets: t.hasAssets,
+    assetFiles: t.assetFiles,
+    assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
+    installedAt: t.installedAt,
+    hasComponentJs: t.hasComponentJs !== false,
+    regions: t.regions,
+    strings: t.strings,
+    tokens: t.tokens,
+    author: t.author,
+  };
+}
+
 const __initialCustomThemes = loadCustomThemes();
-const __initialThemeId = getStoredThemeId();
-const __initialTheme = [...BUILT_IN_THEMES, ...__initialCustomThemes]
+// قالب فعال سراسری که سرور داخل HTML تزریق کرده (production) — اولین رندر با همان
+// قالب انجام می‌شود تا هدر/هرو پیش‌فرض یک لحظه هم دیده نشود (E.86).
+const __bootstrapTheme: ThemeInfo | null = BOOTSTRAP?.theme && typeof BOOTSTRAP.theme === 'object' && (BOOTSTRAP.theme as any).id ? serverThemeToInfo(BOOTSTRAP.theme) : null;
+const __bootstrapActiveId: string | null = typeof BOOTSTRAP?.activeThemeId === 'string' ? BOOTSTRAP.activeThemeId : null;
+const __initialThemeId = __bootstrapActiveId || getStoredThemeId();
+const __initialTheme = [...BUILT_IN_THEMES, ...__initialCustomThemes, ...(__bootstrapTheme ? [__bootstrapTheme] : [])]
   .find(t => t.id === __initialThemeId) ?? BUILT_IN_THEMES[0];
 document.body.setAttribute('data-theme', __initialTheme.id);
 loadThemeStylesheet(__initialTheme);
@@ -84,17 +123,6 @@ const TAB_DATASETS: Record<string, string[]> = {
   loyalty: ['transactions', 'coupons', 'user'],
 };
 
-// ── داده‌ی اولیه‌ی تزریق‌شده در HTML توسط سرور ────────────────────────────
-// سرور در production، لیست مسابقات را به‌صورت window.__BAZINO_BOOTSTRAP__
-// داخل خودِ HTML می‌گذارد تا اولین رندر منتظر یک رفت‌وبرگشت اضافه‌ی /api
-// نماند — یعنی /api/tournaments از زنجیره‌ی بحرانی LCP (HTML → JS → API) که
-// Lighthouse گزارش کرده بود حذف می‌شود. در dev (Vite) این متغیر وجود ندارد
-// و کد همان مسیر fetch قبلی را می‌رود.
-type BgRequestInit = RequestInit & { priority?: 'high' | 'low' | 'auto' };
-const BOOTSTRAP = (typeof window !== 'undefined'
-  ? (window as unknown as { __BAZINO_BOOTSTRAP__?: { tournaments?: Tournament[] } }).__BAZINO_BOOTSTRAP__
-  : undefined);
-const BOOTSTRAP_TOURNAMENTS: Tournament[] | null = Array.isArray(BOOTSTRAP?.tournaments) ? (BOOTSTRAP!.tournaments as Tournament[]) : null;
 
 // fetchهای پس‌زمینه با اولویت «low» — با منابع LCP رقابت نمی‌کنند و در
 // درخت وابستگی شبکه‌ی Chrome بخشی از مسیر بحرانی حساب نمی‌شوند.
@@ -110,11 +138,12 @@ export default function App() {
   // dark-gold برگردیم، useEffect پایین بلافاصله انتخاب کاربر را در localStorage
   // بازنویسی می‌کند و بعد از هر رفرش قالب به پیش‌فرض برمی‌گردد. اعتبارسنجی
   // نهایی بعد از دریافت لیست سرور انجام می‌شود.
-  const [themeId, setThemeId] = useState(() => getStoredThemeId() || 'dark-gold');
+  const [themeId, setThemeId] = useState(() => __initialThemeId || 'dark-gold');
   const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
   const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
     ...BUILT_IN_THEMES,
-    ...loadCustomThemes()
+    ...loadCustomThemes(),
+    ...(__bootstrapTheme ? [__bootstrapTheme] : []),
   ]);
 
   // نسخه‌ی هوشمند setAvailableThemes: قالب‌های سفارشی (محلی) را در
@@ -155,25 +184,7 @@ export default function App() {
     fetch('/api/themes', { cache: 'no-store' })
       .then(r => r.json())
       .then((data: { serverThemes?: any[]; activeThemeId?: string }) => {
-        const serverThemes: ThemeInfo[] = (data.serverThemes || []).map(t => ({
-          id: t.id,
-          name: t.name,
-          type: 'custom',
-          kind: 'server',
-          version: t.version,
-          description: t.description,
-          colors: t.colors,
-          cssUrl: t.cssUrl,
-          hasAssets: t.hasAssets,
-          assetFiles: t.assetFiles,
-          assetsBase: t.cssUrl ? t.cssUrl.replace(/\/theme\.css$/, '/assets') : undefined,
-          installedAt: t.installedAt,
-          hasComponentJs: t.hasComponentJs !== false,
-          regions: t.regions,
-          strings: t.strings,
-          tokens: t.tokens,
-          author: t.author,
-        }));
+        const serverThemes: ThemeInfo[] = (data.serverThemes || []).map(serverThemeToInfo);
         setServerActiveThemeId(data.activeThemeId || 'dark-gold');
         setAvailableThemesState(prev => {
           // قالب‌های سروری همیشه از پاسخ تازه‌ی سرور جایگزین می‌شوند (نسخه/installedAt جدید)؛
@@ -241,6 +252,7 @@ export default function App() {
       : null
   ), [activeTheme]);
   const themeScript = useThemeScript(themeScriptSource);
+  const themeRegistered = themeScript.registered;
   const [themeSlides, setThemeSlides] = useState<ThemeSlide[]>([]);
   useEffect(() => {
     // اسلایدهای ادمین (چهارزبانه) برای بخش‌های قالب — کم‌اولویت
@@ -573,6 +585,18 @@ export default function App() {
     addNotification(L(language, { fa: 'خروج موفقیت‌آمیز بود', en: 'Logged out successfully', ru: 'Вы успешно вышли', tr: 'Başarıyla çıkış yapıldı' }), 'success');
   };
 
+  // جای‌نگهدار LCP صفحه‌ی اصلی: اسلایدر پیش‌فرض فقط وقتی paint می‌شود که مطمئن باشیم
+  // قالب فعال بخش hero/home اختصاصی ندارد؛ وگرنه (theme.js در حال بارگذاری یا بخش ثبت‌شده)
+  // یک بلوک خالی هم‌ارتفاع نشان می‌دهیم تا اسلایدر یک لحظه «فلش» نکند (E.86).
+  const themeOwnsHero = !themeScript.ready || themeRegistered.includes('hero') || themeRegistered.includes('home');
+  // وقتی قالب خودش hero/home دارد، تأخیر LCP معنایی ندارد → HomeTab بلافاصله mount می‌شود
+  useEffect(() => {
+    if (themeScript.ready && (themeRegistered.includes('hero') || themeRegistered.includes('home'))) setIsHomeContentReady(true);
+  }, [themeScript.ready, themeRegistered]);
+  const homePlaceholder = themeOwnsHero
+    ? <div className="w-full min-h-[340px]" aria-hidden="true" data-hero-pending="" />
+    : <LandingHero onNavigate={() => setActiveTab('reservations')} />;
+
   const renderTabContent = () => (
     <Suspense fallback={
       <div className="w-full min-h-[600px]" aria-hidden="true" />
@@ -618,9 +642,9 @@ export default function App() {
             refreshData={refreshAll}
           />
         ) : !isHomeContentReady ? (
-          <LandingHero onNavigate={() => setActiveTab('reservations')} />
+          homePlaceholder
         ) : (
-          <Suspense fallback={<LandingHero onNavigate={() => setActiveTab('reservations')} />}>
+          <Suspense fallback={homePlaceholder}>
             <HomeTab
               themeId={themeId}
               tournaments={tournaments}

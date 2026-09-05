@@ -22,6 +22,7 @@
  *  - رزرو/تورنمنت با کیف پول فوراً تأیید می‌شوند؛ لغو توسط کاربر قبل از مهلت → بازگشت کامل به کیف پول.
  */
 import type express from 'express';
+import { transactional } from '../management/core';
 import { randomBytes } from 'crypto';
 import type { IDataStore, OnsiteOrderRow, WalletTxRow } from '../dataProviders';
 import { normalizePhone } from '../accountRoutes';
@@ -128,6 +129,9 @@ export function computeOnsiteDueAt(kind: OrderKind, payload: any, now = new Date
 
 /** ابطال خودکار سفارش‌های حضوری که مهلت‌شان گذشته. برمی‌گرداند تعداد ابطال‌شده‌ها. */
 export async function expireOnsiteOrders(store: IDataStore, deps: Pick<WalletDeps, 'unfulfil'>, now = Date.now()): Promise<number> {
+  return store.runInTransaction(() => expireOnsiteOrdersAtomic(store, deps, now));
+}
+async function expireOnsiteOrdersAtomic(store: IDataStore, deps: Pick<WalletDeps, 'unfulfil'>, now: number): Promise<number> {
   const pending = await store.listOnsiteOrders({ status: 'pending_onsite' });
   let n = 0;
   for (const o of pending) {
@@ -185,7 +189,7 @@ export function registerWalletRoutes(d: WalletDeps) {
       const username = d.authUsername(req)!;
       const user = await store().getUserByUsername(username);
       const tx = await store().listWalletTxFor(username, 100);
-      const balance = tx.length ? tx[0].balanceAfter : Number(user?.walletBalance || 0);
+      const balance = await store().getWalletBalance(username);
       res.json({ balance: round2(balance), currency: 'TL', transactions: tx });
     } catch (e) { httpError(res, e); }
   });
@@ -200,7 +204,7 @@ export function registerWalletRoutes(d: WalletDeps) {
   });
 
   /** پرداخت با کیف پول: قیمت سمت سرور، کسر اتمیک، تکمیل فوری. */
-  app.post('/api/checkout/wallet', requireAuth, async (req, res) => {
+  app.post('/api/checkout/wallet', requireAuth, transactional(d.getStore, async (req, res) => {
     try {
       const { kind, params } = req.body || {};
       if (!methodsFor(kind).includes('wallet')) return res.status(400).json({ error: 'Wallet payment is not allowed for this order kind', code: 'METHOD_NOT_ALLOWED' });
@@ -229,10 +233,10 @@ export function registerWalletRoutes(d: WalletDeps) {
       log(`Wallet checkout ${orderId} (${kind}) by ${username}: ${q.amount} TL`);
       res.json({ success: true, orderId, amount: q.amount, balance: tx ? tx.balanceAfter : undefined, result });
     } catch (e) { httpError(res, e); }
-  });
+  }));
 
   /** پرداخت در محل: فقط ثبت سفارش با مهلت؛ رزرو ایستگاه/ظرفیت تورنمنت همین حالا گرفته می‌شود. */
-  app.post('/api/checkout/onsite', requireAuth, async (req, res) => {
+  app.post('/api/checkout/onsite', requireAuth, transactional(d.getStore, async (req, res) => {
     try {
       const { kind, params } = req.body || {};
       if (!methodsFor(kind).includes('onsite')) return res.status(400).json({ error: 'On-site payment is not allowed for this order kind', code: 'METHOD_NOT_ALLOWED' });
@@ -252,10 +256,10 @@ export function registerWalletRoutes(d: WalletDeps) {
       log(`On-site order ${orderId} (${kind}) by ${username}: ${q.amount} TL, due ${dueAt || '-'}`);
       res.json({ success: true, orderId, amount: q.amount, status: 'pending_onsite', dueAt, startsAt, result });
     } catch (e) { httpError(res, e); }
-  });
+  }));
 
   /** لغو توسط کاربر: در انتظار → لغو؛ کیف‌پولی قبل از مهلت → بازگشت کامل. */
-  app.post('/api/checkout/onsite/:id/cancel', requireAuth, async (req, res) => {
+  app.post('/api/checkout/onsite/:id/cancel', requireAuth, transactional(d.getStore, async (req, res) => {
     try {
       const username = d.authUsername(req)!;
       const o = await store().getOnsiteOrder(String(req.params.id));
@@ -278,7 +282,7 @@ export function registerWalletRoutes(d: WalletDeps) {
       }
       return res.status(400).json({ error: `Order is ${o.status}`, code: 'BAD_STATE' });
     } catch (e) { httpError(res, e); }
-  });
+  }));
 
   /* ---------- نرم‌افزار مدیریت (sync API key) ---------- */
   async function userForPhone(phoneRaw: unknown, createIfMissing: boolean) {

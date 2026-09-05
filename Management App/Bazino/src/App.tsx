@@ -1,3 +1,4 @@
+import { WalletConsole } from '../../../shared/management/Wallet';
 import { useOps } from '../../../shared/management/context';
 import { StationRegistry, AccessManager } from '../../../shared/management/Registry';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -847,24 +848,8 @@ export default function App() {
           />
         )}
 
-        {/* Customers View */}
-        {activeTab === 'customers' && (
-          <div className="space-y-4">
-            <WebWalletPanel
-              status={webSyncStatus}
-              currency={currency}
-              operatorName={activeOperator.name}
-              onQueueChange={(n) => setWebSyncStatus(prev => ({ ...prev, walletQueueCount: n }))}
-            />
-            <CustomerManagement
-              customers={customersWithBirthdayFlags}
-              walletTransactions={walletTransactions}
-              currency={currency}
-              onAddCustomer={handleAddCustomer}
-              onUpdateWallet={handleUpdateWallet}
-            />
-          </div>
-        )}
+        {/* Wallets and cash-outs use the authoritative server ledger, never a local balance. */}
+        {activeTab === 'customers' && <WalletConsole />}
 
         {/* Accounting Reports View */}
         {activeTab === 'accounting' && activeOperator.permissions.canAccessReports && (

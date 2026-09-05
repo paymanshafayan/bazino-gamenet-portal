@@ -55,6 +55,7 @@ import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
 import { bookingViews } from './server/management/bookings';
 import { transactional, fail, nowISO, parseJSON } from './server/management/core';
+import { FinanceService, registerFinance } from './server/management/finance';
 import { registerManagementCore } from './server/management/routes';
 import { registerWalletRoutes } from "./server/wallet/routes";
 import { registerAffiliateRoutes } from "./server/affiliate/routes";
@@ -820,6 +821,20 @@ async function startServer() {
     shop: async () => resolveMergedList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES),
     tournaments: async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
   });
+  const finance = new FinanceService(management,{fulfil:paymentFulfil,unfulfil:paymentUnfulfil});
+  registerFinance(app,finance);
+  // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
+  for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{
+    try {const b=req.body||{};if(Number(b.amount)<0)fail('USE_CASHOUT_FLOW',409);const u=b.username?await getActiveDataProvider().getUserByUsername(b.username):await getActiveDataProvider().getUserByPhone(String(b.phone||''));if(!u)fail('USER_NOT_FOUND',404);res.json(await finance.topup((req as any).staff.username,{...b,username:u.username}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}
+  });
+  app.post('/api/sync/wallet/cashout',management.guard('cashout'),async(req,res)=>{try{const b=req.body||{},u=b.username?await getActiveDataProvider().getUserByUsername(b.username):await getActiveDataProvider().getUserByPhone(String(b.phone||''));if(!u)fail('USER_NOT_FOUND',404);res.json(await finance.requestCashout((req as any).staff.username,{...b,username:u.username}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}});
+  app.post('/api/sync/wallet/charge',management.guard('collect'),(_req,res)=>res.status(409).json({error:'LEGACY_WALLET_REVIEW_REQUIRED'}));
+  for (const prefix of ['/api/sync','/api/admin']) {
+    app.post(`${prefix}/onsite-orders/:id/settle`,management.guard('collect'),async(req,res)=>{try{res.json(await finance.settle((req as any).staff.username,req.params.id,req.body||{}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}});
+    app.post(`${prefix}/onsite-orders/:id/cancel`,management.guard('collect'),async(req,res)=>{try{res.json(await finance.cancelOrder((req as any).staff.username,req.params.id,req.body||{}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}});
+  }
+  app.use('/api/state',management.guard('reservations'));
+
 
 
   // =========================================================================

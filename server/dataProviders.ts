@@ -192,6 +192,7 @@ export interface IDataStore {
   purgeSampleData(): Promise<void>;
 
   // Versioned operational records, separate from the legacy /api/state blob.
+  getWalletBalance(username: string): Promise<number>;
   runInTransaction<T>(fn: () => Promise<T>): Promise<T>;
   getOpsRecord(kind: string, id: string): Promise<OpsRecord | undefined>;
   listOpsRecords(kind: string): Promise<OpsRecord[]>;
@@ -424,6 +425,7 @@ export class SqliteStore implements IDataStore {
   private coordinator = new StoreCoordinator();
   constructor() { return this.coordinator.wrap(this); }
 
+  async getWalletBalance(username:string):Promise<number> { return Math.round(Number(this.db.prepare('SELECT COALESCE(SUM(amount),0) AS balance FROM wallet_transactions WHERE username=?').get(username).balance)*100)/100; }
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     return this.coordinator.transaction(async () => { this.db.exec('BEGIN IMMEDIATE'); return true; },
       async () => { this.db.exec('COMMIT'); }, async () => { this.db.exec('ROLLBACK'); }, fn);
@@ -795,7 +797,11 @@ export class SqliteStore implements IDataStore {
 
   // ---- Wallet + on-site orders (task 13) ----
   async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
-    return this.runInTransaction(() => this.appendWalletTxAtomic(tx));
+    return this.runInTransaction(async () => {
+      if (!Number.isFinite(tx.amount) || tx.amount === 0) throw Object.assign(new Error('INVALID_AMOUNT'), {code:'INVALID_AMOUNT',statusCode:400});
+      if(tx.idempotencyKey){const old=await this.getWalletTxByIdempotencyKey(tx.idempotencyKey);if(old){if(old.username!==tx.username||old.amount!==tx.amount||old.type!==tx.type)throw Object.assign(new Error('IDEMPOTENCY_CONFLICT'),{code:'IDEMPOTENCY_CONFLICT',statusCode:409});return old;}}
+      return this.appendWalletTxAtomic(tx);
+    });
   }
   private async appendWalletTxAtomic(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
     const run = this.db.transaction((t: Omit<WalletTxRow, 'balanceAfter'>) => {
@@ -1051,6 +1057,7 @@ export class SqlServerStore implements IDataStore {
   private coordinator = new StoreCoordinator();
   constructor() { return this.coordinator.wrap(this); }
 
+  async getWalletBalance(username:string):Promise<number> { const r=await this.r().input('u',this.sql.NVarChar,username).query('SELECT COALESCE(SUM(amount),0) AS balance FROM dbo.wallet_transactions WHERE username=@u');return Math.round(Number(r.recordset[0]?.balance||0)*100)/100; }
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     return this.coordinator.transaction(async () => {
       const tx = new this.sql.Transaction(this.pool); await tx.begin(this.sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -1452,7 +1459,11 @@ export class SqlServerStore implements IDataStore {
 
   // ---- Wallet + on-site orders (task 13) ----
   async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
-    return this.runInTransaction(() => this.appendWalletTxAtomic(tx));
+    return this.runInTransaction(async () => {
+      if (!Number.isFinite(tx.amount) || tx.amount === 0) throw Object.assign(new Error('INVALID_AMOUNT'), {code:'INVALID_AMOUNT',statusCode:400});
+      if(tx.idempotencyKey){const old=await this.getWalletTxByIdempotencyKey(tx.idempotencyKey);if(old){if(old.username!==tx.username||old.amount!==tx.amount||old.type!==tx.type)throw Object.assign(new Error('IDEMPOTENCY_CONFLICT'),{code:'IDEMPOTENCY_CONFLICT',statusCode:409});return old;}}
+      return this.appendWalletTxAtomic(tx);
+    });
   }
   private async appendWalletTxAtomic(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
     const bal = (await this.r().input('u', this.sql.NVarChar, tx.username).query(`SELECT COALESCE(SUM(amount), 0) as bal FROM dbo.wallet_transactions WHERE username = @u`)).recordset[0]?.bal || 0;
@@ -1754,6 +1765,7 @@ export class MongoStore implements IDataStore {
   private coordinator = new StoreCoordinator();
   constructor() { return this.coordinator.wrap(this); }
 
+  async getWalletBalance(username:string):Promise<number> { const r=await this.col('wallet_transactions').aggregate([{$match:{username}},{$group:{_id:null,balance:{$sum:'$amount'}}}]).toArray();return Math.round(Number(r[0]?.balance||0)*100)/100; }
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     if (this.coordinator.native) return fn();
     const session=this.client.startSession();
@@ -1998,7 +2010,11 @@ export class MongoStore implements IDataStore {
 
   // ---- Wallet + on-site orders (task 13) ----
   async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
-    return this.runInTransaction(() => this.appendWalletTxAtomic(tx));
+    return this.runInTransaction(async () => {
+      if (!Number.isFinite(tx.amount) || tx.amount === 0) throw Object.assign(new Error('INVALID_AMOUNT'), {code:'INVALID_AMOUNT',statusCode:400});
+      if(tx.idempotencyKey){const old=await this.getWalletTxByIdempotencyKey(tx.idempotencyKey);if(old){if(old.username!==tx.username||old.amount!==tx.amount||old.type!==tx.type)throw Object.assign(new Error('IDEMPOTENCY_CONFLICT'),{code:'IDEMPOTENCY_CONFLICT',statusCode:409});return old;}}
+      return this.appendWalletTxAtomic(tx);
+    });
   }
   private async appendWalletTxAtomic(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
     const agg = await this.col('wallet_transactions').aggregate([{ $match: { username: tx.username } }, { $group: { _id: null, bal: { $sum: '$amount' } } }]).toArray();

@@ -1,3 +1,5 @@
+import { OpsProvider } from '../../shared/management/context';
+import { WalletConsole } from '../../shared/management/Wallet';
 /** پنل ادمین — طرح همکاری در فروش (/admin/affiliates) */
 import React, { useEffect, useState } from 'react';
 import { Megaphone, RefreshCw, Plus, Save } from 'lucide-react';
@@ -118,7 +120,7 @@ export default function AdminAffiliatesSection({ addNotification }: Props) {
               ['paid', 'پرداخت‌شده', 'Paid'],
               ['attended', 'حضور', 'Attended'],
               ['netSales', 'فروش خالص', 'Net sales'],
-              ['paidOut', 'کمیسیون پرداختی', 'Paid out'],
+              ['paidOut', 'واریز کمیسیون به کیف پول', 'Credited to wallet'],
               ['pending', 'در انتظار', 'Pending'],
               ['reversed', 'برگشت', 'Reversed'],
             ] as const).map(([k, fa, en]) => (
@@ -189,6 +191,7 @@ export default function AdminAffiliatesSection({ addNotification }: Props) {
           </div>
           <p className="text-[11px] text-gray-400" dir="ltr">/?ref={detail.affiliate?.code}</p>
           <div className="text-xs text-gray-300">{L(language, { fa: 'گزارش مالی این همکار', en: 'This affiliate’s financials', ru: 'Финансы партнёра', tr: 'Bu ortağın mali raporu' })}: {money(detail.stats?.netSales)} / {L(language, { fa: 'پرداخت‌شده', en: 'paid out', ru: 'выплачено', tr: 'ödendi' })} {money(detail.stats?.paidOut)}</div>
+          {detail.affiliate?.username && <OpsProvider language={language}><WalletConsole username={detail.affiliate.username} compact/></OpsProvider>}
           {detail.children?.length > 0 && (
             <div className="text-xs">
               <div className="font-bold text-white mb-1">{L(language, { fa: 'زیرمجموعه‌ها', en: 'Downline', ru: 'Нижестоящие', tr: 'Alt hat' })}</div>

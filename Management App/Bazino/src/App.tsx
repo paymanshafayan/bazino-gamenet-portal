@@ -1,5 +1,7 @@
 import { WalletConsole } from '../../../shared/management/Wallet';
 import { StartSessionDialog, SessionCheckout } from '../../../shared/management/Stations';
+import { AffiliateConsole } from '../../../shared/management/Affiliates';
+import { ReportsConsole } from '../../../shared/management/Reports';
 import { OrdersConsole } from '../../../shared/management/Orders';
 import type { BookingView, OpsTab } from '../../../shared/management/types';
 import { useOps, useResource, Notice, SyncState } from '../../../shared/management/context';
@@ -38,6 +40,7 @@ import { enqueueWalletOp, flushWalletQueue, attachAffiliateCode } from './utils/
 export default function App() {
   const { staff, logout, api, can } = useOps();
   const floor = useResource<any>(can('reservations') ? '/floor' : null);
+  const ledgerSummary = useResource<any>(can('reports') ? '/reports' : null,10000);
   const [opsError, setOpsError] = useState('');
   const [orderTarget, setOrderTarget] = useState<{stationId:string;sessionId?:string}|null>(null);
   const [startBooking, setStartBooking] = useState<BookingView | null>(null);
@@ -672,7 +675,7 @@ export default function App() {
 
   // Calculations for Header
   const activeStationsCount = stations.filter((s) => s.status !== 'IDLE').length;
-  const todayTotalRevenue = invoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
+  const todayTotalRevenue = ledgerSummary.data?.netSales || 0;
   const birthdayCountToday = customersWithBirthdayFlags.filter((c) => c.isBirthdayToday).length;
 
   return (
@@ -810,20 +813,22 @@ export default function App() {
 
         {activeTab === 'buffet' && <OrdersConsole kind="cafe" defaultStationId={orderTarget?.stationId} defaultSessionId={orderTarget?.sessionId}/>}
         {activeTab === 'shop' && <OrdersConsole kind="shop"/>}
+        {activeTab === 'affiliates' && <AffiliateConsole/>}
+        {activeTab === 'accounting' && can('reports') && <ReportsConsole/>}
 
         {/* Wallets and cash-outs use the authoritative server ledger, never a local balance. */}
         {activeTab === 'customers' && <WalletConsole />}
 
         {/* Accounting Reports View */}
         {activeTab === 'accounting' && activeOperator.permissions.canAccessReports && (
-          <AccountingReports
+          <details className="mt-6"><summary>بایگانی محلی و هزینه‌های قبلی صندوق (جدا از دفترکل جدید)</summary><AccountingReports
             invoices={invoices}
             expenses={expenses}
             stations={stations}
             currency={currency}
             onAddExpense={handleAddExpense}
             canManageExpenses={activeOperator.permissions.canManageExpenses}
-          />
+          /></details>
         )}
 
         {/* Operators & Roles View */}

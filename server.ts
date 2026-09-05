@@ -53,6 +53,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
+import { AffiliateService, registerAffiliates } from './server/management/affiliates';
+import { registerReports } from './server/management/reports';
 import { OrderService, registerOrders } from './server/management/orders';
 import { SessionService, registerSessions } from './server/management/sessions';
 import { bookingWindow } from './server/management/time';
@@ -159,20 +161,14 @@ export async function resolveMergedList<T extends Record<string, any>>(
   return merged;
 }
 
-/** پیدا کردن یک رکورد با کلید: در حالت sample → داده نمونه؛ در حالت database →
- *  دیتابیس، و اگر پیدا نشد → داده نمونه (تا جریان رزرو/سفارش/ثبت‌نام در
- *  حالت sample هم کار کند). keyField مشخص می‌کند با کدام فیلد جستجو شود
- *  (پیش‌فرض 'id' — برای کد تخفیف 'code'). */
+/** A persisted price, stock, coupon or capacity is authoritative in BOTH modes.
+ * Samples only fill missing catalog entries, never resurrect consumed inventory/coupons. */
 export async function resolveSampleById<T extends Record<string, any>>(
   fetchDb: () => Promise<T | undefined>,
   sampleRows: T[],
   key: string,
   keyField: string = "id"
 ): Promise<T | undefined> {
-  const mode = await getDataSourceMode();
-  if (mode === "sample") {
-    return sampleRows.find(x => x[keyField] === key) ?? (await fetchDb());
-  }
   const dbRow = await fetchDb();
   return dbRow ?? sampleRows.find(x => x[keyField] === key);
 }
@@ -830,6 +826,9 @@ async function startServer() {
   registerSessions(app,sessions);
   const orders = new OrderService(management,finance,paymentQuote,async kind => kind==='cafe'?resolveMergedList(await getActiveDataProvider().listCafeItems(),SAMPLE_CAFE_ITEMS):resolveMergedList(await getActiveDataProvider().listAccessories(),SAMPLE_ACCESSORIES));
   registerOrders(app,orders);
+  const affiliateOperations = new AffiliateService(management);
+  registerAffiliates(app,affiliateOperations);
+  registerReports(app,management);
   // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
   for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{
     try {const b=req.body||{};if(Number(b.amount)<0)fail('USE_CASHOUT_FLOW',409);const u=b.username?await getActiveDataProvider().getUserByUsername(b.username):await getActiveDataProvider().getUserByPhone(String(b.phone||''));if(!u)fail('USER_NOT_FOUND',404);res.json(await finance.topup((req as any).staff.username,{...b,username:u.username}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}

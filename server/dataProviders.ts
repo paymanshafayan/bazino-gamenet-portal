@@ -105,7 +105,7 @@ export interface OtpCodeRow { id: string; phone: string; codeHash: string; ip: s
 export interface WalletTxRow { id: string; username: string; amount: number; type: string; ref: string; operator: string; note: string; idempotencyKey: string; balanceAfter: number; createdAt: string; }
 /** تسک ۱۳ — سفارش‌های «پرداخت در محل»: رزرو/تورنمنت با مهلت (dueAt) و بوفه/فروشگاه بدون مهلت. payload همان payload پیش‌فاکتور است. */
 export interface OnsiteOrderRow { id: string; kind: string; username: string; amount: number; status: string; dueAt: string; payload: string; description: string; result: string; createdAt: string; updatedAt: string; settledAt: string; settledBy: string; }
-export const ONSITE_ORDER_COLUMNS = new Set(['status', 'result', 'updatedAt', 'settledAt', 'settledBy', 'dueAt']);
+export const ONSITE_ORDER_COLUMNS = new Set(['status', 'result', 'payload', 'updatedAt', 'settledAt', 'settledBy', 'dueAt']);
 
 /** طرح همکاری در فروش — نرخ‌ها NULL یا منفی یعنی ارث از تنظیمات سراسری */
 export interface AffiliateRow {
@@ -192,7 +192,7 @@ export interface IDataStore {
   purgeSampleData(): Promise<void>;
 
   // Versioned operational records, separate from the legacy /api/state blob.
-  getWalletBalance(username: string): Promise<number>;
+  getWalletBalance(username?: string): Promise<number>;
   runInTransaction<T>(fn: () => Promise<T>): Promise<T>;
   getOpsRecord(kind: string, id: string): Promise<OpsRecord | undefined>;
   listOpsRecords(kind: string): Promise<OpsRecord[]>;
@@ -425,7 +425,7 @@ export class SqliteStore implements IDataStore {
   private coordinator = new StoreCoordinator();
   constructor() { return this.coordinator.wrap(this); }
 
-  async getWalletBalance(username:string):Promise<number> { return Math.round(Number(this.db.prepare('SELECT COALESCE(SUM(amount),0) AS balance FROM wallet_transactions WHERE username=?').get(username).balance)*100)/100; }
+  async getWalletBalance(username?:string):Promise<number> { return Math.round(Number(this.db.prepare('SELECT COALESCE(SUM(amount),0) AS balance FROM wallet_transactions WHERE (? IS NULL OR username=?)').get(username??null,username??null).balance)*100)/100; }
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     return this.coordinator.transaction(async () => { this.db.exec('BEGIN IMMEDIATE'); return true; },
       async () => { this.db.exec('COMMIT'); }, async () => { this.db.exec('ROLLBACK'); }, fn);
@@ -1057,7 +1057,7 @@ export class SqlServerStore implements IDataStore {
   private coordinator = new StoreCoordinator();
   constructor() { return this.coordinator.wrap(this); }
 
-  async getWalletBalance(username:string):Promise<number> { const r=await this.r().input('u',this.sql.NVarChar,username).query('SELECT COALESCE(SUM(amount),0) AS balance FROM dbo.wallet_transactions WHERE username=@u');return Math.round(Number(r.recordset[0]?.balance||0)*100)/100; }
+  async getWalletBalance(username?:string):Promise<number> { const r=await this.r().input('u',this.sql.NVarChar,username??null).query('SELECT COALESCE(SUM(amount),0) AS balance FROM dbo.wallet_transactions WHERE (@u IS NULL OR username=@u)');return Math.round(Number(r.recordset[0]?.balance||0)*100)/100; }
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     return this.coordinator.transaction(async () => {
       const tx = new this.sql.Transaction(this.pool); await tx.begin(this.sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -1765,7 +1765,7 @@ export class MongoStore implements IDataStore {
   private coordinator = new StoreCoordinator();
   constructor() { return this.coordinator.wrap(this); }
 
-  async getWalletBalance(username:string):Promise<number> { const r=await this.col('wallet_transactions').aggregate([{$match:{username}},{$group:{_id:null,balance:{$sum:'$amount'}}}]).toArray();return Math.round(Number(r[0]?.balance||0)*100)/100; }
+  async getWalletBalance(username?:string):Promise<number> { const r=await this.col('wallet_transactions').aggregate([{$match:username?{username}:{}},{$group:{_id:null,balance:{$sum:'$amount'}}}]).toArray();return Math.round(Number(r[0]?.balance||0)*100)/100; }
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     if (this.coordinator.native) return fn();
     const session=this.client.startSession();

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test, suite, run } from './harness.mts';
 import { SqliteStore } from '../server/dataProviders';
+import { AffiliateService } from '../server/management/affiliates';
+import { operationalReport } from '../server/management/reports';
+import { approveDueCommissions, onOrderPaid } from '../server/affiliate/engine';
 import { OrderService } from '../server/management/orders';
 import { SessionService, segmentCost } from '../server/management/sessions';
 import { bookingViews, assertStationFree } from '../server/management/bookings';
@@ -89,5 +92,22 @@ test('invalid fulfilment transitions and stale versions are rejected',async()=>{
  await assert.rejects(()=>orderService.transition('admin',o.id,{idempotencyKey:'invalid-transition',version:0,status:'delivered'}),{code:'INVALID_TRANSITION'});
  await orderService.transition('admin',o.id,{idempotencyKey:'accept-order',version:0,status:'accepted'});
  await assert.rejects(()=>orderService.transition('admin',o.id,{idempotencyKey:'stale-transition',version:0,status:'ready'}),{code:'VERSION_CONFLICT'});
+});
+
+suite('Management: affiliates and accounting');
+const affiliates=new AffiliateService(core);
+test('affiliate edits are version checked and link to the existing wallet account',async()=>{
+ const a=await affiliates.save('admin',{idempotencyKey:'new-affiliate',code:'TESTAFF',name:'Test partner',username:'member'});assert.equal(a.username,'member');
+ const b=await affiliates.save('admin',{idempotencyKey:'edit-affiliate',id:a.id,etag:a.etag,status:'paused'});assert.equal(b.status,'paused');
+ await assert.rejects(()=>affiliates.save('admin',{idempotencyKey:'stale-affiliate',id:a.id,etag:a.etag,status:'active'}),{code:'VERSION_CONFLICT'});
+ await affiliates.save('admin',{idempotencyKey:'resume-affiliate',id:a.id,etag:b.etag,status:'active'});
+});
+test('commission approval retries credit the same wallet once',async()=>{
+ await store.createUser({username:'buyer',password:'test-only',email:'',phone:''});
+ await onOrderPaid(store,{username:'buyer',orderId:'commission-order',kind:'reservation',amount:100,payload:{referralCode:'TESTAFF'},dueAt:new Date(Date.now()-1000).toISOString()});
+ const before=await store.getWalletBalance('member');await Promise.all([approveDueCommissions(store),approveDueCommissions(store)]);assert.equal(await store.getWalletBalance('member')-before,10);
+});
+test('reports do not count wallet top-ups as service revenue',async()=>{
+ const r=await operationalReport(core);assert.ok(r.posIn>=100);assert.ok(r.cashOut>=75);assert.ok(r.byKind.session>=60);assert.equal(r.byKind.reservation,12);assert.ok(r.customerLiability>=0);
 });
 await run({title:'Management operational core',jsonOut:'tests/reports/management.json'});

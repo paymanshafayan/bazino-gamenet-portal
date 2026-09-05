@@ -1,6 +1,7 @@
 import { WalletConsole } from '../../../shared/management/Wallet';
 import { StartSessionDialog, SessionCheckout } from '../../../shared/management/Stations';
-import type { BookingView } from '../../../shared/management/types';
+import { OrdersConsole } from '../../../shared/management/Orders';
+import type { BookingView, OpsTab } from '../../../shared/management/types';
 import { useOps, useResource, Notice, SyncState } from '../../../shared/management/context';
 import { StationRegistry, AccessManager } from '../../../shared/management/Registry';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -38,6 +39,7 @@ export default function App() {
   const { staff, logout, api, can } = useOps();
   const floor = useResource<any>(can('reservations') ? '/floor' : null);
   const [opsError, setOpsError] = useState('');
+  const [orderTarget, setOrderTarget] = useState<{stationId:string;sessionId?:string}|null>(null);
   const [startBooking, setStartBooking] = useState<BookingView | null>(null);
   const bookingGroups = useMemo(() => { const result: Record<string, BookingView[]> = {}; for (const r of floor.data?.reservations || []) if (r.stationId) (result[r.stationId] ||= []).push(r); return result; }, [floor.data?.reservations]);
   // Application Data States (Persisted safely in local storage & server-side)
@@ -76,7 +78,7 @@ export default function App() {
   );
 
   // UI Active View Tabs
-  const [activeTab, setActiveTab] = useState<'stations' | 'buffet' | 'customers' | 'accounting' | 'operators' | 'settings'>('stations');
+  const [activeTab, setActiveTab] = useState<OpsTab>('stations');
 
   // Station Filter State
   const [stationFilter, setStationFilter] = useState<string>('ALL');
@@ -713,7 +715,7 @@ export default function App() {
               {
                 {
                   stations: 'ایستگاه‌ها',
-                  buffet: 'بوفه',
+                  buffet: 'کافه', shop:'فروشگاه', affiliates:'همکاری در فروش', promotions:'کوپن و ساعات ویژه', content:'محتوا و انتشار', tournaments:'تورنمنت',
                   customers: 'مشتریان',
                   accounting: 'حسابداری',
                   operators: 'اپراتورها',
@@ -797,7 +799,7 @@ export default function App() {
                   onPauseResume={handlePauseResume}
                   onChangeTariffMidGame={setModalTariffStation}
                   onTransferStation={setModalTransferStation}
-                  onAddBuffetServices={() => setActiveTab('buffet')}
+                  onAddBuffetServices={() => {setOrderTarget({stationId:station.id,sessionId:station.activeSession?.sessionId});setActiveTab('buffet');}}
                   onCheckoutSession={setModalCheckoutStation}
                   onEditStation={handleEditStation}
                 />
@@ -806,16 +808,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Buffet View */}
-        {activeTab === 'buffet' && (
-          <BuffetManagement
-            buffetItems={buffetItems}
-            currency={currency}
-            onAddBuffetItem={handleAddBuffetItem}
-            onUpdateStock={handleUpdateStock}
-            canManageStock={activeOperator.permissions.canManageBuffetStock}
-          />
-        )}
+        {activeTab === 'buffet' && <OrdersConsole kind="cafe" defaultStationId={orderTarget?.stationId} defaultSessionId={orderTarget?.sessionId}/>}
+        {activeTab === 'shop' && <OrdersConsole kind="shop"/>}
 
         {/* Wallets and cash-outs use the authoritative server ledger, never a local balance. */}
         {activeTab === 'customers' && <WalletConsole />}

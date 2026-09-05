@@ -54,7 +54,8 @@ export class FinanceService {
     else result={...previous,...await this.deps.fulfil(o.kind as OrderKind,{...payload,__pointsOnly:true},o.username,{merchantOid:o.id,kind:o.kind,username:o.username})};
     const receipt=await this.receipt(actor,b,amount,o.username,`${o.kind}_sale`,o.id,payload._ops?.sessionId);
     result={...result,method,receiptId:receipt?.id||null};
-    await store.updateOnsiteOrder(o.id,{status:'settled',settledAt:nowISO(),settledBy:`${method}:${actor}`,result:JSON.stringify(result),updatedAt:nowISO()});
+    if(o.kind==='cafe'||o.kind==='shop')payload._ops={...payload._ops,inventoryBooked:true};
+    await store.updateOnsiteOrder(o.id,{status:'settled',settledAt:nowISO(),settledBy:`${method}:${actor}`,payload:JSON.stringify(payload),result:JSON.stringify(result),updatedAt:nowISO()});
     await this.core.save('commission-job',o.id,{username:o.username,orderId:o.id,kind:o.kind,amount:o.amount,dueAt:o.dueAt,payload,status:'pending'},0);
     return {success:true,status:'settled',result,receipt};
   });}

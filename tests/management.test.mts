@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, suite, run } from './harness.mts';
 import { SqliteStore } from '../server/dataProviders';
+import { OrderService } from '../server/management/orders';
 import { SessionService, segmentCost } from '../server/management/sessions';
 import { bookingViews, assertStationFree } from '../server/management/bookings';
 import { FinanceService } from '../server/management/finance';
@@ -74,5 +75,19 @@ test('quote freezes billing; finish is idempotent and creates one invoice',async
  const r=(await core.list('session')).find(r=>r.data.stationId==='test-station')!;const from=new Date(Date.now()-30*60000).toISOString();await core.save('session',r.id,{...r.data,startedAt:from,segments:[{from,rate:120}]},r.version);
  const q=await sessions.quote('admin',r.id,{idempotencyKey:'quote-session'});assert.ok(q.data.quote.amount>=60);
  const b={idempotencyKey:'finish-session',version:q.version,method:'cash',confirmed:true};const a=await sessions.finish('admin',r.id,b),again=await sessions.finish('admin',r.id,b);assert.equal(a.invoice.id,again.invoice.id);assert.equal((await core.list('invoice')).length,1);
+});
+
+suite('Management: order lifecycle');
+const orderService=new OrderService(core,finance,async(kind,p,u)=>({amount:25,payload:{...p},description:'Test order'}),async kind=>kind==='cafe'?store.listCafeItems():store.listAccessories());
+test('walk-in order is visible before collection and retains its canonical ID',async()=>{
+ const r=await orderService.create('admin',{idempotencyKey:'create-order',kind:'cafe',username:'member',stationId:'test-station',lines:[{item:{id:'test-product',name:'Tea'},quantity:1}]});
+ const view=(await orderService.list('cafe')).find(x=>x.id===r.id)!;assert.equal(view.source,'onsite');assert.equal(view.stationId,'test-station');assert.equal(view.paymentStatus,'pending');
+ const again=await orderService.create('admin',{idempotencyKey:'create-order',kind:'cafe',username:'member',stationId:'test-station',lines:[{item:{id:'test-product',name:'Tea'},quantity:1}]});assert.equal(again.id,r.id);
+});
+test('invalid fulfilment transitions and stale versions are rejected',async()=>{
+ const o=(await orderService.list('cafe')).find(x=>x.source==='onsite')!;
+ await assert.rejects(()=>orderService.transition('admin',o.id,{idempotencyKey:'invalid-transition',version:0,status:'delivered'}),{code:'INVALID_TRANSITION'});
+ await orderService.transition('admin',o.id,{idempotencyKey:'accept-order',version:0,status:'accepted'});
+ await assert.rejects(()=>orderService.transition('admin',o.id,{idempotencyKey:'stale-transition',version:0,status:'ready'}),{code:'VERSION_CONFLICT'});
 });
 await run({title:'Management operational core',jsonOut:'tests/reports/management.json'});

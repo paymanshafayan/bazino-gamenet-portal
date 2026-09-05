@@ -53,10 +53,11 @@ import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
+import { OrderService, registerOrders } from './server/management/orders';
 import { SessionService, registerSessions } from './server/management/sessions';
 import { bookingWindow } from './server/management/time';
 import { bookingViews, assertStationFree } from './server/management/bookings';
-import { transactional, fail, nowISO, parseJSON } from './server/management/core';
+import { transactional, fail, nowISO, parseJSON, newId as newOperationId } from './server/management/core';
 import { FinanceService, registerFinance } from './server/management/finance';
 import { registerManagementCore } from './server/management/routes';
 import { registerWalletRoutes } from "./server/wallet/routes";
@@ -827,6 +828,8 @@ async function startServer() {
   registerFinance(app,finance);
   const sessions = new SessionService(management,finance);
   registerSessions(app,sessions);
+  const orders = new OrderService(management,finance,paymentQuote,async kind => kind==='cafe'?resolveMergedList(await getActiveDataProvider().listCafeItems(),SAMPLE_CAFE_ITEMS):resolveMergedList(await getActiveDataProvider().listAccessories(),SAMPLE_ACCESSORIES));
+  registerOrders(app,orders);
   // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
   for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{
     try {const b=req.body||{};if(Number(b.amount)<0)fail('USE_CASHOUT_FLOW',409);const u=b.username?await getActiveDataProvider().getUserByUsername(b.username):await getActiveDataProvider().getUserByPhone(String(b.phone||''));if(!u)fail('USER_NOT_FOUND',404);res.json(await finance.topup((req as any).staff.username,{...b,username:u.username}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}
@@ -1198,7 +1201,7 @@ async function startServer() {
   // Systems & Reservations
   app.get("/api/systems", async (req, res) => {
     try {
-      const systems = await resolveSampleList(await getActiveDataProvider().listSystems(), SAMPLE_SYSTEMS);
+      const systems = await resolveMergedList(await getActiveDataProvider().listSystems(), SAMPLE_SYSTEMS);
       res.json(systems);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -2029,7 +2032,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Cafe Buffet Catalog & Orders
   app.get("/api/cafe", async (req, res) => {
     try {
-      const cafeItems = await resolveSampleList(await getActiveDataProvider().listCafeItems(), SAMPLE_CAFE_ITEMS);
+      const cafeItems = await resolveMergedList(await getActiveDataProvider().listCafeItems(), SAMPLE_CAFE_ITEMS);
       res.json(cafeItems);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -2154,7 +2157,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Accessory Shop & Orders
   app.get("/api/accessories", async (req, res) => {
     try {
-      const accessories = await resolveSampleList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES);
+      const accessories = await resolveMergedList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES);
       res.json(accessories);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -2302,6 +2305,15 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // =========================================================================
   const POINTS_PER_CURRENCY_UNIT = 10;   // هر ۱۰ TL = ۱ امتیاز (معادل قاعده‌ی قبلی ÷10000)
 
+  async function orderContext(params:any,username?:string) {
+    const systemId=typeof params?.systemId==='string'?params.systemId:null;
+    if(!systemId)return {source:'online'};
+    const system=await resolveSampleById(()=>getActiveDataProvider().getSystemById(systemId),SAMPLE_SYSTEMS,systemId);if(!system)fail('SYSTEM_NOT_FOUND',404);
+    const station=(await management.list('station')).find(s=>s.data.systemId===systemId);
+    const session=(await management.list('session')).find(s=>s.data.systemId===systemId&&s.data.username===username&&!s.data.closedAt&&!s.data.settlingAt);
+    return {source:'online',systemId,stationId:station?.id||null,sessionId:session?.id||null};
+  }
+
   async function paymentQuote(kind: OrderKind, params: any, username?: string) {
     const store = getActiveDataProvider();
     if (kind === "reservation") {
@@ -2325,10 +2337,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
     if (kind === "cafe") {
       const { items, couponCode, tableNumber } = params || {};
-      if (!Array.isArray(items) || items.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      if (!Array.isArray(items) || items.length === 0 || items.length > 100) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
       let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
       for (const it of items) {
-        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const id = it?.item?.id ?? it?.id; const qty = Number(it?.quantity ?? it?.qty ?? 1); if(!Number.isSafeInteger(qty)||qty<1||qty>1000)fail('INVALID_QUANTITY');
         const m = await resolveSampleById(() => store.getCafeItemById(id), SAMPLE_CAFE_ITEMS, id);
         if (!m) throw Object.assign(new Error(`Menu item not found: ${id}`), { statusCode: 404 });
         if (m.inventory < qty) throw Object.assign(new Error(`Out of stock: ${m.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
@@ -2336,14 +2348,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       }
       const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
       const amount = Math.max(0, total - discountAmount);
-      return { amount, description: `Kafe siparişi (${lines.length} kalem)`, basket, payload: { items: lines, couponCode: coupon ? couponCode : "", tableNumber: tableNumber || "میز عمومی", totalPrice: total, discountAmount, amount } };
+      return { amount, description: `Kafe siparişi (${lines.length} kalem)`, basket, payload: { _ops: await orderContext(params,username), items: lines, couponCode: coupon ? couponCode : "", tableNumber: tableNumber || "میز عمومی", totalPrice: total, discountAmount, amount } };
     }
     if (kind === "shop") {
       const { cart, couponCode } = params || {};
-      if (!Array.isArray(cart) || cart.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      if (!Array.isArray(cart) || cart.length === 0 || cart.length > 100) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
       let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
       for (const it of cart) {
-        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const id = it?.item?.id ?? it?.id; const qty = Number(it?.quantity ?? it?.qty ?? 1); if(!Number.isSafeInteger(qty)||qty<1||qty>1000)fail('INVALID_QUANTITY');
         const a = await resolveSampleById(() => store.getAccessoryById(id), SAMPLE_ACCESSORIES, id);
         if (!a) throw Object.assign(new Error(`Product not found: ${id}`), { statusCode: 404 });
         if (a.stock < qty) throw Object.assign(new Error(`Out of stock: ${a.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
@@ -2351,7 +2363,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       }
       const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
       const amount = Math.max(0, total - discountAmount);
-      return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
+      return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { _ops: await orderContext(params,username), cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
     }
     // tournament
     const { tournamentId, team, referralCode } = params || {};
@@ -2373,13 +2385,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   // پرچم‌های تسک ۱۳ (پرداخت در محل): __noPoints = جا بگیر ولی امتیاز نده (هنوز پرداخت نشده)،
   // __pointsOnly = جا قبلاً گرفته شده، فقط امتیاز بده (بعد از تسویه‌ی حضوری).
-  async function paymentFulfil(kind: OrderKind, p: any, username: string) {
+  async function paymentFulfil(kind: OrderKind, p: any, username: string, order?: {merchantOid:string;kind:string;username:string}) {
     const store = getActiveDataProvider();
     const noPoints = p?.__noPoints === true;
     if (kind === "reservation") {
       if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز بابت رزرو ${p.systemName} (پرداخت در محل)`) };
       await store.setSystemReserved(p.systemId, true);
-      const id = Math.random().toString(36).substring(2, 9);
+      const id = newOperationId('RES');
       await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString() });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
@@ -2387,8 +2399,15 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
     if (kind === "cafe") {
       if (p.__pointsOnly) return {points:noPoints?0:await creditPoints(username,p.amount,'امتیاز سفارش کافه')};
-      for (const l of p.items) await store.decrementCafeInventory(l.item.id, l.quantity);
-      const id = "CF-" + Math.floor(1000 + Math.random() * 9000);
+      for (const l of p.items) {
+        if(!Number.isSafeInteger(l.quantity)||l.quantity<1||l.quantity>1000)fail('INVALID_QUANTITY');
+        const m=await resolveSampleById(()=>store.getCafeItemById(l.item.id),SAMPLE_CAFE_ITEMS,l.item.id);
+        if(!m||!m.isAvailable||m.inventory<l.quantity)fail('OUT_OF_STOCK',409);
+        await ensurePersisted(()=>store.getCafeItemById(m.id),x=>store.createCafeItem(x),m);
+        await store.decrementCafeInventory(m.id,l.quantity);
+        await management.save('stock-movement',newOperationId('SM'),{kind:'cafe',itemId:m.id,delta:-l.quantity,orderId:order?.merchantOid,reason:'allocated',at:nowISO()},0);
+      }
+      const id = newOperationId('CF');
       await store.addCafeOrder({ id, items: JSON.stringify(p.items), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, tableNumber: p.tableNumber, date: "امروز", status: "Pending", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = noPoints ? 0 : await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
@@ -2396,8 +2415,15 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
     if (kind === "shop") {
       if (p.__pointsOnly) return {points:noPoints?0:await creditPoints(username,p.amount,'امتیاز خرید فروشگاه')};
-      for (const l of p.cart) await store.decrementAccessoryStock(l.item.id, l.quantity);
-      const id = "ACC-" + Math.floor(1000 + Math.random() * 9000);
+      for (const l of p.cart) {
+        if(!Number.isSafeInteger(l.quantity)||l.quantity<1||l.quantity>1000)fail('INVALID_QUANTITY');
+        const m=await resolveSampleById(()=>store.getAccessoryById(l.item.id),SAMPLE_ACCESSORIES,l.item.id);
+        if(!m||m.stock<l.quantity)fail('OUT_OF_STOCK',409);
+        await ensurePersisted(()=>store.getAccessoryById(m.id),x=>store.createAccessory(x),m);
+        await store.decrementAccessoryStock(m.id,l.quantity);
+        await management.save('stock-movement',newOperationId('SM'),{kind:'shop',itemId:m.id,delta:-l.quantity,orderId:order?.merchantOid,reason:'allocated',at:nowISO()},0);
+      }
+      const id = newOperationId('ACC');
       await store.addShopOrder({ id, cart: JSON.stringify(p.cart), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, date: "امروز", status: "Processing", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = noPoints ? 0 : await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");

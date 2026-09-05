@@ -42,6 +42,7 @@ export function registerManagementCore(d:ManagementDeps):OpsCore {
       if(systemId && !(await d.systems()).some(s=>s.id===systemId))fail('SYSTEM_NOT_FOUND',404);
       if(systemId!==old.data.systemId && (await core.list('session')).some(s=>s.data.stationId===id&&!s.data.closedAt))fail('STATION_IN_USE',409);
       if(systemId){const system=(await d.systems()).find(s=>s.id===systemId)!;if(!(await core.store.getSystemById(systemId)))await core.store.createSystem(system);}
+      if(systemId&&b.hourlyRate!==undefined)await core.store.updateSystem(systemId,{hourlyRate:minor(b.hourlyRate,true)/100});
       return core.save('station',id,{...old.data,name:stringValue(b.name??old.data.name,180,true),systemId,hourlyRate:minor(b.hourlyRate??old.data.hourlyRate,true)/100,active:b.active!==false},expected(b.version),systemId?`station:${systemId}`:null);
     });res.json(response);
   }));

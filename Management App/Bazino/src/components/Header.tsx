@@ -201,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="bg-zinc-900 text-xs text-zinc-200 border border-zinc-700 rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-500"
             title="تغییر واحد پول"
           >
-            {Object.entries(CURRENCY_SYMBOLS).map(([code, info]) => (
+            {Object.entries(CURRENCY_SYMBOLS).filter(([code]) => code === 'TRY').map(([code, info]) => (
               <option key={code} value={code}>
                 {info.label}
               </option>

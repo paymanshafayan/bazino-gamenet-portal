@@ -53,7 +53,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
-import { bookingViews } from './server/management/bookings';
+import { SessionService, registerSessions } from './server/management/sessions';
+import { bookingWindow } from './server/management/time';
+import { bookingViews, assertStationFree } from './server/management/bookings';
 import { transactional, fail, nowISO, parseJSON } from './server/management/core';
 import { FinanceService, registerFinance } from './server/management/finance';
 import { registerManagementCore } from './server/management/routes';
@@ -823,6 +825,8 @@ async function startServer() {
   });
   const finance = new FinanceService(management,{fulfil:paymentFulfil,unfulfil:paymentUnfulfil});
   registerFinance(app,finance);
+  const sessions = new SessionService(management,finance);
+  registerSessions(app,sessions);
   // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
   for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{
     try {const b=req.body||{};if(Number(b.amount)<0)fail('USE_CASHOUT_FLOW',409);const u=b.username?await getActiveDataProvider().getUserByUsername(b.username):await getActiveDataProvider().getUserByPhone(String(b.phone||''));if(!u)fail('USER_NOT_FOUND',404);res.json(await finance.topup((req as any).staff.username,{...b,username:u.username}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}
@@ -834,6 +838,14 @@ async function startServer() {
     app.post(`${prefix}/onsite-orders/:id/cancel`,management.guard('collect'),async(req,res)=>{try{res.json(await finance.cancelOrder((req as any).staff.username,req.params.id,req.body||{}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}});
   }
   app.use('/api/state',management.guard('reservations'));
+  for (const [route,kind] of [['/api/systems/reserve','reservation'],['/api/cafe/order','cafe'],['/api/accessories/order','shop'],['/api/tournaments/register','tournament']]) {
+    app.post(route, requireAuth, (req,res,next) => {
+      const params={...req.body}; (req as any).legacyCheckout=true;
+      req.body={kind,params,idempotencyKey:params.idempotencyKey};
+      req.url='/api/checkout/onsite'; next('route');
+    });
+  }
+
 
 
 
@@ -2296,16 +2308,19 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const { systemId, startTime, endTime, date, couponCode, referralCode } = params || {};
       const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
       if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
-      const st = startTime || "12:00", et = endTime || "14:00", reservationDate = date || "امروز";
-      if (await store.hasOverlappingReservation(systemId, reservationDate, st, et)) throw Object.assign(new Error("SLOT_TAKEN"), { statusCode: 409, code: "SLOT_TAKEN" });
-      const durationHours = hoursBetween(st, et) || 1;
-      const baseTotal = Math.round(durationHours * system.hourlyRate);
+      const st = startTime || "12:00", et = endTime || "14:00";
+      const window = bookingWindow({date,startTime:st,endTime:et,...(params?.startsAt?{startsAt:params.startsAt,endsAt:params.endsAt}:{})},Date.now(),await management.timezone());
+      if (Date.parse(window.startsAt) < Date.now()-60000) fail('PAST_RESERVATION');
+      const reservationDate = window.date;
+      await assertStationFree(management,systemId,window.startsAt,window.endsAt);
+      const durationHours = (Date.parse(window.endsAt)-Date.parse(window.startsAt))/3600000;
+      const baseTotal = Math.round(durationHours * system.hourlyRate * 100)/100;
       const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, username);
       const amount = Math.max(0, baseTotal - discountAmount);
       return {
         amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
         basket: [{ name: `${system.name} (${durationHours}h)`, unitPrice: amount, qty: 1 }],
-        payload: { systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name },
+        payload: { ...window, systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name },
       };
     }
     if (kind === "cafe") {
@@ -2371,19 +2386,21 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       return { reservationId: id, points };
     }
     if (kind === "cafe") {
+      if (p.__pointsOnly) return {points:noPoints?0:await creditPoints(username,p.amount,'امتیاز سفارش کافه')};
       for (const l of p.items) await store.decrementCafeInventory(l.item.id, l.quantity);
       const id = "CF-" + Math.floor(1000 + Math.random() * 9000);
       await store.addCafeOrder({ id, items: JSON.stringify(p.items), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, tableNumber: p.tableNumber, date: "امروز", status: "Pending", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
-      const points = await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
+      const points = noPoints ? 0 : await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
       return { orderId: id, points };
     }
     if (kind === "shop") {
+      if (p.__pointsOnly) return {points:noPoints?0:await creditPoints(username,p.amount,'امتیاز خرید فروشگاه')};
       for (const l of p.cart) await store.decrementAccessoryStock(l.item.id, l.quantity);
       const id = "ACC-" + Math.floor(1000 + Math.random() * 9000);
       await store.addShopOrder({ id, cart: JSON.stringify(p.cart), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, date: "امروز", status: "Processing", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
-      const points = await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
+      const points = noPoints ? 0 : await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
       return { orderId: id, points };
     }
     if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title} (پرداخت در محل)`) };
@@ -2438,6 +2455,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     quote: paymentQuote,
     fulfil: paymentFulfil,
     unfulfil: paymentUnfulfil,
+    legacyResponse: async (kind,username) => ({
+      systems:await resolveMergedList(await getActiveDataProvider().listSystems(),SAMPLE_SYSTEMS),
+      reservationLogs:(await getActiveDataProvider().listReservationLogs()).filter(r=>r.username===username),
+      cafeItems:await resolveMergedList(await getActiveDataProvider().listCafeItems(),SAMPLE_CAFE_ITEMS),
+      accessories:await resolveMergedList(await getActiveDataProvider().listAccessories(),SAMPLE_ACCESSORIES),
+      tournaments:(await resolveMergedList(await getActiveDataProvider().listTournaments(),SAMPLE_TOURNAMENTS)).map(t=>({...t,teams:parseJSON(t.teams,[]),bracket:parseJSON(t.bracket)})),
+      user:publicUser(await getActiveDataProvider().getUserByUsername(username)),transactions:(await getActiveDataProvider().listTransactions()).filter(r=>r.username===username),pointsEarned:0,
+    }),
     onlineEnabled: () => isOnlinePaymentEnabled(),
     log: (msg) => logDbQuery(getActiveDataProvider().name, "SYSTEM", `[Wallet] ${msg}`),
   });

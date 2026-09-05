@@ -57,6 +57,7 @@ export interface WalletDeps {
   /** برگرداندن اثر یک سفارش تکمیل‌شده (آزاد کردن ایستگاه/ظرفیت) — برای لغو رزرو/تورنمنتِ کیف‌پولی. */
   unfulfil: (kind: OrderKind, payload: any, username: string, result: any) => Promise<void>;
   /** آیا پرداخت آنلاین فعال است؟ */
+  legacyResponse?: (kind:OrderKind,username:string)=>Promise<any>;
   onlineEnabled: () => boolean;
   /** ثبت لاگ */
   log?: (msg: string) => void;
@@ -115,6 +116,7 @@ export function combineDateTime(day: Date, hhmm: string): Date | null {
 /** محاسبه‌ی مهلت پرداخت حضوری بر اساس نوع سفارش. برای بوفه/فروشگاه '' (بدون مهلت). */
 export function computeOnsiteDueAt(kind: OrderKind, payload: any, now = new Date()): { dueAt: string; startsAt: string } {
   if (kind === 'reservation') {
+    if(payload?.startsAt && Number.isFinite(Date.parse(payload.startsAt))) return {dueAt:iso(Date.parse(payload.startsAt)-ONSITE_RESERVATION_LEAD_MS),startsAt:payload.startsAt};
     const day = parseSiteDate(payload?.date, now) || new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start = combineDateTime(day, payload?.startTime) || new Date(day.getTime() + 12 * 3600000);
     return { dueAt: iso(start.getTime() - ONSITE_RESERVATION_LEAD_MS), startsAt: start.toISOString() };
@@ -254,7 +256,7 @@ export function registerWalletRoutes(d: WalletDeps) {
       }
       await store().createOnsiteOrder({ id: orderId, kind, username, amount: q.amount, status: 'pending_onsite', dueAt, payload: JSON.stringify(q.payload), description: q.description, result: result ? JSON.stringify(result) : '', createdAt: iso(), updatedAt: iso(), settledAt: '', settledBy: '' });
       log(`On-site order ${orderId} (${kind}) by ${username}: ${q.amount} TL, due ${dueAt || '-'}`);
-      res.json({ success: true, orderId, amount: q.amount, status: 'pending_onsite', dueAt, startsAt, result });
+      res.json({ ...((req as any).legacyCheckout&&d.legacyResponse?await d.legacyResponse(kind,username):{}),success: true, orderId, amount: q.amount,totalPrice:q.amount, status: 'pending_onsite', dueAt, startsAt, result });
     } catch (e) { httpError(res, e); }
   }));
 

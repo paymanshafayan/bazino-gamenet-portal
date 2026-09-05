@@ -48,6 +48,9 @@ export interface StationSession {
   rateEffectiveFromSeconds?: number;
   /** Timestamp (ms) of the last time the alarm sound played for this session (set on first FINISHED trigger, then refreshed every soundConfig.repeatIntervalSeconds while still FINISHED and not checked out). */
   lastAlarmAt?: number;
+  serverDue?: number;
+  serverPrepaid?: number;
+  endsAt?: string;
 }
 
 export interface Station {

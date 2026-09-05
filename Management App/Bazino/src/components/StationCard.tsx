@@ -1,9 +1,13 @@
+import { StationReservations } from '../../../../shared/management/Stations';
+import type { BookingView } from '../../../../shared/management/types';
 import React, { memo } from 'react';
 import { Play, Pause, Square, Gamepad2, Gamepad, Monitor, Glasses, CircleDot, Clock, ArrowRightLeft, Coffee, DollarSign, Bell, AlertTriangle, ShieldAlert, Tag, User, Edit2 } from 'lucide-react';
 import { Station, TariffRate, CurrencyCode } from '../types';
 import { formatCurrency, formatTimerSeconds, calculateGameCost } from '../utils/formatters';
 
 interface StationCardProps {
+  bookings?: BookingView[];
+  onStartBooking: (booking: BookingView) => void;
   station: Station;
   tariffs: TariffRate[];
   currency: CurrencyCode;
@@ -25,6 +29,7 @@ interface StationCardProps {
  */
 const StationCardBase: React.FC<StationCardProps> = ({
   station,
+  bookings, onStartBooking,
   tariffs,
   currency,
   onStartSession,
@@ -64,7 +69,7 @@ const StationCardBase: React.FC<StationCardProps> = ({
   if (activeSession) {
     if (activeSession.durationMinutes) {
       const totalAllowedSeconds = activeSession.durationMinutes * 60;
-      remainingSeconds = totalAllowedSeconds - activeSession.elapsedSeconds;
+      remainingSeconds = activeSession.endsAt ? Math.ceil((Date.parse(activeSession.endsAt)-Date.now())/1000) : totalAllowedSeconds - activeSession.elapsedSeconds;
       if (remainingSeconds <= 0) {
         isEnded = true;
         remainingSeconds = 0;
@@ -85,7 +90,7 @@ const StationCardBase: React.FC<StationCardProps> = ({
     ? activeSession.services.reduce((acc, s) => acc + s.price * s.qty, 0)
     : 0;
 
-  const totalCurrentBill = gameCost + servicesTotal;
+  const totalCurrentBill = activeSession?.serverDue ?? (gameCost + servicesTotal);
 
   // Warning Light Indicator Color
   const getStatusLightClass = () => {
@@ -169,6 +174,7 @@ const StationCardBase: React.FC<StationCardProps> = ({
         </div>
       </div>
 
+      <StationReservations reservations={bookings} onStart={onStartBooking} />
       {/* Main Active Timer Display */}
       <div className="p-4 flex-1 flex flex-col justify-center">
         {station.status !== 'IDLE' && activeSession ? (

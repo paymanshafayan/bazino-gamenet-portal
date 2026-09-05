@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test, suite, run } from './harness.mts';
 import { SqliteStore } from '../server/dataProviders';
+import { SessionService, segmentCost } from '../server/management/sessions';
+import { bookingViews, assertStationFree } from '../server/management/bookings';
 import { FinanceService } from '../server/management/finance';
 import { OpsCore } from '../server/management/core';
 import { bookingWindow, dayAt, localInstant } from '../server/management/time';
@@ -49,5 +51,28 @@ test('cancelling an undelivered cash-out releases funds exactly once',async()=>{
 test('settlement preserves reservationId, prevents repeat collection and records receipt',async()=>{
  const time=new Date().toISOString();await store.createOnsiteOrder({id:'onsite-res',kind:'reservation',username:'member',amount:12,status:'pending_onsite',dueAt:new Date(Date.now()+86400000).toISOString(),payload:'{}',description:'test',result:JSON.stringify({reservationId:'res-keep'}),createdAt:time,updatedAt:time,settledAt:'',settledBy:''});
  const b={idempotencyKey:'settle',method:'cash',confirmed:true};const a=await finance.settle('admin','onsite-res',b);const c=await finance.settle('admin','onsite-res',b);assert.equal(a.result.reservationId,'res-keep');assert.equal(a.receipt?.id,c.receipt?.id);await assert.rejects(()=>finance.settle('admin','onsite-res',{...b,idempotencyKey:'other'}),{code:'BAD_STATE'});
+});
+
+suite('Management: reservations and sessions');
+const sessions=new SessionService(core,finance);
+test('setup a real server station and create a session',async()=>{
+ await store.createSystem({id:'test-system',name:'Test station',type:'PC',hourlyRate:120,isActive:true,isReserved:false});
+ await core.save('station','test-station',{name:'Test station',systemId:'test-system',hourlyRate:120,active:true},0,'station:test-system');
+ const r=await sessions.start('admin',{idempotencyKey:'start-session',stationId:'test-station',username:'member',durationMinutes:60});assert.equal(r.data.hourlyRate,120);assert.equal(r.data.username,'member');
+ await assert.rejects(()=>sessions.start('admin',{idempotencyKey:'competing-session',stationId:'test-station',durationMinutes:60}),{code:'STATION_IN_USE'});
+});
+test('a booking blocks only its own station; unknown legacy payment is not marked paid',async()=>{
+ const date=new Date(Date.now()+86400000).toISOString().slice(0,10);await store.addReservationLog({id:'legacy-unknown',systemId:'test-system',username:'member',systemName:'Test',date,startTime:'10:00',endTime:'11:00',totalPrice:120,checkedIn:false,timestamp:new Date().toISOString()});
+ const r=(await bookingViews(core)).find(x=>x.id==='legacy-unknown')!;assert.equal(r.paymentStatus,'unknown');assert.equal(r.stationId,'test-station');
+ await assert.rejects(()=>assertStationFree(core,'test-system',r.startsAt!,r.endsAt!),{code:'SLOT_TAKEN'});await assertStationFree(core,'other-system',r.startsAt!,r.endsAt!);
+});
+test('prepaid reservation interval is not charged again',()=>{
+ const from='2026-09-05T10:00:00Z',end='2026-09-05T11:00:00Z';const data={startedAt:from,reservationEndsAt:end,hourlyRate:120,segments:[{from,rate:120}],pauses:[]};
+ assert.equal(segmentCost(data,Date.parse(end)),0);assert.equal(segmentCost(data,Date.parse(end)+30*60000),60);
+});
+test('quote freezes billing; finish is idempotent and creates one invoice',async()=>{
+ const r=(await core.list('session')).find(r=>r.data.stationId==='test-station')!;const from=new Date(Date.now()-30*60000).toISOString();await core.save('session',r.id,{...r.data,startedAt:from,segments:[{from,rate:120}]},r.version);
+ const q=await sessions.quote('admin',r.id,{idempotencyKey:'quote-session'});assert.ok(q.data.quote.amount>=60);
+ const b={idempotencyKey:'finish-session',version:q.version,method:'cash',confirmed:true};const a=await sessions.finish('admin',r.id,b),again=await sessions.finish('admin',r.id,b);assert.equal(a.invoice.id,again.invoice.id);assert.equal((await core.list('invoice')).length,1);
 });
 await run({title:'Management operational core',jsonOut:'tests/reports/management.json'});

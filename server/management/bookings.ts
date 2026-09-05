@@ -8,9 +8,9 @@ export async function bookingViews(core:OpsCore):Promise<BookingView[]> {
   function make(r:any,o?:any){
     const p=parseJSON(o?.payload),payment=parseJSON(o?.result),meta=metadata.find(m=>m.id===r.id),extra=meta?.data||{};
     let window:any={startsAt:null,endsAt:null};try{window=bookingWindow(p.startsAt?p:r,Date.parse(o?.createdAt||r.timestamp)||Date.now(),zone);}catch{}
-    const cancelled=o?.status?.startsWith('cancelled')||extra.cancelledAt,expired=o?.status==='cancelled_unpaid';
-    const paid=o?.status==='settled';const systemId=r.systemId||p.systemId;
-    const view:BookingView={id:r.id,orderId:o?.id||null,systemId,stationId:stations.find(s=>s.data.systemId===systemId)?.id||null,systemName:r.systemName||p.systemName||systemId,
+    const cancelled=o?.status?.startsWith('cancelled')||extra.cancelledAt,expired=o?.status==='cancelled_unpaid'||(o?.status==='pending_onsite'&&!!o.dueAt&&Date.parse(o.dueAt)<=Date.now());
+    const paid=o?.status==='settled';const systemId=extra.assignedSystemId||r.systemId||p.systemId;
+    const view:BookingView={id:r.id,orderId:o?.id||null,systemId,stationId:extra.assignedStationId||stations.find(s=>s.data.systemId===systemId)?.id||null,systemName:r.systemName||p.systemName||systemId,
       username:r.username||o?.username||'',customerName:users.find(u=>u.username===(r.username||o?.username))?.displayName||r.username||o?.username||'—',
       startsAt:window.startsAt,endsAt:window.endsAt,totalAmount:Number(o?.amount??r.totalPrice??0),paidAmount:paid?Number(o.amount):0,currency:'TRY',
       paymentStatus:paid?(Number(o.amount)===0?'free':'paid'):cancelled&&o?.settledBy==='wallet'?'refunded':o?'pending':'unknown',
@@ -26,7 +26,7 @@ export async function bookingViews(core:OpsCore):Promise<BookingView[]> {
 export async function assertStationFree(core:OpsCore,systemId:string|null,start:string,end:string,ignoreBooking?:string,ignoreSession?:string,ignoreMatch?:string) {
   if(!systemId)return;
   const reservations=await bookingViews(core);
-  if(reservations.some(r=>r.id!==ignoreBooking&&r.startsAt&&r.endsAt&&!['cancelled','expired','completed'].includes(r.bookingStatus)&&!(r.bookingStatus==='held'&&r.paymentDueAt&&Date.parse(r.paymentDueAt)<=Date.now())&&overlaps(start,end,r.startsAt,r.endsAt)))fail('SLOT_TAKEN',409);
+  if(reservations.some(r=>r.systemId===systemId&&r.id!==ignoreBooking&&r.startsAt&&r.endsAt&&!['cancelled','expired','completed'].includes(r.bookingStatus)&&!(r.bookingStatus==='held'&&r.paymentDueAt&&Date.parse(r.paymentDueAt)<=Date.now())&&overlaps(start,end,r.startsAt,r.endsAt)))fail('SLOT_TAKEN',409);
   const slots=await core.list('match-slot');if(slots.some(r=>r.id!==ignoreMatch&&r.data.systemId===systemId&&r.data.status!=='cancelled'&&overlaps(start,end,r.data.startsAt,r.data.endsAt)))fail('SLOT_TAKEN',409);
   const sessions=await core.list('session');if(sessions.some(r=>r.id!==ignoreSession&&!r.data.closedAt&&r.data.systemId===systemId&&overlaps(start,end,r.data.startedAt,r.data.endsAt)))fail('SLOT_TAKEN',409);
 }

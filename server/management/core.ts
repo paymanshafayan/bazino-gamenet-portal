@@ -62,7 +62,10 @@ export function transactional(getStore:()=>IDataStore,fn:(req:Request,res:Respon
     const json=res.json;let body:any;let captured=false;let status=200;
     res.json=function(b:any){body=b;captured=true;status=this.statusCode;return this;};
     try {
-      await getStore().runInTransaction(async()=>{await fn(req,res);if(captured&&status>=400)throw {responseAbort:true};});
+      const execute=async()=>{await fn(req,res);if(captured&&status>=400)throw {responseAbort:true};return {body,status};};
+      if(req.path.startsWith('/api/checkout/') && req.body?.idempotencyKey && (req as any).authUsername){
+        const r=await new OpsCore(getStore).command((req as any).authUsername,req.body.idempotencyKey,req.path,req.body,execute);body=r.body;status=r.status;captured=true;
+      } else await getStore().runInTransaction(execute);
       res.json=json;
       if(captured)res.status(status).json(body);
     }catch(e:any){res.json=json;if(e?.responseAbort)res.status(status).json(body);else sendError(res,e);}

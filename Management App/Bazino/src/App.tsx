@@ -1,5 +1,7 @@
 import { WalletConsole } from '../../../shared/management/Wallet';
-import { useOps } from '../../../shared/management/context';
+import { StartSessionDialog, SessionCheckout } from '../../../shared/management/Stations';
+import type { BookingView } from '../../../shared/management/types';
+import { useOps, useResource, Notice, SyncState } from '../../../shared/management/context';
 import { StationRegistry, AccessManager } from '../../../shared/management/Registry';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Plus, Tag, HelpCircle } from 'lucide-react';
@@ -33,9 +35,13 @@ import { WebWalletPanel } from './components/WebWalletPanel';
 import { enqueueWalletOp, flushWalletQueue, attachAffiliateCode } from './utils/walletSync';
 
 export default function App() {
-  const { staff, logout } = useOps();
+  const { staff, logout, api, can } = useOps();
+  const floor = useResource<any>(can('reservations') ? '/floor' : null);
+  const [opsError, setOpsError] = useState('');
+  const [startBooking, setStartBooking] = useState<BookingView | null>(null);
+  const bookingGroups = useMemo(() => { const result: Record<string, BookingView[]> = {}; for (const r of floor.data?.reservations || []) if (r.stationId) (result[r.stationId] ||= []).push(r); return result; }, [floor.data?.reservations]);
   // Application Data States (Persisted safely in local storage & server-side)
-  const [stations, setStations] = useState<Station[]>(() => safeGetStorage('bazino_stations', INITIAL_STATIONS));
+  const [stations, setStations] = useState<Station[]>(() => safeGetStorage('bazino_stations', INITIAL_STATIONS.map(s => ({...s,status:'IDLE' as const,activeSession:undefined,totalServiceHoursToday:0}))));
   const [buffetItems, setBuffetItems] = useState<BuffetItem[]>(() => safeGetStorage('bazino_buffet', INITIAL_BUFFET_ITEMS));
   const [customers, setCustomers] = useState<Customer[]>(() => safeGetStorage('bazino_customers', INITIAL_CUSTOMERS));
   const [tariffs, setTariffs] = useState<TariffRate[]>(() => safeGetStorage('bazino_tariffs', INITIAL_TARIFFS));
@@ -74,6 +80,24 @@ export default function App() {
 
   // Station Filter State
   const [stationFilter, setStationFilter] = useState<string>('ALL');
+  useEffect(() => {
+    if (!staff) return;
+    setActiveOperator({ id: staff.username, username: staff.username, name: staff.displayName, role: staff.admin ? 'ADMIN' : 'OPERATOR', active: true,
+      permissions: { canAccessReports: can('reports'), canManagePricesAndTariffs: can('configure'), canManageExpenses: can('reports'), canManageBuffetStock: can('orders'), canManageOperators: staff.admin, canGiveDiscounts: can('promotions') } });
+  }, [staff]);
+  useEffect(() => {
+    if (!floor.data) return;
+    setStations(previous => previous.map(st => {
+      const record = floor.data.stations.find((r:any) => r.id===st.id);
+      const live = floor.data.sessions.find((r:any) => r.data.stationId===st.id);
+      if (!live) return st.activeSession?.sessionId.startsWith('SS-') ? {...st,name:record?.data.name||st.name,status:'IDLE',activeSession:undefined} : {...st,name:record?.data.name||st.name};
+      const v=live.data;
+      return {...st,name:record?.data.name||st.name,status:v.settlingAt||Date.now()>=Date.parse(v.endsAt)?'FINISHED':v.status==='paused'?'PAUSED':'PLAYING',
+        activeSession:{sessionId:live.id,stationId:st.id,customerId:v.username,customerName:v.customerName,startTime:Date.parse(v.startedAt),durationMinutes:v.durationMinutes,
+          paymentType:'POST_PAY',tariffId:st.currentTariffId,currentHourlyRate:v.hourlyRate,elapsedSeconds:Math.floor(v.elapsedSeconds),pausedSeconds:0,isPaused:v.status==='paused'||!!v.settlingAt,services:[],serverDue:v.quote?.amount,serverPrepaid:v.prepaidAmount,endsAt:v.endsAt}} as Station;
+    }));
+  }, [floor.data]);
+
 
   // Modals Active Targets
   const [modalStartStation, setModalStartStation] = useState<Station | null>(null);
@@ -193,7 +217,7 @@ export default function App() {
       setStations((prevStations) => {
         let changed = false;
         const nextStations = prevStations.map((st) => {
-          if (st.status === 'PLAYING' && st.activeSession && !st.activeSession.isPaused) {
+          if ((st.status === 'PLAYING' || st.status === 'WARNING') && st.activeSession && !st.activeSession.isPaused) {
             const nextElapsed = st.activeSession.elapsedSeconds + 1;
             let nextStatus: StationStatus = st.status;
             let nextLastAlarmAt = st.activeSession.lastAlarmAt;
@@ -311,23 +335,9 @@ export default function App() {
     setModalStartStation(null);
   };
 
-  const handlePauseResume = (stationId: string) => {
-    setStations((prev) =>
-      prev.map((st) => {
-        if (st.id === stationId && st.activeSession) {
-          const isCurrentlyPaused = st.activeSession.isPaused;
-          return {
-            ...st,
-            status: isCurrentlyPaused ? 'PLAYING' : 'PAUSED',
-            activeSession: {
-              ...st.activeSession,
-              isPaused: !isCurrentlyPaused,
-            },
-          };
-        }
-        return st;
-      })
-    );
+  const handlePauseResume = async (stationId: string) => {
+    const st=stations.find(s=>s.id===stationId);if(!st?.activeSession)return;
+    try { await api(`/sessions/${st.activeSession.sessionId}/${st.activeSession.isPaused?'resume':'pause'}`,'POST',{});await floor.reload();setOpsError(''); } catch(e:any){setOpsError(e.code);}
   };
 
   const handleConfirmCheckout = (invoice: Invoice) => {
@@ -414,63 +424,14 @@ export default function App() {
     setModalBuffetStation(null);
   };
 
-  const handleConfirmTransferStation = (sourceId: string, targetId: string) => {
-    const sourceStation = stations.find((s) => s.id === sourceId);
-    if (!sourceStation || !sourceStation.activeSession) return;
-
-    const sessionToMove = { ...sourceStation.activeSession, stationId: targetId };
-
-    setStations((prev) =>
-      prev.map((st) => {
-        if (st.id === sourceId) {
-          return { ...st, status: 'IDLE', activeSession: undefined };
-        }
-        if (st.id === targetId) {
-          return { ...st, status: 'PLAYING', activeSession: sessionToMove };
-        }
-        return st;
-      })
-    );
-
-    setModalTransferStation(null);
+  const handleConfirmTransferStation = async (sourceId: string, targetId: string) => {
+    const session=stations.find(s=>s.id===sourceId)?.activeSession;if(!session)return;
+    try{await api(`/sessions/${session.sessionId}/move`,'POST',{stationId:targetId});setModalTransferStation(null);await floor.reload();setOpsError('');}catch(e:any){setOpsError(e.code);}
   };
 
-  const handleConfirmChangeTariff = (stationId: string, newTariffId: string) => {
-    const tariff = tariffs.find((t) => t.id === newTariffId) || tariffs[0];
-
-    setStations((prev) =>
-      prev.map((st) => {
-        if (st.id === stationId) {
-          if (!st.activeSession) {
-            return { ...st, currentTariffId: newTariffId };
-          }
-
-          // Bank the cost of the time segment already played at the OLD rate
-          // before switching, so the final invoice bills each segment at the
-          // rate that was actually in effect for it (not the whole session
-          // at only the newest rate).
-          const prevAccrued = st.activeSession.costAccruedBeforeRateChange || 0;
-          const prevEffectiveFrom = st.activeSession.rateEffectiveFromSeconds || 0;
-          const secondsAtOldRate = Math.max(0, st.activeSession.elapsedSeconds - prevEffectiveFrom);
-          const costAtOldRate = Math.round((secondsAtOldRate / 3600) * st.activeSession.currentHourlyRate);
-
-          return {
-            ...st,
-            currentTariffId: newTariffId,
-            activeSession: {
-              ...st.activeSession,
-              tariffId: newTariffId,
-              currentHourlyRate: tariff.hourlyRate,
-              costAccruedBeforeRateChange: prevAccrued + costAtOldRate,
-              rateEffectiveFromSeconds: st.activeSession.elapsedSeconds,
-            },
-          };
-        }
-        return st;
-      })
-    );
-
-    setModalTariffStation(null);
+  const handleConfirmChangeTariff = async (stationId: string, newTariffId: string) => {
+    const session=stations.find(s=>s.id===stationId)?.activeSession,tariff=tariffs.find(t=>t.id===newTariffId);if(!session||!tariff)return;
+    try{await api(`/sessions/${session.sessionId}/rate`,'POST',{hourlyRate:tariff.hourlyRate});setModalTariffStation(null);await floor.reload();setOpsError('');}catch(e:any){setOpsError(e.code);}
   };
 
   // Buffet / Stock Handlers
@@ -696,6 +657,11 @@ export default function App() {
     setTariffs((prev) => prev.filter((t) => t.id !== tariffId));
   };
 
+  const handleStartBooking = useCallback((booking: BookingView) => {
+    setStartBooking(booking);
+    setModalStartStation(stations.find(s=>s.id===booking.stationId)||null);
+  }, [stations]);
+
   // Filtered Stations
   const filteredStations = stations.filter((s) => {
     if (stationFilter === 'ALL') return true;
@@ -721,7 +687,7 @@ export default function App() {
         currentTheme={currentTheme}
         onOpenThemesModal={() => setActiveTab('settings')}
         currency={currency}
-        onChangeCurrency={(c) => setCurrency(c)}
+        onChangeCurrency={() => setCurrency('TRY')}
         webSyncConnected={webSyncStatus.isConnected}
         pendingReservationsCount={webSyncStatus.pendingTransactionsCount}
         onOpenWebSyncModal={() => setShowWebSyncModal(true)}
@@ -765,6 +731,7 @@ export default function App() {
           </button>
         </div>
 
+        <div className="ops"><Notice error={opsError || floor.error}/>{can('reservations') && <SyncState lastSync={floor.lastSync} error={floor.error}/>}</div>
         {/* Stations Grid View */}
         {activeTab === 'stations' && (
           <div className="space-y-4">
@@ -824,11 +791,13 @@ export default function App() {
                   station={station}
                   tariffs={tariffs}
                   currency={currency}
-                  onStartSession={setModalStartStation}
+                  onStartSession={(st) => { setStartBooking(null);setModalStartStation(st); }}
+                  bookings={bookingGroups[station.id]}
+                  onStartBooking={handleStartBooking}
                   onPauseResume={handlePauseResume}
                   onChangeTariffMidGame={setModalTariffStation}
                   onTransferStation={setModalTransferStation}
-                  onAddBuffetServices={setModalBuffetStation}
+                  onAddBuffetServices={() => setActiveTab('buffet')}
                   onCheckoutSession={setModalCheckoutStation}
                   onEditStation={handleEditStation}
                 />
@@ -889,27 +858,8 @@ export default function App() {
       </main>
 
       {/* Modals Container */}
-      {modalStartStation && (
-        <StationModal
-          station={modalStartStation}
-          tariffs={tariffs}
-          customers={customersWithBirthdayFlags}
-          currency={currency}
-          onClose={() => setModalStartStation(null)}
-          onConfirmStart={handleConfirmStartSession}
-        />
-      )}
-
-      {modalCheckoutStation && (
-        <CheckoutModal
-          station={modalCheckoutStation}
-          customers={customersWithBirthdayFlags}
-          currency={currency}
-          operatorName={activeOperator.name}
-          onClose={() => setModalCheckoutStation(null)}
-          onConfirmCheckout={handleConfirmCheckout}
-        />
-      )}
+      {modalStartStation && <StartSessionDialog station={modalStartStation} reservation={startBooking} onClose={() => {setModalStartStation(null);setStartBooking(null);}} onStarted={() => {void floor.reload();}} />}
+      {modalCheckoutStation?.activeSession && <SessionCheckout sessionId={modalCheckoutStation.activeSession.sessionId} onClose={() => setModalCheckoutStation(null)} onFinished={() => {void floor.reload();}} />}
 
       {modalBuffetStation && (
         <AddBuffetServicesModal

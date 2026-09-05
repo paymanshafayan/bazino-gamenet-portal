@@ -37,7 +37,8 @@ import {
   Smartphone,
   Download,
   LifeBuoy,
-  Wallet
+  Wallet,
+  Megaphone
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
@@ -77,11 +78,13 @@ export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; 
   presentation:      { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum', keywords: 'slides معرفی pitch' },
   tickets:           { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения в поддержку', tr: 'Destek Talepleri', keywords: 'support help ticket پشتیبانی تیکت destek' },
   wallet:            { fa: 'کیف پول و پرداخت حضوری', en: 'Wallet & On-site Payments', ru: 'Кошелёк и оплата на месте', tr: 'Cüzdan ve Mekânda Ödeme', keywords: 'wallet onsite cash pos payment کیف پول پرداخت حضوری cüzdan ödeme' },
+  affiliates:        { fa: 'همکاری در فروش', en: 'Affiliate Marketing', ru: 'Партнёрский маркетинг', tr: 'Satış Ortaklığı', keywords: 'affiliate referral commission همکار معرفی کمیسیون ref' },
 };
 
 const PresentationTab = React.lazy(() => import('./PresentationTab'));
 const AdminTicketsSection = React.lazy(() => import('./AdminTicketsSection'));
 const AdminWalletSection = React.lazy(() => import('./AdminWalletSection'));
+const AdminAffiliatesSection = React.lazy(() => import('./AdminAffiliatesSection'));
 
 interface Props {
   themeId?: string;
@@ -1618,6 +1621,19 @@ export default function AdminPanelTab({
           >
             <Wallet className="w-4 h-4" />
             <span>{L(language, { fa: 'کیف پول و پرداخت حضوری', en: 'Wallet & On-site', ru: 'Кошелёк и оплата', tr: 'Cüzdan ve Ödeme' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('affiliates')}
+            data-admin-nav="affiliates"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'affiliates'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Megaphone className="w-4 h-4" />
+            <span>{L(language, { fa: 'همکاری در فروش', en: 'Affiliate Marketing', ru: 'Партнёрский маркетинг', tr: 'Satış Ortaklığı' })}</span>
           </button>
 
           <button
@@ -4522,6 +4538,12 @@ export default function AdminPanelTab({
           {activeSubTab === 'wallet' && (
             <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Wallet...</div>}>
               <AdminWalletSection addNotification={addNotification} />
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'affiliates' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Affiliates...</div>}>
+              <AdminAffiliatesSection addNotification={addNotification} />
             </React.Suspense>
           )}
 

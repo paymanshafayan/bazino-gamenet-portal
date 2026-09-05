@@ -18,11 +18,11 @@ export const PUBLIC_TABS = ['home', 'loyalty', 'reservations', 'cafe', 'shop', '
 
 export const ADMIN_SECTIONS = [
   'dashboard', 'systems', 'cafe', 'shop', 'tournaments', 'blog', 'chat', 'migrations', 'messages',
-  'themes', 'appSlider', 'mobileAppDownload', 'customization', 'dbLogs', 'apiKeys', 'presentation', 'tickets', 'wallet',
+  'themes', 'appSlider', 'mobileAppDownload', 'customization', 'dbLogs', 'apiKeys', 'presentation', 'tickets', 'wallet', 'affiliates',
 ] as const;
 
 /** تب‌های صفحهٔ پروفایل کاربر: /profile یا /profile/<tab> */
-export const PROFILE_TABS = ['overview', 'wallet', 'points', 'reservations', 'orders', 'tournaments', 'tickets', 'security'] as const;
+export const PROFILE_TABS = ['overview', 'wallet', 'points', 'reservations', 'orders', 'tournaments', 'tickets', 'affiliate', 'security'] as const;
 export type ProfileTab = typeof PROFILE_TABS[number];
 export function profileTabFromPath(pathname: string): ProfileTab {
   const parts = pathname.replace(/^\/+|\/+$/g, '').split('/');

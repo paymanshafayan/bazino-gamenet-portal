@@ -525,6 +525,65 @@ test('tickets: answered tickets auto-close 48 h after the last staff reply when 
   assert.equal(await autoCloseStaleTickets(store, now), 0, 'idempotent');
 });
 
+test('affiliate tables: seed settings rows, CRUD partner, click, attribution, commission', async () => {
+  const store = await freshStore('affiliate');
+  const { seedAffiliateSettings, AFFILIATE_SETTING_KEYS } = await import('../server/affiliate/settings.ts');
+  const n = await seedAffiliateSettings(store);
+  assert.equal(n, AFFILIATE_SETTING_KEYS.length);
+  assert.equal(await store.getSetting('affiliate_new_pct'), '10');
+  assert.equal(await seedAffiliateSettings(store), 0, 'second seed must not rewrite');
+  await store.setSetting('affiliate_new_pct', '12');
+  assert.equal(await seedAffiliateSettings(store), 0);
+  assert.equal(await store.getSetting('affiliate_new_pct'), '12');
+  const now = new Date().toISOString();
+  await store.createAffiliate({
+    id: 'AFF-1', code: 'ALI12', username: 'partner', name: 'Ali', type: 'gamer', language: 'tr',
+    destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1,
+    notes: '', createdAt: now, updatedAt: now,
+  });
+  assert.equal((await store.getAffiliateByCode('ALI12')).name, 'Ali');
+  await store.createAffiliateClick({ id: 'CLK-1', code: 'ALI12', path: '/', ipHash: 'aa', uaHash: 'bb', visitorId: 'v', createdAt: now });
+  assert.equal(await store.countRecentAffiliateClicks('ALI12', 'aa', 'bb', '2000-01-01T00:00:00.000Z'), 1);
+  await store.upsertAffiliateAttribution({ id: 'ATT-1', username: 'buyer', visitorId: 'v', code: 'ALI12', source: 'link', expiresAt: '2999-01-01T00:00:00.000Z', createdAt: now, updatedAt: now });
+  assert.equal((await store.getAttributionForUser('buyer')).code, 'ALI12');
+  await store.createAffiliateCommission({
+    id: 'COM-1', affiliateId: 'AFF-1', code: 'ALI12', username: 'buyer', orderId: 'WL-1', kind: 'reservation', eventType: 'new',
+    netAmount: 100, ratePct: 10, commissionAmount: 10, status: 'pending', holdUntil: now, flag: '', walletTxId: '', parentCommissionId: '',
+    createdAt: now, updatedAt: now, approvedAt: '', paidOutAt: '', reversedAt: '', note: '', attendedAt: '',
+  });
+  await store.updateAffiliateCommission('COM-1', { status: 'paid_out' });
+  assert.equal((await store.getAffiliateCommissionById('COM-1')).status, 'paid_out');
+  assert.equal((await store.listAffiliateCommissions({ affiliateId: 'AFF-1' })).length, 1);
+});
+
+test('instagram campaign tables: media/members/events CRUD', async () => {
+  const store = await freshStore('igcamp');
+  const now = new Date().toISOString();
+  await store.upsertIgMedia({
+    id: 'IGM-1', mediaId: '1790001', mediaType: 'post', campaignId: 'SQUAD26',
+    publishedAt: now, captionVersion: 'tr', idempotencyKey: 'instagram:1790001', createdAt: now,
+  });
+  assert.equal((await store.getIgMediaByMediaId('1790001'))?.mediaType, 'post');
+  await store.createIgMember({
+    id: 'IGP-1', role: 'partner', campaignId: 'SQUAD26', mediaId: '1790001', commentId: 'c1',
+    igUserId: 'u1', igUsername: 'ali', partnerCode: '482913', parentMemberId: '', affiliateCode: '482913',
+    status: 'pr1_sent', followMethod: '', shareStatus: '', couponCode: '', inviteUrl: '', createdAt: now, updatedAt: now,
+  });
+  assert.equal((await store.getIgMemberByPartnerCode('482913'))?.igUsername, 'ali');
+  await store.updateIgMember('IGP-1', { status: 'code_sent', followMethod: 'button_event_only', updatedAt: now });
+  assert.equal((await store.getIgMemberById('IGP-1'))?.status, 'code_sent');
+  await store.createIgEvent({
+    id: 'IGE-1', memberId: 'IGP-1', mediaId: '1790001', commentId: 'c1', kind: 'partner_comment',
+    payload: 'SQUAD', result: 'pr1_sent', verificationMethod: 'comment_id', createdAt: now,
+  });
+  assert.equal((await store.listIgEvents(10)).length, 1);
+  const { seedIgSettings, IG_SETTING_KEYS } = await import('../server/affiliate/igSettings.ts');
+  const n = await seedIgSettings(store);
+  assert.ok(n >= IG_SETTING_KEYS.length);
+  assert.equal(await seedIgSettings(store), 0);
+  assert.equal(await store.getSetting('ig_campaign_ids'), 'SQUAD26');
+});
+
 }
 
 await run({ title: 'Bazino — Database (real SQLite) tests', jsonOut: 'tests/reports/database.json' });

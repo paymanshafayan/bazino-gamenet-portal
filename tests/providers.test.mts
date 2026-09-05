@@ -425,6 +425,25 @@ test('Mongo: updateUserFields only touches whitelisted profile columns; getUserB
   assert.notEqual(u.loyaltyPoints, 99999);
 });
 
+test('Mongo: affiliate partner + click + commission round-trip', async () => {
+  const now = new Date().toISOString();
+  await mongo.createAffiliate({
+    id: 'AFF-m', code: 'MONGO1', username: 'mongo_aff', name: 'M', type: 'gamer', language: 'tr',
+    destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1,
+    notes: '', createdAt: now, updatedAt: now,
+  });
+  assert.equal((await mongo.getAffiliateByCode('MONGO1')).id, 'AFF-m');
+  await mongo.createAffiliateClick({ id: 'CLK-m', code: 'MONGO1', path: '/', ipHash: 'h', uaHash: 'u', visitorId: 'v', createdAt: now });
+  assert.equal(await mongo.countAffiliateClicks('MONGO1'), 1);
+  await mongo.createAffiliateCommission({
+    id: 'COM-m', affiliateId: 'AFF-m', code: 'MONGO1', username: 'buyer', orderId: 'WL-m', kind: 'reservation', eventType: 'new',
+    netAmount: 50, ratePct: 10, commissionAmount: 5, status: 'pending', holdUntil: now, flag: '', walletTxId: '', parentCommissionId: '',
+    createdAt: now, updatedAt: now, approvedAt: '', paidOutAt: '', reversedAt: '', note: '', attendedAt: '',
+  });
+  await mongo.updateAffiliateCommission('COM-m', { status: 'paid_out' });
+  assert.equal((await mongo.getAffiliateCommissionById('COM-m')).status, 'paid_out');
+});
+
 /* ═══════════════════════════════════════════════════════════════════════
    38. یکنواختی طرح جدول‌ها بین پرووایدرها
    ═══════════════════════════════════════════════════════════════════════ */

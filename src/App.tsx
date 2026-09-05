@@ -50,6 +50,7 @@ import {
   Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { tabFromPath, pathFromTab, standalonePageFromPath } from './utils/routes';
+import { claimStoredRef } from './utils/affiliateCapture';
 // صفحات قانونی/تماس/پرداخت عمداً lazy نیستند تا هرگز به قالب و ThemeRegion وابسته نباشند
 import { LegalPage } from './legal/LegalPage';
 import InitialAvatar from './components/InitialAvatar';
@@ -331,6 +332,9 @@ export default function App() {
     const id = window.setInterval(poll, 90_000);
     return () => { cancelled = true; window.clearTimeout(t); window.clearInterval(id); };
   }, [user?.username, currentPath]);
+  useEffect(() => {
+    if (user?.username && user.username !== 'Guest') claimStoredRef();
+  }, [user?.username]);
   // نصب در checkInstallStatus عمداً bypass است؛ مقدار اولیه‌ی true از paint واسط
   // spinner و جابه‌جایی کامل layout در mount دوم جلوگیری می‌کند (CLS/TBT گزارش).
   const [isInstalled, setIsInstalled] = useState<boolean | null>(true);

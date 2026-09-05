@@ -25,6 +25,7 @@ import type express from 'express';
 import { randomBytes } from 'crypto';
 import type { IDataStore, OnsiteOrderRow, WalletTxRow } from '../dataProviders';
 import { normalizePhone } from '../accountRoutes';
+import { onOrderPaid, onOrderReversed, approveDueCommissions } from '../affiliate/engine';
 
 export type OrderKind = 'reservation' | 'cafe' | 'shop' | 'tournament';
 export type PayMethod = 'wallet' | 'onsite' | 'online';
@@ -139,6 +140,7 @@ export async function expireOnsiteOrders(store: IDataStore, deps: Pick<WalletDep
       const result = o.result ? JSON.parse(o.result) : null;
       await deps.unfulfil(o.kind as OrderKind, payload, o.username, result);
     } catch { /* ignore */ }
+    try { await onOrderReversed(store, o.id, 'expire'); } catch { /* ignore */ }
     n++;
   }
   return n;
@@ -155,7 +157,10 @@ export function registerWalletRoutes(d: WalletDeps) {
   const log = d.log || (() => {});
 
   const sweep = () => expireOnsiteOrders(store(), d).catch(() => 0);
-  const timer = setInterval(sweep, 60 * 1000);
+  const timer = setInterval(() => {
+    sweep();
+    approveDueCommissions(store()).catch(() => 0);
+  }, 60 * 1000);
   timer.unref?.();
 
   const methodsFor = (kind: OrderKind): PayMethod[] => {
@@ -215,7 +220,12 @@ export function registerWalletRoutes(d: WalletDeps) {
         throw e;
       }
       // رکورد سفارش برای لغو/گزارش (وضعیت settled با روش wallet)
-      await store().createOnsiteOrder({ id: orderId, kind, username, amount: q.amount, status: 'settled', dueAt: computeOnsiteDueAt(kind, q.payload).dueAt, payload: JSON.stringify(q.payload), description: q.description, result: JSON.stringify({ method: 'wallet', ...result }), createdAt: iso(), updatedAt: iso(), settledAt: iso(), settledBy: 'wallet' });
+      const dueAt = computeOnsiteDueAt(kind, q.payload).dueAt;
+      await store().createOnsiteOrder({ id: orderId, kind, username, amount: q.amount, status: 'settled', dueAt, payload: JSON.stringify(q.payload), description: q.description, result: JSON.stringify({ method: 'wallet', ...result }), createdAt: iso(), updatedAt: iso(), settledAt: iso(), settledBy: 'wallet' });
+      try {
+        const u = await store().getUserByUsername(username);
+        await onOrderPaid(store(), { username, orderId, kind, amount: q.amount, dueAt, payload: q.payload, userRole: u?.role });
+      } catch { /* commission must never fail checkout */ }
       log(`Wallet checkout ${orderId} (${kind}) by ${username}: ${q.amount} TL`);
       res.json({ success: true, orderId, amount: q.amount, balance: tx ? tx.balanceAfter : undefined, result });
     } catch (e) { httpError(res, e); }
@@ -255,6 +265,7 @@ export function registerWalletRoutes(d: WalletDeps) {
       if (o.status === 'pending_onsite') {
         await store().updateOnsiteOrder(o.id, { status: 'cancelled_user', updatedAt: iso() });
         await d.unfulfil(o.kind as OrderKind, payload, username, result);
+        try { await onOrderReversed(store(), o.id, username); } catch { /* ignore */ }
         return res.json({ success: true, status: 'cancelled_user', refunded: 0 });
       }
       if (o.status === 'settled' && o.settledBy === 'wallet') {
@@ -262,6 +273,7 @@ export function registerWalletRoutes(d: WalletDeps) {
         await store().updateOnsiteOrder(o.id, { status: 'cancelled_user', updatedAt: iso() });
         await d.unfulfil(o.kind as OrderKind, payload, username, result);
         const tx = o.amount > 0 ? await store().appendWalletTx({ id: newId('TX'), username, amount: round2(o.amount), type: 'refund', ref: o.id, operator: username, note: 'cancelled by user', idempotencyKey: '', createdAt: iso() }) : null;
+        try { await onOrderReversed(store(), o.id, username); } catch { /* ignore */ }
         return res.json({ success: true, status: 'cancelled_user', refunded: o.amount, balance: tx?.balanceAfter });
       }
       return res.status(400).json({ error: `Order is ${o.status}`, code: 'BAD_STATE' });
@@ -346,6 +358,10 @@ export function registerWalletRoutes(d: WalletDeps) {
         result = await d.fulfil(o.kind as OrderKind, { ...payload, __pointsOnly: true }, o.username, { merchantOid: o.id, kind: o.kind, username: o.username });
       }
       await store().updateOnsiteOrder(o.id, { status: 'settled', settledAt: iso(), settledBy: `${method}:${who}`, result: JSON.stringify({ method, ...(result || {}) }), updatedAt: iso() });
+      try {
+        const u = await store().getUserByUsername(o.username);
+        await onOrderPaid(store(), { username: o.username, orderId: o.id, kind: o.kind, amount: o.amount, dueAt: o.dueAt, payload, userRole: u?.role });
+      } catch { /* commission must never fail settle */ }
       log(`On-site order ${o.id} settled (${method}) by ${who}`);
       res.json({ success: true, status: 'settled', result });
     } catch (e) { httpError(res, e); }
@@ -357,6 +373,7 @@ export function registerWalletRoutes(d: WalletDeps) {
       if (o.status !== 'pending_onsite') return res.status(400).json({ error: `Order is ${o.status}`, code: 'BAD_STATE' });
       await store().updateOnsiteOrder(o.id, { status: 'cancelled_admin', settledBy: who, updatedAt: iso() });
       await d.unfulfil(o.kind as OrderKind, safeJson(o.payload), o.username, safeJson(o.result));
+      try { await onOrderReversed(store(), o.id, who); } catch { /* ignore */ }
       res.json({ success: true, status: 'cancelled_admin' });
     } catch (e) { httpError(res, e); }
   };

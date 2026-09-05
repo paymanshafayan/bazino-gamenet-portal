@@ -934,5 +934,270 @@ test('Management App wallet queue: enqueue → flush with idempotency key; failu
   delete (globalThis as any).localStorage;
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   14. Affiliate marketing
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('14. Affiliate marketing — settings, codes, engine');
+
+const affSettings = await import('../server/affiliate/settings.ts');
+const affEngine = await import('../server/affiliate/engine.ts');
+
+function memAffStore() {
+  const settings: Record<string, string> = {};
+  const affiliates: any[] = [];
+  const clicks: any[] = [];
+  const atts: any[] = [];
+  const comms: any[] = [];
+  const audits: any[] = [];
+  const orders: any[] = [];
+  const wallet: any[] = [];
+  return {
+    getSetting: async (k: string) => settings[k],
+    setSetting: async (k: string, v: string) => { settings[k] = v; },
+    listAffiliates: async () => affiliates,
+    getAffiliateById: async (id: string) => affiliates.find(a => a.id === id),
+    getAffiliateByCode: async (c: string) => affiliates.find(a => a.code === c),
+    getAffiliateByUsername: async (u: string) => affiliates.find(a => a.username === u),
+    createAffiliate: async (a: any) => { affiliates.push({ ...a }); },
+    updateAffiliate: async (id: string, f: any) => { Object.assign(affiliates.find(a => a.id === id) || {}, f); },
+    createAffiliateClick: async (c: any) => { clicks.push(c); },
+    countRecentAffiliateClicks: async (code: string, ip: string, ua: string, since: string) =>
+      clicks.filter(c => c.code === code && c.ipHash === ip && c.uaHash === ua && c.createdAt >= since).length,
+    countAffiliateClicks: async (code: string, since?: string) =>
+      clicks.filter(c => c.code === code && (!since || c.createdAt >= since)).length,
+    upsertAffiliateAttribution: async (a: any) => {
+      for (let i = atts.length - 1; i >= 0; i--) {
+        if ((a.username && atts[i].username === a.username) || (a.visitorId && a.visitorId && atts[i].visitorId === a.visitorId)) atts.splice(i, 1);
+      }
+      atts.push(a);
+    },
+    getAttributionForUser: async (u: string) => atts.filter(a => a.username === u).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0],
+    getAttributionForVisitor: async (v: string) => atts.find(a => a.visitorId === v),
+    listAttributionsByCode: async (c: string) => atts.filter(a => a.code === c),
+    createAffiliateCommission: async (c: any) => { comms.push({ ...c }); },
+    getAffiliateCommissionById: async (id: string) => comms.find(c => c.id === id),
+    listAffiliateCommissions: async (f: any = {}) => comms.filter(c =>
+      (!f.affiliateId || c.affiliateId === f.affiliateId) &&
+      (!f.username || c.username === f.username) &&
+      (!f.orderId || c.orderId === f.orderId) &&
+      (!f.status || c.status === f.status)),
+    updateAffiliateCommission: async (id: string, f: any) => { Object.assign(comms.find(c => c.id === id) || {}, f); },
+    createAffiliateAudit: async (a: any) => { audits.push(a); },
+    listAffiliateAudit: async () => audits,
+    listOnsiteOrders: async (f: any = {}) => orders.filter(o => !f.username || o.username === f.username),
+    getOnsiteOrder: async (id: string) => orders.find(o => o.id === id),
+    appendWalletTx: async (tx: any) => { const row = { ...tx, balanceAfter: (wallet.at(-1)?.balanceAfter || 0) + tx.amount }; wallet.push(row); return row; },
+    _settings: settings, _affiliates: affiliates, _clicks: clicks, _comms: comms, _wallet: wallet, _orders: orders,
+  };
+}
+
+test('normalizeCode / isValidCode: upper alnum 4–16, strips junk', () => {
+  assert.equal(affEngine.normalizeCode(' ali-12 '), 'ALI12');
+  assert.equal(affEngine.normalizeCode('ab'), 'AB');
+  assert.equal(affEngine.isValidCode('ALI12'), true);
+  assert.equal(affEngine.isValidCode('AB'), false);
+  assert.equal(affEngine.isValidCode('ali12'), false);
+});
+
+test('seedAffiliateSettings inserts missing keys once and never overwrites stored values', async () => {
+  const store = memAffStore();
+  const n1 = await affSettings.seedAffiliateSettings(store as any);
+  assert.equal(n1, affSettings.AFFILIATE_SETTING_KEYS.length);
+  assert.equal(store._settings.affiliate_new_pct, '10');
+  assert.equal(store._settings.affiliate_return_pct, '5');
+  assert.equal(store._settings.affiliate_tournament_pct, '10');
+  assert.equal(store._settings.affiliate_override_pct, '0');
+  assert.equal(store._settings.affiliate_window_days, '30');
+  assert.equal(store._settings.wallet_cashout_min_tl, '0');
+  store._settings.affiliate_new_pct = '12';
+  const n2 = await affSettings.seedAffiliateSettings(store as any);
+  assert.equal(n2, 0);
+  assert.equal(store._settings.affiliate_new_pct, '12', 'seed must not overwrite an existing row');
+  const read = await affSettings.readAffiliateSettings(store as any);
+  assert.equal(read.affiliate_new_pct, '12');
+  assert.equal(read.affiliate_return_pct, '5');
+});
+
+test('parsePct / parseDays reject out-of-range and fall back', () => {
+  assert.equal(affSettings.parsePct('10', 1), 10);
+  assert.equal(affSettings.parsePct('101', 5), 5);
+  assert.equal(affSettings.parsePct('nope', 7), 7);
+  assert.equal(affSettings.parseDays('30', 1), 30);
+  assert.equal(affSettings.parseDays('0', 14), 14);
+});
+
+test('onOrderPaid: reservation new=10%, cafe skipped, self-referral skipped, duplicate order reused', async () => {
+  const store = memAffStore();
+  await affSettings.seedAffiliateSettings(store as any);
+  const aff = { id: 'AFF1', code: 'ALI12', username: 'partner', name: 'Ali', type: 'gamer', language: 'tr', destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1, notes: '', createdAt: 't', updatedAt: 't' };
+  await store.createAffiliate(aff);
+  const cafe = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'OS-c', kind: 'cafe', amount: 80, payload: { referralCode: 'ALI12' } });
+  assert.equal(cafe.length, 0);
+  const created = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'WL-1', kind: 'reservation', amount: 200, dueAt: '2999-01-01T00:00:00.000Z', payload: { referralCode: 'ALI12' } });
+  assert.equal(created.length, 1);
+  assert.equal(created[0].eventType, 'new');
+  assert.equal(created[0].ratePct, 10);
+  assert.equal(created[0].commissionAmount, 20);
+  assert.equal(created[0].status, 'pending');
+  const again = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'WL-1', kind: 'reservation', amount: 200, payload: { referralCode: 'ALI12' } });
+  assert.equal(again[0].id, created[0].id);
+  const self = await affEngine.onOrderPaid(store as any, { username: 'partner', orderId: 'WL-self', kind: 'reservation', amount: 100, payload: { referralCode: 'ALI12' } });
+  assert.equal(self.length, 0);
+  const adminBuy = await affEngine.onOrderPaid(store as any, { username: 'adminish', orderId: 'WL-ad', kind: 'reservation', amount: 100, userRole: 'admin', payload: { referralCode: 'ALI12' } });
+  assert.equal(adminBuy.length, 0);
+});
+
+test('approveDueCommissions credits wallet; reverse after payout writes commission_reversal', async () => {
+  const store = memAffStore();
+  await affSettings.seedAffiliateSettings(store as any);
+  await store.createAffiliate({ id: 'AFF1', code: 'ALI12', username: 'partner', name: 'Ali', type: 'gamer', language: 'tr', destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1, notes: '', createdAt: 't', updatedAt: 't' });
+  const created = await affEngine.onOrderPaid(store as any, { username: 'buyer', orderId: 'WL-2', kind: 'reservation', amount: 100, dueAt: '2000-01-01T00:00:00.000Z', payload: { referralCode: 'ALI12' } });
+  const n = await affEngine.approveDueCommissions(store as any);
+  assert.equal(n, 1);
+  assert.equal(store._comms[0].status, 'paid_out');
+  assert.equal(store._wallet[0].type, 'commission');
+  assert.equal(store._wallet[0].amount, 10);
+  const rev = await affEngine.onOrderReversed(store as any, 'WL-2', 'test');
+  assert.equal(rev, 1);
+  assert.equal(store._comms[0].status, 'reversed');
+  assert.equal(store._wallet[1].type, 'commission_reversal');
+  assert.equal(store._wallet[1].amount, -10);
+});
+
+test('click de-dupes same IP+UA within 15 minutes', async () => {
+  const store = memAffStore();
+  await store.createAffiliate({ id: 'AFF1', code: 'ALI12', username: 'partner', name: 'Ali', type: 'gamer', language: 'tr', destination: '/', parentId: '', status: 'active', newPct: -1, returnPct: -1, tournamentPct: -1, overridePct: -1, notes: '', createdAt: 't', updatedAt: 't' });
+  const a = await affEngine.recordClick(store as any, { code: 'ALI12', path: '/', ip: '1.1.1.1', ua: 'ua', visitorId: 'v1' });
+  const b = await affEngine.recordClick(store as any, { code: 'ALI12', path: '/', ip: '1.1.1.1', ua: 'ua', visitorId: 'v1' });
+  assert.equal(a.ok, true); assert.equal(a.duplicate, undefined);
+  assert.equal(b.duplicate, true);
+  assert.equal(store._clicks.length, 1);
+});
+
+test('routes + legal slug expose affiliate surfaces', () => {
+  assert.ok(routes.ADMIN_SECTIONS.includes('affiliates'));
+  assert.equal(routes.adminSectionFromPath('/admin/affiliates'), 'affiliates');
+  assert.ok(routes.PROFILE_TABS.includes('affiliate'));
+  assert.equal(routes.pathFromProfileTab('affiliate'), '/profile/affiliate');
+  assert.ok(legal.LEGAL_SLUGS.includes('affiliate'));
+  assert.ok(legal.LEGAL_TITLES.affiliate.fa);
+  assert.ok(legal.LEGAL_DEFAULTS.affiliate.tr.length > 100);
+});
+
+test('admin settings form keys match AFFILIATE_SETTING_KEYS; cashout is a wallet op type', () => {
+  const adminSrc = read('src/components/AdminAffiliatesSection.tsx');
+  for (const k of affSettings.AFFILIATE_SETTING_KEYS) {
+    assert.ok(adminSrc.includes(`'${k}'`) || adminSrc.includes(`"${k}"`), `admin form missing ${k}`);
+  }
+  const wsSrc = read('Management App/Bazino/src/utils/walletSync.ts');
+  assert.ok(wsSrc.includes("'cashout'"));
+  assert.ok(read('server/wallet/routes.ts').includes('onOrderPaid'));
+  assert.ok(read('server.ts').includes('seedAffiliateSettings'));
+});
+
+suite('15. Instagram campaign — Media-ID + Friend Gate');
+
+const igSettings = await import('../server/affiliate/igSettings.ts');
+const igEngine = await import('../server/affiliate/igEngine.ts');
+
+function memIgStore() {
+  const settings: Record<string, string> = {};
+  const media: any[] = [];
+  const members: any[] = [];
+  const events: any[] = [];
+  const affiliates: any[] = [];
+  const coupons: any[] = [];
+  return {
+    async getSetting(k: string) { return settings[k]; },
+    async setSetting(k: string, v: string) { settings[k] = v; },
+    async upsertIgMedia(row: any) { media.push({ ...row }); },
+    async getIgMediaByMediaId(id: string) { return media.find(m => m.mediaId === id); },
+    async listIgMedia() { return media; },
+    async createIgMember(m: any) { members.push({ ...m }); },
+    async getIgMemberById(id: string) { return members.find(m => m.id === id); },
+    async getIgMemberByCommentId(id: string) { return members.find(m => m.commentId === id); },
+    async getIgMemberByPartnerCode(c: string) { return members.find(m => m.partnerCode === c && m.role === 'partner'); },
+    async listIgMembers() { return members; },
+    async updateIgMember(id: string, f: any) { const m = members.find(x => x.id === id); if (m) Object.assign(m, f); },
+    async createIgEvent(e: any) { events.push(e); },
+    async listIgEvents() { return events; },
+    async listAffiliates() { return affiliates; },
+    async getAffiliateByCode(c: string) { return affiliates.find(a => a.code === c); },
+    async createAffiliate(a: any) { affiliates.push(a); },
+    async getCouponByCode(c: string) { return coupons.find(x => x.code === c); },
+    async createCoupon(c: any) { coupons.push(c); },
+  };
+}
+
+test('IG setting keys are separate from affiliate keys and appear in the admin form', () => {
+  for (const k of igSettings.IG_SETTING_KEYS) {
+    assert.ok(!affSettings.AFFILIATE_SETTING_KEYS.includes(k), `IG key leaked into affiliate keys: ${k}`);
+  }
+  const adminSrc = read('src/components/AdminAffiliatesSection.tsx');
+  for (const k of igSettings.IG_SETTING_KEYS) {
+    assert.ok(adminSrc.includes(`'${k}'`) || adminSrc.includes(`"${k}"`) || adminSrc.includes(`data-ig-setting={k}`) || adminSrc.includes(`data-ig-setting={f.key}`), `admin IG form missing ${k}`);
+    assert.ok(adminSrc.includes(k), `admin IG form missing string ${k}`);
+  }
+  assert.ok(read('server.ts').includes('seedIgSettings'));
+  assert.ok(read('server.ts').includes('registerIgRoutes'));
+});
+
+test('published-media payload validation and template render', () => {
+  const bad = igEngine.validatePublishedMediaPayload({ media_id: 'x', media_type: 'story' });
+  assert.equal(bad.ok, false);
+  const ok = igEngine.validatePublishedMediaPayload({ media_id: '179000111', media_type: 'reel', published_at: '2026-04-01T12:00:00Z', campaign_id: 'SQUAD26' });
+  assert.equal(ok.ok, true);
+  assert.equal(igEngine.isKeywordComment('@bazinopro SQUAD please', 'SQUAD'), true);
+  assert.equal(igEngine.isKeywordComment('hello', 'SQUAD'), false);
+  assert.equal(igEngine.extractNumericCode('code 482913 thanks'), '482913');
+  assert.equal(igEngine.renderIgTemplate('x {{code}} y', { code: '111222' }), 'x 111222 y');
+  assert.equal(igEngine.parseFollowPayload('ig_follow:IGP-1'), 'IGP-1');
+});
+
+test('Friend Gate: keyword PR → button DM with unique code → friend comment confirms share', async () => {
+  const store = memIgStore();
+  await igSettings.seedIgSettings(store as any);
+  const ingested = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999001', media_type: 'post', published_at: '2026-04-01T12:00:00Z', campaign_id: 'SQUAD26',
+  }, 'instagram:179999001');
+  assert.equal(ingested.status, 200);
+  const dup = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999001', media_type: 'post', published_at: '2026-04-01T12:00:00Z', campaign_id: 'SQUAD26',
+  }, 'instagram:179999001');
+  assert.equal(dup.json.duplicate, true);
+  const conflict = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999001', media_type: 'reel', published_at: '2026-04-01T12:00:00Z',
+  }, 'instagram:179999001');
+  assert.equal(conflict.status, 409);
+  const unknown = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999002', media_type: 'post', campaign_id: 'NOPE',
+  }, 'instagram:179999002');
+  assert.equal(unknown.status, 422);
+
+  const c1 = await igEngine.onCampaignComment(store as any, {
+    mediaId: '179999001', commentId: 'c-partner', text: 'SQUAD', igUserId: 'u1', igUsername: 'ali',
+  });
+  assert.equal(c1.ok, true);
+  assert.equal(c1.outbound?.kind, 'private_reply');
+  assert.ok(c1.member?.partnerCode);
+  assert.match(c1.outbound?.text || '', /@bazinopro|Follow|takip|فالو/i);
+  const btn = await igEngine.onFollowButton(store as any, c1.member!.id, false);
+  assert.equal(btn.ok, true);
+  assert.equal(btn.outbound?.kind, 'dm');
+  assert.ok(btn.outbound?.text.includes(c1.member!.partnerCode));
+  const friend = await igEngine.onCampaignComment(store as any, {
+    mediaId: '179999001', commentId: 'c-friend', text: c1.member!.partnerCode, igUserId: 'u2', igUsername: 'veli',
+  });
+  assert.equal(friend.ok, true);
+  assert.equal(friend.member?.shareStatus, 'share_confirmed_by_friend_code');
+  assert.equal(friend.outbound?.kind, 'private_reply');
+  const gate = await igEngine.onFollowButton(store as any, friend.member!.id, false);
+  assert.equal(gate.ok, true);
+  assert.equal(gate.outbound?.kind, 'dm');
+  assert.match(gate.member?.inviteUrl || '', /utm_source=instagram/);
+  assert.match(gate.member?.inviteUrl || '', /ref=/);
+  assert.equal(gate.member?.followMethod, 'button_event_only');
+});
+
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });
 await vite.close();

@@ -54,6 +54,11 @@ import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
 import { registerWalletRoutes } from "./server/wallet/routes";
+import { registerAffiliateRoutes } from "./server/affiliate/routes";
+import { seedAffiliateSettings } from "./server/affiliate/settings";
+import { registerIgRoutes } from "./server/affiliate/igRoutes";
+import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
+import { onReservationAttended } from "./server/affiliate/engine";
 import { isOnlinePaymentEnabled } from "./server/payments/paytr";
 import { registerAccountRoutes, publicUser } from "./server/accountRoutes";
 import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
@@ -79,6 +84,7 @@ const MOBILE_APP_APK_FILE_NAME = "bazino-app.apk";
 const SECRET_SETTING_KEYS = new Set<string>([
   JARVIS_AI_PROVIDERS_SETTING,
   SYNC_API_KEY_SETTING,
+  IG_INGEST_TOKEN_KEY,
 ]);
 export type DataSourceMode = "sample" | "database";
 
@@ -548,7 +554,15 @@ async function startServer() {
 
   // Parse ordinary JSON requests globally. Upload routes must keep the incoming stream
   // untouched so formidable/raw parsers can consume it directly.
-  const jsonParser = express.json({ limit: "260mb" });
+  const jsonParser = express.json({
+    limit: "260mb",
+    verify: (req, _res, buf) => {
+      const url = String((req as any).originalUrl || req.url || "");
+      if (url.includes("/api/integrations/zernio/webhook")) {
+        (req as any).rawBody = Buffer.from(buf);
+      }
+    },
+  });
   app.use((req, res, next) => {
     if (
       req.path === "/api/admin/mobile-app/upload-apk" ||
@@ -715,6 +729,15 @@ async function startServer() {
     }
   } catch (err) {
     console.error(`[${bootStore.name}] Error checking/seeding minimal admin account:`, err);
+  }
+
+  try {
+    const n = await seedAffiliateSettings(bootStore);
+    if (n > 0) console.log(`[${bootStore.name}] Seeded ${n} affiliate/wallet setting row(s) (existing keys left untouched).`);
+    const igN = await seedIgSettings(bootStore);
+    if (igN > 0) console.log(`[${bootStore.name}] Seeded ${igN} Instagram campaign setting row(s) (existing keys left untouched).`);
+  } catch (err) {
+    console.warn(`[${bootStore.name}] Could not seed affiliate/instagram settings:`, err);
   }
 
   // Resolves the REAL current user for this specific request — and ONLY from the
@@ -1288,6 +1311,7 @@ async function startServer() {
           reservation
         );
         await store.setReservationCheckedIn(id);
+        try { await onReservationAttended(store, id, reservation.username || ''); } catch { /* ignore */ }
         const reservationLogs = await store.listReservationLogs();
         res.json({
           success: true,
@@ -1969,7 +1993,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     try {
       const { reservationId, newStatus } = req.body || {};
       if (newStatus === "CONFIRMED" || newStatus === "REJECTED") {
-        await getActiveDataProvider().setReservationCheckedIn(reservationId);
+        const store = getActiveDataProvider();
+        const log = await store.getReservationLogById(reservationId);
+        await store.setReservationCheckedIn(reservationId);
+        if (log) { try { await onReservationAttended(store, reservationId, log.username || ''); } catch { /* ignore */ } }
         logSyncEvent(
           "RESERVATION_UPDATE",
           "SUCCESS",
@@ -2273,7 +2300,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   async function paymentQuote(kind: OrderKind, params: any, username?: string) {
     const store = getActiveDataProvider();
     if (kind === "reservation") {
-      const { systemId, startTime, endTime, date, couponCode } = params || {};
+      const { systemId, startTime, endTime, date, couponCode, referralCode } = params || {};
       const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
       if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
       const st = startTime || "12:00", et = endTime || "14:00", reservationDate = date || "امروز";
@@ -2285,7 +2312,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       return {
         amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
         basket: [{ name: `${system.name} (${durationHours}h)`, unitPrice: amount, qty: 1 }],
-        payload: { systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", amount, systemName: system.name },
+        payload: { systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name },
       };
     }
     if (kind === "cafe") {
@@ -2319,13 +2346,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
     }
     // tournament
-    const { tournamentId, team } = params || {};
+    const { tournamentId, team, referralCode } = params || {};
     const tour = await resolveSampleById(() => store.getTournamentById(tournamentId), SAMPLE_TOURNAMENTS, tournamentId);
     if (!tour) throw Object.assign(new Error("Tournament not found"), { statusCode: 404 });
     if (tour.registeredTeamsCount >= tour.maxTeams) throw Object.assign(new Error("Tournament is full"), { statusCode: 400, code: "TOURNAMENT_FULL" });
     if (!team?.name) throw Object.assign(new Error("Team name required"), { statusCode: 400 });
     const amount = Number(tour.registrationFee) || 0;
-    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, title: tour.title, startDate: tour.startDate } };
+    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, title: tour.title, startDate: tour.startDate, referralCode: String(referralCode || "").trim() } };
   }
 
   async function creditPoints(username: string, amount: number, description: string) {
@@ -2420,6 +2447,19 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     unfulfil: paymentUnfulfil,
     onlineEnabled: () => isOnlinePaymentEnabled(),
     log: (msg) => logDbQuery(getActiveDataProvider().name, "SYSTEM", `[Wallet] ${msg}`),
+  });
+
+  registerAffiliateRoutes({
+    app,
+    getStore: getActiveDataProvider,
+    requireAuth,
+    requireSyncApiKey,
+    authUsername: (req) => (req as any).authUsername || undefined,
+  });
+  registerIgRoutes({
+    app,
+    getStore: getActiveDataProvider,
+    authUsername: (req) => (req as any).authUsername || undefined,
   });
 
   // Blog News Articles & Comments
@@ -3307,7 +3347,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         const wantsAuto = autoGenerateMobile === true || (typeof mobileImageUrl === "string" && !mobileImageUrl.trim() && autoGenerateMobile !== false);
         const finalMobileUrl = typeof mobileImageUrl === "string" && mobileImageUrl.trim()
           ? mobileImageUrl.trim()
-          : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "slide") : undefined) ?? slide.mobileImageUrl;
+           : (wantsAuto ? await generateMobileImageVariant(finalImageUrl, "slide") : undefined) ?? slide.mobileImageUrl;
 
         await store.updateSlider(id, {
           imageUrl: finalImageUrl,

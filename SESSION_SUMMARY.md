@@ -1,5 +1,17 @@
 # BAZINO PRO — خلاصه‌ی تغییرات این جلسه (تکمیل‌شده)
 
+## ۱۴۰۵/۰۶/۱۴ — کمپین اینستاگرام Invite Your Squad (Media-ID + Friend Gate)
+
+- ingest: `POST /api/integrations/instagram/published-media` با Bearer توکن پورتال (`IG_INGEST_TOKEN` / `ig_ingest_token` seedشده؛ نه کلید sync). جدول `ig_media`.
+- Friend Gate: کامنت کلیدواژه → یک PR (پیام۱+دکمه) → بعد دکمه **DM** پیام۲ با کد ۶رقمی یکتا → کامنت همان عدد توسط دوست زیر همان پست = `share_confirmed_by_friend_code` → لینک `/?ref=` + UTM اینستاگرام (+ کوپن اگر مقدار>۰). کمیسیون فقط قیف رزرو/پرداخت موجود.
+- جداول `ig_media` / `ig_members` / `ig_events` در SQLite و `dbo.` و Mongo. کلیدهای `IG_SETTING_KEYS` جدا از `AFFILIATE_SETTING_KEYS`.
+- متن‌ها ۴ زبان × پیام۱/۲/دوست/لینک + برچسب دکمه، همه قابل‌ویرایش در `/admin/affiliates` (`data-ig-setting`). شبیه‌ساز ادمین بدون Zernio.
+- HMAC inbound `X-Zernio-Signature` روی raw body. Outbound فقط اگر env Zernio ست باشد.
+- سند: `docs/payments/AFFILIATE-IG.md`.
+- تست اجرا شد: unit 98/98 (سوئیت ۱۵ IG سبز)، database 38/38، providers 27/27، `tsc --noEmit` صفر خطا. API: سوئیت ۳۷ ingest+simulator سبز؛ ۱۰ شکست باقی‌مانده فقط SPA/static به‌خاطر نبودن `vite build` در این اجرا (نه منطق IG). Chromium این batch اجرا نشد.
+
+---
+
 ## چه چیزی عوض شد
 
 ### ۱. `server/dataProviders.ts` — بازنویسی کامل

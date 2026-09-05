@@ -1095,5 +1095,109 @@ test('admin settings form keys match AFFILIATE_SETTING_KEYS; cashout is a wallet
   assert.ok(read('server.ts').includes('seedAffiliateSettings'));
 });
 
+suite('15. Instagram campaign — Media-ID + Friend Gate');
+
+const igSettings = await import('../server/affiliate/igSettings.ts');
+const igEngine = await import('../server/affiliate/igEngine.ts');
+
+function memIgStore() {
+  const settings: Record<string, string> = {};
+  const media: any[] = [];
+  const members: any[] = [];
+  const events: any[] = [];
+  const affiliates: any[] = [];
+  const coupons: any[] = [];
+  return {
+    async getSetting(k: string) { return settings[k]; },
+    async setSetting(k: string, v: string) { settings[k] = v; },
+    async upsertIgMedia(row: any) { media.push({ ...row }); },
+    async getIgMediaByMediaId(id: string) { return media.find(m => m.mediaId === id); },
+    async listIgMedia() { return media; },
+    async createIgMember(m: any) { members.push({ ...m }); },
+    async getIgMemberById(id: string) { return members.find(m => m.id === id); },
+    async getIgMemberByCommentId(id: string) { return members.find(m => m.commentId === id); },
+    async getIgMemberByPartnerCode(c: string) { return members.find(m => m.partnerCode === c && m.role === 'partner'); },
+    async listIgMembers() { return members; },
+    async updateIgMember(id: string, f: any) { const m = members.find(x => x.id === id); if (m) Object.assign(m, f); },
+    async createIgEvent(e: any) { events.push(e); },
+    async listIgEvents() { return events; },
+    async listAffiliates() { return affiliates; },
+    async getAffiliateByCode(c: string) { return affiliates.find(a => a.code === c); },
+    async createAffiliate(a: any) { affiliates.push(a); },
+    async getCouponByCode(c: string) { return coupons.find(x => x.code === c); },
+    async createCoupon(c: any) { coupons.push(c); },
+  };
+}
+
+test('IG setting keys are separate from affiliate keys and appear in the admin form', () => {
+  for (const k of igSettings.IG_SETTING_KEYS) {
+    assert.ok(!affSettings.AFFILIATE_SETTING_KEYS.includes(k), `IG key leaked into affiliate keys: ${k}`);
+  }
+  const adminSrc = read('src/components/AdminAffiliatesSection.tsx');
+  for (const k of igSettings.IG_SETTING_KEYS) {
+    assert.ok(adminSrc.includes(`'${k}'`) || adminSrc.includes(`"${k}"`) || adminSrc.includes(`data-ig-setting={k}`) || adminSrc.includes(`data-ig-setting={f.key}`), `admin IG form missing ${k}`);
+    assert.ok(adminSrc.includes(k), `admin IG form missing string ${k}`);
+  }
+  assert.ok(read('server.ts').includes('seedIgSettings'));
+  assert.ok(read('server.ts').includes('registerIgRoutes'));
+});
+
+test('published-media payload validation and template render', () => {
+  const bad = igEngine.validatePublishedMediaPayload({ media_id: 'x', media_type: 'story' });
+  assert.equal(bad.ok, false);
+  const ok = igEngine.validatePublishedMediaPayload({ media_id: '179000111', media_type: 'reel', published_at: '2026-04-01T12:00:00Z', campaign_id: 'SQUAD26' });
+  assert.equal(ok.ok, true);
+  assert.equal(igEngine.isKeywordComment('@bazinopro SQUAD please', 'SQUAD'), true);
+  assert.equal(igEngine.isKeywordComment('hello', 'SQUAD'), false);
+  assert.equal(igEngine.extractNumericCode('code 482913 thanks'), '482913');
+  assert.equal(igEngine.renderIgTemplate('x {{code}} y', { code: '111222' }), 'x 111222 y');
+  assert.equal(igEngine.parseFollowPayload('ig_follow:IGP-1'), 'IGP-1');
+});
+
+test('Friend Gate: keyword PR → button DM with unique code → friend comment confirms share', async () => {
+  const store = memIgStore();
+  await igSettings.seedIgSettings(store as any);
+  const ingested = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999001', media_type: 'post', published_at: '2026-04-01T12:00:00Z', campaign_id: 'SQUAD26',
+  }, 'instagram:179999001');
+  assert.equal(ingested.status, 200);
+  const dup = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999001', media_type: 'post', published_at: '2026-04-01T12:00:00Z', campaign_id: 'SQUAD26',
+  }, 'instagram:179999001');
+  assert.equal(dup.json.duplicate, true);
+  const conflict = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999001', media_type: 'reel', published_at: '2026-04-01T12:00:00Z',
+  }, 'instagram:179999001');
+  assert.equal(conflict.status, 409);
+  const unknown = await igEngine.registerPublishedMedia(store as any, {
+    media_id: '179999002', media_type: 'post', campaign_id: 'NOPE',
+  }, 'instagram:179999002');
+  assert.equal(unknown.status, 422);
+
+  const c1 = await igEngine.onCampaignComment(store as any, {
+    mediaId: '179999001', commentId: 'c-partner', text: 'SQUAD', igUserId: 'u1', igUsername: 'ali',
+  });
+  assert.equal(c1.ok, true);
+  assert.equal(c1.outbound?.kind, 'private_reply');
+  assert.ok(c1.member?.partnerCode);
+  assert.match(c1.outbound?.text || '', /@bazinopro|Follow|takip|فالو/i);
+  const btn = await igEngine.onFollowButton(store as any, c1.member!.id, false);
+  assert.equal(btn.ok, true);
+  assert.equal(btn.outbound?.kind, 'dm');
+  assert.ok(btn.outbound?.text.includes(c1.member!.partnerCode));
+  const friend = await igEngine.onCampaignComment(store as any, {
+    mediaId: '179999001', commentId: 'c-friend', text: c1.member!.partnerCode, igUserId: 'u2', igUsername: 'veli',
+  });
+  assert.equal(friend.ok, true);
+  assert.equal(friend.member?.shareStatus, 'share_confirmed_by_friend_code');
+  assert.equal(friend.outbound?.kind, 'private_reply');
+  const gate = await igEngine.onFollowButton(store as any, friend.member!.id, false);
+  assert.equal(gate.ok, true);
+  assert.equal(gate.outbound?.kind, 'dm');
+  assert.match(gate.member?.inviteUrl || '', /utm_source=instagram/);
+  assert.match(gate.member?.inviteUrl || '', /ref=/);
+  assert.equal(gate.member?.followMethod, 'button_event_only');
+});
+
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });
 await vite.close();

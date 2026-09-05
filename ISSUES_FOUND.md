@@ -447,3 +447,8 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 |---|---|---|---|
 | E.94 | طرح همکاری در فروش وجود نداشت؛ کمیسیون رزرو/تورنمنت و پنل همکاران نبود | 🟠 محصول | ✅ `server/affiliate/*` + جداول پنج‌گانه در هر سه پروایدر؛ seed ردیف واقعی settings (۱۰/۵/۱۰/۰/۳۰)؛ پنل `/admin/affiliates` و `/profile/affiliate`؛ قانونی `/legal/affiliate`؛ نقد حضوری `CASHOUT` در اپ مدیریت |
 | E.95 | اگر تنظیمات خالی می‌ماند موتور از ثابت runtime استفاده می‌کرد و فیلد ادمین خالی می‌ماند | 🟠 داده | ✅ `seedAffiliateSettings` در بوت و GET ادمین؛ فقط کلید غایب INSERT می‌شود؛ فرم ادمین همان ردیف‌ها را نشان می‌دهد |
+| E.96 | کمپین اینستاگرام: پورتال نباید به Meta وصل شود؛ ناشر فقط Media ID می‌فرستد | 🟠 محصول | ✅ `POST /api/integrations/instagram/published-media` + جدول `ig_media`؛ توکن ingest جدا از sync |
+| E.97 | تأیید Share نباید از لیست فالوور یا Graph باشد | 🟠 محصول | ✅ شاهد عملی = کامنت کد یکتا توسط دوست زیر همان پست (`share_confirmed_by_friend_code`)؛ بدون follower list |
+| E.98 | دو Private Reply روی یک comment_id غیرممکن است؛ پیام ۲ باید DM باشد | 🟠 محصول | ✅ پیام۱ = یک PR + دکمه؛ پیام۲ = DM بعد از دکمه با `{{code}}` |
+| E.99 | مسیرهای دقیق PR/DM در Zernio آداپتر حدسی‌اند تا زمان تأیید مستند رسمی inbox | 🟡 ادغام | ⏳ ماشین حالت پورتال قفل است؛ `server/affiliate/zernio.ts` با env قابل‌تنظیم. تا ست‌شدن کلید، شبیه‌ساز ادمین کافی است |
+| E.100 | HMAC وب‌هوک بدون raw body با JSON.stringify ممکن است با بایت اصلی نخواند | 🟠 امنیتی | ✅ `express.json` verify برای `/api/integrations/zernio/webhook` → `rawBody` |

@@ -1,6 +1,8 @@
 # طرح همکاری در فروش بازینو (Affiliate Marketing)
 
 > وضعیت: پیاده‌سازی‌شده روی هر سه پروایدر. نرخ‌ها **ردیف واقعی جدول `settings`** هستند (نه fallback اجرا). تست خودکار: Unit ۱۴، Database جداول+CRUD، API کلیک/چک‌اوت. Chromium واقعی در این batch اجرا نشد.
+>
+> کمپین اینستاگرام (Media-ID + Friend Gate) جدا است: [`AFFILIATE-IG.md`](./AFFILIATE-IG.md).
 
 ## ۱. محدوده
 

@@ -2209,5 +2209,60 @@ test('sync cashout deducts wallet; SPA shells for affiliate pages', async () => 
   }
 });
 
+suite('37. API — Instagram Media-ID ingest + Friend Gate simulator');
+
+test('published-media requires portal ingest token; rejects bad type and unknown campaign', async () => {
+  const camp: any = await getJson(`${BASE}/api/admin/ig-campaign`, 200, adminAuth());
+  assert.equal(camp.settings.ig_campaign_ids, 'SQUAD26');
+  assert.ok(camp.settings.ig_msg_partner2_fa.includes('{{code}}'));
+  const token = camp.settings.ig_ingest_token;
+  assert.ok(token && token.length >= 16);
+  const noAuth = await postJson(`${BASE}/api/integrations/instagram/published-media`, { media_id: '1791', media_type: 'post' });
+  assert.equal(noAuth.status, 401);
+  const badType = await postJson(`${BASE}/api/integrations/instagram/published-media`, { media_id: '1791', media_type: 'story' }, { Authorization: `Bearer ${token}` });
+  assert.equal(badType.status, 400);
+  const nope = await postJson(`${BASE}/api/integrations/instagram/published-media`, { media_id: '1791', media_type: 'post', campaign_id: 'NOPE' }, { Authorization: `Bearer ${token}`, 'Idempotency-Key': 'instagram:1791' });
+  assert.equal(nope.status, 422);
+  const ok = await postJson(`${BASE}/api/integrations/instagram/published-media`, {
+    media_id: '179555001', media_type: 'post', campaign_id: 'SQUAD26', published_at: '2026-04-01T12:00:00Z', caption_version: 'tr',
+  }, { Authorization: `Bearer ${token}`, 'Idempotency-Key': 'instagram:179555001' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.accepted, true);
+  const dup = await postJson(`${BASE}/api/integrations/instagram/published-media`, {
+    media_id: '179555001', media_type: 'post', campaign_id: 'SQUAD26', published_at: '2026-04-01T12:00:00Z',
+  }, { Authorization: `Bearer ${token}`, 'Idempotency-Key': 'instagram:179555001' });
+  assert.equal(dup.body.duplicate, true);
+  const conflict = await postJson(`${BASE}/api/integrations/instagram/published-media`, {
+    media_id: '179555001', media_type: 'reel',
+  }, { Authorization: `Bearer ${token}`, 'Idempotency-Key': 'instagram:179555001' });
+  assert.equal(conflict.status, 409);
+});
+
+test('admin simulator: keyword PR, follow DM with unique code, friend comment confirms share', async () => {
+  const mediaId = '179555001';
+  const p = await postJson(`${BASE}/api/admin/ig/simulate-comment`, {
+    mediaId, commentId: 'c-ali', text: 'SQUAD', igUserId: 'ig-ali', igUsername: 'ali',
+  }, adminAuth());
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  assert.equal(p.body.outbound.kind, 'private_reply');
+  const code = p.body.member.partnerCode;
+  assert.match(String(code), /^\d{6}$/);
+  const btn = await postJson(`${BASE}/api/admin/ig/simulate-button`, { memberId: p.body.member.id, followVerified: false }, adminAuth());
+  assert.equal(btn.status, 200, JSON.stringify(btn.body));
+  assert.equal(btn.body.outbound.kind, 'dm');
+  assert.ok(btn.body.outbound.text.includes(code));
+  const friend = await postJson(`${BASE}/api/admin/ig/simulate-comment`, {
+    mediaId, commentId: 'c-veli', text: code, igUserId: 'ig-veli', igUsername: 'veli',
+  }, adminAuth());
+  assert.equal(friend.status, 200, JSON.stringify(friend.body));
+  assert.equal(friend.body.member.shareStatus, 'share_confirmed_by_friend_code');
+  const gate = await postJson(`${BASE}/api/admin/ig/simulate-button`, { memberId: friend.body.member.id }, adminAuth());
+  assert.equal(gate.status, 200, JSON.stringify(gate.body));
+  assert.match(gate.body.member.inviteUrl, /utm_source=instagram/);
+  assert.match(gate.body.member.inviteUrl, new RegExp(`ref=${code}`));
+  const hook = await postJson(`${BASE}/api/integrations/zernio/webhook`, { event: 'comment.received' });
+  assert.equal(hook.status, 401);
+});
+
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

@@ -122,6 +122,15 @@ export interface AffiliateCommissionRow {
   reversedAt: string; note: string; attendedAt: string;
 }
 export const AFFILIATE_COMMISSION_COLUMNS = new Set(['status','holdUntil','flag','walletTxId','updatedAt','approvedAt','paidOutAt','reversedAt','note','attendedAt']);
+export interface IgMediaRow { id: string; mediaId: string; mediaType: string; campaignId: string; publishedAt: string; captionVersion: string; idempotencyKey: string; createdAt: string; }
+export interface IgMemberRow {
+  id: string; role: string; campaignId: string; mediaId: string; commentId: string; igUserId: string; igUsername: string;
+  partnerCode: string; parentMemberId: string; affiliateCode: string; status: string; followMethod: string; shareStatus: string;
+  couponCode: string; inviteUrl: string; createdAt: string; updatedAt: string;
+}
+export const IG_MEMBER_COLUMNS = new Set(['status','followMethod','shareStatus','couponCode','inviteUrl','affiliateCode','updatedAt','partnerCode']);
+export interface IgEventRow { id: string; memberId: string; mediaId: string; commentId: string; kind: string; payload: string; result: string; verificationMethod: string; createdAt: string; }
+
 export interface AffiliateAuditRow { id: string; affiliateId: string; commissionId: string; actor: string; action: string; fromStatus: string; toStatus: string; detail: string; createdAt: string; }
 
 export interface TicketRow { id: string; username: string; subject: string; category: string; priority: string; status: string; createdAt: string; updatedAt: string; lastStaffReplyAt: string; userSeenAt: string; }
@@ -351,6 +360,19 @@ export interface IDataStore {
   updateAffiliateCommission(id: string, fields: Partial<AffiliateCommissionRow>): Promise<void>;
   createAffiliateAudit(a: AffiliateAuditRow): Promise<void>;
   listAffiliateAudit(affiliateId?: string, limit?: number): Promise<AffiliateAuditRow[]>;
+
+  // ---- Instagram campaign (Media-ID + Friend Gate) ----
+  upsertIgMedia(row: IgMediaRow): Promise<void>;
+  getIgMediaByMediaId(mediaId: string): Promise<IgMediaRow | undefined>;
+  listIgMedia(): Promise<IgMediaRow[]>;
+  createIgMember(m: IgMemberRow): Promise<void>;
+  getIgMemberById(id: string): Promise<IgMemberRow | undefined>;
+  getIgMemberByCommentId(commentId: string): Promise<IgMemberRow | undefined>;
+  getIgMemberByPartnerCode(code: string): Promise<IgMemberRow | undefined>;
+  listIgMembers(filter?: { mediaId?: string; campaignId?: string }): Promise<IgMemberRow[]>;
+  updateIgMember(id: string, fields: Partial<IgMemberRow>): Promise<void>;
+  createIgEvent(e: IgEventRow): Promise<void>;
+  listIgEvents(limit?: number): Promise<IgEventRow[]>;
 }
 
 // -----------------------------------------------------------------------------
@@ -447,6 +469,13 @@ export class SqliteStore implements IDataStore {
       CREATE INDEX IF NOT EXISTS idx_aff_com_st ON affiliate_commissions(status, holdUntil);
       CREATE TABLE IF NOT EXISTS affiliate_audit (id TEXT PRIMARY KEY, affiliateId TEXT, commissionId TEXT DEFAULT '', actor TEXT, action TEXT, fromStatus TEXT DEFAULT '', toStatus TEXT DEFAULT '', detail TEXT DEFAULT '', createdAt TEXT);
       CREATE INDEX IF NOT EXISTS idx_aff_aud ON affiliate_audit(affiliateId, createdAt);
+      CREATE TABLE IF NOT EXISTS ig_media (id TEXT PRIMARY KEY, mediaId TEXT UNIQUE, mediaType TEXT, campaignId TEXT DEFAULT '', publishedAt TEXT, captionVersion TEXT DEFAULT '', idempotencyKey TEXT DEFAULT '', createdAt TEXT);
+      CREATE INDEX IF NOT EXISTS idx_ig_media ON ig_media(mediaId);
+      CREATE TABLE IF NOT EXISTS ig_members (id TEXT PRIMARY KEY, role TEXT, campaignId TEXT DEFAULT '', mediaId TEXT, commentId TEXT DEFAULT '', igUserId TEXT DEFAULT '', igUsername TEXT DEFAULT '', partnerCode TEXT DEFAULT '', parentMemberId TEXT DEFAULT '', affiliateCode TEXT DEFAULT '', status TEXT, followMethod TEXT DEFAULT '', shareStatus TEXT DEFAULT '', couponCode TEXT DEFAULT '', inviteUrl TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT);
+      CREATE INDEX IF NOT EXISTS idx_ig_mem_code ON ig_members(partnerCode);
+      CREATE INDEX IF NOT EXISTS idx_ig_mem_cmt ON ig_members(commentId);
+      CREATE TABLE IF NOT EXISTS ig_events (id TEXT PRIMARY KEY, memberId TEXT DEFAULT '', mediaId TEXT DEFAULT '', commentId TEXT DEFAULT '', kind TEXT, payload TEXT DEFAULT '', result TEXT DEFAULT '', verificationMethod TEXT DEFAULT '', createdAt TEXT);
+      CREATE INDEX IF NOT EXISTS idx_ig_ev ON ig_events(mediaId, createdAt);
     `);
     logDbQuery(this.name, 'SQL', 'CREATE TABLE IF NOT EXISTS ... (17 tables verified)');
     this.addMissingColumns();
@@ -813,6 +842,32 @@ export class SqliteStore implements IDataStore {
     return this.db.prepare(`SELECT * FROM affiliate_audit ORDER BY createdAt DESC LIMIT ?`).all(limit) as AffiliateAuditRow[];
   }
 
+  async upsertIgMedia(row: IgMediaRow) {
+    this.db.prepare(`INSERT INTO ig_media (id, mediaId, mediaType, campaignId, publishedAt, captionVersion, idempotencyKey, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(row.id, row.mediaId, row.mediaType, row.campaignId || '', row.publishedAt, row.captionVersion || '', row.idempotencyKey || '', row.createdAt);
+  }
+  async getIgMediaByMediaId(mediaId: string) { return this.db.prepare(`SELECT * FROM ig_media WHERE mediaId = ?`).get(mediaId) as IgMediaRow | undefined; }
+  async listIgMedia() { return this.db.prepare(`SELECT * FROM ig_media ORDER BY createdAt DESC`).all() as IgMediaRow[]; }
+  async createIgMember(m: IgMemberRow) {
+    this.db.prepare(`INSERT INTO ig_members (id, role, campaignId, mediaId, commentId, igUserId, igUsername, partnerCode, parentMemberId, affiliateCode, status, followMethod, shareStatus, couponCode, inviteUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(m.id, m.role, m.campaignId || '', m.mediaId, m.commentId || '', m.igUserId || '', m.igUsername || '', m.partnerCode || '', m.parentMemberId || '', m.affiliateCode || '', m.status, m.followMethod || '', m.shareStatus || '', m.couponCode || '', m.inviteUrl || '', m.createdAt, m.updatedAt);
+  }
+  async getIgMemberById(id: string) { return this.db.prepare(`SELECT * FROM ig_members WHERE id = ?`).get(id) as IgMemberRow | undefined; }
+  async getIgMemberByCommentId(commentId: string) { if (!commentId) return undefined; return this.db.prepare(`SELECT * FROM ig_members WHERE commentId = ?`).get(commentId) as IgMemberRow | undefined; }
+  async getIgMemberByPartnerCode(code: string) { if (!code) return undefined; return this.db.prepare(`SELECT * FROM ig_members WHERE partnerCode = ? AND role = 'partner'`).get(code) as IgMemberRow | undefined; }
+  async listIgMembers(filter?: { mediaId?: string; campaignId?: string }) {
+    if (filter?.mediaId) return this.db.prepare(`SELECT * FROM ig_members WHERE mediaId = ? ORDER BY createdAt DESC`).all(filter.mediaId) as IgMemberRow[];
+    if (filter?.campaignId) return this.db.prepare(`SELECT * FROM ig_members WHERE campaignId = ? ORDER BY createdAt DESC`).all(filter.campaignId) as IgMemberRow[];
+    return this.db.prepare(`SELECT * FROM ig_members ORDER BY createdAt DESC`).all() as IgMemberRow[];
+  }
+  async updateIgMember(id: string, f: Partial<IgMemberRow>) {
+    const keys = Object.keys(f).filter(k => IG_MEMBER_COLUMNS.has(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE ig_members SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => (f as any)[k]), id);
+  }
+  async createIgEvent(e: IgEventRow) {
+    this.db.prepare(`INSERT INTO ig_events (id, memberId, mediaId, commentId, kind, payload, result, verificationMethod, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(e.id, e.memberId || '', e.mediaId || '', e.commentId || '', e.kind, e.payload || '', e.result || '', e.verificationMethod || '', e.createdAt);
+  }
+  async listIgEvents(limit = 200) { return this.db.prepare(`SELECT * FROM ig_events ORDER BY createdAt DESC LIMIT ?`).all(limit) as IgEventRow[]; }
+
   // ---- Accessories / shop ----
   async listAccessories() { return this.db.prepare(`SELECT * FROM accessories`).all() as AccessoryRow[]; }
   async getAccessoryById(id: string) { return this.db.prepare(`SELECT * FROM accessories WHERE id = ?`).get(id) as AccessoryRow | undefined; }
@@ -1043,6 +1098,9 @@ export class SqlServerStore implements IDataStore {
       IF OBJECT_ID('dbo.affiliate_attributions','U') IS NULL CREATE TABLE dbo.affiliate_attributions (id NVARCHAR(40) PRIMARY KEY, username NVARCHAR(100) DEFAULT '', visitorId NVARCHAR(80) DEFAULT '', code NVARCHAR(20), source NVARCHAR(20), expiresAt NVARCHAR(50), createdAt NVARCHAR(50), updatedAt NVARCHAR(50));
       IF OBJECT_ID('dbo.affiliate_commissions','U') IS NULL CREATE TABLE dbo.affiliate_commissions (id NVARCHAR(40) PRIMARY KEY, affiliateId NVARCHAR(40), code NVARCHAR(20), username NVARCHAR(100), orderId NVARCHAR(40), kind NVARCHAR(20), eventType NVARCHAR(20), netAmount FLOAT, ratePct FLOAT, commissionAmount FLOAT, status NVARCHAR(20), holdUntil NVARCHAR(50) DEFAULT '', flag NVARCHAR(40) DEFAULT '', walletTxId NVARCHAR(40) DEFAULT '', parentCommissionId NVARCHAR(40) DEFAULT '', createdAt NVARCHAR(50), updatedAt NVARCHAR(50), approvedAt NVARCHAR(50) DEFAULT '', paidOutAt NVARCHAR(50) DEFAULT '', reversedAt NVARCHAR(50) DEFAULT '', note NVARCHAR(500) DEFAULT '', attendedAt NVARCHAR(50) DEFAULT '');
       IF OBJECT_ID('dbo.affiliate_audit','U') IS NULL CREATE TABLE dbo.affiliate_audit (id NVARCHAR(40) PRIMARY KEY, affiliateId NVARCHAR(40), commissionId NVARCHAR(40) DEFAULT '', actor NVARCHAR(100), action NVARCHAR(30), fromStatus NVARCHAR(20) DEFAULT '', toStatus NVARCHAR(20) DEFAULT '', detail NVARCHAR(MAX) DEFAULT '', createdAt NVARCHAR(50));
+      IF OBJECT_ID('dbo.ig_media','U') IS NULL CREATE TABLE dbo.ig_media (id NVARCHAR(40) PRIMARY KEY, mediaId NVARCHAR(80) UNIQUE, mediaType NVARCHAR(10), campaignId NVARCHAR(40) DEFAULT '', publishedAt NVARCHAR(50), captionVersion NVARCHAR(40) DEFAULT '', idempotencyKey NVARCHAR(120) DEFAULT '', createdAt NVARCHAR(50));
+      IF OBJECT_ID('dbo.ig_members','U') IS NULL CREATE TABLE dbo.ig_members (id NVARCHAR(40) PRIMARY KEY, role NVARCHAR(20), campaignId NVARCHAR(40) DEFAULT '', mediaId NVARCHAR(80), commentId NVARCHAR(80) DEFAULT '', igUserId NVARCHAR(80) DEFAULT '', igUsername NVARCHAR(100) DEFAULT '', partnerCode NVARCHAR(20) DEFAULT '', parentMemberId NVARCHAR(40) DEFAULT '', affiliateCode NVARCHAR(20) DEFAULT '', status NVARCHAR(40), followMethod NVARCHAR(40) DEFAULT '', shareStatus NVARCHAR(60) DEFAULT '', couponCode NVARCHAR(40) DEFAULT '', inviteUrl NVARCHAR(400) DEFAULT '', createdAt NVARCHAR(50), updatedAt NVARCHAR(50));
+      IF OBJECT_ID('dbo.ig_events','U') IS NULL CREATE TABLE dbo.ig_events (id NVARCHAR(40) PRIMARY KEY, memberId NVARCHAR(40) DEFAULT '', mediaId NVARCHAR(80) DEFAULT '', commentId NVARCHAR(80) DEFAULT '', kind NVARCHAR(40), payload NVARCHAR(MAX) DEFAULT '', result NVARCHAR(80) DEFAULT '', verificationMethod NVARCHAR(60) DEFAULT '', createdAt NVARCHAR(50));
     `);
     logDbQuery(this.name, 'SQL', 'Verified mobileImageUrl columns (cafe_items, accessories, articles, app_sliders).');
 
@@ -1420,6 +1478,38 @@ export class SqlServerStore implements IDataStore {
     return (await this.r().input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.affiliate_audit ORDER BY createdAt DESC`)).recordset as AffiliateAuditRow[];
   }
 
+  async upsertIgMedia(row: IgMediaRow) {
+    await this.r().input('id', this.sql.NVarChar, row.id).input('mid', this.sql.NVarChar, row.mediaId).input('mt', this.sql.NVarChar, row.mediaType).input('cid', this.sql.NVarChar, row.campaignId || '').input('pa', this.sql.NVarChar, row.publishedAt).input('cv', this.sql.NVarChar, row.captionVersion || '').input('ik', this.sql.NVarChar, row.idempotencyKey || '').input('ca', this.sql.NVarChar, row.createdAt)
+      .query(`INSERT INTO dbo.ig_media (id, mediaId, mediaType, campaignId, publishedAt, captionVersion, idempotencyKey, createdAt) VALUES (@id, @mid, @mt, @cid, @pa, @cv, @ik, @ca)`);
+  }
+  async getIgMediaByMediaId(mediaId: string) { return (await this.r().input('m', this.sql.NVarChar, mediaId).query(`SELECT * FROM dbo.ig_media WHERE mediaId = @m`)).recordset[0] as IgMediaRow | undefined; }
+  async listIgMedia() { return (await this.r().query(`SELECT * FROM dbo.ig_media ORDER BY createdAt DESC`)).recordset as IgMediaRow[]; }
+  async createIgMember(m: IgMemberRow) {
+    await this.r().input('id', this.sql.NVarChar, m.id).input('role', this.sql.NVarChar, m.role).input('cid', this.sql.NVarChar, m.campaignId || '').input('mid', this.sql.NVarChar, m.mediaId).input('cmt', this.sql.NVarChar, m.commentId || '').input('uid', this.sql.NVarChar, m.igUserId || '').input('un', this.sql.NVarChar, m.igUsername || '').input('pc', this.sql.NVarChar, m.partnerCode || '').input('pid', this.sql.NVarChar, m.parentMemberId || '').input('ac', this.sql.NVarChar, m.affiliateCode || '').input('st', this.sql.NVarChar, m.status).input('fm', this.sql.NVarChar, m.followMethod || '').input('ss', this.sql.NVarChar, m.shareStatus || '').input('cc', this.sql.NVarChar, m.couponCode || '').input('iu', this.sql.NVarChar, m.inviteUrl || '').input('ca', this.sql.NVarChar, m.createdAt).input('ua', this.sql.NVarChar, m.updatedAt)
+      .query(`INSERT INTO dbo.ig_members (id, role, campaignId, mediaId, commentId, igUserId, igUsername, partnerCode, parentMemberId, affiliateCode, status, followMethod, shareStatus, couponCode, inviteUrl, createdAt, updatedAt) VALUES (@id, @role, @cid, @mid, @cmt, @uid, @un, @pc, @pid, @ac, @st, @fm, @ss, @cc, @iu, @ca, @ua)`);
+  }
+  async getIgMemberById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.ig_members WHERE id = @id`)).recordset[0] as IgMemberRow | undefined; }
+  async getIgMemberByCommentId(commentId: string) { if (!commentId) return undefined; return (await this.r().input('c', this.sql.NVarChar, commentId).query(`SELECT * FROM dbo.ig_members WHERE commentId = @c`)).recordset[0] as IgMemberRow | undefined; }
+  async getIgMemberByPartnerCode(code: string) { if (!code) return undefined; return (await this.r().input('c', this.sql.NVarChar, code).query(`SELECT * FROM dbo.ig_members WHERE partnerCode = @c AND role = N'partner'`)).recordset[0] as IgMemberRow | undefined; }
+  async listIgMembers(filter?: { mediaId?: string; campaignId?: string }) {
+    if (filter?.mediaId) return (await this.r().input('m', this.sql.NVarChar, filter.mediaId).query(`SELECT * FROM dbo.ig_members WHERE mediaId = @m ORDER BY createdAt DESC`)).recordset as IgMemberRow[];
+    if (filter?.campaignId) return (await this.r().input('c', this.sql.NVarChar, filter.campaignId).query(`SELECT * FROM dbo.ig_members WHERE campaignId = @c ORDER BY createdAt DESC`)).recordset as IgMemberRow[];
+    return (await this.r().query(`SELECT * FROM dbo.ig_members ORDER BY createdAt DESC`)).recordset as IgMemberRow[];
+  }
+  async updateIgMember(id: string, f: Partial<IgMemberRow>) {
+    const keys = Object.keys(f).filter(k => IG_MEMBER_COLUMNS.has(k));
+    if (!keys.length) return;
+    const req = this.r().input('key', this.sql.NVarChar, id);
+    keys.forEach((k, i) => { req.input(`v${i}`, this.sql.NVarChar, String((f as any)[k] ?? '')); });
+    const columnSet = keys.map((k, i) => k + ' = @v' + i).join(', ');
+    await req.query(`UPDATE dbo.ig_members SET ${columnSet} WHERE id = @key`);
+  }
+  async createIgEvent(e: IgEventRow) {
+    await this.r().input('id', this.sql.NVarChar, e.id).input('mid', this.sql.NVarChar, e.memberId || '').input('media', this.sql.NVarChar, e.mediaId || '').input('cmt', this.sql.NVarChar, e.commentId || '').input('k', this.sql.NVarChar, e.kind).input('p', this.sql.NVarChar, e.payload || '').input('r', this.sql.NVarChar, e.result || '').input('v', this.sql.NVarChar, e.verificationMethod || '').input('ca', this.sql.NVarChar, e.createdAt)
+      .query(`INSERT INTO dbo.ig_events (id, memberId, mediaId, commentId, kind, payload, result, verificationMethod, createdAt) VALUES (@id, @mid, @media, @cmt, @k, @p, @r, @v, @ca)`);
+  }
+  async listIgEvents(limit = 200) { return (await this.r().input('l', this.sql.Int, limit).query(`SELECT TOP (@l) * FROM dbo.ig_events ORDER BY createdAt DESC`)).recordset as IgEventRow[]; }
+
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.r().query(`SELECT * FROM dbo.accessories`)).recordset as AccessoryRow[]; }
   async getAccessoryById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.accessories WHERE id = @id`)).recordset[0]; }
@@ -1630,6 +1720,10 @@ export class MongoStore implements IDataStore {
     await this.col('affiliate_commissions').createIndex({ orderId: 1 });
     await this.col('affiliate_commissions').createIndex({ status: 1, holdUntil: 1 });
     await this.col('affiliate_audit').createIndex({ affiliateId: 1, createdAt: -1 });
+    await this.col('ig_media').createIndex({ mediaId: 1 }, { unique: true });
+    await this.col('ig_members').createIndex({ partnerCode: 1 });
+    await this.col('ig_members').createIndex({ commentId: 1 });
+    await this.col('ig_events').createIndex({ mediaId: 1, createdAt: -1 });
     logDbQuery(this.name, 'NoSQL', 'db.createIndex(...) on users/settings/chat_rooms/active_coupons');
     return { success: true, message: `MongoDB collections/indexes verified on database [${this.config.dbName || 'bazino'}].` };
   }
@@ -1841,6 +1935,29 @@ export class MongoStore implements IDataStore {
     const q: any = affiliateId ? { affiliateId } : {};
     return (await this.col('affiliate_audit').find(q).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r));
   }
+
+  async upsertIgMedia(row: IgMediaRow) { await this.col('ig_media').insertOne({ ...row }); }
+  async getIgMediaByMediaId(mediaId: string) { return this.strip(await this.col('ig_media').findOne({ mediaId })) as IgMediaRow | undefined; }
+  async listIgMedia() { return (await this.col('ig_media').find({}).sort({ createdAt: -1 }).toArray()).map((r: any) => this.strip(r)); }
+  async createIgMember(m: IgMemberRow) { await this.col('ig_members').insertOne({ ...m }); }
+  async getIgMemberById(id: string) { return this.strip(await this.col('ig_members').findOne({ id })) as IgMemberRow | undefined; }
+  async getIgMemberByCommentId(commentId: string) { if (!commentId) return undefined; return this.strip(await this.col('ig_members').findOne({ commentId })) as IgMemberRow | undefined; }
+  async getIgMemberByPartnerCode(code: string) { if (!code) return undefined; return this.strip(await this.col('ig_members').findOne({ partnerCode: code, role: 'partner' })) as IgMemberRow | undefined; }
+  async listIgMembers(filter?: { mediaId?: string; campaignId?: string }) {
+    const q: any = {};
+    if (filter?.mediaId) q.mediaId = filter.mediaId;
+    if (filter?.campaignId) q.campaignId = filter.campaignId;
+    return (await this.col('ig_members').find(q).sort({ createdAt: -1 }).toArray()).map((r: any) => this.strip(r));
+  }
+  async updateIgMember(id: string, f: Partial<IgMemberRow>) {
+    const keys = Object.keys(f).filter(k => IG_MEMBER_COLUMNS.has(k));
+    if (!keys.length) return;
+    const patch: any = {};
+    for (const k of keys) patch[k] = (f as any)[k];
+    await this.col('ig_members').updateOne({ id }, { $set: patch });
+  }
+  async createIgEvent(e: IgEventRow) { await this.col('ig_events').insertOne({ ...e }); }
+  async listIgEvents(limit = 200) { return (await this.col('ig_events').find({}).sort({ createdAt: -1 }).limit(limit).toArray()).map((r: any) => this.strip(r)); }
 
   // ---- Accessories / shop ----
   async listAccessories() { return (await this.col('accessories').find({}).toArray()).map((r: any) => this.strip(r)); }

@@ -556,6 +556,34 @@ test('affiliate tables: seed settings rows, CRUD partner, click, attribution, co
   assert.equal((await store.listAffiliateCommissions({ affiliateId: 'AFF-1' })).length, 1);
 });
 
+test('instagram campaign tables: media/members/events CRUD', async () => {
+  const store = await freshStore('igcamp');
+  const now = new Date().toISOString();
+  await store.upsertIgMedia({
+    id: 'IGM-1', mediaId: '1790001', mediaType: 'post', campaignId: 'SQUAD26',
+    publishedAt: now, captionVersion: 'tr', idempotencyKey: 'instagram:1790001', createdAt: now,
+  });
+  assert.equal((await store.getIgMediaByMediaId('1790001'))?.mediaType, 'post');
+  await store.createIgMember({
+    id: 'IGP-1', role: 'partner', campaignId: 'SQUAD26', mediaId: '1790001', commentId: 'c1',
+    igUserId: 'u1', igUsername: 'ali', partnerCode: '482913', parentMemberId: '', affiliateCode: '482913',
+    status: 'pr1_sent', followMethod: '', shareStatus: '', couponCode: '', inviteUrl: '', createdAt: now, updatedAt: now,
+  });
+  assert.equal((await store.getIgMemberByPartnerCode('482913'))?.igUsername, 'ali');
+  await store.updateIgMember('IGP-1', { status: 'code_sent', followMethod: 'button_event_only', updatedAt: now });
+  assert.equal((await store.getIgMemberById('IGP-1'))?.status, 'code_sent');
+  await store.createIgEvent({
+    id: 'IGE-1', memberId: 'IGP-1', mediaId: '1790001', commentId: 'c1', kind: 'partner_comment',
+    payload: 'SQUAD', result: 'pr1_sent', verificationMethod: 'comment_id', createdAt: now,
+  });
+  assert.equal((await store.listIgEvents(10)).length, 1);
+  const { seedIgSettings, IG_SETTING_KEYS } = await import('../server/affiliate/igSettings.ts');
+  const n = await seedIgSettings(store);
+  assert.ok(n >= IG_SETTING_KEYS.length);
+  assert.equal(await seedIgSettings(store), 0);
+  assert.equal(await store.getSetting('ig_campaign_ids'), 'SQUAD26');
+});
+
 }
 
 await run({ title: 'Bazino — Database (real SQLite) tests', jsonOut: 'tests/reports/database.json' });

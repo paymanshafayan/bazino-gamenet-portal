@@ -355,7 +355,7 @@ export function registerWalletRoutes(d: WalletDeps) {
         result = await d.fulfil(o.kind as OrderKind, payload, o.username, { merchantOid: o.id, kind: o.kind, username: o.username });
       } else {
         // رزرو/تورنمنت: جا قبلاً گرفته شده؛ فقط امتیاز
-        result = await d.fulfil(o.kind as OrderKind, { ...payload, __pointsOnly: true }, o.username, { merchantOid: o.id, kind: o.kind, username: o.username });
+        result = { ...(result || {}), ...(await d.fulfil(o.kind as OrderKind, { ...payload, __pointsOnly: true }, o.username, { merchantOid: o.id, kind: o.kind, username: o.username })) };
       }
       await store().updateOnsiteOrder(o.id, { status: 'settled', settledAt: iso(), settledBy: `${method}:${who}`, result: JSON.stringify({ method, ...(result || {}) }), updatedAt: iso() });
       try {

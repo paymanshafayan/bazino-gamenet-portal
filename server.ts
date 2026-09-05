@@ -53,6 +53,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
+import { bookingViews } from './server/management/bookings';
+import { transactional, fail, nowISO, parseJSON } from './server/management/core';
+import { registerManagementCore } from './server/management/routes';
 import { registerWalletRoutes } from "./server/wallet/routes";
 import { registerAffiliateRoutes } from "./server/affiliate/routes";
 import { seedAffiliateSettings } from "./server/affiliate/settings";
@@ -809,6 +812,15 @@ async function startServer() {
   // Single choke point: every current AND future /api/admin/* route is gated here,
   // so a new admin endpoint can't accidentally ship unprotected.
   app.use("/api/admin", requireAdmin);
+
+  const management = registerManagementCore({
+    app, getStore: getActiveDataProvider, signToken: signAuthToken,
+    systems: async () => resolveMergedList(await getActiveDataProvider().listSystems(), SAMPLE_SYSTEMS),
+    cafe: async () => resolveMergedList(await getActiveDataProvider().listCafeItems(), SAMPLE_CAFE_ITEMS),
+    shop: async () => resolveMergedList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES),
+    tournaments: async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+  });
+
 
   // =========================================================================
   // API ROUTE CONTROLLERS
@@ -1884,6 +1896,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   async function requireSyncApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
+      if ((req as any).authUsername) { await management.staff((req as any).authUsername); return next(); }
       const expectedKey = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
 
       if (expectedKey) {
@@ -1927,17 +1940,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       // Fetch pending reservations from website database
       const pendingLogs = await store.listPendingReservationLogs();
-      const pendingReservations = pendingLogs.map((log, index) => ({
-        id: log.id,
-        customerName: `مشتری آنلاین #${index + 1}`,
-        phone: "09121112233",
-        stationType: log.systemName.includes("VIP") ? "PS5_VIP" : "PC_GAMING",
-        stationName: log.systemName,
-        reservedTime: log.startTime,
-        depositPaid: log.totalPrice,
-        status: "PENDING",
-        createdAt: log.timestamp || new Date().toISOString()
-      }));
+      const pendingReservations = (await bookingViews(management)).filter(r=>r.paymentStatus==='pending').map(r=>({...r,stationName:r.systemName,reservedTime:r.startsAt,depositPaid:r.paidAmount,status:'PENDING'}));
 
       logSyncEvent(
         action || "FULL_SYNC",
@@ -1965,54 +1968,29 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
-  app.get("/api/sync/reservations", requireSyncApiKey, async (req, res) => {
+  app.get("/api/sync/reservations", requireSyncApiKey, async (_req, res) => {
     try {
-      const pendingLogs = await getActiveDataProvider().listPendingReservationLogs();
-      const reservations = pendingLogs.map((log, index) => ({
-        id: log.id,
-        customerName: `مشتری آنلاین #${index + 1}`,
-        phone: "09121112233",
-        stationType: log.systemName.includes("VIP") ? "PS5_VIP" : "PC_GAMING",
-        stationName: log.systemName,
-        reservedTime: log.startTime,
-        depositPaid: log.totalPrice,
-        status: "PENDING",
-        createdAt: log.timestamp || new Date().toISOString()
-      }));
-      res.json({
-        success: true,
-        reservations,
-        pendingCount: reservations.length
-      });
-    } catch (e) {
-      res.status(500).json({ error: String(e) });
-    }
+      const reservations = (await bookingViews(management)).map(r => ({ ...r, phone:'', stationName:r.systemName,
+        reservedTime:r.startsAt, depositPaid:r.paidAmount,
+        status:r.bookingStatus==='confirmed'?'CONFIRMED':r.bookingStatus==='cancelled'?'REJECTED':r.bookingStatus==='expired'?'EXPIRED':'PENDING' }));
+      res.json({success:true,reservations,pendingCount:reservations.filter(r=>r.paymentStatus==='pending').length});
+    } catch(e) { res.status(500).json({error:'RESERVATIONS_UNAVAILABLE'}); }
   });
 
-  app.post("/api/sync/reservations/update", requireSyncApiKey, async (req, res) => {
-    try {
-      const { reservationId, newStatus } = req.body || {};
-      if (newStatus === "CONFIRMED" || newStatus === "REJECTED") {
-        const store = getActiveDataProvider();
-        const log = await store.getReservationLogById(reservationId);
-        await store.setReservationCheckedIn(reservationId);
-        if (log) { try { await onReservationAttended(store, reservationId, log.username || ''); } catch { /* ignore */ } }
-        logSyncEvent(
-          "RESERVATION_UPDATE",
-          "SUCCESS",
-          `رزرو ${reservationId} روی سایت با وضعیت ${newStatus} ثبت نهایی شد.`,
-          1
-        );
-        res.json({ success: true, message: t(req, "RESERVATION_FINALIZED", { id: reservationId }) });
-      } else {
-        logSyncEvent("RESERVATION_UPDATE", "WARNING", `وضعیت نامعتبر برای رزرو ${reservationId}: ${newStatus}`, 0);
-        res.status(400).json({ success: false, message: t(req, "INVALID_STATUS"), code: "INVALID_STATUS" });
-      }
-    } catch (e) {
-      logSyncEvent("RESERVATION_UPDATE", "ERROR", `به‌روزرسانی رزرو ناموفق: ${String(e)}`, 0);
-      res.status(500).json({ error: String(e) });
-    }
-  });
+  app.post("/api/sync/reservations/update", requireSyncApiKey, management.guard('reservations'), transactional(getActiveDataProvider, async (req, res) => {
+    const {reservationId,newStatus}=req.body||{};
+    const view=(await bookingViews(management)).find(r=>r.id===reservationId);if(!view)fail('NOT_FOUND',404);
+    if(newStatus==='CONFIRMED') {
+      if(!['paid','free'].includes(view.paymentStatus))fail('PAYMENT_REQUIRED',409);
+      // Confirmation is a financial state, never a check-in.
+    } else if(newStatus==='REJECTED') {
+      if(['paid','free'].includes(view.paymentStatus))fail('PAID_RESERVATION_REQUIRES_REFUND',409);
+      if(view.orderId){const o=await getActiveDataProvider().getOnsiteOrder(view.orderId);if(o){await getActiveDataProvider().updateOnsiteOrder(o.id,{status:'cancelled_admin',updatedAt:nowISO()});await paymentUnfulfil('reservation',parseJSON(o.payload),o.username,parseJSON(o.result));}}
+      const previous=await management.read('booking',reservationId);await management.save('booking',reservationId,{...previous?.data,cancelledAt:nowISO()},previous?.version||0);
+    } else fail('INVALID_STATUS');
+    await management.audit((req as any).staff.username,'reservation-status',reservationId,{newStatus});
+    res.json({success:true});
+  }));
 
   // Backs the Management App's "لاگ‌ها" (sync activity log) tab — was previously missing
   // entirely (the client called this exact path but the server had no matching route, so

@@ -1,3 +1,5 @@
+import { useOps } from '../../../shared/management/context';
+import { StationRegistry, AccessManager } from '../../../shared/management/Registry';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Plus, Tag, HelpCircle } from 'lucide-react';
 import { Station, StationType, BuffetItem, Customer, TariffRate, ShopExpense, Invoice, Operator, AppTheme, SoundAlarmConfig, CurrencyCode, WalletTransaction, ServiceItem, PaymentType, BackupSettings, WebSyncStatus, StationStatus } from './types';
@@ -30,6 +32,7 @@ import { WebWalletPanel } from './components/WebWalletPanel';
 import { enqueueWalletOp, flushWalletQueue, attachAffiliateCode } from './utils/walletSync';
 
 export default function App() {
+  const { staff, logout } = useOps();
   // Application Data States (Persisted safely in local storage & server-side)
   const [stations, setStations] = useState<Station[]>(() => safeGetStorage('bazino_stations', INITIAL_STATIONS));
   const [buffetItems, setBuffetItems] = useState<BuffetItem[]>(() => safeGetStorage('bazino_buffet', INITIAL_BUFFET_ITEMS));
@@ -711,7 +714,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         activeOperator={activeOperator}
         operators={operators}
-        onSwitchOperator={(op) => setActiveOperator(op)}
+        onSwitchOperator={() => logout()}
         soundConfig={soundConfig}
         onToggleSound={() => setSoundConfig({ ...soundConfig, enabled: !soundConfig.enabled })}
         currentTheme={currentTheme}
@@ -729,6 +732,7 @@ export default function App() {
         onOpenHelpGuide={() => { setHelpGuideSection(undefined); setShowHelpGuide(true); }}
       />
 
+      <div className="ops max-w-7xl mx-auto px-4 pt-3"><div className="ops-row"><span className="ops-small ops-muted">حساب تأییدشده: {staff?.displayName} · مرجع عملیات: سرور · POS: ثبت دستی</span><button className="ops-quiet" onClick={logout}>خروج / تغییر کاربر</button></div></div>
       {/* Main View Container */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         {/* Context-aware section guide bar — jumps the help modal straight to whichever tab is active */}
@@ -883,6 +887,8 @@ export default function App() {
         )}
 
         {/* Settings & Themes View */}
+        {activeTab === 'settings' && <div className="mb-8"><StationRegistry localStations={stations.map(st => ({ id: st.id, name: st.name, type: st.type, hourlyRate: tariffs.find(t => t.id === st.currentTariffId)?.hourlyRate || 0 }))} /></div>}
+        {activeTab === 'operators' && <div className="mb-8"><AccessManager /></div>}
         {activeTab === 'settings' && (
           <SettingsThemesModal
             currentTheme={currentTheme}
@@ -1013,21 +1019,6 @@ export default function App() {
           currency={currency}
           onClose={() => setShowManageTariffsModal(false)}
           onAddTariff={handleAddTariff}
-          onUpdateTariff={handleUpdateTariff}
-          onDeleteTariff={handleDeleteTariff}
-        />
-      )}
-
-      {showHardwareModal && (
-        <HardwareRelayModal
-          stations={stations}
-          onClose={() => setShowHardwareModal(false)}
-        />
-      )}
-    </div>
-  );
-}
-dleAddTariff}
           onUpdateTariff={handleUpdateTariff}
           onDeleteTariff={handleDeleteTariff}
         />

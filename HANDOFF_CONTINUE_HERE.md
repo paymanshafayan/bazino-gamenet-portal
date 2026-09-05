@@ -98,12 +98,13 @@
 
 ---
 
-## ۵. کار بعدی (اولویت‌بندی پیشنهادی)
+## ۵. کار بعدی (اولویت این برنچ — `arena/01a06e3e-bazino-gamenet-portal`)
 
-1. **تست واقعی در مرورگر (ضروری):** `npm install && npm run build && npm start` لوکال یا روی هاست؛ همه‌ی ۲۸ مورد + مودال‌ها (باز/بسته شدن و چانک‌های lazy) + تغییر تم + چراغ WARNING زرد + حالت OPEN را دستی تست کنید.
-2. **دیپلوی و GTmetrix دوباره** (از Frankfurt/Amsterdam نه Seattle): انتظار بهبود Performance از 54 به ~70+ (TBT 729→~300ms، حذف lazy LCP). TTFB/Cache از قبل خوب است.
-3. در صورت باقی‌ماندن TBT بالا: بررسی `recharts` در Management App نیست؛ در سایت اصلی، بزرگ‌ترین چانک‌های lazy (`AdminPanelTab` 163KB، `CsharpCodeViewer` 95KB، `ThemeSelectorModal` 135KB) فقط با کلیک بار می‌شوند — اگر در تست دیدید روی تب admin کند است، اسپلیت بیشتر لازم است.
-4. `flutter_app`: حتماً `flutter pub get && flutter analyze && flutter run` تست شود (تغییرات Dart در جلسات قبلی کامپایل نشده‌اند).
+> جزئیات کامل و قوانین: `HANDOFF_PROMPT.md` بخش ۹. HEAD مورد انتظار: `4dfb6ed` به‌علاوه کامیت هندآف این بسته شدن جلسه.
+
+1. **فوری — تحقیق POS (هنوز کد نزن):** عکس Ingenico با اسپلش `maximum 25.yıl` و `TERMINAL NO: S1E5R402`. کاربر خواست مستندات اتصال به نرم‌افزار مدیریت. تحقیق وب در نشست قبل **انجام نشد**. در پیام اول چت جدید `web_search` را واقعاً صدا بزنید. پلن بدهید؛ صبر برای «شروع کن». درگاه آنلاین پیشنهاد نشود.
+2. افیلیت + کمپین اینستاگرام Media-ID/Friend Gate **تمام** است (`dcedcb8` + `4dfb6ed`). Chromium پنل `/admin/affiliates` هنوز گرفته نشده.
+3. تست واقعی مرورگر / GTmetrix / Flutter — همان موارد قدیمی؛ اولویت‌شان زیر POS است مگر کاربر چیز دیگری بگوید.
 
 ---
 

@@ -452,3 +452,4 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 | E.98 | دو Private Reply روی یک comment_id غیرممکن است؛ پیام ۲ باید DM باشد | 🟠 محصول | ✅ پیام۱ = یک PR + دکمه؛ پیام۲ = DM بعد از دکمه با `{{code}}` |
 | E.99 | مسیرهای دقیق PR/DM در Zernio آداپتر حدسی‌اند تا زمان تأیید مستند رسمی inbox | 🟡 ادغام | ⏳ ماشین حالت پورتال قفل است؛ `server/affiliate/zernio.ts` با env قابل‌تنظیم. تا ست‌شدن کلید، شبیه‌ساز ادمین کافی است |
 | E.100 | HMAC وب‌هوک بدون raw body با JSON.stringify ممکن است با بایت اصلی نخواند | 🟠 امنیتی | ✅ `express.json` verify برای `/api/integrations/zernio/webhook` → `rawBody` |
+| E.101 | اتصال کارتخوان Ingenico/Maximum گیم‌نت به نرم‌افزار مدیریت | 🟠 محصول | ⏳ تحقیق وب انجام نشد؛ عکس: `maximum 25.yıl`، `TERMINAL NO: S1E5R402`. کار بعدی چت جدید. بدون «شروع کن» کد نزن |

@@ -1,7 +1,7 @@
 import { useOps } from '../../../../shared/management/context';
 import type { OpsTab } from '../../../../shared/management/types';
 import React from 'react';
-import { Gamepad2, Shield, Wallet, Users, Coffee, BarChart3, Settings, RefreshCw, Volume2, VolumeX, ShieldAlert, Crown, Sparkles, MapPin, Cpu, Minimize2, Square, X, Monitor, Wifi, FileText, Download, HelpCircle } from 'lucide-react';
+import { Gamepad2, Shield, Wallet, Users, Coffee, BarChart3, Settings, RefreshCw, Volume2, VolumeX, ShieldAlert, Crown, Sparkles, MapPin, Cpu, Minimize2, Square, X, Monitor, Wifi, FileText, Download, HelpCircle, Ticket, Megaphone, Trophy } from 'lucide-react';
 import { Operator, AppTheme, SoundAlarmConfig, CurrencyCode } from '../types';
 import { CURRENCY_SYMBOLS, formatCurrency } from '../utils/formatters';
 
@@ -348,6 +348,9 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {can('affiliates') && <button onClick={() => setActiveTab('affiliates')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='affiliates'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}>همکاری در فروش</button>}
+          {can('tournaments') && <button onClick={() => setActiveTab('tournaments')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='tournaments'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}><Trophy className="w-4 h-4" />مسابقات</button>}
+          {can('promotions') && <button onClick={() => setActiveTab('promotions')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='promotions'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}><Ticket className="w-4 h-4" />کوپن و ساعات ویژه</button>}
+          {(can('content')||can('publish')) && <button onClick={() => setActiveTab('content')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='content'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}><Megaphone className="w-4 h-4" />محتوا و انتشار</button>}
           {activeOperator.permissions.canAccessReports && (
             <button
               onClick={() => setActiveTab('accounting')}

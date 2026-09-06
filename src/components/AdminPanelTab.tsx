@@ -40,7 +40,8 @@ import {
   Download,
   LifeBuoy,
   Wallet,
-  Megaphone
+  Megaphone,
+  Ticket
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
@@ -67,7 +68,10 @@ export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; 
   cafe:              { fa: 'بوفه و کافه', en: 'Cafe Buffet', ru: 'Кафе-буфет', tr: 'Kafe Büfe', keywords: 'menu منو غذا نوشیدنی food drink' },
   shop:              { fa: 'فروشگاه لوازم جانبی', en: 'Accessory Shop', ru: 'Магазин аксессуаров', tr: 'Ekipman Mağazası', keywords: 'products محصول کالا mouse headset' },
   tournaments:       { fa: 'مسابقات و تورنمنت‌ها', en: 'Tournaments', ru: 'Турниры', tr: 'Turnuvalar', keywords: 'match تورنمنت جایزه prize bracket' },
+  tournamentOps:     { fa: 'مدیریت عملیاتی مسابقات', en: 'Tournament Operations', ru: 'Управление турнирами', tr: 'Turnuva Operasyonları', keywords: 'bracket براکت ثبت‌نام حضور نتیجه تیم checkin team result مساقات' },
   blog:              { fa: 'وبلاگ و اخبار', en: 'Blog & News', ru: 'Блог и новости', tr: 'Blog ve Haberler', keywords: 'article مقاله خبر post' },
+  content:           { fa: 'محتوا و صف انتشار (Manus)', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu', keywords: 'manus سوشیال social instagram telegram صف انتشار queue publish schedule زمانبندی' },
+  promotions:        { fa: 'کوپن‌ها و ساعات رایگان/نیم‌بها', en: 'Coupons & Free/Half Hours', ru: 'Купоны и бесплатные/льготные часы', tr: 'Kuponlar ve Ücretsiz/Yarım Saatler', keywords: 'coupon کوپن تخفیف discount happy hour رایگان نیم‌بها ساعت ویژه' },
   chat:              { fa: 'اتاق‌های گفتگوی زنده', en: 'Live Chat Rooms', ru: 'Живые чат-комнаты', tr: 'Canlı Sohbet Odaları', keywords: 'room پیام گفتگو message' },
   messages:          { fa: 'پیام‌ها و اعلان‌ها', en: 'Messages & Notifications', ru: 'Сообщения и уведомления', tr: 'Mesajlar ve Bildirimler', keywords: 'notification ایمیل تماس contact inbox' },
   migrations:        { fa: 'مهاجرت‌های دیتابیس (EF Core)', en: 'Database Migrations', ru: 'Миграции БД', tr: 'Veritabanı Geçişleri', keywords: 'ef core sql schema جدول' },
@@ -87,6 +91,9 @@ const PresentationTab = React.lazy(() => import('./PresentationTab'));
 const AdminTicketsSection = React.lazy(() => import('./AdminTicketsSection'));
 const AdminWalletSection = React.lazy(() => import('./AdminWalletSection'));
 const AdminAffiliatesSection = React.lazy(() => import('./AdminAffiliatesSection'));
+const PromotionsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Promotions')).PromotionsConsole as unknown as React.ComponentType }));
+const TournamentsOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Tournaments')).TournamentsConsole as unknown as React.ComponentType }));
+const ContentOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Content')).ContentConsole as unknown as React.ComponentType }));
 
 interface Props {
   themeId?: string;
@@ -1636,6 +1643,45 @@ export default function AdminPanelTab({
           >
             <Megaphone className="w-4 h-4" />
             <span>{L(language, { fa: 'همکاری در فروش', en: 'Affiliate Marketing', ru: 'Партнёрский маркетинг', tr: 'Satış Ortaklığı' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('tournamentOps')}
+            data-admin-nav="tournamentOps"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'tournamentOps'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Trophy className="w-4 h-4" />
+            <span>{L(language, { fa: 'مدیریت عملیاتی مسابقات', en: 'Tournament Operations', ru: 'Операции турниров', tr: 'Turnuva Operasyonları' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('promotions')}
+            data-admin-nav="promotions"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'promotions'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Ticket className="w-4 h-4" />
+            <span>{L(language, { fa: 'کوپن‌ها و ساعات رایگان/نیم‌بها', en: 'Coupons & Special Hours', ru: 'Купоны и спец-часы', tr: 'Kuponlar ve Özel Saatler' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('content')}
+            data-admin-nav="content"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'content'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+            <span>{L(language, { fa: 'محتوا و صف انتشار (Manus)', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu' })}</span>
           </button>
 
           <button
@@ -4290,6 +4336,24 @@ export default function AdminPanelTab({
           {activeSubTab === 'affiliates' && (
             <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Affiliates...</div>}>
               <AdminAffiliatesSection addNotification={addNotification} />
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'promotions' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
+              <OpsProvider language={language}><PromotionsConsole /></OpsProvider>
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'tournamentOps' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
+              <OpsProvider language={language}><TournamentsOpsConsole /></OpsProvider>
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'content' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
+              <OpsProvider language={language}><ContentOpsConsole /></OpsProvider>
             </React.Suspense>
           )}
 

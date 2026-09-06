@@ -892,6 +892,7 @@ test('expireOnsiteOrders cancels only overdue pending orders and releases their 
   const store: any = {
     listOnsiteOrders: async () => rows.filter(r => r.status === 'pending_onsite'),
     updateOnsiteOrder: async (id: string, f: any) => { Object.assign(rows.find(r => r.id === id), f); },
+    runInTransaction: async (fn: () => Promise<any>) => fn(),
   };
   const n = await wallet.expireOnsiteOrders(store, { unfulfil: async (...a: any[]) => { calls.push(a); } }, Date.parse('2026-06-01T00:00:00Z'));
   assert.equal(n, 1);
@@ -987,6 +988,7 @@ function memAffStore() {
     listOnsiteOrders: async (f: any = {}) => orders.filter(o => !f.username || o.username === f.username),
     getOnsiteOrder: async (id: string) => orders.find(o => o.id === id),
     appendWalletTx: async (tx: any) => { const row = { ...tx, balanceAfter: (wallet.at(-1)?.balanceAfter || 0) + tx.amount }; wallet.push(row); return row; },
+    runInTransaction: async (fn: () => Promise<any>) => fn(),
     _settings: settings, _affiliates: affiliates, _clicks: clicks, _comms: comms, _wallet: wallet, _orders: orders,
   };
 }

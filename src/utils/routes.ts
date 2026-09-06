@@ -17,7 +17,7 @@
 export const PUBLIC_TABS = ['home', 'loyalty', 'reservations', 'cafe', 'shop', 'tournaments', 'blog', 'chat', 'admin'] as const;
 
 export const ADMIN_SECTIONS = [
-  'dashboard', 'systems', 'cafe', 'shop', 'tournaments', 'blog', 'chat', 'migrations', 'messages',
+  'dashboard', 'systems', 'cafe', 'shop', 'tournaments', 'tournamentOps', 'blog', 'content', 'promotions', 'chat', 'migrations', 'messages',
   'themes', 'appSlider', 'mobileAppDownload', 'customization', 'dbLogs', 'apiKeys', 'presentation', 'tickets', 'wallet', 'affiliates',
 ] as const;
 

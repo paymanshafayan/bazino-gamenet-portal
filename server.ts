@@ -53,6 +53,15 @@ import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
+import { AffiliateService, registerAffiliates } from './server/management/affiliates';
+import { registerReports } from './server/management/reports';
+import { OrderService, registerOrders } from './server/management/orders';
+import { SessionService, registerSessions } from './server/management/sessions';
+import { bookingWindow } from './server/management/time';
+import { bookingViews, assertStationFree } from './server/management/bookings';
+import { transactional, fail, nowISO, parseJSON, newId as newOperationId } from './server/management/core';
+import { FinanceService, registerFinance } from './server/management/finance';
+import { registerManagementCore } from './server/management/routes';
 import { registerWalletRoutes } from "./server/wallet/routes";
 import { registerAffiliateRoutes } from "./server/affiliate/routes";
 import { seedAffiliateSettings } from "./server/affiliate/settings";
@@ -152,20 +161,14 @@ export async function resolveMergedList<T extends Record<string, any>>(
   return merged;
 }
 
-/** پیدا کردن یک رکورد با کلید: در حالت sample → داده نمونه؛ در حالت database →
- *  دیتابیس، و اگر پیدا نشد → داده نمونه (تا جریان رزرو/سفارش/ثبت‌نام در
- *  حالت sample هم کار کند). keyField مشخص می‌کند با کدام فیلد جستجو شود
- *  (پیش‌فرض 'id' — برای کد تخفیف 'code'). */
+/** A persisted price, stock, coupon or capacity is authoritative in BOTH modes.
+ * Samples only fill missing catalog entries, never resurrect consumed inventory/coupons. */
 export async function resolveSampleById<T extends Record<string, any>>(
   fetchDb: () => Promise<T | undefined>,
   sampleRows: T[],
   key: string,
   keyField: string = "id"
 ): Promise<T | undefined> {
-  const mode = await getDataSourceMode();
-  if (mode === "sample") {
-    return sampleRows.find(x => x[keyField] === key) ?? (await fetchDb());
-  }
   const dbRow = await fetchDb();
   return dbRow ?? sampleRows.find(x => x[keyField] === key);
 }
@@ -810,6 +813,44 @@ async function startServer() {
   // so a new admin endpoint can't accidentally ship unprotected.
   app.use("/api/admin", requireAdmin);
 
+  const management = registerManagementCore({
+    app, getStore: getActiveDataProvider, signToken: signAuthToken,
+    systems: async () => resolveMergedList(await getActiveDataProvider().listSystems(), SAMPLE_SYSTEMS),
+    cafe: async () => resolveMergedList(await getActiveDataProvider().listCafeItems(), SAMPLE_CAFE_ITEMS),
+    shop: async () => resolveMergedList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES),
+    tournaments: async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
+  });
+  const finance = new FinanceService(management,{fulfil:paymentFulfil,unfulfil:paymentUnfulfil});
+  registerFinance(app,finance);
+  const sessions = new SessionService(management,finance);
+  registerSessions(app,sessions);
+  const orders = new OrderService(management,finance,paymentQuote,async kind => kind==='cafe'?resolveMergedList(await getActiveDataProvider().listCafeItems(),SAMPLE_CAFE_ITEMS):resolveMergedList(await getActiveDataProvider().listAccessories(),SAMPLE_ACCESSORIES));
+  registerOrders(app,orders);
+  const affiliateOperations = new AffiliateService(management);
+  registerAffiliates(app,affiliateOperations);
+  registerReports(app,management);
+  // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
+  for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{
+    try {const b=req.body||{};if(Number(b.amount)<0)fail('USE_CASHOUT_FLOW',409);const u=b.username?await getActiveDataProvider().getUserByUsername(b.username):await getActiveDataProvider().getUserByPhone(String(b.phone||''));if(!u)fail('USER_NOT_FOUND',404);res.json(await finance.topup((req as any).staff.username,{...b,username:u.username}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}
+  });
+  app.post('/api/sync/wallet/cashout',management.guard('cashout'),async(req,res)=>{try{const b=req.body||{},u=b.username?await getActiveDataProvider().getUserByUsername(b.username):await getActiveDataProvider().getUserByPhone(String(b.phone||''));if(!u)fail('USER_NOT_FOUND',404);res.json(await finance.requestCashout((req as any).staff.username,{...b,username:u.username}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}});
+  app.post('/api/sync/wallet/charge',management.guard('collect'),(_req,res)=>res.status(409).json({error:'LEGACY_WALLET_REVIEW_REQUIRED'}));
+  for (const prefix of ['/api/sync','/api/admin']) {
+    app.post(`${prefix}/onsite-orders/:id/settle`,management.guard('collect'),async(req,res)=>{try{res.json(await finance.settle((req as any).staff.username,req.params.id,req.body||{}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}});
+    app.post(`${prefix}/onsite-orders/:id/cancel`,management.guard('collect'),async(req,res)=>{try{res.json(await finance.cancelOrder((req as any).staff.username,req.params.id,req.body||{}));}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}});
+  }
+  app.use('/api/state',management.guard('reservations'));
+  for (const [route,kind] of [['/api/systems/reserve','reservation'],['/api/cafe/order','cafe'],['/api/accessories/order','shop'],['/api/tournaments/register','tournament']]) {
+    app.post(route, requireAuth, (req,res,next) => {
+      const params={...req.body}; (req as any).legacyCheckout=true;
+      req.body={kind,params,idempotencyKey:params.idempotencyKey};
+      req.url='/api/checkout/onsite'; next('route');
+    });
+  }
+
+
+
+
   // =========================================================================
   // API ROUTE CONTROLLERS
   // =========================================================================
@@ -1159,7 +1200,7 @@ async function startServer() {
   // Systems & Reservations
   app.get("/api/systems", async (req, res) => {
     try {
-      const systems = await resolveSampleList(await getActiveDataProvider().listSystems(), SAMPLE_SYSTEMS);
+      const systems = await resolveMergedList(await getActiveDataProvider().listSystems(), SAMPLE_SYSTEMS);
       res.json(systems);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -1884,6 +1925,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   async function requireSyncApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
+      if ((req as any).authUsername) { await management.staff((req as any).authUsername); return next(); }
       const expectedKey = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
 
       if (expectedKey) {
@@ -1927,17 +1969,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       // Fetch pending reservations from website database
       const pendingLogs = await store.listPendingReservationLogs();
-      const pendingReservations = pendingLogs.map((log, index) => ({
-        id: log.id,
-        customerName: `مشتری آنلاین #${index + 1}`,
-        phone: "09121112233",
-        stationType: log.systemName.includes("VIP") ? "PS5_VIP" : "PC_GAMING",
-        stationName: log.systemName,
-        reservedTime: log.startTime,
-        depositPaid: log.totalPrice,
-        status: "PENDING",
-        createdAt: log.timestamp || new Date().toISOString()
-      }));
+      const pendingReservations = (await bookingViews(management)).filter(r=>r.paymentStatus==='pending').map(r=>({...r,stationName:r.systemName,reservedTime:r.startsAt,depositPaid:r.paidAmount,status:'PENDING'}));
 
       logSyncEvent(
         action || "FULL_SYNC",
@@ -1965,54 +1997,29 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
-  app.get("/api/sync/reservations", requireSyncApiKey, async (req, res) => {
+  app.get("/api/sync/reservations", requireSyncApiKey, async (_req, res) => {
     try {
-      const pendingLogs = await getActiveDataProvider().listPendingReservationLogs();
-      const reservations = pendingLogs.map((log, index) => ({
-        id: log.id,
-        customerName: `مشتری آنلاین #${index + 1}`,
-        phone: "09121112233",
-        stationType: log.systemName.includes("VIP") ? "PS5_VIP" : "PC_GAMING",
-        stationName: log.systemName,
-        reservedTime: log.startTime,
-        depositPaid: log.totalPrice,
-        status: "PENDING",
-        createdAt: log.timestamp || new Date().toISOString()
-      }));
-      res.json({
-        success: true,
-        reservations,
-        pendingCount: reservations.length
-      });
-    } catch (e) {
-      res.status(500).json({ error: String(e) });
-    }
+      const reservations = (await bookingViews(management)).map(r => ({ ...r, phone:'', stationName:r.systemName,
+        reservedTime:r.startsAt, depositPaid:r.paidAmount,
+        status:r.bookingStatus==='confirmed'?'CONFIRMED':r.bookingStatus==='cancelled'?'REJECTED':r.bookingStatus==='expired'?'EXPIRED':'PENDING' }));
+      res.json({success:true,reservations,pendingCount:reservations.filter(r=>r.paymentStatus==='pending').length});
+    } catch(e) { res.status(500).json({error:'RESERVATIONS_UNAVAILABLE'}); }
   });
 
-  app.post("/api/sync/reservations/update", requireSyncApiKey, async (req, res) => {
-    try {
-      const { reservationId, newStatus } = req.body || {};
-      if (newStatus === "CONFIRMED" || newStatus === "REJECTED") {
-        const store = getActiveDataProvider();
-        const log = await store.getReservationLogById(reservationId);
-        await store.setReservationCheckedIn(reservationId);
-        if (log) { try { await onReservationAttended(store, reservationId, log.username || ''); } catch { /* ignore */ } }
-        logSyncEvent(
-          "RESERVATION_UPDATE",
-          "SUCCESS",
-          `رزرو ${reservationId} روی سایت با وضعیت ${newStatus} ثبت نهایی شد.`,
-          1
-        );
-        res.json({ success: true, message: t(req, "RESERVATION_FINALIZED", { id: reservationId }) });
-      } else {
-        logSyncEvent("RESERVATION_UPDATE", "WARNING", `وضعیت نامعتبر برای رزرو ${reservationId}: ${newStatus}`, 0);
-        res.status(400).json({ success: false, message: t(req, "INVALID_STATUS"), code: "INVALID_STATUS" });
-      }
-    } catch (e) {
-      logSyncEvent("RESERVATION_UPDATE", "ERROR", `به‌روزرسانی رزرو ناموفق: ${String(e)}`, 0);
-      res.status(500).json({ error: String(e) });
-    }
-  });
+  app.post("/api/sync/reservations/update", requireSyncApiKey, management.guard('reservations'), transactional(getActiveDataProvider, async (req, res) => {
+    const {reservationId,newStatus}=req.body||{};
+    const view=(await bookingViews(management)).find(r=>r.id===reservationId);if(!view)fail('NOT_FOUND',404);
+    if(newStatus==='CONFIRMED') {
+      if(!['paid','free'].includes(view.paymentStatus))fail('PAYMENT_REQUIRED',409);
+      // Confirmation is a financial state, never a check-in.
+    } else if(newStatus==='REJECTED') {
+      if(['paid','free'].includes(view.paymentStatus))fail('PAID_RESERVATION_REQUIRES_REFUND',409);
+      if(view.orderId){const o=await getActiveDataProvider().getOnsiteOrder(view.orderId);if(o){await getActiveDataProvider().updateOnsiteOrder(o.id,{status:'cancelled_admin',updatedAt:nowISO()});await paymentUnfulfil('reservation',parseJSON(o.payload),o.username,parseJSON(o.result));}}
+      const previous=await management.read('booking',reservationId);await management.save('booking',reservationId,{...previous?.data,cancelledAt:nowISO()},previous?.version||0);
+    } else fail('INVALID_STATUS');
+    await management.audit((req as any).staff.username,'reservation-status',reservationId,{newStatus});
+    res.json({success:true});
+  }));
 
   // Backs the Management App's "لاگ‌ها" (sync activity log) tab — was previously missing
   // entirely (the client called this exact path but the server had no matching route, so
@@ -2024,7 +2031,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Cafe Buffet Catalog & Orders
   app.get("/api/cafe", async (req, res) => {
     try {
-      const cafeItems = await resolveSampleList(await getActiveDataProvider().listCafeItems(), SAMPLE_CAFE_ITEMS);
+      const cafeItems = await resolveMergedList(await getActiveDataProvider().listCafeItems(), SAMPLE_CAFE_ITEMS);
       res.json(cafeItems);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -2149,7 +2156,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Accessory Shop & Orders
   app.get("/api/accessories", async (req, res) => {
     try {
-      const accessories = await resolveSampleList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES);
+      const accessories = await resolveMergedList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES);
       res.json(accessories);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -2297,30 +2304,42 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // =========================================================================
   const POINTS_PER_CURRENCY_UNIT = 10;   // هر ۱۰ TL = ۱ امتیاز (معادل قاعده‌ی قبلی ÷10000)
 
+  async function orderContext(params:any,username?:string) {
+    const systemId=typeof params?.systemId==='string'?params.systemId:null;
+    if(!systemId)return {source:'online'};
+    const system=await resolveSampleById(()=>getActiveDataProvider().getSystemById(systemId),SAMPLE_SYSTEMS,systemId);if(!system)fail('SYSTEM_NOT_FOUND',404);
+    const station=(await management.list('station')).find(s=>s.data.systemId===systemId);
+    const session=(await management.list('session')).find(s=>s.data.systemId===systemId&&s.data.username===username&&!s.data.closedAt&&!s.data.settlingAt);
+    return {source:'online',systemId,stationId:station?.id||null,sessionId:session?.id||null};
+  }
+
   async function paymentQuote(kind: OrderKind, params: any, username?: string) {
     const store = getActiveDataProvider();
     if (kind === "reservation") {
       const { systemId, startTime, endTime, date, couponCode, referralCode } = params || {};
       const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
       if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
-      const st = startTime || "12:00", et = endTime || "14:00", reservationDate = date || "امروز";
-      if (await store.hasOverlappingReservation(systemId, reservationDate, st, et)) throw Object.assign(new Error("SLOT_TAKEN"), { statusCode: 409, code: "SLOT_TAKEN" });
-      const durationHours = hoursBetween(st, et) || 1;
-      const baseTotal = Math.round(durationHours * system.hourlyRate);
+      const st = startTime || "12:00", et = endTime || "14:00";
+      const window = bookingWindow({date,startTime:st,endTime:et,...(params?.startsAt?{startsAt:params.startsAt,endsAt:params.endsAt}:{})},Date.now(),await management.timezone());
+      if (Date.parse(window.startsAt) < Date.now()-60000) fail('PAST_RESERVATION');
+      const reservationDate = window.date;
+      await assertStationFree(management,systemId,window.startsAt,window.endsAt);
+      const durationHours = (Date.parse(window.endsAt)-Date.parse(window.startsAt))/3600000;
+      const baseTotal = Math.round(durationHours * system.hourlyRate * 100)/100;
       const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, username);
       const amount = Math.max(0, baseTotal - discountAmount);
       return {
         amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
         basket: [{ name: `${system.name} (${durationHours}h)`, unitPrice: amount, qty: 1 }],
-        payload: { systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name },
+        payload: { ...window, systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name },
       };
     }
     if (kind === "cafe") {
       const { items, couponCode, tableNumber } = params || {};
-      if (!Array.isArray(items) || items.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      if (!Array.isArray(items) || items.length === 0 || items.length > 100) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
       let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
       for (const it of items) {
-        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const id = it?.item?.id ?? it?.id; const qty = Number(it?.quantity ?? it?.qty ?? 1); if(!Number.isSafeInteger(qty)||qty<1||qty>1000)fail('INVALID_QUANTITY');
         const m = await resolveSampleById(() => store.getCafeItemById(id), SAMPLE_CAFE_ITEMS, id);
         if (!m) throw Object.assign(new Error(`Menu item not found: ${id}`), { statusCode: 404 });
         if (m.inventory < qty) throw Object.assign(new Error(`Out of stock: ${m.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
@@ -2328,14 +2347,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       }
       const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
       const amount = Math.max(0, total - discountAmount);
-      return { amount, description: `Kafe siparişi (${lines.length} kalem)`, basket, payload: { items: lines, couponCode: coupon ? couponCode : "", tableNumber: tableNumber || "میز عمومی", totalPrice: total, discountAmount, amount } };
+      return { amount, description: `Kafe siparişi (${lines.length} kalem)`, basket, payload: { _ops: await orderContext(params,username), items: lines, couponCode: coupon ? couponCode : "", tableNumber: tableNumber || "میز عمومی", totalPrice: total, discountAmount, amount } };
     }
     if (kind === "shop") {
       const { cart, couponCode } = params || {};
-      if (!Array.isArray(cart) || cart.length === 0) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
+      if (!Array.isArray(cart) || cart.length === 0 || cart.length > 100) throw Object.assign(new Error("CART_EMPTY"), { statusCode: 400, code: "CART_EMPTY" });
       let total = 0; const basket: Array<{ name: string; unitPrice: number; qty: number }> = []; const lines: any[] = [];
       for (const it of cart) {
-        const id = it?.item?.id ?? it?.id; const qty = Math.max(1, Number(it?.quantity ?? it?.qty ?? 1));
+        const id = it?.item?.id ?? it?.id; const qty = Number(it?.quantity ?? it?.qty ?? 1); if(!Number.isSafeInteger(qty)||qty<1||qty>1000)fail('INVALID_QUANTITY');
         const a = await resolveSampleById(() => store.getAccessoryById(id), SAMPLE_ACCESSORIES, id);
         if (!a) throw Object.assign(new Error(`Product not found: ${id}`), { statusCode: 404 });
         if (a.stock < qty) throw Object.assign(new Error(`Out of stock: ${a.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
@@ -2343,7 +2362,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       }
       const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
       const amount = Math.max(0, total - discountAmount);
-      return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
+      return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { _ops: await orderContext(params,username), cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
     }
     // tournament
     const { tournamentId, team, referralCode } = params || {};
@@ -2365,32 +2384,48 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   // پرچم‌های تسک ۱۳ (پرداخت در محل): __noPoints = جا بگیر ولی امتیاز نده (هنوز پرداخت نشده)،
   // __pointsOnly = جا قبلاً گرفته شده، فقط امتیاز بده (بعد از تسویه‌ی حضوری).
-  async function paymentFulfil(kind: OrderKind, p: any, username: string) {
+  async function paymentFulfil(kind: OrderKind, p: any, username: string, order?: {merchantOid:string;kind:string;username:string}) {
     const store = getActiveDataProvider();
     const noPoints = p?.__noPoints === true;
     if (kind === "reservation") {
       if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز بابت رزرو ${p.systemName} (پرداخت در محل)`) };
       await store.setSystemReserved(p.systemId, true);
-      const id = Math.random().toString(36).substring(2, 9);
+      const id = newOperationId('RES');
       await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString() });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
       return { reservationId: id, points };
     }
     if (kind === "cafe") {
-      for (const l of p.items) await store.decrementCafeInventory(l.item.id, l.quantity);
-      const id = "CF-" + Math.floor(1000 + Math.random() * 9000);
+      if (p.__pointsOnly) return {points:noPoints?0:await creditPoints(username,p.amount,'امتیاز سفارش کافه')};
+      for (const l of p.items) {
+        if(!Number.isSafeInteger(l.quantity)||l.quantity<1||l.quantity>1000)fail('INVALID_QUANTITY');
+        const m=await resolveSampleById(()=>store.getCafeItemById(l.item.id),SAMPLE_CAFE_ITEMS,l.item.id);
+        if(!m||!m.isAvailable||m.inventory<l.quantity)fail('OUT_OF_STOCK',409);
+        await ensurePersisted(()=>store.getCafeItemById(m.id),x=>store.createCafeItem(x),m);
+        await store.decrementCafeInventory(m.id,l.quantity);
+        await management.save('stock-movement',newOperationId('SM'),{kind:'cafe',itemId:m.id,delta:-l.quantity,orderId:order?.merchantOid,reason:'allocated',at:nowISO()},0);
+      }
+      const id = newOperationId('CF');
       await store.addCafeOrder({ id, items: JSON.stringify(p.items), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, tableNumber: p.tableNumber, date: "امروز", status: "Pending", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
-      const points = await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
+      const points = noPoints ? 0 : await creditPoints(username, p.amount, "امتیاز بابت سفارش آنلاین کافه");
       return { orderId: id, points };
     }
     if (kind === "shop") {
-      for (const l of p.cart) await store.decrementAccessoryStock(l.item.id, l.quantity);
-      const id = "ACC-" + Math.floor(1000 + Math.random() * 9000);
+      if (p.__pointsOnly) return {points:noPoints?0:await creditPoints(username,p.amount,'امتیاز خرید فروشگاه')};
+      for (const l of p.cart) {
+        if(!Number.isSafeInteger(l.quantity)||l.quantity<1||l.quantity>1000)fail('INVALID_QUANTITY');
+        const m=await resolveSampleById(()=>store.getAccessoryById(l.item.id),SAMPLE_ACCESSORIES,l.item.id);
+        if(!m||m.stock<l.quantity)fail('OUT_OF_STOCK',409);
+        await ensurePersisted(()=>store.getAccessoryById(m.id),x=>store.createAccessory(x),m);
+        await store.decrementAccessoryStock(m.id,l.quantity);
+        await management.save('stock-movement',newOperationId('SM'),{kind:'shop',itemId:m.id,delta:-l.quantity,orderId:order?.merchantOid,reason:'allocated',at:nowISO()},0);
+      }
+      const id = newOperationId('ACC');
       await store.addShopOrder({ id, cart: JSON.stringify(p.cart), totalPrice: p.totalPrice, discountApplied: p.discountAmount, finalAmount: p.amount, couponCode: p.couponCode, date: "امروز", status: "Processing", username: username !== "Guest" ? username : "" });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
-      const points = await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
+      const points = noPoints ? 0 : await creditPoints(username, p.amount, "امتیاز خرید آنلاین لوازم جانبی");
       return { orderId: id, points };
     }
     if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز ثبت‌نام تیم ${p.team?.name} در ${p.title} (پرداخت در محل)`) };
@@ -2445,6 +2480,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     quote: paymentQuote,
     fulfil: paymentFulfil,
     unfulfil: paymentUnfulfil,
+    legacyResponse: async (kind,username) => ({
+      systems:await resolveMergedList(await getActiveDataProvider().listSystems(),SAMPLE_SYSTEMS),
+      reservationLogs:(await getActiveDataProvider().listReservationLogs()).filter(r=>r.username===username),
+      cafeItems:await resolveMergedList(await getActiveDataProvider().listCafeItems(),SAMPLE_CAFE_ITEMS),
+      accessories:await resolveMergedList(await getActiveDataProvider().listAccessories(),SAMPLE_ACCESSORIES),
+      tournaments:(await resolveMergedList(await getActiveDataProvider().listTournaments(),SAMPLE_TOURNAMENTS)).map(t=>({...t,teams:parseJSON(t.teams,[]),bracket:parseJSON(t.bracket)})),
+      user:publicUser(await getActiveDataProvider().getUserByUsername(username)),transactions:(await getActiveDataProvider().listTransactions()).filter(r=>r.username===username),pointsEarned:0,
+    }),
     onlineEnabled: () => isOnlinePaymentEnabled(),
     log: (msg) => logDbQuery(getActiveDataProvider().name, "SYSTEM", `[Wallet] ${msg}`),
   });

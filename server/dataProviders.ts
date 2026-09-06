@@ -1,4 +1,6 @@
 import path from 'path';
+import { StoreCoordinator, sessionCollection, versionConflict } from './transactions';
+import type { OpsRecord } from '../shared/management/types';
 import { dataPath, installConfigPath as installConfigFile } from './paths';
 import bcrypt from 'bcryptjs';
 import { createRequire } from 'module';
@@ -103,7 +105,7 @@ export interface OtpCodeRow { id: string; phone: string; codeHash: string; ip: s
 export interface WalletTxRow { id: string; username: string; amount: number; type: string; ref: string; operator: string; note: string; idempotencyKey: string; balanceAfter: number; createdAt: string; }
 /** تسک ۱۳ — سفارش‌های «پرداخت در محل»: رزرو/تورنمنت با مهلت (dueAt) و بوفه/فروشگاه بدون مهلت. payload همان payload پیش‌فاکتور است. */
 export interface OnsiteOrderRow { id: string; kind: string; username: string; amount: number; status: string; dueAt: string; payload: string; description: string; result: string; createdAt: string; updatedAt: string; settledAt: string; settledBy: string; }
-export const ONSITE_ORDER_COLUMNS = new Set(['status', 'result', 'updatedAt', 'settledAt', 'settledBy', 'dueAt']);
+export const ONSITE_ORDER_COLUMNS = new Set(['status', 'result', 'payload', 'updatedAt', 'settledAt', 'settledBy', 'dueAt']);
 
 /** طرح همکاری در فروش — نرخ‌ها NULL یا منفی یعنی ارث از تنظیمات سراسری */
 export interface AffiliateRow {
@@ -164,6 +166,11 @@ export interface PaymentOrderRow {
 /** ستون‌های قابل به‌روزرسانی payment_orders (برای پرووایدرهایی که SET را پویا می‌سازند). */
 export const PAYMENT_ORDER_COLUMNS = new Set(['status', 'totalAmountKurus', 'failedCode', 'failedMsg', 'result', 'updatedAt', 'email', 'username', 'payload']);
 
+
+const COUPON_EDIT_FIELDS = ['type','value','minOrder','expiry','expiryDate','maxUsageCount','usageCount','isActive','ownerUsername'];
+const TOURNAMENT_EDIT_FIELDS = ['title','game','registrationFee','startDate','maxTeams','status','teams','bracket','registeredTeamsCount'];
+const ARTICLE_EDIT_FIELDS = ['title','content','category','imageUrl','mobileImageUrl','author','date','comments'];
+
 export interface AdminSeedInput { username: string; password: string; email: string; phone: string; }
 
 // -----------------------------------------------------------------------------
@@ -183,6 +190,16 @@ export interface IDataStore {
   seedSampleData(): Promise<void>;
   /** Removes every row that seedSampleData() would have created (systems, cafe items, accessories, tournaments, articles, chat rooms, reservation logs, sliders) without touching the admin account or theme settings. */
   purgeSampleData(): Promise<void>;
+
+  // Versioned operational records, separate from the legacy /api/state blob.
+  getWalletBalance(username?: string): Promise<number>;
+  runInTransaction<T>(fn: () => Promise<T>): Promise<T>;
+  getOpsRecord(kind: string, id: string): Promise<OpsRecord | undefined>;
+  listOpsRecords(kind: string): Promise<OpsRecord[]>;
+  saveOpsRecord(row: OpsRecord, expectedVersion: number): Promise<OpsRecord>;
+  updateCoupon(code: string, fields: Partial<CouponRow>): Promise<void>;
+  updateTournament(id: string, fields: Partial<TournamentRow>): Promise<void>;
+  updateArticle(id: string, fields: Partial<ArticleRow>): Promise<void>;
 
   // Users & auth
   getUserByUsername(username: string): Promise<UserRow | undefined>;
@@ -405,6 +422,34 @@ const DEFAULT_THEMES: ThemeRow[] = [
 //    strings with regular expressions; it now uses an actual SQLite engine)
 // =============================================================================
 export class SqliteStore implements IDataStore {
+  private coordinator = new StoreCoordinator();
+  constructor() { return this.coordinator.wrap(this); }
+
+  async getWalletBalance(username?:string):Promise<number> { return Math.round(Number(this.db.prepare('SELECT COALESCE(SUM(amount),0) AS balance FROM wallet_transactions WHERE (? IS NULL OR username=?)').get(username??null,username??null).balance)*100)/100; }
+  async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    return this.coordinator.transaction(async () => { this.db.exec('BEGIN IMMEDIATE'); return true; },
+      async () => { this.db.exec('COMMIT'); }, async () => { this.db.exec('ROLLBACK'); }, fn);
+  }
+  async getOpsRecord(kind: string, id: string): Promise<OpsRecord | undefined> {
+    const r = this.db.prepare('SELECT * FROM ops_records WHERE kind=? AND id=?').get(kind,id);
+    return r ? {...r, data: JSON.parse(r.data)} : undefined;
+  }
+  async listOpsRecords(kind: string): Promise<OpsRecord[]> {
+    return this.db.prepare('SELECT * FROM ops_records WHERE kind=? ORDER BY updatedAt DESC,id').all(kind).map((r: any) => ({...r,data:JSON.parse(r.data)}));
+  }
+  async saveOpsRecord(row: OpsRecord, expectedVersion: number): Promise<OpsRecord> {
+    const r = {...row, version: expectedVersion+1, uniqueKey: row.uniqueKey || null};
+    if (expectedVersion === 0) this.db.prepare('INSERT INTO ops_records(kind,id,version,data,uniqueKey,updatedAt) VALUES(?,?,?,?,?,?)').run(r.kind,r.id,r.version,JSON.stringify(r.data),r.uniqueKey,r.updatedAt);
+    else if (!this.db.prepare('UPDATE ops_records SET version=?,data=?,uniqueKey=?,updatedAt=? WHERE kind=? AND id=? AND version=?').run(r.version,JSON.stringify(r.data),r.uniqueKey,r.updatedAt,r.kind,r.id,expectedVersion).changes) throw versionConflict();
+    return r;
+  }
+  private opsUpdate(table: string, key: string, id: string, f: any, allowed: string[]) {
+    const keys=Object.keys(f).filter(k=>allowed.includes(k)); if (!keys.length) return;
+    this.db.prepare(`UPDATE ${table} SET ${keys.map(k=>k+'=?').join(',')} WHERE ${key}=?`).run(...keys.map(k=>typeof f[k]==='boolean'?Number(f[k]):f[k]),id);
+  }
+  async updateCoupon(id: string, f: Partial<CouponRow>) { this.opsUpdate('active_coupons','code',id,f,COUPON_EDIT_FIELDS); }
+  async updateTournament(id: string, f: Partial<TournamentRow>) { this.opsUpdate('tournaments','id',id,f,TOURNAMENT_EDIT_FIELDS); }
+  async updateArticle(id: string, f: Partial<ArticleRow>) { this.opsUpdate('articles','id',id,f,ARTICLE_EDIT_FIELDS); }
   name = 'SQLite';
   isConnected = false;
   config: any = {};
@@ -426,6 +471,8 @@ export class SqliteStore implements IDataStore {
 
   async createDatabaseIfNotExist(): Promise<{ success: boolean; message: string }> {
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS ops_records (kind TEXT NOT NULL, id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, uniqueKey TEXT UNIQUE, updatedAt TEXT NOT NULL, PRIMARY KEY(kind,id));
+      CREATE INDEX IF NOT EXISTS idx_ops_kind_updated ON ops_records(kind,updatedAt);
       CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, passwordHash TEXT NOT NULL, email TEXT, phone TEXT, loyaltyPoints INTEGER DEFAULT 0, role TEXT DEFAULT 'gamer');
       CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
       CREATE TABLE IF NOT EXISTS chat_rooms (name TEXT PRIMARY KEY);
@@ -750,6 +797,13 @@ export class SqliteStore implements IDataStore {
 
   // ---- Wallet + on-site orders (task 13) ----
   async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    return this.runInTransaction(async () => {
+      if (!Number.isFinite(tx.amount) || tx.amount === 0) throw Object.assign(new Error('INVALID_AMOUNT'), {code:'INVALID_AMOUNT',statusCode:400});
+      if(tx.idempotencyKey){const old=await this.getWalletTxByIdempotencyKey(tx.idempotencyKey);if(old){if(old.username!==tx.username||old.amount!==tx.amount||old.type!==tx.type)throw Object.assign(new Error('IDEMPOTENCY_CONFLICT'),{code:'IDEMPOTENCY_CONFLICT',statusCode:409});return old;}}
+      return this.appendWalletTxAtomic(tx);
+    });
+  }
+  private async appendWalletTxAtomic(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
     const run = this.db.transaction((t: Omit<WalletTxRow, 'balanceAfter'>) => {
       const row = this.db.prepare(`SELECT COALESCE(SUM(amount), 0) as bal FROM wallet_transactions WHERE username = ?`).get(t.username) as any;
       const balanceAfter = Math.round(((row?.bal || 0) + t.amount) * 100) / 100;
@@ -1000,6 +1054,33 @@ export class SqliteStore implements IDataStore {
 // 2. SQL SERVER STORE — real connection via the `mssql` driver
 // =============================================================================
 export class SqlServerStore implements IDataStore {
+  private coordinator = new StoreCoordinator();
+  constructor() { return this.coordinator.wrap(this); }
+
+  async getWalletBalance(username?:string):Promise<number> { const r=await this.r().input('u',this.sql.NVarChar,username??null).query('SELECT COALESCE(SUM(amount),0) AS balance FROM dbo.wallet_transactions WHERE (@u IS NULL OR username=@u)');return Math.round(Number(r.recordset[0]?.balance||0)*100)/100; }
+  async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    return this.coordinator.transaction(async () => {
+      const tx = new this.sql.Transaction(this.pool); await tx.begin(this.sql.ISOLATION_LEVEL.SERIALIZABLE);
+      try { await new this.sql.Request(tx).query("DECLARE @r INT; EXEC @r=sp_getapplock @Resource='bazino-business-v1', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=5000; IF @r < 0 THROW 50001, 'BUSINESS_LOCK_TIMEOUT', 1;"); } catch(e) { await tx.rollback(); throw e; }
+      return tx;
+    }, async tx => { await tx.commit(); }, async tx => { await tx.rollback(); }, fn);
+  }
+  async getOpsRecord(kind: string, id: string): Promise<OpsRecord | undefined> {
+    const r=(await this.r().input('k',this.sql.NVarChar,kind).input('id',this.sql.NVarChar,id).query('SELECT * FROM dbo.ops_records WHERE kind=@k AND id=@id')).recordset[0];
+    return r?{...r,data:JSON.parse(r.data)}:undefined;
+  }
+  async listOpsRecords(kind: string): Promise<OpsRecord[]> {
+    return (await this.r().input('k',this.sql.NVarChar,kind).query('SELECT * FROM dbo.ops_records WHERE kind=@k ORDER BY updatedAt DESC,id')).recordset.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+  }
+  async saveOpsRecord(row: OpsRecord, expectedVersion: number): Promise<OpsRecord> {
+    const r={...row,version:expectedVersion+1,uniqueKey:row.uniqueKey||null};
+    const q=this.r().input('k',this.sql.NVarChar,r.kind).input('id',this.sql.NVarChar,r.id).input('v',this.sql.Int,r.version).input('old',this.sql.Int,expectedVersion).input('d',this.sql.NVarChar,JSON.stringify(r.data)).input('u',this.sql.NVarChar,r.uniqueKey).input('t',this.sql.NVarChar,r.updatedAt);
+    const result=await q.query(expectedVersion===0?'INSERT INTO dbo.ops_records(kind,id,version,data,uniqueKey,updatedAt) VALUES(@k,@id,@v,@d,@u,@t)':'UPDATE dbo.ops_records SET version=@v,data=@d,uniqueKey=@u,updatedAt=@t WHERE kind=@k AND id=@id AND version=@old');
+    if(expectedVersion>0 && !result.rowsAffected[0]) throw versionConflict(); return r;
+  }
+  async updateCoupon(id:string,f:Partial<CouponRow>) { await this.dynUpdate('active_coupons',new Set(COUPON_EDIT_FIELDS),'code',id,f as any); }
+  async updateTournament(id:string,f:Partial<TournamentRow>) { await this.dynUpdate('tournaments',new Set(TOURNAMENT_EDIT_FIELDS),'id',id,f as any); }
+  async updateArticle(id:string,f:Partial<ArticleRow>) { await this.dynUpdate('articles',new Set(ARTICLE_EDIT_FIELDS),'id',id,f as any); }
   name = 'SQLServer';
   isConnected = false;
   config: any = {};
@@ -1043,6 +1124,10 @@ export class SqlServerStore implements IDataStore {
 
     const req = this.pool.request();
     await req.query(`
+      IF OBJECT_ID('dbo.ops_records','U') IS NULL BEGIN
+        CREATE TABLE dbo.ops_records (kind NVARCHAR(50) NOT NULL, id NVARCHAR(100) NOT NULL, version INT NOT NULL, data NVARCHAR(MAX) NOT NULL, uniqueKey NVARCHAR(200) NULL, updatedAt NVARCHAR(50) NOT NULL, PRIMARY KEY(kind,id));
+        CREATE UNIQUE INDEX idx_ops_unique ON dbo.ops_records(uniqueKey) WHERE uniqueKey IS NOT NULL;
+      END;
       IF OBJECT_ID('dbo.users','U') IS NULL CREATE TABLE dbo.users (username NVARCHAR(100) PRIMARY KEY, passwordHash NVARCHAR(200) NOT NULL, email NVARCHAR(200), phone NVARCHAR(50), loyaltyPoints INT DEFAULT 0, role NVARCHAR(50) DEFAULT 'gamer');
       IF OBJECT_ID('dbo.settings','U') IS NULL CREATE TABLE dbo.settings ([key] NVARCHAR(100) PRIMARY KEY, value NVARCHAR(MAX));
       IF OBJECT_ID('dbo.chat_rooms','U') IS NULL CREATE TABLE dbo.chat_rooms ([name] NVARCHAR(200) PRIMARY KEY);
@@ -1107,7 +1192,7 @@ export class SqlServerStore implements IDataStore {
     return { success: true, message: `SQL Server database [${dbName}] and schema verified/created.` };
   }
 
-  private r() { return this.pool.request(); }
+  private r() { return this.coordinator.native ? new this.sql.Request(this.coordinator.native) : this.pool.request(); }
 
   // ---- Users ----
   async getUserByUsername(username: string) {
@@ -1374,6 +1459,13 @@ export class SqlServerStore implements IDataStore {
 
   // ---- Wallet + on-site orders (task 13) ----
   async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    return this.runInTransaction(async () => {
+      if (!Number.isFinite(tx.amount) || tx.amount === 0) throw Object.assign(new Error('INVALID_AMOUNT'), {code:'INVALID_AMOUNT',statusCode:400});
+      if(tx.idempotencyKey){const old=await this.getWalletTxByIdempotencyKey(tx.idempotencyKey);if(old){if(old.username!==tx.username||old.amount!==tx.amount||old.type!==tx.type)throw Object.assign(new Error('IDEMPOTENCY_CONFLICT'),{code:'IDEMPOTENCY_CONFLICT',statusCode:409});return old;}}
+      return this.appendWalletTxAtomic(tx);
+    });
+  }
+  private async appendWalletTxAtomic(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
     const bal = (await this.r().input('u', this.sql.NVarChar, tx.username).query(`SELECT COALESCE(SUM(amount), 0) as bal FROM dbo.wallet_transactions WHERE username = @u`)).recordset[0]?.bal || 0;
     const balanceAfter = Math.round((bal + tx.amount) * 100) / 100;
     if (balanceAfter < -0.000001) throw Object.assign(new Error('INSUFFICIENT_FUNDS'), { code: 'INSUFFICIENT_FUNDS', statusCode: 402, balance: bal });
@@ -1670,13 +1762,44 @@ export class SqlServerStore implements IDataStore {
 // 3. MONGODB STORE — real connection via the official `mongodb` driver
 // =============================================================================
 export class MongoStore implements IDataStore {
+  private coordinator = new StoreCoordinator();
+  constructor() { return this.coordinator.wrap(this); }
+
+  async getWalletBalance(username?:string):Promise<number> { const r=await this.col('wallet_transactions').aggregate([{$match:username?{username}:{}},{$group:{_id:null,balance:{$sum:'$amount'}}}]).toArray();return Math.round(Number(r[0]?.balance||0)*100)/100; }
+  async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.coordinator.native) return fn();
+    const session=this.client.startSession();
+    try {
+      return await session.withTransaction(() => this.coordinator.inScope(session, async () => {
+        await this.col('ops_locks').updateOne({_id:'business'},{$inc:{revision:1}});
+        return fn();
+      }), {readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});
+    } catch (e:any) {
+      if(e.code===20 || /Transaction numbers are only allowed/.test(e.message||'')) throw Object.assign(new Error('MongoDB replica set is required for atomic financial operations'),{code:'TRANSACTIONS_REQUIRED',statusCode:503});
+      throw e;
+    } finally { await session.endSession(); }
+  }
+  async getOpsRecord(kind:string,id:string):Promise<OpsRecord|undefined> { const r=await this.col('ops_records').findOne({kind,id}); return r?this.strip(r):undefined; }
+  async listOpsRecords(kind:string):Promise<OpsRecord[]> { return (await this.col('ops_records').find({kind}).sort({updatedAt:-1,id:1}).toArray()).map((r:any)=>this.strip(r)); }
+  async saveOpsRecord(row:OpsRecord,expectedVersion:number):Promise<OpsRecord> {
+    const r={...row,version:expectedVersion+1,uniqueKey:row.uniqueKey||null};
+    if(expectedVersion===0) await this.col('ops_records').insertOne(r);
+    else { const result=await this.col('ops_records').replaceOne({kind:r.kind,id:r.id,version:expectedVersion},r); if(!result.matchedCount) throw versionConflict(); }
+    return r;
+  }
+  private async opsUpdate(collection:string,key:string,id:string,f:any,allowed:string[]) {
+    const fields=Object.fromEntries(Object.entries(f).filter(([k])=>allowed.includes(k))); if(Object.keys(fields).length) await this.col(collection).updateOne({[key]:id},{$set:fields});
+  }
+  async updateCoupon(id:string,f:Partial<CouponRow>) { await this.opsUpdate('active_coupons','code',id,f,COUPON_EDIT_FIELDS); }
+  async updateTournament(id:string,f:Partial<TournamentRow>) { await this.opsUpdate('tournaments','id',id,f,TOURNAMENT_EDIT_FIELDS); }
+  async updateArticle(id:string,f:Partial<ArticleRow>) { await this.opsUpdate('articles','id',id,f,ARTICLE_EDIT_FIELDS); }
   name = 'MongoDB';
   isConnected = false;
   config: any = {};
   private client: any;
   private db: any;
 
-  private col(name: string) { return this.db.collection(name); }
+  private col(name: string) { return sessionCollection(this.db.collection(name), this.coordinator.native); }
 
   async connect(): Promise<{ success: boolean; message: string }> {
     const { MongoClient } = require('mongodb');
@@ -1699,6 +1822,9 @@ export class MongoStore implements IDataStore {
   }
 
   async createDatabaseIfNotExist(): Promise<{ success: boolean; message: string }> {
+    await this.col('ops_records').createIndex({kind: 1, id: 1}, {unique: true});
+    await this.col('ops_records').createIndex({uniqueKey: 1}, {unique: true, partialFilterExpression: {uniqueKey: {$type: 'string'}}});
+    await this.col('ops_locks').updateOne({_id: 'business'}, {$setOnInsert: {revision: 0}}, {upsert: true});
     await this.col('users').createIndex({ username: 1 }, { unique: true });
     await this.col('settings').createIndex({ key: 1 }, { unique: true });
     await this.col('chat_rooms').createIndex({ name: 1 }, { unique: true });
@@ -1884,6 +2010,13 @@ export class MongoStore implements IDataStore {
 
   // ---- Wallet + on-site orders (task 13) ----
   async appendWalletTx(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
+    return this.runInTransaction(async () => {
+      if (!Number.isFinite(tx.amount) || tx.amount === 0) throw Object.assign(new Error('INVALID_AMOUNT'), {code:'INVALID_AMOUNT',statusCode:400});
+      if(tx.idempotencyKey){const old=await this.getWalletTxByIdempotencyKey(tx.idempotencyKey);if(old){if(old.username!==tx.username||old.amount!==tx.amount||old.type!==tx.type)throw Object.assign(new Error('IDEMPOTENCY_CONFLICT'),{code:'IDEMPOTENCY_CONFLICT',statusCode:409});return old;}}
+      return this.appendWalletTxAtomic(tx);
+    });
+  }
+  private async appendWalletTxAtomic(tx: Omit<WalletTxRow, 'balanceAfter'>): Promise<WalletTxRow> {
     const agg = await this.col('wallet_transactions').aggregate([{ $match: { username: tx.username } }, { $group: { _id: null, bal: { $sum: '$amount' } } }]).toArray();
     const bal = agg[0]?.bal || 0;
     const balanceAfter = Math.round((bal + tx.amount) * 100) / 100;

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useModalDismiss } from '../hooks/useModalDismiss';
 
-export type HelpSection = 'stations' | 'buffet' | 'customers' | 'accounting' | 'operators' | 'settings';
+export type HelpSection = import('../../../../shared/management/types').OpsTab;
 
 interface Props {
   isOpen: boolean;

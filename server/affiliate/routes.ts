@@ -34,7 +34,7 @@ function httpError(res: express.Response, e: any, fallback = 500) {
   return res.status(status).json({ error: e?.code || e?.message || String(e), code: e?.code || undefined, message: e?.message });
 }
 
-function sanitizeAffiliateInput(body: any): Partial<AffiliateRow> {
+export function sanitizeAffiliateInput(body: any): Partial<AffiliateRow> {
   const out: Partial<AffiliateRow> = {};
   if (body.code !== undefined) out.code = normalizeCode(body.code);
   if (body.username !== undefined) out.username = String(body.username || '').trim();
@@ -55,7 +55,7 @@ function sanitizeAffiliateInput(body: any): Partial<AffiliateRow> {
   return out;
 }
 
-async function assertParentOk(store: IDataStore, parentId: string, selfId?: string) {
+export async function assertParentOk(store: IDataStore, parentId: string, selfId?: string) {
   if (!parentId) return;
   if (selfId && parentId === selfId) throw Object.assign(new Error('PARENT_SELF'), { statusCode: 400, code: 'PARENT_SELF' });
   const p = await store.getAffiliateById(parentId);

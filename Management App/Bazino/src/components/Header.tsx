@@ -1,11 +1,13 @@
+import { useOps } from '../../../../shared/management/context';
+import type { OpsTab } from '../../../../shared/management/types';
 import React from 'react';
 import { Gamepad2, Shield, Wallet, Users, Coffee, BarChart3, Settings, RefreshCw, Volume2, VolumeX, ShieldAlert, Crown, Sparkles, MapPin, Cpu, Minimize2, Square, X, Monitor, Wifi, FileText, Download, HelpCircle } from 'lucide-react';
 import { Operator, AppTheme, SoundAlarmConfig, CurrencyCode } from '../types';
 import { CURRENCY_SYMBOLS, formatCurrency } from '../utils/formatters';
 
 interface HeaderProps {
-  activeTab: 'stations' | 'buffet' | 'customers' | 'accounting' | 'operators' | 'settings';
-  setActiveTab: (tab: 'stations' | 'buffet' | 'customers' | 'accounting' | 'operators' | 'settings') => void;
+  activeTab: OpsTab;
+  setActiveTab: (tab: OpsTab) => void;
   activeOperator: Operator;
   operators: Operator[];
   onSwitchOperator: (op: Operator) => void;
@@ -64,6 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenHardwareModal,
   onOpenHelpGuide,
 }) => {
+  const { can } = useOps();
   const serverAddressLabel = getServerAddressLabel();
 
   const [showOpMenu, setShowOpMenu] = React.useState(false);
@@ -201,7 +204,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="bg-zinc-900 text-xs text-zinc-200 border border-zinc-700 rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-500"
             title="تغییر واحد پول"
           >
-            {Object.entries(CURRENCY_SYMBOLS).map(([code, info]) => (
+            {Object.entries(CURRENCY_SYMBOLS).filter(([code]) => code === 'TRY').map(([code, info]) => (
               <option key={code} value={code}>
                 {info.label}
               </option>
@@ -328,9 +331,10 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Coffee className="w-4 h-4" />
-            <span>بوفه و انبار داری</span>
+            <span>کافه</span>
           </button>
 
+          <button onClick={() => setActiveTab('shop')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='shop'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}>فروشگاه</button>
           <button
             onClick={() => setActiveTab('customers')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
@@ -343,6 +347,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>اعضا و کیف پول</span>
           </button>
 
+          {can('affiliates') && <button onClick={() => setActiveTab('affiliates')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='affiliates'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}>همکاری در فروش</button>}
           {activeOperator.permissions.canAccessReports && (
             <button
               onClick={() => setActiveTab('accounting')}

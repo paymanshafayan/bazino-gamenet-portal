@@ -3,6 +3,42 @@ import { OpsCore, endpoint, fail, minor, newId, nowISO, stringValue } from './co
 import { bookingViews, assertStationFree } from './bookings';
 import { onReservationAttended } from '../affiliate/engine';
 import type { FinanceService } from './finance';
+import type { PromotionService } from './promotions';
+import { hourDiscountFraction } from './promotions';
+
+/**
+ * Cost of session time (excluding prepaid reservation interval and linked orders),
+ * applying free/half-price hours segment-by-segment. Each minute inside an active
+ * special hour for the station type is priced at the discounted rate; the rest at the
+ * current tariff segment rate. Paused time is excluded. Frozen once quoted/finished.
+ */
+export async function sessionPromoCost(core: OpsCore, promos: PromotionService | undefined, stationType: string, session: any, until = Date.now()): Promise<number> {
+  if (!promos) return segmentCost(session, until);
+  const zone = await core.timezone();
+  const hardEnd = session.settlingAt ? Date.parse(session.settlingAt) : session.closedAt ? Date.parse(session.closedAt) : until;
+  let cost = 0;
+  for (const seg of session.segments || [{ from: session.startedAt, rate: session.hourlyRate }]) {
+    let a = Date.parse(seg.from), b = Math.min(hardEnd, seg.to ? Date.parse(seg.to) : hardEnd);
+    if (session.reservationEndsAt) a = Math.max(a, Date.parse(session.reservationEndsAt));
+    if (b <= a) continue;
+    // Walk the segment minute-by-minute in coarse 5-minute steps; discount can change
+    // at the boundary of a special hour, so sample the discount at each step's midpoint.
+    const STEP = 5 * 60 * 1000;
+    for (let t = a; t < b; t += STEP) {
+      const stepEnd = Math.min(t + STEP, b);
+      // subtract paused overlap within this step
+      let activeMs = stepEnd - t;
+      for (const pause of session.pauses || []) {
+        const pf = Date.parse(pause.from), pt = pause.to ? Date.parse(pause.to) : hardEnd;
+        activeMs -= Math.max(0, Math.min(stepEnd, pt) - Math.max(t, pf));
+      }
+      const hours = await promos.activeHoursFor(stationType, (t + stepEnd) / 2, zone);
+      const frac = hourDiscountFraction(hours);
+      cost += Math.max(0, activeMs / 1000) * Number(seg.rate || 0) * (1 - frac) / 3600;
+    }
+  }
+  return Math.round(cost * 100) / 100;
+}
 
 export function billableSeconds(session:any,until=Date.now()):number {
   const end=session.closedAt?Date.parse(session.closedAt):session.settlingAt?Date.parse(session.settlingAt):until,start=Date.parse(session.startedAt);
@@ -22,7 +58,7 @@ export function segmentCost(session:any,until=Date.now()):number {
   return Math.round(cost*100)/100;
 }
 export class SessionService {
-  constructor(public core:OpsCore,public finance:FinanceService){}
+  constructor(public core:OpsCore,public finance:FinanceService,public promos?:PromotionService){}
   async start(actor:string,b:any){return this.core.command(actor,b.idempotencyKey,'session-start',b,async()=>{
     const station=await this.core.read('station',stringValue(b.stationId,100,true));if(!station||!station.data.active)fail('STATION_NOT_REGISTERED',409);
     if((await this.core.list('session')).some(r=>r.data.stationId===station.id&&!r.data.closedAt))fail('STATION_IN_USE',409);
@@ -60,7 +96,10 @@ export class SessionService {
   });}
   async quoteData(data:any){
     let extra=0;const orders=[];for(const o of await this.core.store.listOnsiteOrders()){const p=JSON.parse(o.payload||'{}');if(p._ops?.sessionId&&p._ops.sessionId===data.id&&o.status==='pending_onsite'){extra+=o.amount;orders.push(o.id);}}
-    const newGameCost=segmentCost(data),gameCost=Math.round((newGameCost+Number(data.reservationPrice||0))*100)/100;
+    const station=data.stationId?await this.core.read('station',data.stationId):undefined;
+    const sys=data.systemId?await this.core.store.getSystemById(data.systemId):null;
+    const stationType=String(sys?.type||station?.data?.type||'');
+    const newGameCost=await sessionPromoCost(this.core,this.promos,stationType,data),gameCost=Math.round((newGameCost+Number(data.reservationPrice||0))*100)/100;
     return {gameCost,newGameCost,prepaidAmount:data.prepaidAmount||0,orderCost:Math.round(extra*100)/100,orderIds:orders,amount:Math.round((newGameCost+extra)*100)/100,currency:'TRY'};
   }
   async quote(actor:string,id:string,b:any){return this.core.command(actor,b.idempotencyKey,'session-quote',{id,...b},async()=>{

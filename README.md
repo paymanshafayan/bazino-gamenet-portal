@@ -74,8 +74,9 @@ npx tsx scripts/test-theme-sdk.mts             # تست SDK کامپوننت ق�
 | `APP_URL` | آدرس عمومی میزبانی برنامه |
 | `JWT_SECRET` | کلید امضای توکن‌های احراز هویت (در production الزامی است) |
 | `BAZINO_DATA_DIR` | پوشه‌ی داده‌های ماندگار (قالب‌های نصب‌شده `themes/`، فایل SQLite، `install-config.json`، APK). پیش‌فرض: پوشه‌ی جاری. روی Railway یک Volume با مسیر `/data` بسازید و `BAZINO_DATA_DIR=/data` بدهید؛ در غیر این صورت قالب‌ها با هر دیپلوی پاک می‌شوند. |
-| `SMS_PROVIDER` | درایور پیامک برای ورود با کد یک‌بارمصرف: `smsto` (پیشنهادی)، `easysendsms`، `mock` (پیش‌فرض؛ فقط لاگ کنسول — برای production مناسب نیست). جزئیات: `docs/sms/SMS-PROVIDERS.md` |
+| `SMS_PROVIDER` | درایور پیامک برای ورود با کد یک‌بارمصرف: `smsto` (پیشنهادی)، `easysendsms`، `messaggio`، `mock` (پیش‌فرض؛ فقط لاگ کنسول — برای production مناسب نیست). جزئیات: `docs/sms/SMS-PROVIDERS.md` |
 | `SMSTO_API_KEY` / `EASYSENDSMS_API_KEY` | کلید API ارائه‌دهنده‌ی انتخاب‌شده |
+| `MESSAGGIO_PROJECT_LOGIN` / `MESSAGGIO_SENDE_CODE` | برای درایور `messaggio`: به‌ترتیب Bulk Login (هدر `Messaggio-Login`، سکرت) و کد API فرستنده (`sms.from`) |
 | `SMS_SENDER_ID` | نام فرستنده (حداکثر ۱۱ کاراکتر، پیش‌فرض `Bazino`) |
 | `PAYMENT_ONLINE_ENABLED` | پیش‌فرض خاموش. با `1` درگاه PayTR (به‌همراه `PAYTR_MERCHANT_ID/KEY/SALT`, `PAYTR_TEST_MODE`, `PAYTR_MOCK`) دوباره فعال می‌شود و گزینه‌ی «پرداخت آنلاین» به مودال پرداخت اضافه می‌شود. تا آن زمان پرداخت‌ها فقط با کیف پول / در محل است — `docs/payments/WALLET.md`, `docs/payments/PAYTR.md` |
 | `MONGO_URL` (یا `MONGODB_URI`) | اگر تنظیم شود، سرور بدون نیاز به پنل نصب مستقیماً به MongoDB وصل می‌شود (Railway: Reference به سرویس Mongo). نام دیتابیس از `MONGO_DB_NAME` یا مسیر URL؛ پیش‌فرض `bazino`. |

@@ -3,6 +3,9 @@ import { StartSessionDialog, SessionCheckout } from '../../../shared/management/
 import { AffiliateConsole } from '../../../shared/management/Affiliates';
 import { ReportsConsole } from '../../../shared/management/Reports';
 import { OrdersConsole } from '../../../shared/management/Orders';
+import { PromotionsConsole } from '../../../shared/management/Promotions';
+import { TournamentsConsole } from '../../../shared/management/Tournaments';
+import { ContentConsole } from '../../../shared/management/Content';
 import type { BookingView, OpsTab } from '../../../shared/management/types';
 import { useOps, useResource, Notice, SyncState } from '../../../shared/management/context';
 import { StationRegistry, AccessManager } from '../../../shared/management/Registry';
@@ -814,6 +817,9 @@ export default function App() {
         {activeTab === 'buffet' && <OrdersConsole kind="cafe" defaultStationId={orderTarget?.stationId} defaultSessionId={orderTarget?.sessionId}/>}
         {activeTab === 'shop' && <OrdersConsole kind="shop"/>}
         {activeTab === 'affiliates' && <AffiliateConsole/>}
+        {activeTab === 'tournaments' && <TournamentsConsole/>}
+        {activeTab === 'promotions' && <PromotionsConsole/>}
+        {activeTab === 'content' && <ContentConsole/>}
         {activeTab === 'accounting' && can('reports') && <ReportsConsole/>}
 
         {/* Wallets and cash-outs use the authoritative server ledger, never a local balance. */}

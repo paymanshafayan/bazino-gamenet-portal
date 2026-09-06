@@ -2,7 +2,7 @@ import { OpsProvider } from '../../shared/management/context';
 import { WalletConsole } from '../../shared/management/Wallet';
 /** پنل ادمین — طرح همکاری در فروش (/admin/affiliates) */
 import React, { useEffect, useState } from 'react';
-import { Megaphone, RefreshCw, Plus, Save } from 'lucide-react';
+import { Megaphone, RefreshCw, Plus, Save, Key, Copy, Trash2, Pencil, Check } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { L } from '../utils/i18n';
 
@@ -330,6 +330,120 @@ function IgCampaignPanel({ ig, setIg, igSim, setIgSim, igOut, setIgOut, language
           </tbody>
         </table>
       </div>
+
+      <IntegrationTokensPanel inp={inp} addNotification={addNotification} language={language} />
     </section>
+  );
+}
+
+/** Standard bearer-token manager for the Manus / Zernio integrations. */
+function IntegrationTokensPanel({ inp, addNotification, language }: { inp: string; addNotification: Props['addNotification']; language: string }) {
+  const [tokens, setTokens] = useState<any[]>([]);
+  const [name, setName] = useState('Manus');
+  const [editId, setEditId] = useState('');
+  const [editName, setEditName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState('');
+
+  const load = () => fetch('/api/admin/api-tokens').then(r => r.json()).then(d => setTokens(d.tokens || [])).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  const copy = async (text: string, id: string) => {
+    try { await navigator.clipboard.writeText(text); } catch {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch { /* */ } document.body.removeChild(ta);
+    }
+    setCopied(id); addNotification(L(language, { fa: 'توکن کپی شد', en: 'Token copied', ru: 'Токен скопирован', tr: 'Token kopyalandı' }), 'success');
+    setTimeout(() => setCopied(''), 1500);
+  };
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/admin/api-tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() || 'API token' }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'fail');
+      await load(); setName('');
+      addNotification(L(language, { fa: 'توکن ساخته شد؛ همین حالا کپی‌اش کنید (فقط الان مقدارش اینجاست).', en: 'Token created — copy it now.', ru: 'Токен создан — скопируйте его.', tr: 'Token oluşturuldu — hemen kopyalayın.' }), 'success');
+      if (d.token?.token) copy(d.token.token, d.token.id);
+    } catch { addNotification(L(language, { fa: 'خطا در ساخت توکن', en: 'Failed to create token', ru: 'Не удалось создать', tr: 'Token oluşturulamadı' }), 'error'); }
+    finally { setBusy(false); }
+  };
+  const rename = async (id: string) => {
+    await fetch(`/api/admin/api-tokens/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editName }) });
+    setEditId(''); setEditName(''); load();
+  };
+  const remove = async (id: string) => {
+    if (!confirm(L(language, { fa: 'این توکن برای همیشه باطل می‌شود؛ مطمئنید؟', en: 'Revoke this token permanently?', ru: 'Отозвать токен безвозвратно?', tr: 'Bu token kalıcı olarak iptal edilsin mi?' }))) return;
+    await fetch(`/api/admin/api-tokens/${id}`, { method: 'DELETE' }); load();
+    addNotification(L(language, { fa: 'توکن حذف شد', en: 'Token revoked', ru: 'Токен отозван', tr: 'Token silindi' }), 'info');
+  };
+
+  const prompt = `You are integrated with the Bazino (bazino.pro) affiliate system.
+
+TASK: For a new Instagram partner, mint a unique code and a signed invite link.
+
+REQUEST:
+POST https://bazino.pro/api/integrations/instagram/partner-invite
+Authorization: Bearer <PASTE_A_TOKEN_YOU_CREATED_IN_THE_BAZINO_ADMIN_PANEL>
+Content-Type: application/json
+
+{
+  "ig_user_id": "<numeric Instagram ACCOUNT id of the partner — NOT a post/reel id>",
+  "ig_username": "<partner handle, optional>",
+  "campaign_id": "SQUAD26"
+}
+
+SUCCESS (200):
+{ "ok": true, "code": "482913", "invite_url": "https://bazino.pro/?ref=...&sig=...", "campaign": "SQUAD26", "is_new": true }
+
+RULES:
+- ig_user_id is the Instagram ACCOUNT id; it is NOT the post/reel media id.
+- Send the invite_url to the partner. A friend opening it goes through the gate and, after sign-up, receives a discount coupon.
+- Re-calling with the same ig_user_id + campaign returns the SAME code/link (is_new:false) — safe to retry; do not create duplicates.
+- 401 = token wrong/missing · 400 invalid_ig_user_id · 422 campaign_not_found.`;
+
+  return (
+    <div className="space-y-3 border-t border-white/10 pt-4" data-api-tokens>
+      <h4 className="text-xs font-black text-white flex items-center gap-2"><Key className="w-4 h-4 text-cyan-300" />{L(language, { fa: 'توکن‌های دسترسی (Manus / Zernio)', en: 'Access tokens (Manus / Zernio)', ru: 'Токены доступа (Manus / Zernio)', tr: 'Erişim tokenları (Manus / Zernio)' })}</h4>
+      <div className="flex flex-wrap gap-2">
+        <input className={`${inp} flex-1 min-w-[180px]`} dir="ltr" placeholder={L(language, { fa: 'نام توکن (مثلا Manus)', en: 'Token name (e.g. Manus)', ru: 'Имя токена', tr: 'Token adı (ör. Manus)' })} value={name} onChange={e => setName(e.target.value)} />
+        <button type="button" disabled={busy} onClick={create} className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-100 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50" data-create-token>
+          <Plus className="w-4 h-4" />{L(language, { fa: 'ساخت توکن جدید', en: 'Create token', ru: 'Создать токен', tr: 'Yeni token' })}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {tokens.length === 0 && <p className="text-[11px] text-gray-500">{L(language, { fa: 'هنوز توکنی ساخته نشده است.', en: 'No tokens yet.', ru: 'Токенов нет.', tr: 'Henüz token yok.' })}</p>}
+        {tokens.map(t => (
+          <div key={t.id} className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg p-2" data-token-row={t.id}>
+            {editId === t.id ? (
+              <>
+                <input className={`${inp} flex-1`} dir="ltr" value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
+                <button type="button" className="p-2 text-emerald-300" onClick={() => rename(t.id)}><Check className="w-4 h-4" /></button>
+                <button type="button" className="p-2 text-gray-400" onClick={() => setEditId('')}><Trash2 className="w-4 h-4" /></button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-xs text-white font-bold truncate">{t.name}</span>
+                <span className="text-[10px] text-gray-500 font-mono hidden sm:inline" dir="ltr">baz_••••••••{String(t.token || '').slice(-4)}</span>
+                <button type="button" title={L(language, { fa: 'کپی مقدار توکن (بدون نمایش)', en: 'Copy token value (hidden)', ru: 'Скопировать (скрыто)', tr: 'Değeri kopyala (gizli)' })} className="p-2 text-cyan-300 hover:text-cyan-100" onClick={() => copy(t.token, t.id)} data-copy-token>
+                  {copied === t.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+                <button type="button" className="p-2 text-gray-300 hover:text-white" onClick={() => { setEditId(t.id); setEditName(t.name); }} data-rename-token><Pencil className="w-4 h-4" /></button>
+                <button type="button" className="p-2 text-rose-300 hover:text-rose-200" onClick={() => remove(t.id)} data-delete-token><Trash2 className="w-4 h-4" /></button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-gray-500 leading-relaxed">{L(language, { fa: 'همان توکن را برای Manus و Zernio استفاده کنید: Manus با Bearer صدا می‌زند و وب‌هوک زرنیو هم آن را می‌پذیرد. حذف توکن بلافاصله دسترسی را باطل می‌کند.', en: 'Use the same token for Manus and Zernio: Manus sends it as Bearer and the Zernio webhook accepts it too. Deleting a token revokes access immediately.', ru: 'Один токен для Manus и Zernio: Manus шлёт Bearer, вебхук Zernio тоже его принимает. Удаление сразу отзывает доступ.', tr: 'Aynı token hem Manus hem Zernio için: Manus Bearer gönderir, Zernio webhook da kabul eder. Silmek erişimi hemen iptal eder.' })}</p>
+
+      <details className="bg-black/40 rounded-lg border border-white/10" data-api-prompt>
+        <summary className="cursor-pointer text-[11px] font-bold text-cyan-200 p-2.5">{L(language, { fa: 'دستورالعمل API برای Manus (کپی)', en: 'Manus API prompt (copy)', ru: 'Промпт для Manus (копировать)', tr: 'Manus API talimatı (kopyala)' })}</summary>
+        <pre className="text-[10px] text-gray-300 p-3 overflow-auto max-h-72 whitespace-pre-wrap" dir="ltr">{prompt}</pre>
+        <div className="px-3 pb-3"><button type="button" onClick={() => copy(prompt, 'prompt')} className="px-3 py-1.5 rounded bg-white/10 text-white text-[11px] font-bold flex items-center gap-1.5">{copied === 'prompt' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}{L(language, { fa: 'کپی پرامپت', en: 'Copy prompt', ru: 'Скопировать промпт', tr: 'Prompti kopyala' })}</button></div>
+      </details>
+    </div>
   );
 }

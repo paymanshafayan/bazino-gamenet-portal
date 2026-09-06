@@ -4,6 +4,29 @@
 
 ---
 
+## ★ به‌روزرسانی ۲۰۲۶/۰۹/۰۷ — بچ‌های ۱۰ تا ۱۳ (نشست `arena/01a07603-…`)
+
+**وضعیت گیت:** همهٔ این کارها روی برنچ `arena/01a07603-bazino-gamenet-portal` کامیت و با PR به `main` فرستاده شده (کاربر merge می‌کند). جزییات اجرایی هر بچ در `docs/management/EXECUTION_LOG.md`.
+
+### انجام‌شده در این نشست
+- **بچ ۱۰ — تورنومنت‌های عمومی/زنده:** فصول ۴گانه (بهار/تابستان/پاییز/زمستان) با امتیاز رتبه‌بندی هفتگی ۵/۲/۱ و ویژه ۱۰/۴/۲ (جدا از Credits)؛ فصل و متادیتای تورنومنت روی OpsRecord بدون تغییر اسکیما؛ پیرینگ دستی زنده + BYE + صعود خودکار؛ پخش SSE + پولینگ؛ صفحهٔ عمومی جدید `src/components/tournaments/EventsTab.tsx` (تب‌های هفتگی/ویژه/رتبه فصل/براکت زنده+حالت تلویزیون/ثبت‌نام) با تم فعلی؛ پنل برنامه‌ریز تورنومنت سایت `src/components/admin/AdminTournamentPlanner.tsx`؛ کنسول مدیریت `shared/management/Tournaments.tsx` به‌روز شد.
+- **بچ ۱۱ — درایور پیامک Messaggio** در `server/sms/index.ts` (`SMS_PROVIDER=messaggio`، هدر `Messaggio-Login`=$MESSAGGIO_PROJECT_LOGIN، `sms.from`=$MESSAGGIO_SENDE_CODE). fallback سکرت برای MANUS/ZERNIO هم اضافه شد.
+- **بچ ۱۲ — پنل پیامک گروهی تبلیغاتی** (`server/management/messaging.ts` + پنل `src/components/admin/AdminMessagingPanel.tsx`، ساب‌تب `messaging`): ارسال کمپین روی SMS/Viber/WhatsApp؛ کانال بدون کلید → شبیه‌ساز؛ مخاطب OTP + شماره دستی؛ تاریخچه کمپین.
+- **بچ ۱۳ — کمپین اینستاگرام/Manus:**
+  - اندپوینت `POST /api/integrations/instagram/partner-invite` — Manus **Instagram account id** می‌فرستد (نه media id)، **کد یکتا + لینک دعوت امضاشده HMAC** می‌گیرد؛ idempotent. شرح کامل در `docs/payments/AFFILIATE-IG.md` (فاز ۳).
+  - **سیستم توکن استاندارد** در پنل `/admin/affiliates` (بخش «توکن‌های دسترسی»): ساخت/کپی بدون نمایش/تغییرنام/حذف توکن `baz_<hex>`؛ مسیرهای `/api/admin/api-tokens`؛ یک توکن هم برای Manus (Bearer) هم برای وب‌هوک Zernio معتبر است؛ در `integration_api_tokens` (سکرت) ذخیره می‌شود.
+
+### باقی‌مانده / تست‌نشده (زیرساخت، نه کد)
+- **ارسال واقعی پیامک** با Messaggio: باید روی هاست `SMS_PROVIDER=messaggio` + سکرت‌ها ست شوند و یک ارسال زنده تست شود (کد/شکل درخواست تست‌شده، تماس زنده نه).
+- **Viber/WhatsApp** برای پیامک گروهی به `MESSAGGIO_VIBER_CODE` / `MESSAGGIO_WHATSAPP_CODE` نیاز دارند؛ واتساپ خارج از پنجرهٔ ۲۴ساعته قالب تأییدشده می‌خواهد.
+- **Zernio واقعی** (PR/DM/follow-status) به `ZERNIO_API_KEY` + `ZERNIO_IG_ACCOUNT_ID` (+`ZERNIO_WEBHOOK_SECRET` در پروداکشن) نیاز دارد. فعلاً کاربر مدیریت زرنیو را به Manus سپرده؛ برای همین فاز فقط **توکن پنل کافی است**.
+- **اتصال واقعی Manus** به `partner-invite` با توکن پنل باید در محیط زنده تأیید شود.
+- **دامنهٔ لینک دعوت:** `ig_invite_base_url` (پیش‌فرض `https://bazino.pro`) باید روی دامنهٔ نهایی باشد.
+- **محدودیت تست این سندباکس:** `node_modules` بین نوبت‌ها پاک شد و نصب مجدد به‌خاطر بلاک شبکه (بیلد native better-sqlite3 → node headers) ممکن نشد. آخرین اجرای کامل سبز: واحد ۹۹/۹۹، مدیریت ۴۱/۴۱، دیتابیس ۳۸، پرووایدر ۲۷، UI ۴۲؛ API ۱۴۷/۱۶۹ (۲۲ خطا از-قبل-موجود روی main). در CI/هاست با شبکه: `npm ci` و کل سوییت باید سبز باشد. تایپ‌چک/esbuild هر دو سبز بود.
+
+---
+
+
 ## ۱. معرفی کلی پروژه
 
 **BAZINO PRO** یک پلتفرم مدیریت گیم‌نت با چهار بخش:

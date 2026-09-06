@@ -143,7 +143,7 @@ export interface ChatMessageRow { id: string; room: string; username: string; me
 export interface TransactionRow { id: string; points: number; description: string; type: string; date: string; username?: string; }
 /** ownerUsername: رشته‌ی خالی = کد تبلیغاتی عمومی؛ نام کاربری = کد شخصیِ حاصل از تبدیل امتیاز
  *  که فقط خودِ آن کاربر باید ببیند و خرج کند. */
-export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; ownerUsername?: string; }
+export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; ownerUsername?: string; scopes?: string; }
 export interface SystemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
 export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; }
 export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; }
@@ -167,7 +167,7 @@ export interface PaymentOrderRow {
 export const PAYMENT_ORDER_COLUMNS = new Set(['status', 'totalAmountKurus', 'failedCode', 'failedMsg', 'result', 'updatedAt', 'email', 'username', 'payload']);
 
 
-const COUPON_EDIT_FIELDS = ['type','value','minOrder','expiry','expiryDate','maxUsageCount','usageCount','isActive','ownerUsername'];
+const COUPON_EDIT_FIELDS = ['type','value','minOrder','expiry','expiryDate','maxUsageCount','usageCount','isActive','ownerUsername','scopes'];
 const TOURNAMENT_EDIT_FIELDS = ['title','game','registrationFee','startDate','maxTeams','status','teams','bracket','registeredTeamsCount'];
 const ARTICLE_EDIT_FIELDS = ['title','content','category','imageUrl','mobileImageUrl','author','date','comments'];
 
@@ -545,6 +545,8 @@ export class SqliteStore implements IDataStore {
       // مالکیت: تراکنش امتیاز و کد تخفیف شخصی به یک کاربر تعلق دارند.
       { table: 'transactions', column: 'username', type: "TEXT NOT NULL DEFAULT ''" },
       { table: 'active_coupons', column: 'ownerUsername', type: "TEXT NOT NULL DEFAULT ''" },
+      // Promotions console: coupon scope tag (JSON array of reservation/cafe/shop/tournament).
+      { table: 'active_coupons', column: 'scopes', type: "TEXT DEFAULT ''" },
       // پروفایل کاربر + OTP (تسک ۱۲)
       { table: 'users', column: 'displayName', type: "TEXT DEFAULT ''" },
       { table: 'users', column: 'avatarUrl', type: "TEXT DEFAULT ''" },
@@ -629,8 +631,8 @@ export class SqliteStore implements IDataStore {
     return row ? { ...row, isActive: !!row.isActive } : undefined;
   }
   async createCoupon(c: CouponRow) {
-    this.db.prepare(`INSERT INTO active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive, ownerUsername) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?)`)
-      .run(c.code, c.type, c.value, c.minOrder, c.expiry, c.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString(), c.maxUsageCount || 1, c.ownerUsername || '');
+    this.db.prepare(`INSERT INTO active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive, ownerUsername, scopes) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)`)
+      .run(c.code, c.type, c.value, c.minOrder, c.expiry, c.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString(), c.maxUsageCount || 1, c.ownerUsername || '', c.scopes || '');
   }
   async deactivateCoupon(code: string) { this.db.prepare(`UPDATE active_coupons SET isActive = 0 WHERE code = ?`).run(code); }
   // یک دستور، نه دو تا: قبلاً بین «افزایش شمارنده» و «غیرفعال‌سازی» یک پنجره وجود داشت که
@@ -1057,7 +1059,7 @@ export class SqlServerStore implements IDataStore {
   private coordinator = new StoreCoordinator();
   constructor() { return this.coordinator.wrap(this); }
 
-  async getWalletBalance(username?:string):Promise<number> { const r=await this.r().input('u',this.sql.NVarChar,username??null).query('SELECT COALESCE(SUM(amount),0) AS balance FROM dbo.wallet_transactions WHERE (@u IS NULL OR username=@u)');return Math.round(Number(r.recordset[0]?.balance||0)*100)/100; }
+  async getWalletBalance(username?:string):Promise<number> { const r=await this.r().input('u',this.sql.NVarChar,username??null).query(`SELECT COALESCE(SUM(amount),0) AS balance FROM dbo.wallet_transactions WHERE (@u IS NULL OR username=@u)`);return Math.round(Number(r.recordset[0]?.balance||0)*100)/100; }
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     return this.coordinator.transaction(async () => {
       const tx = new this.sql.Transaction(this.pool); await tx.begin(this.sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -1066,16 +1068,16 @@ export class SqlServerStore implements IDataStore {
     }, async tx => { await tx.commit(); }, async tx => { await tx.rollback(); }, fn);
   }
   async getOpsRecord(kind: string, id: string): Promise<OpsRecord | undefined> {
-    const r=(await this.r().input('k',this.sql.NVarChar,kind).input('id',this.sql.NVarChar,id).query('SELECT * FROM dbo.ops_records WHERE kind=@k AND id=@id')).recordset[0];
+    const r=(await this.r().input('k',this.sql.NVarChar,kind).input('id',this.sql.NVarChar,id).query(`SELECT * FROM dbo.ops_records WHERE kind=@k AND id=@id`)).recordset[0];
     return r?{...r,data:JSON.parse(r.data)}:undefined;
   }
   async listOpsRecords(kind: string): Promise<OpsRecord[]> {
-    return (await this.r().input('k',this.sql.NVarChar,kind).query('SELECT * FROM dbo.ops_records WHERE kind=@k ORDER BY updatedAt DESC,id')).recordset.map((r:any)=>({...r,data:JSON.parse(r.data)}));
+    return (await this.r().input('k',this.sql.NVarChar,kind).query(`SELECT * FROM dbo.ops_records WHERE kind=@k ORDER BY updatedAt DESC,id`)).recordset.map((r:any)=>({...r,data:JSON.parse(r.data)}));
   }
   async saveOpsRecord(row: OpsRecord, expectedVersion: number): Promise<OpsRecord> {
     const r={...row,version:expectedVersion+1,uniqueKey:row.uniqueKey||null};
     const q=this.r().input('k',this.sql.NVarChar,r.kind).input('id',this.sql.NVarChar,r.id).input('v',this.sql.Int,r.version).input('old',this.sql.Int,expectedVersion).input('d',this.sql.NVarChar,JSON.stringify(r.data)).input('u',this.sql.NVarChar,r.uniqueKey).input('t',this.sql.NVarChar,r.updatedAt);
-    const result=await q.query(expectedVersion===0?'INSERT INTO dbo.ops_records(kind,id,version,data,uniqueKey,updatedAt) VALUES(@k,@id,@v,@d,@u,@t)':'UPDATE dbo.ops_records SET version=@v,data=@d,uniqueKey=@u,updatedAt=@t WHERE kind=@k AND id=@id AND version=@old');
+    const result=await q.query(expectedVersion===0?`INSERT INTO dbo.ops_records(kind,id,version,data,uniqueKey,updatedAt) VALUES(@k,@id,@v,@d,@u,@t)`:`UPDATE dbo.ops_records SET version=@v,data=@d,uniqueKey=@u,updatedAt=@t WHERE kind=@k AND id=@id AND version=@old`);
     if(expectedVersion>0 && !result.rowsAffected[0]) throw versionConflict(); return r;
   }
   async updateCoupon(id:string,f:Partial<CouponRow>) { await this.dynUpdate('active_coupons',new Set(COUPON_EDIT_FIELDS),'code',id,f as any); }
@@ -1178,6 +1180,7 @@ export class SqlServerStore implements IDataStore {
       IF OBJECT_ID('dbo.ticket_messages','U') IS NULL CREATE TABLE dbo.ticket_messages (id NVARCHAR(40) PRIMARY KEY, ticketId NVARCHAR(40), author NVARCHAR(100), isStaff INT DEFAULT 0, body NVARCHAR(MAX), createdAt NVARCHAR(50));
       IF COL_LENGTH('dbo.transactions','username') IS NULL ALTER TABLE dbo.transactions ADD username NVARCHAR(100) NOT NULL DEFAULT '';
       IF COL_LENGTH('dbo.active_coupons','ownerUsername') IS NULL ALTER TABLE dbo.active_coupons ADD ownerUsername NVARCHAR(100) NOT NULL DEFAULT '';
+      IF COL_LENGTH('dbo.active_coupons','scopes') IS NULL ALTER TABLE dbo.active_coupons ADD scopes NVARCHAR(400) NOT NULL DEFAULT '';
       IF OBJECT_ID('dbo.affiliates','U') IS NULL CREATE TABLE dbo.affiliates (id NVARCHAR(40) PRIMARY KEY, code NVARCHAR(20) UNIQUE, username NVARCHAR(100) DEFAULT '', name NVARCHAR(200), type NVARCHAR(30) DEFAULT 'gamer', language NVARCHAR(10) DEFAULT 'tr', destination NVARCHAR(200) DEFAULT '/', parentId NVARCHAR(40) DEFAULT '', status NVARCHAR(20) DEFAULT 'active', newPct FLOAT DEFAULT -1, returnPct FLOAT DEFAULT -1, tournamentPct FLOAT DEFAULT -1, overridePct FLOAT DEFAULT -1, notes NVARCHAR(MAX) DEFAULT '', createdAt NVARCHAR(50), updatedAt NVARCHAR(50));
       IF OBJECT_ID('dbo.affiliate_clicks','U') IS NULL CREATE TABLE dbo.affiliate_clicks (id NVARCHAR(40) PRIMARY KEY, code NVARCHAR(20), path NVARCHAR(200), ipHash NVARCHAR(64), uaHash NVARCHAR(64), visitorId NVARCHAR(80) DEFAULT '', createdAt NVARCHAR(50));
       IF OBJECT_ID('dbo.affiliate_attributions','U') IS NULL CREATE TABLE dbo.affiliate_attributions (id NVARCHAR(40) PRIMARY KEY, username NVARCHAR(100) DEFAULT '', visitorId NVARCHAR(80) DEFAULT '', code NVARCHAR(20), source NVARCHAR(20), expiresAt NVARCHAR(50), createdAt NVARCHAR(50), updatedAt NVARCHAR(50));
@@ -1268,7 +1271,8 @@ export class SqlServerStore implements IDataStore {
       .input('ed', this.sql.NVarChar, c.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString())
       .input('mu', this.sql.Int, c.maxUsageCount || 1)
       .input('own', this.sql.NVarChar, c.ownerUsername || '')
-      .query(`INSERT INTO dbo.active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive, ownerUsername) VALUES (@c, @t, @v, @m, @e, @ed, @mu, 0, 1, @own)`);
+      .input('sc', this.sql.NVarChar, c.scopes || '')
+      .query(`INSERT INTO dbo.active_coupons (code, type, value, minOrder, expiry, expiryDate, maxUsageCount, usageCount, isActive, ownerUsername, scopes) VALUES (@c, @t, @v, @m, @e, @ed, @mu, 0, 1, @own, @sc)`);
   }
   async deactivateCoupon(code: string) { await this.r().input('c', this.sql.NVarChar, code).query(`UPDATE dbo.active_coupons SET isActive = 0 WHERE code = @c`); }
   // یک UPDATE شرطی — رجوع کنید به توضیح نسخه‌ی SQLite درباره‌ی مصرف هم‌زمان.

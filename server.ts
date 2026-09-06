@@ -61,6 +61,9 @@ import { bookingWindow } from './server/management/time';
 import { bookingViews, assertStationFree } from './server/management/bookings';
 import { transactional, fail, nowISO, parseJSON, newId as newOperationId } from './server/management/core';
 import { FinanceService, registerFinance } from './server/management/finance';
+import { PromotionService, registerPromotions } from './server/management/promotions';
+import { TournamentService, registerTournaments } from './server/management/tournaments';
+import { ContentService, registerContent } from './server/management/content';
 import { registerManagementCore } from './server/management/routes';
 import { registerWalletRoutes } from "./server/wallet/routes";
 import { registerAffiliateRoutes } from "./server/affiliate/routes";
@@ -94,6 +97,10 @@ const SECRET_SETTING_KEYS = new Set<string>([
   JARVIS_AI_PROVIDERS_SETTING,
   SYNC_API_KEY_SETTING,
   IG_INGEST_TOKEN_KEY,
+  // Batch 8 — content publishing integration secrets (server-side only)
+  'manus_api_key',
+  'manus_webhook_secret',
+  'zernio_api_key',
 ]);
 export type DataSourceMode = "sample" | "database";
 
@@ -822,12 +829,18 @@ async function startServer() {
   });
   const finance = new FinanceService(management,{fulfil:paymentFulfil,unfulfil:paymentUnfulfil});
   registerFinance(app,finance);
-  const sessions = new SessionService(management,finance);
+  const promotions = new PromotionService(management);
+  registerPromotions(app,promotions);
+  const sessions = new SessionService(management,finance,promotions);
   registerSessions(app,sessions);
   const orders = new OrderService(management,finance,paymentQuote,async kind => kind==='cafe'?resolveMergedList(await getActiveDataProvider().listCafeItems(),SAMPLE_CAFE_ITEMS):resolveMergedList(await getActiveDataProvider().listAccessories(),SAMPLE_ACCESSORIES));
   registerOrders(app,orders);
   const affiliateOperations = new AffiliateService(management);
   registerAffiliates(app,affiliateOperations);
+  const tournamentOps = new TournamentService(management,finance);
+  registerTournaments(app,tournamentOps);
+  const contentOps = new ContentService(management);
+  registerContent(app,contentOps);
   registerReports(app,management);
   // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
   for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{
@@ -1249,7 +1262,7 @@ async function startServer() {
       // hourly rate — the client cannot influence how much is charged or earned.
       const durationHours = hoursBetween(st, et) || 1;
       const baseTotal = Math.round(durationHours * system.hourlyRate);
-      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, (req as any).authUsername);
+      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, (req as any).authUsername, 'reservation');
       const totalPrice = Math.max(0, baseTotal - discountAmount);
       const pointsEarned = Math.floor(totalPrice / 10);
 
@@ -2041,7 +2054,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Server-authoritative coupon validation shared by cafe orders, shop orders,
   // and the standalone /api/discount/validate endpoint. The client only ever
   // sends a coupon *code* — the discount amount is always computed here.
-  async function validateCouponServerSide(amount: number, code?: string, username?: string) {
+  async function validateCouponServerSide(amount: number, code?: string, username?: string, scope?: string) {
     if (!code) return { discountAmount: 0, coupon: null as any };
     const store = getActiveDataProvider();
     const coupon = await resolveSampleById(() => store.getCouponByCode(code), SAMPLE_COUPONS, code, "code");
@@ -2061,6 +2074,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
     if (amount < coupon.minOrder) {
       throw Object.assign(new Error(`حداقل مبلغ خرید جهت استفاده از این کد ${coupon.minOrder.toLocaleString()} TL است.`), { statusCode: 400 });
+    }
+    // Promotions console tags coupons with allowed scopes (reservation/cafe/shop/tournament).
+    // A coupon without a scopes tag keeps legacy behaviour (valid everywhere) so older
+    // loyalty coupons are not broken. Stored as a JSON array string in the coupon row.
+    let scopes: any = (coupon as any).scopes;
+    if (typeof scopes === 'string' && scopes) { try { scopes = JSON.parse(scopes); } catch { scopes = null; } }
+    if (scope && Array.isArray(scopes) && scopes.length && !scopes.includes(scope)) {
+      throw Object.assign(new Error("این کد تخفیف برای این بخش قابل استفاده نیست."), { statusCode: 400, code: "COUPON_SCOPE_MISMATCH" });
     }
     const discountAmount = coupon.type === "Percent" ? amount * (coupon.value / 100) : coupon.value;
     return { discountAmount: Math.min(discountAmount, amount), coupon };
@@ -2089,7 +2110,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         totalPrice += menuItem.price * orderItem.quantity;
       }
 
-      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
+      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername, 'cafe');
       const finalAmount = Math.max(0, totalPrice - discountAmount);
       const pointsEarned = Math.floor(finalAmount / 10);
 
@@ -2186,7 +2207,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         totalPrice += catalogItem.price * cartItem.quantity;
       }
 
-      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername);
+      const { discountAmount, coupon } = await validateCouponServerSide(totalPrice, couponCode, (req as any).authUsername, 'shop');
       const finalAmount = Math.max(0, totalPrice - discountAmount);
       const pointsEarned = Math.floor(finalAmount / 10);
 
@@ -2326,7 +2347,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       await assertStationFree(management,systemId,window.startsAt,window.endsAt);
       const durationHours = (Date.parse(window.endsAt)-Date.parse(window.startsAt))/3600000;
       const baseTotal = Math.round(durationHours * system.hourlyRate * 100)/100;
-      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, username);
+      const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, username, 'reservation');
       const amount = Math.max(0, baseTotal - discountAmount);
       return {
         amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
@@ -2345,7 +2366,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         if (m.inventory < qty) throw Object.assign(new Error(`Out of stock: ${m.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
         total += m.price * qty; basket.push({ name: m.name, unitPrice: m.price, qty }); lines.push({ item: { id: m.id, name: m.name, price: m.price }, quantity: qty });
       }
-      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
+      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username, 'cafe');
       const amount = Math.max(0, total - discountAmount);
       return { amount, description: `Kafe siparişi (${lines.length} kalem)`, basket, payload: { _ops: await orderContext(params,username), items: lines, couponCode: coupon ? couponCode : "", tableNumber: tableNumber || "میز عمومی", totalPrice: total, discountAmount, amount } };
     }
@@ -2360,7 +2381,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         if (a.stock < qty) throw Object.assign(new Error(`Out of stock: ${a.name}`), { statusCode: 400, code: "OUT_OF_STOCK" });
         total += a.price * qty; basket.push({ name: a.name, unitPrice: a.price, qty }); lines.push({ item: { id: a.id, name: a.name, price: a.price }, quantity: qty });
       }
-      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username);
+      const { discountAmount, coupon } = await validateCouponServerSide(total, couponCode, username, 'shop');
       const amount = Math.max(0, total - discountAmount);
       return { amount, description: `Mağaza siparişi (${lines.length} ürün)`, basket, payload: { _ops: await orderContext(params,username), cart: lines, couponCode: coupon ? couponCode : "", totalPrice: total, discountAmount, amount } };
     }
@@ -2370,8 +2391,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     if (!tour) throw Object.assign(new Error("Tournament not found"), { statusCode: 404 });
     if (tour.registeredTeamsCount >= tour.maxTeams) throw Object.assign(new Error("Tournament is full"), { statusCode: 400, code: "TOURNAMENT_FULL" });
     if (!team?.name) throw Object.assign(new Error("Team name required"), { statusCode: 400 });
-    const amount = Number(tour.registrationFee) || 0;
-    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, title: tour.title, startDate: tour.startDate, referralCode: String(referralCode || "").trim() } };
+    const baseFee = Number(tour.registrationFee) || 0;
+    const { discountAmount, coupon } = await validateCouponServerSide(baseFee, params?.couponCode, username, 'tournament');
+    const amount = Math.max(0, baseFee - discountAmount);
+    return { amount, description: `Turnuva kaydı: ${tour.title}`, basket: [{ name: tour.title, unitPrice: amount, qty: 1 }], payload: { tournamentId, team, amount, baseFee, title: tour.title, startDate: tour.startDate, referralCode: String(referralCode || "").trim(), couponCode: coupon ? params.couponCode : "" } };
   }
 
   async function creditPoints(username: string, amount: number, description: string) {

@@ -4,10 +4,12 @@ Bazino sends one-time login codes through `server/sms/index.ts`. The driver is c
 
 | Variable | Values | Notes |
 |---|---|---|
-| `SMS_PROVIDER` | `smsto` (recommended), `easysendsms`, `mock` (default) | `mock` only logs to console; never use in production |
+| `SMS_PROVIDER` | `smsto`, `easysendsms`, `messaggio`, `mock` (default) | `mock` only logs to console; never use in production |
 | `SMSTO_API_KEY` | API key from SMS.to dashboard | required for `smsto` |
 | `EASYSENDSMS_API_KEY` | API key from EasySendSMS | required for `easysendsms` |
-| `SMS_SENDER_ID` | alphanumeric ≤ 11 chars, default `Bazino` | sender name must be approved by the provider for some countries (TR requires registration) |
+| `MESSAGGIO_PROJECT_LOGIN` | Messaggio **Bulk Login** token (header `Messaggio-Login`) | required for `messaggio` — secret |
+| `MESSAGGIO_SENDE_CODE` | Messaggio per-sender **API code** (sent as `sms.from`) | required for `messaggio` |
+| `SMS_SENDER_ID` | alphanumeric ≤ 11 chars, default `Bazino` | used by smsto / easysendsms only |
 
 ## SMS.to (primary)
 1. Sign up at https://sms.to → Dashboard → **API Keys** → create key.
@@ -17,6 +19,17 @@ Bazino sends one-time login codes through `server/sms/index.ts`. The driver is c
 
 ## EasySendSMS (fallback)
 `POST https://restapi.easysendsms.app/v1/rest/sms/send`, header `apikey`, JSON `{from,to,text,type}`; numbers are sent without `+`.
+
+## Messaggio
+Multichannel gateway — for OTP we use the SMS channel only.
+1. Register at https://my.messaggio.com/, **create an SMS sender name** and wait for activation.
+2. From the sender's detail page copy the **Messaggio Bulk Login** (account auth token) and the sender's **API code**.
+3. Set `SMS_PROVIDER=messaggio`, `MESSAGGIO_PROJECT_LOGIN=<bulk login>`, `MESSAGGIO_SENDE_CODE=<sender api code>`.
+4. Request: `POST https://msg.messaggio.com/api/v1/send`, header `Messaggio-Login: <bulk login>`, body:
+   `{"recipients":[{"phone":"90532…"}],"channels":["sms"],"sms":{"from":"<sender api code>","content":[{"type":"text","text":"…"}]}}`.
+   The phone is sent as digits with country code (leading `+`/spaces are stripped). Optional delivery reports go through
+   `options.dlr_callback_url` (configured in the Messaggio project settings as a Callback URL).
+   Note: the Messaggio bulk login is the only true secret; the sender API code identifies the approved sender.
 
 ## Mock (development / tests)
 * Codes are printed to server console as `[sms:mock] → +90…: …`.

@@ -5,7 +5,7 @@
  *   • آنلاین    → PaymentCheckout (PayTR) فقط اگر سرور اعلام کند فعال است
  * روش‌های مجاز هر نوع سفارش از GET /api/payments/methods خوانده می‌شود (بوفه/فروشگاه: فقط در محل).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { L } from '../utils/i18n';
@@ -151,7 +151,10 @@ export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn
     }
     setBusy(true); setError('');
     try {
-      const r = await postJson<any>(selected === 'wallet' ? '/api/checkout/wallet' : '/api/checkout/onsite', { kind, params });
+      const signature=JSON.stringify({kind,params,selected});
+      let idempotencyKey=localStorage.getItem('bazino.checkout.'+signature);if(!idempotencyKey){idempotencyKey=crypto.randomUUID();localStorage.setItem('bazino.checkout.'+signature,idempotencyKey);}
+      const r = await postJson<any>(selected === 'wallet' ? '/api/checkout/wallet' : '/api/checkout/onsite', { kind, params, idempotencyKey });
+      localStorage.removeItem('bazino.checkout.'+signature);
       window.dispatchEvent(new CustomEvent('bazino:refresh-data'));
       onDone({ method: selected, orderId: r.orderId, amount: r.amount, status: r.status, dueAt: r.dueAt, startsAt: r.startsAt, balance: r.balance, result: r.result });
     } catch (e) {

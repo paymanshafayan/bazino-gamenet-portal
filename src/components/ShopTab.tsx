@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Accessory, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Tag, CreditCard, ChevronRight, Check, X, Sparkles, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -119,13 +119,16 @@ export default function ShopTab({
   // خرید واقعاً به بک‌اند فرستاده می‌شود (POST /api/accessories/order). شماره‌ی
   // فاکتور، مبلغ نهایی، کسر موجودی و امتیاز همه از پاسخ سرور می‌آیند — قبلاً
   // شماره‌ی فاکتور با Math.random ساخته می‌شد و هیچ سفارشی ثبت نمی‌شد.
+  const [deliverySystemId,setDeliverySystemId] = useState('');
+  const [deliverySystems,setDeliverySystems] = useState<any[]>([]);
+  useEffect(() => { fetch('/api/systems').then(r=>r.json()).then(d=>setDeliverySystems(Array.isArray(d)?d:[])).catch(()=>{}); }, []);
   const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number } | null>(null);
 
   const handleCheckout = async () => {
     if (cart.length === 0 || isSubmitting) return;
 
     // تسک ۱۳: فروشگاه فقط «پرداخت در محل» — کالا در کلاب تحویل و تسویه می‌شود
-    setCheckout({ params: { cart: toServerCart(cart), couponCode: appliedCoupon?.code || '' }, amount: getSubtotal() - getDiscountAmount() });
+    setCheckout({ params: { cart: toServerCart(cart), couponCode: appliedCoupon?.code || '', systemId: deliverySystemId || undefined }, amount: getSubtotal() - getDiscountAmount() });
     return;
     // eslint-disable-next-line no-unreachable
     setIsSubmitting(true);
@@ -161,6 +164,7 @@ export default function ShopTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
+      <div className="p-4 border border-white/10 rounded-xl my-3"><label className="text-sm text-gray-300">{L(language,{fa:'ایستگاه مرتبط (اختیاری)',en:'Related station (optional)',tr:'İlgili istasyon (isteğe bağlı)',ru:'Станция (необязательно)'})}<select value={deliverySystemId} onChange={e=>setDeliverySystemId(e.target.value)} className="block w-full bg-darkBg border border-white/20 rounded-lg p-2 mt-2"><option value="">—</option>{deliverySystems.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></div>
       {checkout && <CheckoutModal kind="shop" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)}
         onDone={(r: CheckoutResult) => {
           setCheckout(null);

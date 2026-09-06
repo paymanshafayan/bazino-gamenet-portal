@@ -48,6 +48,42 @@ class EasySendSmsProvider implements SmsProvider {
   }
 }
 
+// ---------- Messaggio (https://messaggio.com/api-docs/) ----------
+// Multichannel gateway; for SMS we POST to /api/v1/send with the bulk login in the
+// `Messaggio-Login` header and the per-sender "API code" as `sms.from`.
+// Secrets (env, set in the host): MESSAGGIO_PROJECT_LOGIN, MESSAGGIO_SENDE_CODE.
+export class MessaggioProvider implements SmsProvider {
+  readonly name = 'messaggio';
+  constructor(private login: string, private senderCode: string) {}
+  async send(to: string, message: string): Promise<SmsSendResult> {
+    try {
+      // Messaggio examples use digits with country code and no leading "+".
+      const phone = to.replace(/\D/g, '');
+      const res = await fetch('https://msg.messaggio.com/api/v1/send', {
+        method: 'POST',
+        headers: {
+          'Messaggio-Login': this.login,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          recipients: [{ phone }],
+          channels: ['sms'],
+          sms: { from: this.senderCode, content: [{ type: 'text', text: message }] },
+        }),
+      });
+      const raw: any = await res.json().catch(() => ({}));
+      if (!res.ok || raw?.success === false || (raw?.status && /error|fail|denied|invalid/i.test(String(raw.status)))) {
+        return { ok: false, error: raw?.message || raw?.error || raw?.description || `HTTP ${res.status}`, raw };
+      }
+      const id = raw?.message_id || raw?.id || raw?.response?.message_id
+        || (Array.isArray(raw?.messages) ? raw.messages[0]?.id : undefined)
+        || raw?.result?.[0]?.message_id;
+      return { ok: true, providerMessageId: id ? String(id) : undefined, raw };
+    } catch (e: any) { return { ok: false, error: e?.message || String(e) }; }
+  }
+}
+
 // ---------- Mock (development / tests) ----------
 export interface MockSmsEntry { to: string; message: string; at: string }
 export class MockSmsProvider implements SmsProvider {
@@ -73,6 +109,10 @@ export function getSmsProvider(): SmsProvider {
   } else if (kind === 'easysendsms') {
     if (!process.env.EASYSENDSMS_API_KEY) throw new Error('SMS_PROVIDER=easysendsms requires EASYSENDSMS_API_KEY');
     instance = new EasySendSmsProvider(process.env.EASYSENDSMS_API_KEY);
+  } else if (kind === 'messaggio') {
+    if (!process.env.MESSAGGIO_PROJECT_LOGIN) throw new Error('SMS_PROVIDER=messaggio requires MESSAGGIO_PROJECT_LOGIN');
+    if (!process.env.MESSAGGIO_SENDE_CODE) throw new Error('SMS_PROVIDER=messaggio requires MESSAGGIO_SENDE_CODE (sender API code)');
+    instance = new MessaggioProvider(process.env.MESSAGGIO_PROJECT_LOGIN, process.env.MESSAGGIO_SENDE_CODE);
   } else {
     if (kind !== 'mock') console.warn(`[sms] unknown SMS_PROVIDER "${kind}", falling back to mock`);
     instance = new MockSmsProvider();

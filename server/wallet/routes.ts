@@ -22,6 +22,7 @@
  *  - رزرو/تورنمنت با کیف پول فوراً تأیید می‌شوند؛ لغو توسط کاربر قبل از مهلت → بازگشت کامل به کیف پول.
  */
 import type express from 'express';
+import { transactional } from '../management/core';
 import { randomBytes } from 'crypto';
 import type { IDataStore, OnsiteOrderRow, WalletTxRow } from '../dataProviders';
 import { normalizePhone } from '../accountRoutes';
@@ -56,6 +57,7 @@ export interface WalletDeps {
   /** برگرداندن اثر یک سفارش تکمیل‌شده (آزاد کردن ایستگاه/ظرفیت) — برای لغو رزرو/تورنمنتِ کیف‌پولی. */
   unfulfil: (kind: OrderKind, payload: any, username: string, result: any) => Promise<void>;
   /** آیا پرداخت آنلاین فعال است؟ */
+  legacyResponse?: (kind:OrderKind,username:string)=>Promise<any>;
   onlineEnabled: () => boolean;
   /** ثبت لاگ */
   log?: (msg: string) => void;
@@ -114,6 +116,7 @@ export function combineDateTime(day: Date, hhmm: string): Date | null {
 /** محاسبه‌ی مهلت پرداخت حضوری بر اساس نوع سفارش. برای بوفه/فروشگاه '' (بدون مهلت). */
 export function computeOnsiteDueAt(kind: OrderKind, payload: any, now = new Date()): { dueAt: string; startsAt: string } {
   if (kind === 'reservation') {
+    if(payload?.startsAt && Number.isFinite(Date.parse(payload.startsAt))) return {dueAt:iso(Date.parse(payload.startsAt)-ONSITE_RESERVATION_LEAD_MS),startsAt:payload.startsAt};
     const day = parseSiteDate(payload?.date, now) || new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start = combineDateTime(day, payload?.startTime) || new Date(day.getTime() + 12 * 3600000);
     return { dueAt: iso(start.getTime() - ONSITE_RESERVATION_LEAD_MS), startsAt: start.toISOString() };
@@ -128,6 +131,9 @@ export function computeOnsiteDueAt(kind: OrderKind, payload: any, now = new Date
 
 /** ابطال خودکار سفارش‌های حضوری که مهلت‌شان گذشته. برمی‌گرداند تعداد ابطال‌شده‌ها. */
 export async function expireOnsiteOrders(store: IDataStore, deps: Pick<WalletDeps, 'unfulfil'>, now = Date.now()): Promise<number> {
+  return store.runInTransaction(() => expireOnsiteOrdersAtomic(store, deps, now));
+}
+async function expireOnsiteOrdersAtomic(store: IDataStore, deps: Pick<WalletDeps, 'unfulfil'>, now: number): Promise<number> {
   const pending = await store.listOnsiteOrders({ status: 'pending_onsite' });
   let n = 0;
   for (const o of pending) {
@@ -185,7 +191,7 @@ export function registerWalletRoutes(d: WalletDeps) {
       const username = d.authUsername(req)!;
       const user = await store().getUserByUsername(username);
       const tx = await store().listWalletTxFor(username, 100);
-      const balance = tx.length ? tx[0].balanceAfter : Number(user?.walletBalance || 0);
+      const balance = await store().getWalletBalance(username);
       res.json({ balance: round2(balance), currency: 'TL', transactions: tx });
     } catch (e) { httpError(res, e); }
   });
@@ -200,7 +206,7 @@ export function registerWalletRoutes(d: WalletDeps) {
   });
 
   /** پرداخت با کیف پول: قیمت سمت سرور، کسر اتمیک، تکمیل فوری. */
-  app.post('/api/checkout/wallet', requireAuth, async (req, res) => {
+  app.post('/api/checkout/wallet', requireAuth, transactional(d.getStore, async (req, res) => {
     try {
       const { kind, params } = req.body || {};
       if (!methodsFor(kind).includes('wallet')) return res.status(400).json({ error: 'Wallet payment is not allowed for this order kind', code: 'METHOD_NOT_ALLOWED' });
@@ -229,10 +235,10 @@ export function registerWalletRoutes(d: WalletDeps) {
       log(`Wallet checkout ${orderId} (${kind}) by ${username}: ${q.amount} TL`);
       res.json({ success: true, orderId, amount: q.amount, balance: tx ? tx.balanceAfter : undefined, result });
     } catch (e) { httpError(res, e); }
-  });
+  }));
 
   /** پرداخت در محل: فقط ثبت سفارش با مهلت؛ رزرو ایستگاه/ظرفیت تورنمنت همین حالا گرفته می‌شود. */
-  app.post('/api/checkout/onsite', requireAuth, async (req, res) => {
+  app.post('/api/checkout/onsite', requireAuth, transactional(d.getStore, async (req, res) => {
     try {
       const { kind, params } = req.body || {};
       if (!methodsFor(kind).includes('onsite')) return res.status(400).json({ error: 'On-site payment is not allowed for this order kind', code: 'METHOD_NOT_ALLOWED' });
@@ -250,12 +256,12 @@ export function registerWalletRoutes(d: WalletDeps) {
       }
       await store().createOnsiteOrder({ id: orderId, kind, username, amount: q.amount, status: 'pending_onsite', dueAt, payload: JSON.stringify(q.payload), description: q.description, result: result ? JSON.stringify(result) : '', createdAt: iso(), updatedAt: iso(), settledAt: '', settledBy: '' });
       log(`On-site order ${orderId} (${kind}) by ${username}: ${q.amount} TL, due ${dueAt || '-'}`);
-      res.json({ success: true, orderId, amount: q.amount, status: 'pending_onsite', dueAt, startsAt, result });
+      res.json({ ...((req as any).legacyCheckout&&d.legacyResponse?await d.legacyResponse(kind,username):{}),success: true, orderId, amount: q.amount,totalPrice:q.amount, status: 'pending_onsite', dueAt, startsAt, result });
     } catch (e) { httpError(res, e); }
-  });
+  }));
 
   /** لغو توسط کاربر: در انتظار → لغو؛ کیف‌پولی قبل از مهلت → بازگشت کامل. */
-  app.post('/api/checkout/onsite/:id/cancel', requireAuth, async (req, res) => {
+  app.post('/api/checkout/onsite/:id/cancel', requireAuth, transactional(d.getStore, async (req, res) => {
     try {
       const username = d.authUsername(req)!;
       const o = await store().getOnsiteOrder(String(req.params.id));
@@ -278,7 +284,7 @@ export function registerWalletRoutes(d: WalletDeps) {
       }
       return res.status(400).json({ error: `Order is ${o.status}`, code: 'BAD_STATE' });
     } catch (e) { httpError(res, e); }
-  });
+  }));
 
   /* ---------- نرم‌افزار مدیریت (sync API key) ---------- */
   async function userForPhone(phoneRaw: unknown, createIfMissing: boolean) {
@@ -355,7 +361,7 @@ export function registerWalletRoutes(d: WalletDeps) {
         result = await d.fulfil(o.kind as OrderKind, payload, o.username, { merchantOid: o.id, kind: o.kind, username: o.username });
       } else {
         // رزرو/تورنمنت: جا قبلاً گرفته شده؛ فقط امتیاز
-        result = await d.fulfil(o.kind as OrderKind, { ...payload, __pointsOnly: true }, o.username, { merchantOid: o.id, kind: o.kind, username: o.username });
+        result = { ...(result || {}), ...(await d.fulfil(o.kind as OrderKind, { ...payload, __pointsOnly: true }, o.username, { merchantOid: o.id, kind: o.kind, username: o.username })) };
       }
       await store().updateOnsiteOrder(o.id, { status: 'settled', settledAt: iso(), settledBy: `${method}:${who}`, result: JSON.stringify({ method, ...(result || {}) }), updatedAt: iso() });
       try {

@@ -3,7 +3,7 @@
  * شاهد Share = کامنت کد یکتا زیر همان پست (`share_confirmed_by_friend_code`).
  * پیام ۱ = یک Private Reply؛ پیام ۲ = دایرکت بعد از دکمه (نه PR دوم).
  */
-import { randomBytes } from 'crypto';
+import { createHmac, randomBytes } from 'crypto';
 import type { AffiliateRow, CouponRow, IgEventRow, IgMediaRow, IgMemberRow, IDataStore } from '../dataProviders';
 import { isValidCode, newAffId, normalizeCode } from './engine';
 import {
@@ -277,4 +277,94 @@ export async function onFollowButton(store: IDataStore, memberId: string, follow
 export function parseFollowPayload(payload: string): string | null {
   const m = String(payload || '').match(/^ig_follow:(.+)$/);
   return m ? m[1] : null;
+}
+
+// ── Batch (link-based invites): Manus sends an Instagram ACCOUNT id (not a post
+// media id), the portal mints a unique partner code + a signed invite link. A friend
+// opening the link enters the existing friend gate / coupon flow. ──────────────
+
+/** Secret used to sign invite links (stable per install; falls back to the ingest token). */
+export async function inviteSigningSecret(store: IDataStore): Promise<string> {
+  const g = async (k: string) => { try { return (await store.getSetting(k)) || ''; } catch { return ''; } };
+  return (
+    (await g('ig_invite_signing_secret')) ||
+    process.env.IG_INVITE_SIGNING_SECRET ||
+    process.env.ZERNIO_WEBHOOK_SECRET ||
+    (await g('ig_ingest_token'))
+  );
+}
+
+/** HMAC-signed invite link: carries the partner code + campaign so a friend can be
+ *  attributed, and a `sig` so the link can't be forged or have its code swapped. */
+export async function buildSignedInviteLink(store: IDataStore, opts: { code: string; campaign: string; handle?: string; username?: string }): Promise<string> {
+  const settings = await readIgSettings(store);
+  const base = String(settings.ig_invite_base_url || 'https://bazino.pro').replace(/\/$/, '');
+  const params = new URLSearchParams({
+    ref: opts.code,
+    utm_source: 'instagram',
+    utm_medium: 'affiliate',
+    utm_campaign: opts.campaign,
+    partner_code: opts.code,
+    gate: '1',
+  });
+  if (opts.handle) params.set('h', opts.handle);
+  const secret = await inviteSigningSecret(store);
+  const sig = createHmac('sha256', secret).update(`${opts.campaign}:${opts.code}`).digest('hex').slice(0, 32);
+  params.set('sig', sig);
+  return `${base}/?${params.toString()}`;
+}
+
+/** Verify an invite link signature (used by the friend gate). Returns the partner code. */
+export async function verifySignedInvite(store: IDataStore, code: string, campaign: string, sig: string): Promise<boolean> {
+  if (!code || !sig) return false;
+  const secret = await inviteSigningSecret(store);
+  const expect = createHmac('sha256', secret).update(`${campaign || 'SQUAD26'}:${code}`).digest('hex').slice(0, 32);
+  const a = Buffer.from(String(sig).trim(), 'utf8');
+  const b = Buffer.from(expect, 'utf8');
+  return a.length === b.length && timingSafeEqualLike(a, b);
+}
+function timingSafeEqualLike(a: Buffer, b: Buffer): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0; for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]; return diff === 0;
+}
+
+export interface PartnerInviteResult {
+  ok: boolean; code?: string; invite_url?: string; campaign?: string; isNew?: boolean; error?: string;
+}
+
+/**
+ * Mint (or return existing) partner invite for an Instagram ACCOUNT id.
+ * Idempotent per (campaign, igUserId): Manus can call again with the same account
+ * and get the same code/link instead of a new one.
+ */
+export async function createPartnerInvite(store: IDataStore, input: {
+  igUserId: string; igUsername?: string; campaignId?: string;
+}): Promise<PartnerInviteResult> {
+  const igUserId = String(input.igUserId || '').trim();
+  if (!igUserId || !/^[A-Za-z0-9._-]{1,64}$/.test(igUserId)) return { ok: false, error: 'invalid_ig_user_id' };
+  const settings = await readIgSettings(store);
+  const campaign = String(input.campaignId || knownCampaignIds(settings)[0] || 'SQUAD26').trim();
+  if (input.campaignId && !knownCampaignIds(settings).includes(campaign)) return { ok: false, error: 'campaign_not_found' };
+
+  // Idempotent: same Instagram account + campaign → same partner.
+  const existing = (await store.listIgMembers({ campaignId: campaign }))
+    .find(m => m.role === 'partner' && m.igUserId === igUserId && m.inviteUrl);
+  if (existing) return { ok: true, code: existing.partnerCode, invite_url: existing.inviteUrl, campaign, isNew: false };
+
+  const taken = new Set((await store.listIgMembers()).filter(m => m.role === 'partner').map(m => m.partnerCode));
+  for (const a of await store.listAffiliates()) taken.add(a.code);
+  const code = generatePartnerCode(taken);
+  await ensureAffiliateForCode(store, code, input.igUsername || igUserId);
+
+  const now = iso();
+  const inviteUrl = await buildSignedInviteLink(store, { code, campaign, handle: input.igUsername || '' });
+  const partner: IgMemberRow = {
+    id: newAffId('IGP'), role: 'partner', campaignId: campaign, mediaId: '', commentId: '',
+    igUserId, igUsername: input.igUsername || '', partnerCode: code, parentMemberId: '',
+    affiliateCode: code, status: 'link_invite_created', followMethod: 'manus_link', shareStatus: '',
+    couponCode: '', inviteUrl, createdAt: now, updatedAt: now,
+  };
+  await store.createIgMember(partner);
+  await writeEvent(store, { memberId: partner.id, mediaId: '', commentId: '', kind: 'partner_link_invite', payload: JSON.stringify({ campaign, igUserId: igUserId }), result: 'link_created', verificationMethod: 'signed_link' });
+  return { ok: true, code, invite_url: inviteUrl, campaign, isNew: true };
 }

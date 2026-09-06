@@ -80,13 +80,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (paymentMethod === 'WALLET' && customer && customer.walletBalance - finalAmount < 0) {
-      const proceed = confirm(
-        `موجودی کیف‌پول ${customer.name} کافی نیست و با این تسویه به بدهکار می‌رود. آیا مطمئن هستید؟`
-      );
-      if (!proceed) return;
-    }
+    if (paymentMethod !== 'CASH' && paymentMethod !== 'POS') return;
 
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
@@ -103,9 +97,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       discountAmount,
       totalAmount: finalAmount,
       paymentMethod,
-      cashPaid: paymentMethod === 'CASH' ? finalAmount : paymentMethod === 'SPLIT' ? cashPaidInput : 0,
-      posPaid: paymentMethod === 'POS' ? finalAmount : paymentMethod === 'SPLIT' ? posPaidInput : 0,
-      walletPaid: paymentMethod === 'WALLET' ? finalAmount : 0,
+      cashPaid: paymentMethod === 'CASH' ? finalAmount : 0,
+      posPaid: paymentMethod === 'POS' ? finalAmount : 0,
+      walletPaid: 0,
       roundingAmount: roundedDifference,
       operatorName,
       date: new Date().toISOString().split('T')[0],
@@ -219,7 +213,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {/* Payment Method Selector */}
           <div>
             <label className="text-xs font-semibold text-zinc-300 block mb-2">روش تسویه فاکتور:</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => handlePaymentMethodChange('CASH')}
@@ -246,32 +240,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <span className="text-xs">کارتخوان POS</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => handlePaymentMethodChange('SPLIT')}
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${
-                  paymentMethod === 'SPLIT'
-                    ? 'bg-purple-500/20 border-purple-500 text-purple-300 font-bold'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                }`}
-              >
-                <DollarSign className="w-4 h-4" />
-                <span className="text-xs">ترکیبی (نقد+کارت)</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => handlePaymentMethodChange('WALLET')}
-                disabled={!customer}
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${
-                  paymentMethod === 'WALLET'
-                    ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-500 disabled:opacity-40'
-                }`}
-              >
-                <Wallet className="w-4 h-4" />
-                <span className="text-xs">کیف‌پول اعتباری</span>
-              </button>
+
+
             </div>
           </div>
 

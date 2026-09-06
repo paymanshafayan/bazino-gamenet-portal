@@ -3,8 +3,9 @@
  */
 import type express from 'express';
 import type { IDataStore } from '../dataProviders';
-import { IG_INGEST_TOKEN_KEY, IG_SETTING_KEYS, readIgSettings, seedIgSettings } from './igSettings';
-import { onCampaignComment, onFollowButton, parseFollowPayload, registerPublishedMedia } from './igEngine';
+import { IG_INGEST_TOKEN_KEY, IG_SETTING_KEYS, readIgSettings, seedIgSettings,
+  listApiTokens, createApiToken, renameApiToken, deleteApiToken, isValidApiToken } from './igSettings';
+import { onCampaignComment, onFollowButton, parseFollowPayload, registerPublishedMedia, createPartnerInvite } from './igEngine';
 import { dispatchIgOutbound, verifyZernioSignature, zernioConfigured, zernioFollowStatus } from './zernio';
 
 export interface IgRouteDeps {
@@ -28,6 +29,15 @@ async function ingestToken(store: IDataStore): Promise<string> {
   return (process.env.IG_INGEST_TOKEN || (await store.getSetting(IG_INGEST_TOKEN_KEY)) || '').trim();
 }
 
+/** Accept either the legacy IG ingest bearer or any active integration API token. */
+async function validIntegrationBearer(store: IDataStore, req: express.Request): Promise<boolean> {
+  const t = bearer(req);
+  if (!t) return false;
+  const legacy = (await ingestToken(store)).trim();
+  if (legacy && t === legacy) return true;
+  return isValidApiToken(store, t);
+}
+
 export function registerIgRoutes(d: IgRouteDeps) {
   const { app } = d;
   const store = () => d.getStore();
@@ -35,8 +45,7 @@ export function registerIgRoutes(d: IgRouteDeps) {
   app.post('/api/integrations/instagram/published-media', async (req, res) => {
     try {
       await seedIgSettings(store());
-      const expected = await ingestToken(store());
-      if (!expected || bearer(req) !== expected) {
+      if (!(await validIntegrationBearer(store(), req))) {
         return res.status(401).json({ accepted: false, error: 'unauthorized', code: 'unauthorized' });
       }
       const key = String(req.headers['idempotency-key'] || `instagram:${req.body?.media_id || ''}`);
@@ -45,11 +54,42 @@ export function registerIgRoutes(d: IgRouteDeps) {
     } catch (e) { httpError(res, e); }
   });
 
+  // Manus → mint a signed partner invite for an Instagram ACCOUNT id (not a post/reel
+  // media id). Returns the unique partner code and the signed invite link; a friend
+  // opening the link enters the existing friend gate / coupon flow.
+  app.post('/api/integrations/instagram/partner-invite', async (req, res) => {
+    try {
+      await seedIgSettings(store());
+      if (!(await validIntegrationBearer(store(), req))) {
+        return res.status(401).json({ ok: false, error: 'unauthorized', code: 'unauthorized' });
+      }
+      const b = req.body || {};
+      const out = await createPartnerInvite(store(), {
+        igUserId: String(b.ig_user_id ?? b.igUserId ?? b.instagram_id ?? b.account_id ?? ''),
+        igUsername: b.ig_username ?? b.igUsername ?? b.username ?? '',
+        campaignId: b.campaign_id ?? b.campaignId ?? '',
+      });
+      if (!out.ok) {
+        const status = out.error === 'campaign_not_found' ? 422 : 400;
+        return res.status(status).json({ ok: false, error: out.error, code: out.error });
+      }
+      res.json({
+        ok: true,
+        code: out.code,
+        invite_url: out.invite_url,
+        campaign: out.campaign,
+        is_new: out.isNew,
+      });
+    } catch (e) { httpError(res, e); }
+  });
+
   app.post('/api/integrations/zernio/webhook', async (req, res) => {
     try {
       const raw = (req as any).rawBody as Buffer | undefined;
       const payload = raw || Buffer.from(JSON.stringify(req.body || {}));
-      if (!verifyZernioSignature(payload, String(req.headers['x-zernio-signature'] || ''))) {
+      const sigOk = verifyZernioSignature(payload, String(req.headers['x-zernio-signature'] || ''));
+      const bearerOk = await validIntegrationBearer(store(), req);
+      if (!sigOk && !bearerOk) {
         return res.status(401).json({ error: 'unauthorized', code: 'unauthorized' });
       }
       const body = req.body || {};
@@ -83,6 +123,33 @@ export function registerIgRoutes(d: IgRouteDeps) {
         }
       }
       res.json({ ok: true, outboundSent });
+    } catch (e) { httpError(res, e); }
+  });
+
+  // Integration API tokens (Manus / Zernio). Admin only (mounted under /api/admin).
+  app.get('/api/admin/api-tokens', async (_req, res) => {
+    try { res.json({ tokens: await listApiTokens(store()) }); } catch (e) { httpError(res, e); }
+  });
+  app.post('/api/admin/api-tokens', async (req, res) => {
+    try {
+      const name = String((req.body || {}).name || '').trim() || 'API token';
+      const row = await createApiToken(store(), name);
+      res.json({ success: true, token: row });
+    } catch (e) { httpError(res, e); }
+  });
+  app.put('/api/admin/api-tokens/:id', async (req, res) => {
+    try {
+      const name = String((req.body || {}).name || '').trim();
+      const ok = await renameApiToken(store(), String(req.params.id), name);
+      if (!ok) return res.status(404).json({ error: 'not_found', code: 'not_found' });
+      res.json({ success: true });
+    } catch (e) { httpError(res, e); }
+  });
+  app.delete('/api/admin/api-tokens/:id', async (req, res) => {
+    try {
+      const ok = await deleteApiToken(store(), String(req.params.id));
+      if (!ok) return res.status(404).json({ error: 'not_found', code: 'not_found' });
+      res.json({ success: true });
     } catch (e) { httpError(res, e); }
   });
 

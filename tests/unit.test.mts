@@ -781,6 +781,35 @@ test('SMS layer: mock is the default, unknown provider falls back to mock, real 
   assert.ok(existsSync(path.join(ROOT, 'docs/sms/SMS-PROVIDERS.md')));
 });
 
+test('SMS layer: Messaggio driver sends Messaggio-Login header, sender code in sms.from, digits-only phone', async () => {
+  const sms = await import('../server/sms/index.ts');
+  let captured: { url?: string; init?: RequestInit } = {};
+  const realFetch = (globalThis as any).fetch;
+  (globalThis as any).fetch = async (url: any, init: any) => {
+    captured = { url: String(url), init };
+    return { ok: true, json: async () => ({ success: true, message_id: 'MID-9001' }) } as any;
+  };
+  try {
+    const p = new sms.MessaggioProvider('PROJ-LOGIN-SECRET', 'SENDER-CODE-123');
+    const r = await p.send('+90 532 111 22 33', 'Bazino code: 123456');
+    assert.equal(r.ok, true);
+    assert.equal(r.providerMessageId, 'MID-9001');
+    assert.equal(captured.url, 'https://msg.messaggio.com/api/v1/send');
+    const headers = captured.init?.headers as Record<string, string>;
+    assert.equal(headers['Messaggio-Login'], 'PROJ-LOGIN-SECRET');
+    const body = JSON.parse((captured.init?.body as string) || '{}');
+    assert.equal(body.channels[0], 'sms');
+    assert.equal(body.sms.from, 'SENDER-CODE-123');
+    assert.equal(body.sms.content[0].type, 'text');
+    assert.equal(body.sms.content[0].text, 'Bazino code: 123456');
+    assert.equal(body.recipients[0].phone, '905321112233'); // "+" and spaces stripped
+  } finally { (globalThis as any).fetch = realFetch; }
+  // factory wiring + secret requirements
+  const src = readFileSync(path.join(ROOT, 'server/sms/index.ts'), 'utf8');
+  assert.ok(src.includes("SMS_PROVIDER=messaggio requires MESSAGGIO_PROJECT_LOGIN"));
+  assert.ok(src.includes("MESSAGGIO_SENDE_CODE"));
+});
+
 test('OTP policy in code: hashed storage, 5-minute expiry, 5 attempts, server-side limits, dev-peek gated', () => {
   const src = readFileSync(path.join(ROOT, 'server/accountRoutes.ts'), 'utf8');
   assert.ok(src.includes("createHash('sha256')"), 'codes must be hashed');
@@ -892,6 +921,7 @@ test('expireOnsiteOrders cancels only overdue pending orders and releases their 
   const store: any = {
     listOnsiteOrders: async () => rows.filter(r => r.status === 'pending_onsite'),
     updateOnsiteOrder: async (id: string, f: any) => { Object.assign(rows.find(r => r.id === id), f); },
+    runInTransaction: async (fn: () => Promise<any>) => fn(),
   };
   const n = await wallet.expireOnsiteOrders(store, { unfulfil: async (...a: any[]) => { calls.push(a); } }, Date.parse('2026-06-01T00:00:00Z'));
   assert.equal(n, 1);
@@ -987,6 +1017,7 @@ function memAffStore() {
     listOnsiteOrders: async (f: any = {}) => orders.filter(o => !f.username || o.username === f.username),
     getOnsiteOrder: async (id: string) => orders.find(o => o.id === id),
     appendWalletTx: async (tx: any) => { const row = { ...tx, balanceAfter: (wallet.at(-1)?.balanceAfter || 0) + tx.amount }; wallet.push(row); return row; },
+    runInTransaction: async (fn: () => Promise<any>) => fn(),
     _settings: settings, _affiliates: affiliates, _clicks: clicks, _comms: comms, _wallet: wallet, _orders: orders,
   };
 }

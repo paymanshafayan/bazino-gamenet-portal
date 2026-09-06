@@ -29,7 +29,7 @@ const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
 const CafeTab = lazy(() => import('./components/CafeTab'));
 const ShopTab = lazy(() => import('./components/ShopTab'));
-const TournamentsTab = lazy(() => import('./components/TournamentsTab'));
+const TournamentsTab = lazy(() => import('./components/tournaments/EventsTab'));
 const BlogTab = lazy(() => import('./components/BlogTab'));
 const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
 
@@ -674,7 +674,7 @@ export default function App() {
       {activeTab === 'reservations' && <ReservationsTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
       {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
       {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
-      {activeTab === 'tournaments' && <TournamentsTab themeId={themeId} tournaments={tournaments} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification}/>}
+      {activeTab === 'tournaments' && <TournamentsTab />}
       {activeTab === 'blog' && <BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/>}
       {activeTab === 'admin' && (
         <AdminPanelTab 

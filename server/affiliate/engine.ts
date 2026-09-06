@@ -295,6 +295,9 @@ export async function onReservationAttended(store: IDataStore, reservationId: st
 
 /** pending بدون flag که holdUntil گذشته → approved و شارژ کیف پول → paid_out */
 export async function approveDueCommissions(store: IDataStore): Promise<number> {
+  return store.runInTransaction(() => approveDueCommissionsAtomic(store));
+}
+async function approveDueCommissionsAtomic(store: IDataStore): Promise<number> {
   const pending = await store.listAffiliateCommissions({ status: 'pending' });
   const now = Date.now();
   let n = 0;

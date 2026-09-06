@@ -1,6 +1,17 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { OpsProvider } from '../../../shared/management/context';
+
+// Legacy local UI requests use the same authenticated account as operational APIs.
+const baseFetch = window.fetch.bind(window);
+window.fetch = (input, init) => {
+  const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, window.location.href);
+  if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')) return baseFetch(input, init);
+  const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+  try { const token = localStorage.getItem('bazino.authToken'); if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`); } catch {}
+  return baseFetch(input, { ...init, headers });
+};
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import './index.css';
 
@@ -31,7 +42,7 @@ unlockAudioOnIOS();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <OpsProvider gate><App /></OpsProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

@@ -119,6 +119,62 @@ export function knownCampaignIds(settings: Record<string, string>): string[] {
   return String(settings.ig_campaign_ids || 'SQUAD26').split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
 }
 
+// ── Integration API tokens (Manus / Zernio) ─────────────────────────────────
+// Standard rotating bearer tokens, stored as a secret setting; managed from the
+// admin panel. An integration (Manus ingest/partner-invite, Zernio webhook) can
+// authenticate with any active token.
+export const API_TOKENS_SETTING = 'integration_api_tokens';
+export interface ApiTokenRow { id: string; name: string; token: string; createdAt: string; lastUsedAt: string; }
+
+export function generateApiToken(): string {
+  return `baz_${randomBytes(24).toString('hex')}`;
+}
+
+async function readTokens(store: { getSetting(k: string): Promise<string | undefined> }): Promise<ApiTokenRow[]> {
+  const raw = await store.getSetting(API_TOKENS_SETTING);
+  if (!raw) return [];
+  try { const arr = JSON.parse(raw); return Array.isArray(arr) ? arr : []; } catch { return []; }
+}
+async function writeTokens(store: { setSetting(k: string, v: string): Promise<void> }, tokens: ApiTokenRow[]): Promise<void> {
+  await store.setSetting(API_TOKENS_SETTING, JSON.stringify(tokens));
+}
+
+/** Admin-facing list (full token included — admin only, needed for copy). */
+export async function listApiTokens(store: any): Promise<ApiTokenRow[]> {
+  return readTokens(store);
+}
+export async function createApiToken(store: any, name: string): Promise<ApiTokenRow> {
+  const tokens = await readTokens(store);
+  const row: ApiTokenRow = {
+    id: newTokId(), name: String(name || '').slice(0, 80) || 'API token',
+    token: generateApiToken(), createdAt: new Date().toISOString(), lastUsedAt: '',
+  };
+  tokens.push(row); await writeTokens(store, tokens); return row;
+}
+export async function renameApiToken(store: any, id: string, name: string): Promise<boolean> {
+  const tokens = await readTokens(store);
+  const t = tokens.find(x => x.id === id); if (!t) return false;
+  t.name = String(name || '').slice(0, 80) || t.name; await writeTokens(store, tokens); return true;
+}
+export async function deleteApiToken(store: any, id: string): Promise<boolean> {
+  const tokens = await readTokens(store);
+  const next = tokens.filter(x => x.id !== id);
+  if (next.length === tokens.length) return false;
+  await writeTokens(store, next); return true;
+}
+/** True when `bearer` matches an active integration token (also stamps lastUsedAt). */
+export async function isValidApiToken(store: any, bearer: string): Promise<boolean> {
+  const t = String(bearer || '').trim();
+  if (!t || !t.startsWith('baz_')) return false;
+  const tokens = await readTokens(store);
+  const match = tokens.find(x => x.token === t);
+  if (!match) return false;
+  match.lastUsedAt = new Date().toISOString();
+  try { await writeTokens(store, tokens); } catch { /* best-effort stamp */ }
+  return true;
+}
+function newTokId(): string { return `TOK-${randomBytes(6).toString('hex')}`; }
+
 export function langFromCaptionVersion(raw: string | undefined, fallback: IgMsgLang = 'tr'): IgMsgLang {
   const s = String(raw || fallback).toLowerCase();
   if (s.startsWith('fa')) return 'fa';

@@ -52,3 +52,25 @@ Outbound (فقط اگر `ZERNIO_API_KEY` و `ZERNIO_IG_ACCOUNT_ID` باشند): 
 ## جداول
 
 `ig_media` · `ig_members` · `ig_events` — هر سه پروایدر (SQLite / `dbo.` / Mongo `col('…')`).
+
+---
+
+## فاز ۳ — دعوت مبتنی‌بر لینک (Manus → کد یکتا + لینک امضاشده)
+
+برای اتوماسیون با **Manus** (بدون دخالت ادمین): عامل فقط **Instagram ACCOUNT id** شریک را می‌فرستد و سرور **کد یکتا** و **لینک دعوت امضاشده (HMAC)** برمی‌گرداند. این id متعلق به اکانت است و با media id پست/ریل (فاز ۱) فرق دارد.
+
+`POST /api/integrations/instagram/partner-invite`
+- `Authorization: Bearer <token>` — توکن احراز هویت یکپارچه (پایین را ببینید).
+- بدنه: `{ "ig_user_id": "<account id>", "ig_username": "<handle اختیاری>", "campaign_id": "SQUAD26" (اختیاری) }`.
+- پاسخ `200`: `{ ok, code, invite_url, campaign, is_new }`.
+- **Idempotent:** همان `ig_user_id`+کمپین همیشه همان کد/لینک را برمی‌گرداند (`is_new:false`)؛ تکرار امن است.
+- خطا: `401 unauthorized` · `400 invalid_ig_user_id` · `422 campaign_not_found`.
+
+دوست با بازکردن `invite_url` وارد گیت می‌شود و پس از ثبت‌نام کوپن یک‌بارمصرف می‌گیرد (همان منطق دوست در فاز ۲). لینک امضای HMAC دارد (`sig`) تا کد داخلش جعل/تعویض نشود؛ سکرت امضا `IG_INVITE_SIGNING_SECRET` (یا fallback به توکن ingest).
+
+## احراز هویت یکپارچه (توکن‌های دسترسی)
+
+- توکن‌های bearer استاندارد از پنل مدیریت (`/admin/affiliates` → «توکن‌های دسترسی») ساخته/کپی/تغییرنام/حذف می‌شوند؛ در ردیف سکرت `integration_api_tokens` ذخیره و از `/api/settings` عمومی حذف می‌شوند. فرمت: `baz_<hex>`.
+- یک توکن فعال هم برای Manus (partner-invite و published-media) و هم برای وب‌هوک Zernio (`Authorization: Bearer` به‌عنوان جایگزین HMAC) معتبر است.
+- سازگاری: `IG_INGEST_TOKEN` (env/ردیف `ig_ingest_token`) همچنان پذیرفته می‌شود.
+- مسیرهای ادمین (زیر requireAdmin): `GET/POST /api/admin/api-tokens`، `PUT/DELETE /api/admin/api-tokens/:id`.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CafeItem, DiscountCode } from '../types/gamenet';
 import { ShoppingCart, Check, X, Sparkles, Coffee, Utensils, Zap } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -114,6 +114,9 @@ export default function CafeTab({
   };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deliverySystemId,setDeliverySystemId] = useState('');
+  const [deliverySystems,setDeliverySystems] = useState<any[]>([]);
+  useEffect(() => { fetch('/api/systems').then(r=>r.json()).then(d=>setDeliverySystems(Array.isArray(d)?d:[])).catch(()=>{}); }, []);
   const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number } | null>(null);
 
   // سفارش واقعاً به بک‌اند فرستاده می‌شود. قیمت، تخفیف، کسر موجودی و امتیاز همه
@@ -130,7 +133,7 @@ export default function CafeTab({
     }
 
     // تسک ۱۳: بوفه فقط «پرداخت در محل» — سفارش ثبت می‌شود و هنگام تحویل تسویه می‌گردد (امتیاز بعد از تسویه)
-    setCheckout({ params: { items: toServerCart(cart), couponCode: appliedCoupon?.code || '', tableNumber: systemNumber }, amount: getSubtotal() - getDiscountAmount() });
+    setCheckout({ params: { items: toServerCart(cart), couponCode: appliedCoupon?.code || '', tableNumber: systemNumber, systemId: deliverySystemId || undefined }, amount: getSubtotal() - getDiscountAmount() });
     return;
     // eslint-disable-next-line no-unreachable
 
@@ -168,6 +171,7 @@ export default function CafeTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
+      <div className="p-4 border border-white/10 rounded-xl my-3"><label className="text-sm text-gray-300">{L(language,{fa:'ایستگاه مرتبط (اختیاری)',en:'Related station (optional)',tr:'İlgili istasyon (isteğe bağlı)',ru:'Станция (необязательно)'})}<select value={deliverySystemId} onChange={e=>setDeliverySystemId(e.target.value)} className="block w-full bg-darkBg border border-white/20 rounded-lg p-2 mt-2"><option value="">—</option>{deliverySystems.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></div>
       {checkout && <CheckoutModal kind="cafe" params={checkout.params} estimatedAmount={checkout.amount} onClose={() => setCheckout(null)}
         onDone={(r: CheckoutResult) => {
           setCheckout(null);

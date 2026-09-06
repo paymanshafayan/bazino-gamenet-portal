@@ -1,3 +1,5 @@
+import { OpsProvider } from '../../shared/management/context';
+import { OrdersConsole } from '../../shared/management/Orders';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   BarChart3, 
@@ -38,7 +40,8 @@ import {
   Download,
   LifeBuoy,
   Wallet,
-  Megaphone
+  Megaphone,
+  Ticket
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
@@ -65,7 +68,11 @@ export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; 
   cafe:              { fa: 'بوفه و کافه', en: 'Cafe Buffet', ru: 'Кафе-буфет', tr: 'Kafe Büfe', keywords: 'menu منو غذا نوشیدنی food drink' },
   shop:              { fa: 'فروشگاه لوازم جانبی', en: 'Accessory Shop', ru: 'Магазин аксессуаров', tr: 'Ekipman Mağazası', keywords: 'products محصول کالا mouse headset' },
   tournaments:       { fa: 'مسابقات و تورنمنت‌ها', en: 'Tournaments', ru: 'Турниры', tr: 'Turnuvalar', keywords: 'match تورنمنت جایزه prize bracket' },
+  tournamentOps:     { fa: 'مدیریت عملیاتی مسابقات', en: 'Tournament Operations', ru: 'Управление турнирами', tr: 'Turnuva Operasyonları', keywords: 'bracket براکت ثبت‌نام حضور نتیجه تیم checkin team result مساقات' },
+  messaging:         { fa: 'پیامک گروهی', en: 'Bulk Messaging', ru: 'Рассылки', tr: 'Toplu Mesaj', keywords: 'sms پیامک وایبر واتساپ whatsapp viber کمپین تبلیغات گروهی messaggio campaign' },
   blog:              { fa: 'وبلاگ و اخبار', en: 'Blog & News', ru: 'Блог и новости', tr: 'Blog ve Haberler', keywords: 'article مقاله خبر post' },
+  content:           { fa: 'محتوا و صف انتشار (Manus)', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu', keywords: 'manus سوشیال social instagram telegram صف انتشار queue publish schedule زمانبندی' },
+  promotions:        { fa: 'کوپن‌ها و ساعات رایگان/نیم‌بها', en: 'Coupons & Free/Half Hours', ru: 'Купоны и бесплатные/льготные часы', tr: 'Kuponlar ve Ücretsiz/Yarım Saatler', keywords: 'coupon کوپن تخفیف discount happy hour رایگان نیم‌بها ساعت ویژه' },
   chat:              { fa: 'اتاق‌های گفتگوی زنده', en: 'Live Chat Rooms', ru: 'Живые чат-комнаты', tr: 'Canlı Sohbet Odaları', keywords: 'room پیام گفتگو message' },
   messages:          { fa: 'پیام‌ها و اعلان‌ها', en: 'Messages & Notifications', ru: 'Сообщения и уведомления', tr: 'Mesajlar ve Bildirimler', keywords: 'notification ایمیل تماس contact inbox' },
   migrations:        { fa: 'مهاجرت‌های دیتابیس (EF Core)', en: 'Database Migrations', ru: 'Миграции БД', tr: 'Veritabanı Geçişleri', keywords: 'ef core sql schema جدول' },
@@ -85,6 +92,11 @@ const PresentationTab = React.lazy(() => import('./PresentationTab'));
 const AdminTicketsSection = React.lazy(() => import('./AdminTicketsSection'));
 const AdminWalletSection = React.lazy(() => import('./AdminWalletSection'));
 const AdminAffiliatesSection = React.lazy(() => import('./AdminAffiliatesSection'));
+const PromotionsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Promotions')).PromotionsConsole as unknown as React.ComponentType }));
+const TournamentsOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Tournaments')).TournamentsConsole as unknown as React.ComponentType }));
+const AdminTournamentPlanner = React.lazy(() => import('./admin/AdminTournamentPlanner'));
+const AdminMessagingPanel = React.lazy(() => import('./admin/AdminMessagingPanel'));
+const ContentOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Content')).ContentConsole as unknown as React.ComponentType }));
 
 interface Props {
   themeId?: string;
@@ -1637,6 +1649,58 @@ export default function AdminPanelTab({
           </button>
 
           <button
+            onClick={() => setActiveSubTab('tournamentOps')}
+            data-admin-nav="tournamentOps"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'tournamentOps'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Trophy className="w-4 h-4" />
+            <span>{L(language, { fa: 'مدیریت عملیاتی مسابقات', en: 'Tournament Operations', ru: 'Операции турниров', tr: 'Turnuva Operasyonları' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('messaging')}
+            data-admin-nav="messaging"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'messaging'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>{L(language, { fa: 'پیامک گروهی (SMS/وایبر/واتساپ)', en: 'Bulk Messaging (SMS/Viber/WA)', ru: 'Рассылки (SMS/Viber/WA)', tr: 'Toplu Mesaj (SMS/Viber/WA)' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('promotions')}
+            data-admin-nav="promotions"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'promotions'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Ticket className="w-4 h-4" />
+            <span>{L(language, { fa: 'کوپن‌ها و ساعات رایگان/نیم‌بها', en: 'Coupons & Special Hours', ru: 'Купоны и спец-часы', tr: 'Kuponlar ve Özel Saatler' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('content')}
+            data-admin-nav="content"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'content'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+            <span>{L(language, { fa: 'محتوا و صف انتشار (Manus)', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu' })}</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('migrations')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
               activeSubTab === 'migrations'
@@ -2794,383 +2858,16 @@ export default function AdminPanelTab({
           )}
 
           {/* Cafe Subtab (CRUD Cafe Menu Items) */}
-          {activeSubTab === 'cafe' && (
-            <div className="flex flex-col gap-6">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">
-                  <Coffee className="w-4 h-4 text-primary" />
-                  <span>{L(language, { fa: 'افزودن آیتم جدید به منوی کافه بوفه', en: 'Add New Cafe Menu Item', ru: 'Добавить пункт меню буфета', tr: 'Kafe Büfe Menüsüne Yeni Öğe Ekle' })}</span>
-                </h3>
+          {activeSubTab === 'cafe' && <OpsProvider language={language}><OrdersConsole kind="cafe"/></OpsProvider>}
 
-                <form onSubmit={handleAddCafeItem} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نام کالا', en: 'Item name', ru: 'Название позиции', tr: 'Ürün adı' })}</label>
-                    <input 
-                      type="text" 
-                      required 
-                      placeholder={L(language, { fa: 'مثلا چیپس چدار بزرگ', en: 'e.g. Large cheddar chips', ru: 'Напр.: большие чипсы чеддер', tr: 'Örn: Büyük cheddar cips' })}
-                      value={newCafe.name}
-                      onChange={(e) => setNewCafe({ ...newCafe, name: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'دسته‌بندی منو', en: 'Menu category', ru: 'Категория меню', tr: 'Menü kategorisi' })}</label>
-                    <select
-                      value={newCafe.category}
-                      onChange={(e) => setNewCafe({ ...newCafe, category: e.target.value as any })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                    >
-                      <option value="Foods">{L(language, { fa: 'غذاها (Foods)', en: 'Foods', ru: 'Еда (Foods)', tr: 'Yemekler (Foods)' })}</option>
-                      <option value="Drinks">{L(language, { fa: 'نوشیدنی‌ها (Drinks)', en: 'Drinks', ru: 'Напитки (Drinks)', tr: 'İçecekler (Drinks)' })}</option>
-                      <option value="Snacks">{L(language, { fa: 'میان‌وعده‌ها (Snacks)', en: 'Snacks', ru: 'Снеки (Snacks)', tr: 'Atıştırmalıklar (Snacks)' })}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'قیمت فروش (TL)', en: 'Sale price (TL)', ru: 'Цена продажи (TL)', tr: 'Satış fiyatı (TL)' })}</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={newCafe.price}
-                      onChange={(e) => setNewCafe({ ...newCafe, price: Number(e.target.value) })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'لینک آدرس تصویر (Unsplash CDN recommended)', en: 'Image URL (Unsplash CDN recommended)', ru: 'URL изображения (рекомендуется Unsplash CDN)', tr: 'Görsel adresi (Unsplash CDN önerilir)' })}</label>
-                    <input 
-                      type="text"
-                      placeholder="/images/home/esports-480.webp"
-                      value={newCafe.imageUrl}
-                      onChange={(e) => setNewCafe({ ...newCafe, imageUrl: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
-                    />
-                  </div>
-                  <div className="md:col-span-2 space-y-2">
-                    <label className="text-xs text-gray-400 block mb-1 font-bold">{L(language, { fa: 'تصویر نسخه موبایل (اختیاری)', en: 'Mobile version image (optional)', ru: 'Мобильная версия изображения (необязательно)', tr: 'Mobil sürüm görseli (isteğe bağlı)' })}</label>
-                    <input 
-                      type="text"
-                      placeholder="/images/mobile/generated/..."
-                      value={newCafe.mobileImageUrl}
-                      onChange={(e) => setNewCafe({ ...newCafe, mobileImageUrl: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
-                    />
-                    <label className="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={newCafe.autoGenerateMobile}
-                        onChange={(e) => setNewCafe({ ...newCafe, autoGenerateMobile: e.target.checked })}
-                        className="accent-primary w-3.5 h-3.5"
-                      />
-                      <span>{L(language, { fa: 'اگر فیلد بالا خالی بود، ساخت خودکار نسخه بهینه موبایل از روی تصویر اصلی', en: 'If empty, auto-generate an optimized mobile version from the main image', ru: 'Если поле пустое — оптимизированная мобильная версия создаётся автоматически', tr: 'Üstteki alan boşsa, ana görselden otomatik olarak optimize mobil sürüm oluşturulur' })}</span>
-                    </label>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'موجودی اولیه انبار', en: 'Initial stock', ru: 'Начальный остаток', tr: 'Başlangıç stoğu' })}</label>
-                    <input 
-                      type="number"
-                      required
-                      value={newCafe.inventory}
-                      onChange={(e) => setNewCafe({ ...newCafe, inventory: Number(e.target.value) })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
-                    />
-                  </div>
-                  <div className="md:col-span-3 flex justify-end">
-                    <button 
-                      type="submit"
-                      className="px-6 bg-primary hover:bg-primary-hover text-black py-2.5 rounded-lg text-xs font-black cursor-pointer flex items-center gap-1.5 border border-primary/20 shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all font-display uppercase tracking-wide"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{L(language, { fa: 'ثبت آیتم در منوی بوفه', en: 'Add item to cafe menu', ru: 'Добавить позицию в меню буфета', tr: 'Öğeyi büfe menüsüne ekle' })}</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
+          {activeSubTab === 'shop' && <OpsProvider language={language}><OrdersConsole kind="shop"/></OpsProvider>}
 
-              {/* Cafe Inventory Grid */}
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4">{L(language, { fa: 'محصولات موجود در انبار بوفه', en: 'Cafe stock items', ru: 'Товары на складе буфета', tr: 'Büfe stoğundaki ürünler' })}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {cafeItems.map((item) => (
-                    <div key={item.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3">
-                      <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img loading="lazy" src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
-                        <div className="flex justify-between items-center mt-1.5">
-                          <span className="text-[10px] text-gray-400 font-mono">{item.price.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${item.inventory > 5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                            {L(language, { fa: 'موجودی:', en: 'Stock:', ru: 'Остаток:', tr: 'Stok:' })} {item.inventory}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => { if (confirm(L(language, { fa: 'آیا از حذف این آیتم مطمئن هستید؟', en: 'Delete this item?', ru: 'Удалить эту позицию?', tr: 'Bu öğeyi silmek istiyor musunuz?' }))) handleDeleteCafeItem(item.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
-                      >
-                        {L(language, { fa: 'حذف', en: 'Delete', ru: 'Удалить', tr: 'Sil' })}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Shop Subtab (CRUD Products) */}
-          {activeSubTab === 'shop' && (
-            <div className="flex flex-col gap-6">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">
-                  <ShoppingBag className="w-4 h-4 text-primary" />
-                  <span>{L(language, { fa: 'افزودن تجهیزات جدید به فروشگاه', en: 'Add New Hardware Accessory', ru: 'Добавить новый аксессуар в магазин', tr: 'Mağazaya Yeni Ekipman Ekle' })}</span>
-                </h3>
-
-                <form onSubmit={handleAddAccessory} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نام تجهیزات', en: 'Gear name', ru: 'Название оборудования', tr: 'Ekipman adı' })}</label>
-                    <input 
-                      type="text" 
-                      required 
-                      placeholder={L(language, { fa: 'مثلا هدست ریزر کراکن', en: 'e.g. Razer Kraken headset', ru: 'Напр.: гарнитура Razer Kraken', tr: 'Örn: Razer Kraken kulaklık' })}
-                      value={newAccessory.name}
-                      onChange={(e) => setNewAccessory({ ...newAccessory, name: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'دسته‌بندی قطعات', en: 'Gear category', ru: 'Категория оборудования', tr: 'Ekipman kategorisi' })}</label>
-                    <select
-                      value={newAccessory.category}
-                      onChange={(e) => setNewAccessory({ ...newAccessory, category: e.target.value as any })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                    >
-                      <option value="Keyboard">{L(language, { fa: 'کیبورد (Keyboard)', en: 'Keyboard', ru: 'Клавиатура (Keyboard)', tr: 'Klavye (Keyboard)' })}</option>
-                      <option value="Mouse">{L(language, { fa: 'موس (Mouse)', en: 'Mouse', ru: 'Мышь (Mouse)', tr: 'Fare (Mouse)' })}</option>
-                      <option value="Headset">{L(language, { fa: 'هدست (Headset)', en: 'Headset', ru: 'Гарнитура (Headset)', tr: 'Kulaklık (Headset)' })}</option>
-                      <option value="Controller">{L(language, { fa: 'دسته بازی (Controller)', en: 'Controller', ru: 'Геймпад (Controller)', tr: 'Oyun kolu (Controller)' })}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'قیمت (TL)', en: 'Price (TL)', ru: 'Цена (TL)', tr: 'Fiyat (TL)' })}</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={newAccessory.price}
-                      onChange={(e) => setNewAccessory({ ...newAccessory, price: Number(e.target.value) })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'توضیحات کوتاه فنی محصول', en: 'Short technical description', ru: 'Краткое техническое описание', tr: 'Kısa teknik açıklama' })}</label>
-                    <input 
-                      type="text"
-                      placeholder={L(language, { fa: 'کیبورد سوییچ مکانیکال قرمز با تاخیر صفر میلی‌ثانیه...', en: 'Red mechanical switch keyboard with zero latency...', ru: 'Клавиатура с красными механическими свитчами и нулевой задержкой...', tr: 'Sıfır gecikmeli kırmızı mekanik anahtarlı klavye...' })}
-                      value={newAccessory.description}
-                      onChange={(e) => setNewAccessory({ ...newAccessory, description: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'موجودی انبار', en: 'Stock', ru: 'Остаток на складе', tr: 'Stok' })}</label>
-                    <input 
-                      type="number"
-                      required
-                      value={newAccessory.stock}
-                      onChange={(e) => setNewAccessory({ ...newAccessory, stock: Number(e.target.value) })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
-                    />
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'لینک آدرس تصویر', en: 'Image URL', ru: 'URL изображения', tr: 'Görsel adresi' })}</label>
-                    <input 
-                      type="text"
-                      placeholder="/images/home/esports-480.webp"
-                      value={newAccessory.imageUrl}
-                      onChange={(e) => setNewAccessory({ ...newAccessory, imageUrl: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
-                    />
-                  </div>
-                  <div className="md:col-span-3 space-y-2">
-                    <label className="text-xs text-gray-400 block mb-1 font-bold">{L(language, { fa: 'تصویر نسخه موبایل (اختیاری)', en: 'Mobile version image (optional)', ru: 'Мобильная версия изображения (необязательно)', tr: 'Mobil sürüm görseli (isteğe bağlı)' })}</label>
-                    <input 
-                      type="text"
-                      placeholder="/images/mobile/generated/..."
-                      value={newAccessory.mobileImageUrl}
-                      onChange={(e) => setNewAccessory({ ...newAccessory, mobileImageUrl: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono"
-                    />
-                    <label className="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={newAccessory.autoGenerateMobile}
-                        onChange={(e) => setNewAccessory({ ...newAccessory, autoGenerateMobile: e.target.checked })}
-                        className="accent-primary w-3.5 h-3.5"
-                      />
-                      <span>{L(language, { fa: 'اگر فیلد بالا خالی بود، ساخت خودکار نسخه بهینه موبایل از روی تصویر اصلی', en: 'If empty, auto-generate an optimized mobile version from the main image', ru: 'Если поле пустое — оптимизированная мобильная версия создаётся автоматически', tr: 'Üstteki alan boşsa, ana görselden otomatik olarak optimize mobil sürüm oluşturulur' })}</span>
-                    </label>
-                  </div>
-                  <div className="md:col-span-3 flex justify-end">
-                    <button 
-                      type="submit"
-                      className="px-6 bg-primary hover:bg-primary-hover text-black py-2.5 rounded-lg text-xs font-black cursor-pointer flex items-center gap-1.5 border border-primary/20 shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all font-display uppercase tracking-wide"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{L(language, { fa: 'ثبت در انبار فروشگاه', en: 'Add to store inventory', ru: 'Добавить на склад магазина', tr: 'Mağaza deposuna ekle' })}</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4">{L(language, { fa: 'کالاهای موجود در فروشگاه', en: 'Products in the store', ru: 'Товары в магазине', tr: 'Mağazadaki ürünler' })}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {accessories.map((acc) => (
-                    <div key={acc.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-3 flex gap-3">
-                      <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden border border-white/5 shrink-0">
-                        <img loading="lazy" src={acc.imageUrl} alt={acc.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold text-white truncate">{acc.name}</h4>
-                        <div className="flex justify-between items-center mt-1.5">
-                          <span className="text-[10px] text-gray-400 font-mono">{acc.price.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر', en: 'TL', ru: 'TL', tr: 'TL' })}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${acc.stock > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                            {L(language, { fa: 'موجودی:', en: 'Stock:', ru: 'Остаток:', tr: 'Stok:' })} {acc.stock}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => { if (confirm(L(language, { fa: 'آیا از حذف این کالا مطمئن هستید؟', en: 'Delete this product?', ru: 'Удалить этот товар?', tr: 'Bu ürünü silmek istiyor musunuz?' }))) handleDeleteAccessory(acc.id); }}
-                        className="self-start px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400 shrink-0"
-                      >
-                        {L(language, { fa: 'حذف', en: 'Delete', ru: 'Удалить', tr: 'Sil' })}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tournaments Subtab (Plan Tournaments) */}
           {activeSubTab === 'tournaments' && (
-            <div className="flex flex-col gap-6">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">
-                  <Trophy className="w-4 h-4 text-primary" />
-                  <span>{L(language, { fa: 'برنامه‌ریزی و فعال‌سازی تورنمنت گیم‌نت', en: 'Schedule New Tournament', ru: 'Запланировать новый турнир', tr: 'Oyun Salonu Turnuvası Planla ve Etkinleştir' })}</span>
-                </h3>
-
-                <form onSubmit={handleAddTournament} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'عنوان مسابقات', en: 'Tournament title', ru: 'Название турнира', tr: 'Turnuva adı' })}</label>
-                    <input 
-                      type="text" 
-                      required 
-                      placeholder={L(language, { fa: 'مثلا لیگ قهرمانان دوتا ۲ سالن', en: 'e.g. Lounge Dota 2 Champions League', ru: 'Напр.: Лига чемпионов Dota 2', tr: 'Örn: Salon Dota 2 Şampiyonlar Ligi' })}
-                      value={newTournament.title}
-                      onChange={(e) => setNewTournament({ ...newTournament, title: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'بازی و ژانر رقابت', en: 'Game & genre', ru: 'Игра и жанр', tr: 'Oyun ve tür' })}</label>
-                    <input 
-                      type="text" 
-                      required 
-                      placeholder="Dota 2 5v5"
-                      value={newTournament.game}
-                      onChange={(e) => setNewTournament({ ...newTournament, game: e.target.value })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'هزینه ثبت نام تیم (TL)', en: 'Team entry fee (TL)', ru: 'Взнос команды (TL)', tr: 'Takım kayıt ücreti (TL)' })}</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={newTournament.registrationFee}
-                      onChange={(e) => setNewTournament({ ...newTournament, registrationFee: Number(e.target.value) })}
-                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono font-bold"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'تاریخ شروع', en: 'Start date', ru: 'Дата начала', tr: 'Başlangıç tarihi' })}</label>
-                      <input 
-                        type="text" 
-                        required
-                        value={newTournament.startDate}
-                        onChange={(e) => setNewTournament({ ...newTournament, startDate: e.target.value })}
-                        className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'حداکثر تیم‌ها', en: 'Max teams', ru: 'Макс. команд', tr: 'Maksimum takım' })}</label>
-                      <input 
-                        type="number" 
-                        required
-                        value={newTournament.maxTeams}
-                        onChange={(e) => setNewTournament({ ...newTournament, maxTeams: Number(e.target.value) })}
-                        className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
-                      />
-                    </div>
-                  </div>
-                  <div className="md:col-span-2 flex justify-end">
-                    <button 
-                      type="submit"
-                      className="px-6 bg-primary hover:bg-primary-hover text-black py-2.5 rounded-lg text-xs font-black cursor-pointer flex items-center gap-1.5 border border-primary/20 shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all font-display uppercase tracking-wide"
-                    >
-                      <Trophy className="w-4 h-4" />
-                      <span>{L(language, { fa: 'ثبت و انتشار زمان‌بندی لیگ', en: 'Save & publish league schedule', ru: 'Сохранить и опубликовать расписание лиги', tr: 'Lig takvimini kaydet ve yayınla' })}</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Tournament list review */}
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4">{L(language, { fa: 'تورنمنت‌های فعال و تعداد تیم‌ها', en: 'Active tournaments & team counts', ru: 'Активные турниры и число команд', tr: 'Aktif turnuvalar ve takım sayıları' })}</h3>
-                <div className="flex flex-col gap-4">
-                  {tournaments.map((tour) => (
-                    <div key={tour.id} className="bg-[#0a0e21] border border-white/5 rounded-xl p-4 flex flex-col gap-3">
-                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                        <span className="text-xs font-bold text-white font-display">{tour.title}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold">{tour.status}</span>
-                          <button
-                            onClick={() => { if (confirm(L(language, { fa: 'آیا از حذف این تورنومنت مطمئن هستید؟', en: 'Delete this tournament?', ru: 'Удалить этот турнир?', tr: 'Bu turnuvayı silmek istiyor musunuz?' }))) handleDeleteTournament(tour.id); }}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer bg-white/5 text-gray-400 border border-white/10 hover:bg-rose-500/20 hover:text-rose-400"
-                          >
-                            {L(language, { fa: 'حذف', en: 'Delete', ru: 'Удалить', tr: 'Sil' })}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-400 font-mono">
-                        <span>{L(language, { fa: 'ثبت نام شده:', en: 'Registered:', ru: 'Зарегистрировано:', tr: 'Kayıtlı:' })} {tour.registeredTeamsCount} / {tour.maxTeams} {L(language, { fa: 'تیم', en: 'teams', ru: 'команд', tr: 'takım' })}</span>
-                        <span>{L(language, { fa: 'بازی:', en: 'Game:', ru: 'Игра:', tr: 'Oyun:' })} {tour.game}</span>
-                      </div>
-                      {tour.teams && tour.teams.length > 0 && (
-                        <div className="bg-[#171717] p-3 rounded-lg border border-white/5">
-                          <p className="text-[10px] text-gray-500 font-bold mb-1.5 uppercase">{L(language, { fa: 'لیست تیم‌های تایید شده:', en: 'Confirmed teams:', ru: 'Подтверждённые команды:', tr: 'Onaylı takımlar:' })}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {tour.teams.map((team: any, index: number) => (
-                              <span key={index} className="text-[10px] font-bold text-white bg-white/5 px-2.5 py-1 rounded-lg border border-white/5">
-                                @{team.name} ({team.leader})
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <React.Suspense fallback={<div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /></div>}>
+              <AdminTournamentPlanner language={language} notify={addNotification} />
+            </React.Suspense>
           )}
 
-          {/* Blog Subtab (CRUD Articles) */}
           {activeSubTab === 'blog' && (
             <div className="flex flex-col gap-6">
               <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
@@ -4544,6 +4241,30 @@ export default function AdminPanelTab({
           {activeSubTab === 'affiliates' && (
             <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Affiliates...</div>}>
               <AdminAffiliatesSection addNotification={addNotification} />
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'promotions' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
+              <OpsProvider language={language}><PromotionsConsole /></OpsProvider>
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'tournamentOps' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
+              <OpsProvider language={language}><TournamentsOpsConsole /></OpsProvider>
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'messaging' && (
+            <React.Suspense fallback={<div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /></div>}>
+              <AdminMessagingPanel language={language} notify={addNotification} />
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'content' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
+              <OpsProvider language={language}><ContentOpsConsole /></OpsProvider>
             </React.Suspense>
           )}
 

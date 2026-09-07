@@ -131,7 +131,7 @@ export class InstagramCampaignService {
     // Computed only at dispatch: never returned in admin lists, logs or partner responses.
     return {...input,text:renderCampaign(input.text,r.data.partnerCode,`${cfg.data.baseUrl}/ig/invite/${r.id}?token=${token}`)};
   }
-  async beforeSend(input:any){return !!await this.registry.eligible(input.accountId,input.mediaId);}
+  async beforeSend(input:any){return input.accountId===(await this.settings.config()).data.zernioAccountId && !!await this.registry.eligible(input.accountId,input.mediaId);}
   async afterSend(input:any,result:any){
     const r=await this.core.read<CampaignMember>('pub-member',input.memberId);if(!r)return;
     const status=input.stage==='partner_code'?'code_sent':input.stage==='friend_link'?'link_sent':r.data.status;

@@ -235,5 +235,32 @@ test('paid walk-in invoice uses only actual new gameplay cost, not linked food o
  await core.save('invoice','prepaid-invoice',{username:'prepaid_buyer',newGameCost:150,receipt,reservationOrderId:'already-paid'},0);
  assert.equal((await af.onOrderPaid(store,{username:'prepaid_buyer',orderId:'prepaid-invoice',kind:'session',amount:250})).length,0);
 });
+
+suite('Agent registry and safe configuration');
+const {AgentRegistry}=await import('../server/publishing/agents');
+const agents=new AgentRegistry(core,async()=>new Response(JSON.stringify({ok:true,tasks:[]}),{status:200}));
+let savedAgent:any;
+test('agent profile stores only encrypted credentials and reports untested until explicitly checked',async()=>{
+ savedAgent=await agents.save('admin',undefined,{name:'Test agent',adapterId:'manus',enabled:true,projectId:'',profile:'standard',apiKey:'agent-test-secret-1234'});
+ assert.equal(savedAgent.status,'configured_untested');assert.ok(!JSON.stringify(await agents.list()).includes('agent-test-secret-1234'));
+ const raw=await core.read('pub-agent',savedAgent.id);assert.ok(!JSON.stringify(raw).includes('agent-test-secret-1234'));
+});
+test('read-only connection test requires explicit consent and cannot claim publishing permissions',async()=>{
+ await assert.rejects(()=>agents.testConnection('admin',savedAgent.id,{}),{code:'CONFIRMATION_REQUIRED'});
+ const checked=await agents.testConnection('admin',savedAgent.id,{confirmed:true});assert.equal(checked.status,'ready');assert.equal(checked.capabilities.requiresExternalAccountAuthorization,true);savedAgent=checked;
+});
+test('explicit key deletion never falls back and seed does not reset a chosen default',async()=>{
+ const cfg=await settings.config();await core.save('pub-config','main',{...cfg.data,defaultAgentId:savedAgent.id,selectedMode:'manual'},cfg.version);
+ const cleared=await agents.save('admin',savedAgent.id,{...savedAgent.data,version:savedAgent.version,apiKey:''});assert.equal(cleared.status,'unconfigured');await settings.seed();assert.equal((await settings.config()).data.defaultAgentId,savedAgent.id);
+});
+test('unsupported adapters and ingest tokens cannot masquerade as working provider keys',async()=>{
+ const x=await agents.save('admin',undefined,{name:'Unknown API',adapterId:'unsupported',profile:'standard',projectId:'',enabled:true,apiKey:'opaque-test-key'});assert.equal(x.status,'unsupported');await assert.rejects(()=>agents.testConnection('admin',x.id,{confirmed:true}),{code:'AGENT_ADAPTER_UNSUPPORTED'});
+ await assert.rejects(()=>agents.save('admin',undefined,{name:'Wrong key',adapterId:'manus',apiKey:'baz_abc123'}),{code:'PROVIDER_KEY_NOT_INGEST_TOKEN'});
+});
+test('agent edits are CAS protected and stale requests roll back credential changes',async()=>{
+ const before=await settings.vault.read('agent:'+savedAgent.id);
+ await assert.rejects(()=>agents.save('admin',savedAgent.id,{...savedAgent.data,version:0,apiKey:'must-not-be-stored'}),{code:'VERSION_CONFLICT'});
+ assert.equal(await settings.vault.read('agent:'+savedAgent.id),before);
+});
 await run({title:'Publishing / Instagram v4',jsonOut:'tests/reports/publishing.json'});
 process.env=env;

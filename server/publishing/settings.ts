@@ -84,18 +84,22 @@ export class PublishingSettings {
   async config() {
     await this.seed();
     const r = (await this.core.read<PublishingConfig>('pub-config','main'))!;
-    return { ...r, data: { ...r.data, zernioAccountId:process.env.ZERNIO_IG_ACCOUNT_ID || r.data.zernioAccountId, zernioProfileId:process.env.ZERNIO_IG_PROFILE_ID || r.data.zernioProfileId } };
+    const primary=process.env.ZERNIO_IG_ACCOUNT_ID,alias=process.env.ZERNIO_ACCOUNT_ID;
+    if(primary&&alias&&primary!==alias)fail('ACCOUNT_CONFIGURATION_CONFLICT',409);
+    return { ...r, data: { ...r.data, zernioAccountId:primary || alias || r.data.zernioAccountId, zernioProfileId:process.env.ZERNIO_PROFILE_ID || r.data.zernioProfileId } };
   }
   async saveConfig(actor:string,b:any) {
     const old=await this.config();
     if (b.selectedMode !== null && !['manual','agent'].includes(b.selectedMode)) fail('INVALID_MODE');
-    const agent=await this.core.read<AgentProfile>('pub-agent',String(b.defaultAgentId));
-    if(!agent||!agent.data.enabled) fail('AGENT_NOT_AVAILABLE');
+    const agent= b.defaultAgentId ? await this.core.read<AgentProfile>('pub-agent',String(b.defaultAgentId)) : undefined;
+    if(b.defaultAgentId&&!agent || b.selectedMode==='agent'&&(!agent||!agent.data.enabled)) fail('AGENT_NOT_AVAILABLE');
     const base=new URL(String(b.baseUrl || old.data.baseUrl));
     if(base.protocol!=='https:'||base.username||base.password||base.pathname!=='/'||base.search||base.hash) fail('INVALID_BASE_URL');
     const timezone=String(b.timezone||old.data.timezone);try{new Intl.DateTimeFormat('en',{timeZone:timezone});}catch{fail('INVALID_TIMEZONE');}
     if(!await this.core.read('pub-campaign',String(b.defaultCampaignId)))fail('CAMPAIGN_NOT_FOUND');
-    const data:PublishingConfig={selectedMode:b.selectedMode,defaultAgentId:agent.id,defaultCampaignId:String(b.defaultCampaignId),
+    if((process.env.ZERNIO_IG_ACCOUNT_ID||process.env.ZERNIO_ACCOUNT_ID) && b.zernioAccountId!==old.data.zernioAccountId)fail('HOST_MANAGED',409);
+    if(b.outboundEnabled===true && (!await this.vault.zernio('zernio_api_key') || !await this.vault.zernio('zernio_webhook_secret') || !b.zernioAccountId))fail('INTEGRATION_NOT_CONFIGURED',409);
+    const data:PublishingConfig={selectedMode:b.selectedMode,defaultAgentId:agent?.id||'',defaultCampaignId:String(b.defaultCampaignId),
       zernioAccountId:stringValue(b.zernioAccountId,100),zernioProfileId:stringValue(b.zernioProfileId,100),outboundEnabled:b.outboundEnabled===true,baseUrl:base.origin,timezone};
     return this.core.command(actor,b.idempotencyKey,'publishing.settings',data,()=>this.core.save('pub-config','main',data,Number(b.version)));
   }

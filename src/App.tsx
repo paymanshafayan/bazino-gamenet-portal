@@ -411,9 +411,9 @@ export default function App() {
   };
 
   // بارگذاریِ همه‌ی دیتاست‌ها (برای refresh بعد از تغییرات ادمین/رزرو/سفارش)
-  const refreshAll = () => {
+  const refreshAll = async () => {
     loadedRef.current = new Set(Object.keys(fetchDataset));
-    Object.values(fetchDataset).forEach(fn => void fn());
+    await Promise.all(Object.values(fetchDataset).map(fn => fn()));
   };
   // تسک ۱۳: پس از پرداخت با کیف پول / ثبت حضوری (CheckoutModal) داده‌ها تازه شوند
   useEffect(() => {
@@ -545,7 +545,7 @@ export default function App() {
         body: JSON.stringify({ points, description })
       });
       if (res.ok) {
-        setUser({ ...user, points: user.loyaltyPoints + points });
+        setUser({ ...user, loyaltyPoints: user.loyaltyPoints + points });
         addNotification(L(language, { fa: `${points} امتیاز به شما اضافه شد.`, en: `Added ${points} points.`, ru: `Вам начислено ${points} баллов.`, tr: `${points} puan hesabınıza eklendi.` }), 'success');
       }
     } catch (e) {

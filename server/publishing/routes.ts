@@ -3,6 +3,8 @@ import { OpsCore, endpoint, fail } from '../management/core';
 import { PublishingSettings, SECRET_NAMES } from './settings';
 import { MediaRegistry } from './registry';
 import { PublishingReports } from './reports';
+import { AgentRegistry } from './agents';
+import { ZernioClient } from './provider';
 import { WebhookService, registerZernioReceiver } from './webhooks';
 import { InstagramCampaignService } from '../affiliate/campaignV4';
 import { FriendGateService,registerFriendGate } from '../affiliate/friendGate';
@@ -15,6 +17,19 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   registerZernioReceiver(app,webhooks);
   registerFriendGate(app,new FriendGateService(core));
   const reports=new PublishingReports(core);
+  const agents=new AgentRegistry(core);
+  app.post(`${base}/zernio-test`,admin,endpoint(async(req,res)=>{
+    if(req.body?.confirmed!==true)fail('CONFIRMATION_REQUIRED');
+    const cfg=await settings.config();const r=await new ZernioClient(settings).request('/v1/accounts?platform=instagram&status=connected');
+    const accounts=Array.isArray(r.accounts)?r.accounts:r.data?.accounts||[];
+    const matched=accounts.some((a:any)=>String(a._id||a.id)===cfg.data.zernioAccountId);
+    await core.audit((req as any).staff.username,'zernio.connection_check','configured-account',{matched});
+    res.json({ok:matched,accountMatched:matched,publishingPermissionsVerified:false});
+  }));
+  app.get(`${base}/agents`,core.guard('content'),endpoint(async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await agents.list());}));
+  app.post(`${base}/agents`,admin,endpoint(async(req,res)=>res.json(await agents.save((req as any).staff.username,undefined,req.body||{}))));
+  app.put(`${base}/agents/:id`,admin,endpoint(async(req,res)=>res.json(await agents.save((req as any).staff.username,String(req.params.id),req.body||{}))));
+  app.post(`${base}/agents/:id/test`,admin,endpoint(async(req,res)=>res.json(await agents.testConnection((req as any).staff.username,String(req.params.id),req.body||{}))));
   app.get(`${base}/reports`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await reports.report())));
   app.post(`${base}/settlements`,admin,endpoint(async(req,res)=>res.json(await reports.settleMonth((req as any).staff.username,req.body||{}))));
   app.get(`${base}/members`,admin,endpoint(async(_req,res)=>res.json(await campaigns.list())));
@@ -27,7 +42,7 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   app.get(`${base}/config`,core.guard('content'),endpoint(async(req,res)=>{
     const cfg=await settings.config();
     const secrets:any={};if((req as any).staff.admin)for(const key of SECRET_NAMES)secrets[key]=await settings.vault.status(key);
-    res.setHeader('Cache-Control','no-store');res.json({config:cfg,secrets,vaultAvailable:settings.vault.available(),webhookUrl:`${cfg.data.baseUrl}/api/webhooks/zernio`});
+    res.setHeader('Cache-Control','no-store');res.json({config:cfg,secrets,vaultAvailable:settings.vault.available(),accountFromHost:!!(process.env.ZERNIO_IG_ACCOUNT_ID||process.env.ZERNIO_ACCOUNT_ID),webhookUrl:`${cfg.data.baseUrl}/api/webhooks/zernio`});
   }));
   app.put(`${base}/config`,admin,endpoint(async(req,res)=>res.json(await settings.saveConfig((req as any).staff.username,req.body||{}))));
   app.put(`${base}/secrets/:key`,admin,endpoint(async(req,res)=>{

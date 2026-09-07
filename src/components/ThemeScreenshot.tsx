@@ -18,7 +18,7 @@ interface ThemeInfo {
 
 interface ThemeScreenshotProps {
   theme: ThemeInfo;
-  language: 'fa' | 'en';
+  language: 'fa' | 'en' | 'tr' | 'ru';
 }
 
 export default function ThemeScreenshot({ theme, language }: ThemeScreenshotProps) {

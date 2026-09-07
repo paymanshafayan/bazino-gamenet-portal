@@ -6,7 +6,7 @@ export interface Versioned<T> { id: string; version: number; updatedAt: string; 
 export interface AgentProfile {
   name: string; adapterId: 'manus' | 'unsupported'; enabled: boolean;
   credentialRef: string; projectId: string; profile: string; checkedAt?: string;
-  checkResult?: 'ready' | 'failed'; credentialVersion?: number;
+  checkResult?: 'ready' | 'failed'; credentialVersion?: number; checkedFingerprint?: string;
 }
 export interface PublishingConfig {
   selectedMode: ExecutionMode | null; defaultAgentId: string; defaultCampaignId: string;

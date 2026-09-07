@@ -17,9 +17,12 @@
     "test:db": "tsx tests/database.test.mts",
     "test:api": "tsx tests/api.test.mts",
     "test:ui": "tsx tests/ui.test.mts",
-    "test:providers": "tsx tests/providers.test.mts"
+    "test:providers": "tsx tests/providers.test.mts",
+    "postinstall": "node scripts/prepare-media-tools.mjs",
+    "prepare:media": "node scripts/prepare-media-tools.mjs"
   },
   "dependencies": {
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
     "bcryptjs": "^2.4.3",
@@ -44,6 +47,7 @@
   },
   "devDependencies": {
     "@csstools/postcss-oklab-function": "^4.0.7",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@preact/preset-vite": "^2.10.6",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.11",

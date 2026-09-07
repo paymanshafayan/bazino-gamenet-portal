@@ -26,9 +26,10 @@ export function normalizeZernio(b:any):InboxEvent {
     if(!e.nativeId||!/^\d{1,40}$/.test(e.nativeId)||!e.commentId||!e.authorId||!e.text)fail('INVALID_COMMENT');
     if(c.isReply||c.parentCommentId)e.status='nested_reply';
   }else if(type.startsWith('post.external.')){
-    e.nativeId=identity(post.id,post.platformPostId);e.platform=str(post.platform)||e.platform;
+    e.nativeId=identity(post.id,post.platformPostId);e.platform=str(post.platform)||e.platform;e.mediaType=post.mediaProductType==='STORY'?'story':post.mediaProductType==='REELS'?'reel':post.mediaProductType==='FEED'?'post':'unknown';
   }else if(type.startsWith('post.')){
     e.providerPostId=str(post.id);e.publicationId=str(post.metadata?.bazinoPublicationId);
+    e.targets=Array.isArray(post.platforms)?post.platforms.slice(0,50).map((p:any)=>({accountId:str(p.accountId?._id||p.accountId),platform:str(p.platform),nativeId:str(p.platformPostId),status:str(p.status)})):[];
     e.nativeId=str(d.platform?.platformPostId);e.status=str(d.platform?.status||post.status);e.platform=str(d.platform?.name)||e.platform;
   }else if(type.startsWith('message.')||['conversation.started','reaction.received','referral.received'].includes(type)){
     e.authorId=identity(message.sender?.id,d.sender?.id,d.reaction?.sender?.id);e.conversationId=identity(conversation.id,message.conversationId);
@@ -49,6 +50,7 @@ export class WebhookService {
     const event=normalizeZernio(body);
     if(stream==='analytics'?event.type!=='analytics.synced':!ZERNIO_EVENTS.includes(event.type as any))return {ok:true,ignored:'unsupported_event'};
     const cfg=(await this.settings.config()).data;
+    if(!event.accountId&&event.targets?.some(t=>t.accountId===cfg.zernioAccountId))event.accountId=cfg.zernioAccountId;
     if(!event.accountId && event.providerPostId){
       const job=(await this.core.list<Publication>('pub-publication')).find(r=>r.data.providerPostId===event.providerPostId);
       if(job)event.accountId=job.data.snapshot.accountId;
@@ -70,17 +72,20 @@ export class WebhookService {
       const r=await this.registry.lookup(e.accountId,e.nativeId);
       if(e.type.endsWith('deleted')){
         if(r)await this.core.save('pub-media',r.id,{...r.data,active:false,approval:'deleted'},r.version);
-      }else if(!r)await this.registry.register('zernio-sync',{media_id:e.nativeId,accountId:e.accountId},'external_discovery');
+      }else if(!r)await this.registry.register('zernio-sync',{media_id:e.nativeId,accountId:e.accountId,media_type:e.mediaType||'unknown'},'external_discovery');
       return;
     }
     if(e.type.startsWith('post.')){
       const jobs=await this.core.list<Publication>('pub-publication');
       const job=jobs.find(j=>(j.data.providerPostId===e.providerPostId||!!e.publicationId&&j.id===e.publicationId)&&j.data.snapshot.accountId===e.accountId);
       if(!job){if(e.nativeId&&/^\d+$/.test(e.nativeId))await this.registry.register('zernio-discovery',{media_id:e.nativeId,accountId:e.accountId},'external_discovery');return;}
-      if(e.type==='post.platform.published'&&e.nativeId){
-        const data={...job.data,state:'published' as const,providerPostId:e.providerPostId,nativeMediaId:e.nativeId,updatedAt:nowISO()};
+      const target=e.targets?.find(t=>t.accountId===e.accountId&&t.platform==='instagram');
+      const confirmedNative=e.type==='post.platform.published'?e.nativeId:target?.status==='published'?target.nativeId:undefined;
+      if(confirmedNative){
+        const data={...job.data,state:'published' as const,providerPostId:e.providerPostId,nativeMediaId:confirmedNative,rollupStatus:e.type.startsWith('post.platform.')?job.data.state==='published'?'published':e.status:e.type.slice(5),updatedAt:nowISO()};
         await this.core.save('pub-publication',job.id,data,job.version);
-        await this.registry.register('publication',{media_id:e.nativeId,accountId:e.accountId,campaign_id:job.data.snapshot.campaignId,media_type:job.data.snapshot.format==='story'?'story':job.data.snapshot.format==='reel'?'reel':'post',providerPostId:e.providerPostId,published_at:e.timestamp},'zernio_publication',job.id);
+        const draft=await this.core.read('pub-draft',job.data.draftId);if(draft?.data.publicationId===job.id)await this.core.save('pub-draft',draft.id,{...draft.data,status:'published'},draft.version);
+        await this.registry.register('publication',{media_id:confirmedNative,accountId:e.accountId,campaign_id:job.data.state==='cancelled'?'':job.data.snapshot.campaignId,media_type:job.data.snapshot.format==='story'?'story':job.data.snapshot.format==='reel'?'reel':'post',providerPostId:e.providerPostId,published_at:e.timestamp},'zernio_publication',job.id);
         return;
       }
       if(e.type==='post.platform.deleted'&&e.nativeId){const m=await this.registry.lookup(e.accountId,e.nativeId);if(m)await this.core.save('pub-media',m.id,{...m.data,active:false,approval:'deleted'},m.version);return;}
@@ -96,13 +101,16 @@ export class WebhookService {
   }
   async analytics(e:InboxEvent){
     if(!e.cursor)return {ignored:true};
-    const key=e.accountId,old=await this.core.read('pub-analytics-cursor',key);
-    const cursor=old?.data.nextCursor||e.cursor;
+    const key=e.accountId;
+    await this.core.store.runInTransaction(async()=>{if(!await this.core.read('pub-analytics-cursor',key))await this.core.save('pub-analytics-cursor',key,{nextCursor:e.cursor,updatedAt:nowISO()},0);});
+    const old=await this.core.read('pub-analytics-cursor',key);
+    const cursor=old!.data.nextCursor;
     const response=await this.queue.client.request(`/v1/analytics/delta?cursor=${encodeURIComponent(cursor)}`);
     const rows=Array.isArray(response.data)?response.data:response.data?.data||[];
     if(!rows.length)return {wait:true}; // Materialized view lag: DO NOT advance an empty page.
     await this.core.store.runInTransaction(async()=>{
-      for(const item of rows){if(String(item.accountId||item.account?.id)!==e.accountId)continue;const id=String(item.platformPostId||item.postId||'');if(!id)continue;const m=await this.registry.lookup(e.accountId,id);if(!m)continue;const prior=await this.core.read('pub-metrics',m.id);
+      const cursorNow=await this.core.read('pub-analytics-cursor',key);if(cursorNow?.data.nextCursor!==cursor)return;
+      for(const item of rows){if(String(item.accountId||item.account?.id)!==e.accountId)continue;const id=String(item.platformPostId||'');if(!id)continue;const m=await this.registry.lookup(e.accountId,id);if(!m)continue;const prior=await this.core.read('pub-metrics',m.id);
         const raw=item.metrics||{},metrics:any={};for(const k of ['reach','impressions','views','shares','comments','likes','saved','follows'])if(Number.isFinite(Number(raw[k]))&&Number(raw[k])>=0)metrics[k]=Number(raw[k]);
         await this.core.save('pub-metrics',m.id,{metrics,syncedAt:nowISO()},prior?.version||0);
       }

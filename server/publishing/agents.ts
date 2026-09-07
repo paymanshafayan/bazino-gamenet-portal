@@ -41,6 +41,10 @@ export class AgentRegistry {
     const key=await this.settings.vault.agentKey(r.data);if(!key||key==='simulator')fail('AGENT_KEY_REQUIRED',409);
     let good=false;
     try{const response=await this.fetcher('https://api.manus.ai/v2/task.list?limit=1',{headers:{'x-manus-api-key':key},signal:AbortSignal.timeout(15000),redirect:'error'});const d=await response.json();good=response.ok&&d.ok===true;}catch{/* Status only: never return provider bodies that can contain secrets. */}
+    if(good)try{
+      const response=await this.fetcher('https://api.manus.ai/v2/webhook.publicKey',{headers:{'x-manus-api-key':key},signal:AbortSignal.timeout(15000),redirect:'error'});const d=await response.json();
+      if(response.ok&&d.ok===true&&d.algorithm==='RSA-SHA256'&&String(d.public_key).includes('BEGIN PUBLIC KEY'))await this.core.store.runInTransaction(async()=>{const prior=await this.core.read('pub-manus-key',id);await this.core.save('pub-manus-key',id,{publicKey:d.public_key,at:nowISO()},prior?.version||0);});
+    }catch{/* Polling does not require webhook setup. */}
     await this.core.store.runInTransaction(async()=>{const fresh=await this.get(id);if(!fresh||fresh.version!==r.version)fail('VERSION_CONFLICT',409);
       await this.core.save('pub-agent',id,{...r.data,checkedAt:nowISO(),checkResult:good?'ready':'failed',checkedFingerprint:createHash('sha256').update(key).digest('hex')},r.version);
       await this.core.audit(actor,'agent.connection_check',id,{ok:good});

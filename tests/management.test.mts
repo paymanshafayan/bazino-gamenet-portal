@@ -268,7 +268,7 @@ test('content draft is created and never published without approval', async () =
   assert.equal(c.data.status, 'draft');
   // scheduling before approval fails
   await assert.rejects(() => contentOps.schedule('admin', c.id, { idempotencyKey: 'ct-sched-fail', publishNow: true }), { code: 'APPROVAL_REQUIRED' });
-  await contentOps.approve('admin', c.id, { idempotencyKey: 'ct-app', destination: 'blog' });
+  await contentOps.approve('admin', c.id, { idempotencyKey: 'ct-app', destination: 'blog', version: c.version });
   await contentOps.schedule('admin', c.id, { idempotencyKey: 'ct-sched', publishNow: true });
 });
 test('publishDue writes blog to articles table but fails social when not configured', async () => {
@@ -282,18 +282,14 @@ test('invalid Manus webhook signature is rejected', async () => {
   await store.setSetting('manus_webhook_secret', 'topsecret');
   await assert.rejects(() => contentOps.handleManusWebhook('{"task_id":"x"}', 'wrong-signature'), { code: 'INVALID_SIGNATURE' });
 });
-test('without a Manus key the simulator fills a reviewable version (no external call)', async () => {
+test('explicit simulator is labelled and cannot be published as a live generation', async () => {
   await store.setSetting('manus_api_key', ''); // ensure no credential
   const c = await contentOps.create('admin', { idempotencyKey: 'ct-sim-1', title: 'Simulated post', destinations: ['blog'] });
-  const out = await contentOps.generate('admin', c.id, { idempotencyKey: 'ct-sim-gen', destination: 'blog', prompt: 'weekend tournament', language: 'en' });
+  const out = await contentOps.generate('admin', c.id, { simulate:true, idempotencyKey: 'ct-sim-gen', destination: 'blog', prompt: 'weekend tournament', language: 'en' });
   assert.equal(out.data.status, 'review');
   assert.ok((out.data.destinations.blog as any).simulated);
   assert.ok(out.data.versions.blog.body.includes('Simulator'));
-  // Simulated draft can then be approved and published like any other version.
-  await contentOps.approve('admin', c.id, { idempotencyKey: 'ct-sim-app', destination: 'blog' });
-  await contentOps.schedule('admin', c.id, { idempotencyKey: 'ct-sim-sched', publishNow: true });
-  const results = await contentOps.publishDue();
-  assert.ok(results.some(r => r.destination === 'blog' && r.ok));
+  await assert.rejects(()=>contentOps.approve('admin', c.id, { idempotencyKey: 'ct-sim-app', destination: 'blog', version: out.version }), {code:'SIMULATED_CONTENT_NOT_PUBLISHABLE'});
 });
 
 

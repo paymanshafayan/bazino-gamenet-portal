@@ -5,4 +5,7 @@ const {browser,page,errors}=await launch({width:1500,height:1000});await page.ad
 await page.goto(base+'/management-app/',{waitUntil:'domcontentloaded',timeout:60000});
 await page.getByRole('button',{name:/محتوا/}).first().click({timeout:30000});await page.locator('[data-publishing-studio]').waitFor({timeout:30000});
 await page.locator('[data-pub-tab=agents]').click();await page.locator('[data-agent-card=builtin-manus]').waitFor();await page.screenshot({path:'/home/user/visual-testing/v4/management-agents.png',fullPage:true});
+await page.locator('[data-pub-tab=posts]').click();await page.locator('[data-post-manager]').waitFor();
+await page.locator('.pub-post-card .pub-secondary').last().click();await page.locator('[data-post-title]').waitFor();
+await page.screenshot({path:'/home/user/visual-testing/v4/management-composer.png',fullPage:true});
 console.log(JSON.stringify({sharedStudio:true,errors}));await browser.close();

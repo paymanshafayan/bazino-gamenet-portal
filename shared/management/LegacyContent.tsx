@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useOps, useResource, Screen, Notice, Badge, SyncState } from './context';
 import { Dialog } from './Payment';
+import {StateBadge} from '../publishing/ui';
 
 const DESTS = [
   ['blog', 'بلاگ سایت', 'Website blog', 'Site blogu', 'Блог сайта'],
@@ -33,8 +34,8 @@ export function LegacyContentConsole() {
     <div className="ops-table-wrap"><table><thead><tr><th>{t('عنوان', 'Title', 'Başlık', 'Заголовок')}</th><th>{t('کانال‌ها', 'Channels', 'Kanallar', 'Каналы')}</th><th>{t('وضعیت', 'Status', 'Durum', 'Статус')}</th><th>{t('زمان انتشار', 'Scheduled', 'Yayın zamanı', 'Время публикации')}</th><th></th></tr></thead>
       <tbody>{(list.data || []).map(c => <tr key={c.id} data-content-row={c.id}>
         <td><b>{c.title}</b><div className="ops-code">{c.id}</div></td>
-        <td>{DESTS.map(([key, fa]) => { const d = c.destinations?.[key]; return d ? <div key={key} className="ops-small">{language === 'fa' ? fa : key}: <Badge tone={STATUS_TONE[d.status] || 'neutral'}>{STATUS_FA[d.status] || d.status}{d.error ? ` (${d.error})` : ''}</Badge></div> : null; })}</td>
-        <td><Badge tone={STATUS_TONE[c.status] || 'neutral'}>{STATUS_FA[c.status] || c.status}</Badge></td>
+        <td>{DESTS.map(([key, fa]) => { const d = c.destinations?.[key]; return d ? <div key={key} className="ops-small">{language === 'fa' ? fa : key}: <StateBadge value={d.status}/>{d.error&&<code>{d.error}</code>}</div> : null; })}</td>
+        <td><StateBadge value={c.status}/></td>
         <td className="ops-small">{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString(language) : '—'}</td>
         <td><div className="ops-actions">
           <button onClick={() => setReview(c)}>{t('بازبینی/تولید', 'Review / generate', 'Gözden geçir / üret', 'Просмотр / генерация')}</button>
@@ -65,13 +66,13 @@ export function LegacyContentConsole() {
           const dest = review.destinations?.[key]; const v = review.versions?.[key];
           if (!dest) return null;
           return <div className="ops-card" key={key} data-dest={key}>
-            <div className="ops-row"><h3>{language === 'fa' ? fa : en}</h3><Badge tone={STATUS_TONE[dest.status] || 'neutral'}>{STATUS_FA[dest.status] || dest.status}</Badge></div>
+            <div className="ops-row"><h3>{language === 'fa' ? fa : en}</h3><StateBadge value={dest.status}/></div>
             <label>{t('عنوان', 'Title', 'Başlık', 'Заголовок')}<input value={v?.title || ''} onChange={e => setReview({ ...review, versions: { ...review.versions, [key]: { ...(v || { body: '', language: 'fa' }), title: e.target.value } } })} /></label>
             <label>{t('متن', 'Body', 'Metin', 'Текст')}<textarea rows={6} value={v?.body || ''} onChange={e => setReview({ ...review, versions: { ...review.versions, [key]: { ...(v || { title: '', language: 'fa' }), body: e.target.value } } })} /></label>
             <div className="ops-actions">
               {can('content') && <button disabled={busy} onClick={() => setGenFor({ id: review.id, dest: key })}>{t('تولید/بازنویسی با Manus', 'Generate with Manus', 'Manus ile üret', 'Сгенерировать через Manus')}</button>}
-              {can('content') && <button disabled={busy} onClick={() => act(async () => { await api(`/content/${review.id}`, 'POST', { version: review.version, versions: { [key]: review.versions[key] } }); setSuccess(t('متن ذخیره شد.', 'Text saved.', 'Metin kaydedildi.', 'Текст сохранён.')); })}>{t('ذخیره متن', 'Save text', 'Metni kaydet', 'Сохранить текст')}</button>}
-              {can('publish') && v?.body && dest.status !== 'published' && <button className="ops-primary" disabled={busy} onClick={() => act(async () => { await api(`/content/${review.id}/approve`, 'POST', { destination: key }); setSuccess(t('نسخه تأیید شد.', 'Version approved.', 'Sürüm onaylandı.', 'Версия одобрена.')); })}>{t('تأیید نسخه', 'Approve version', 'Sürümü onayla', 'Одобрить версию')}</button>}
+              {can('content') && <button disabled={busy} onClick={() => act(async () => { const updated=await api(`/content/${review.id}`, 'POST', { version: review.version, versions: { [key]: review.versions[key] } }); setReview({id:updated.id,version:updated.version,...updated.data}); setSuccess(t('متن ذخیره شد.', 'Text saved.', 'Metin kaydedildi.', 'Текст сохранён.')); })}>{t('ذخیره متن', 'Save text', 'Metni kaydet', 'Сохранить текст')}</button>}
+              {can('publish') && v?.body && dest.status !== 'published' && <button className="ops-primary" disabled={busy} onClick={() => act(async () => { await api(`/content/${review.id}/approve`, 'POST', { destination: key, version: review.version }); setReview(null); setSuccess(t('نسخه تأیید شد.', 'Version approved.', 'Sürüm onaylandı.', 'Версия одобрена.')); })}>{t('تأیید نسخه', 'Approve version', 'Sürümü onayla', 'Одобрить версию')}</button>}
               {dest.error && <p className="ops-error ops-small">{dest.error}</p>}
             </div>
           </div>;
@@ -82,7 +83,7 @@ export function LegacyContentConsole() {
     {genFor && <Dialog title={t('تولید محتوا با Manus', 'Generate with Manus', 'Manus ile üret', 'Генерация через Manus')} onClose={() => setGenFor(null)}>
       <form onSubmit={e => { e.preventDefault(); void act(async () => {
         const fd = new FormData(e.currentTarget);
-        try { await api(`/content/${genFor.id}/generate`, 'POST', { destination: genFor.dest, prompt: fd.get('prompt'), language: fd.get('language'), category: fd.get('category') }); setGenFor(null); setReview(null); setSuccess(t('درخواست تولید به Manus ارسال شد؛ نتیجه پس از تکمیل به صف بازمی‌گردد.', 'Manus task created; the result returns to the queue when ready.', 'Manus görevi oluşturuldu; sonuç tamamlanınca kuyruğa döner.', 'Задача отправлена в Manus; результат вернётся в очередь по вебхуку.')); }
+        try { await api(`/content/${genFor.id}/generate`, 'POST', { destination: genFor.dest, confirmedCost: true, prompt: fd.get('prompt'), language: fd.get('language'), category: fd.get('category') }); setGenFor(null); setReview(null); setSuccess(t('درخواست تولید به Manus ارسال شد؛ نتیجه پس از تکمیل به صف بازمی‌گردد.', 'Manus task created; the result returns to the queue when ready.', 'Manus görevi oluşturuldu; sonuç tamamlanınca kuyruğa döner.', 'Задача отправлена в Manus; результат вернётся в очередь по вебхуку.')); }
         catch (e: any) { setError(e.code === 'INTEGRATION_NOT_CONFIGURED' ? t('کلید API مانوس تنظیم نشده است.', 'Manus API key is not configured.', 'Manus API anahtarı ayarlı değil.', 'Ключ Manus не настроен.') : e.code); }
       }); }}>
         <label>{t('زبان', 'Language', 'Dil', 'Язык')}<select name="language"><option value="fa">فارسی</option><option value="en">English</option><option value="tr">Türkçe</option><option value="ru">Русский</option></select></label>

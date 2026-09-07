@@ -20,14 +20,21 @@ export class MediaRegistry {
     const nativeId=nativeMediaId(b.media_id), cfg=(await this.settings.config()).data;
     const accountId=stringValue(b.accountId||cfg.zernioAccountId,100,true);
     // HTTP ingest never gets to choose arbitrary account/approval; callers supply only server-scoped fields.
-    const type=b.media_type || 'unknown';if(!['post','reel','unknown','story'].includes(type)||(source==='manus_ingest'&&type==='story'))fail('INVALID_MEDIA_TYPE');
+    const type=b.media_type || 'unknown';if(!['post','reel','unknown','story'].includes(type)||(source==='manus_ingest'&&type==='story'&&!publicationId))fail('INVALID_MEDIA_TYPE');
     const campaignId=source==='external_discovery'?'':String(b.campaign_id ?? cfg.defaultCampaignId);
     const campaign=campaignId?await this.core.read<CampaignPolicy>('pub-campaign',campaignId):undefined;
     if(campaignId&&!campaign)fail('CAMPAIGN_NOT_FOUND',422);
     const ready=source!=='external_discovery'&&type!=='story'&&!!campaign?.data.active&&campaign.data.accountId===accountId;
     return this.core.store.runInTransaction(async()=>{
       const id=mediaKey(accountId,nativeId),existing=await this.lookup(accountId,nativeId);
-      if(existing) return {accepted:true,media_id:nativeId,registry_id:id,campaign_id:existing.data.campaignId,status:existing.data.approval,duplicate:true};
+      if(existing) {
+        if(existing.data.source==='external_discovery'&&existing.data.approval==='needs_review'&&ready){
+          const updated={...existing.data,source,mediaType:type,campaignId,languages:campaign!.data.languages,active:true,approval:'approved' as const,publicationId,providerPostId:b.providerPostId};
+          await this.core.save('pub-media',id,updated,existing.version);
+          return {accepted:true,media_id:nativeId,registry_id:id,campaign_id:campaignId,status:'approved',duplicate:true};
+        }
+        return {accepted:true,media_id:nativeId,registry_id:id,campaign_id:existing.data.campaignId,status:existing.data.approval,duplicate:true};
+      }
       const data:PublishedMedia={nativeId,accountId,platform:'instagram',source,mediaType:type,campaignId,languages:campaign?.data.languages||[],active:ready,approval:ready?'approved':'needs_review',receivedAt:nowISO(),publicationId,providerPostId:b.providerPostId};
       if(b.published_at){if(!Number.isFinite(Date.parse(b.published_at)))fail('INVALID_DATE');data.publishedAt=new Date(b.published_at).toISOString();}
       await this.core.save('pub-media',id,data,0,`media:${id}`);

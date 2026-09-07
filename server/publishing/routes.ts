@@ -5,6 +5,8 @@ import { MediaRegistry } from './registry';
 import { PublishingReports } from './reports';
 import { AgentRegistry } from './agents';
 import { ZernioClient } from './provider';
+import {PublishingService} from './publish';
+import {registerPublicationRoutes} from './publicationRoutes';
 import { WebhookService, registerZernioReceiver } from './webhooks';
 import { InstagramCampaignService } from '../affiliate/campaignV4';
 import { FriendGateService,registerFriendGate } from '../affiliate/friendGate';
@@ -15,6 +17,7 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   const settings=new PublishingSettings(core),registry=new MediaRegistry(core),admin=publishingAdmin(core),base='/api/management/publishing';
   const webhooks=new WebhookService(core),campaigns=new InstagramCampaignService(core);
   registerZernioReceiver(app,webhooks);
+  registerPublicationRoutes(app,new PublishingService(core));
   registerFriendGate(app,new FriendGateService(core));
   const reports=new PublishingReports(core);
   const agents=new AgentRegistry(core);

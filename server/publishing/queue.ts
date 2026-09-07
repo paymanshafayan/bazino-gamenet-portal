@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { OpsCore, fingerprint, nowISO } from '../management/core';
 import { PublishingSettings } from './settings';
 import { ZernioClient, ProviderFailure } from './provider';
-export interface InboxEvent {type:string;accountId:string;nativeId?:string;commentId?:string;authorId?:string;username?:string;text?:string;createdAt?:string;conversationId?:string;participantId?:string;button?:string;direction?:string;providerPostId?:string;publicationId?:string;platform?:string;status?:string;timestamp:string;cursor?:string;messageId?:string;}
+export interface InboxEvent {type:string;accountId:string;nativeId?:string;commentId?:string;authorId?:string;username?:string;text?:string;createdAt?:string;conversationId?:string;participantId?:string;button?:string;direction?:string;providerPostId?:string;publicationId?:string;platform?:string;status?:string;timestamp:string;cursor?:string;messageId?:string;mediaType?:'post'|'reel'|'story'|'unknown';targets?:Array<{accountId:string;platform:string;nativeId:string;status:string}>;}
 export class DurableQueue {
   settings:PublishingSettings;
   client:ZernioClient;

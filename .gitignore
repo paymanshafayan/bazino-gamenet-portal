@@ -45,3 +45,6 @@ tmp-shots/
 # Batch 10-12 transient/regenerable artifacts (scratches & visual-test screenshots)
 /modified_image.jpg
 /visual-testing/
+
+# Runtime media library (private assets; never versioned)
+/media-library/

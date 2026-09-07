@@ -497,3 +497,12 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 | E.119 | URL موقت Zernio برای draft و زمان‌بندی طولانی کافی نیست | ریسک طراحی/نگه‌داری فایل | ⏳ طبق راهنمای رسمی uploadUrl یک ساعت و temp هفت روز است؛ source file خصوصی/پایدار و staging نزدیک نشر، همراه اعتبارسنجی asset/session و تست persistence لازم است. صرف BAZINO_DATA_DIR متفاوت اثبات Volume نیست؛ خرابی واقعی هاست یا تست موفق ادعا نشده |
 
 مرجع: `docs/publishing/ZERNIO_EVENTS_AND_ARCHITECTURE.md §۵٫۱` و پلن نسخهٔ ۳. سقف upload عمومی با قابلیت انتشار Instagram و موفقیت بارگذاری با published اشتباه نشود.
+
+## ۱۴۰۵/۰۶/۱۶ — حالت دستی/عامل و دفتر عامل‌های انتشار
+
+| # | مورد | نوع | وضعیت |
+|---|---|---|---|
+| E.120 | حالت انتشار/Agent Registry/Manus پیش‌فرضِ ذخیره‌شده در مدل فعلی نیست | فاصلهٔ کد با درخواست جدید | ⏳ ContentItem فاقد mode/agentId/configVersion و مسیر تولید مستقیماً Manus است؛ seed واقعی defaultAgentId، CRUD/API Key، capability و اتصال حالت‌ها در پلن v4 بچ‌های ۶–۷ طراحی شده؛ هنوز اجرا نشده |
+| E.121 | مهاجرت credential می‌تواند کلید مؤثر یا revoke مدیر را بی‌صدا عوض کند | ریسک پیکربندی/امنیت، نه رخداد تأییدشده | ⏳ Manus فعلی setting را قبل از env می‌خواند؛ credentialRef با منبع صریح، حفظ تقدم در مهاجرت و تفکیک نبود مقدار از پاک‌کردن عمدی در طرح ثبت شد. هیچ کلید واقعی خوانده، جابه‌جا یا ثبت نشد |
+
+مرجع: `docs/publishing/ZERNIO_EVENTS_AND_ARCHITECTURE.md §۵٫۲` و پلن نسخهٔ ۴. API Key، قابلیت adapter و مجوز انتشار سه چیز جدا هستند؛ انتخاب Manus به معنی اجرای واقعی نیست.

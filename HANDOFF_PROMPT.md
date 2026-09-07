@@ -1135,3 +1135,5 @@ done
 - افزودن workflow فعال به permission workflows و dispatch استقرار به permission Actions نیاز دارد؛ GitHub App هر دو را رد کرد. قالب CI کامل در docs/publishing/publishing-v4.workflow.yml تحویل است. مدیر می‌تواند PR را merge/مسیر استقرار main را اجرا یا اتصال GitHub در Arena را با مجوزهای لازم اصلاح کند؛ کلید در چت خواسته نشود.
 - fetch جایگزینِ health دامنه، صفحهٔ HTML عمومی برگرداند، نه JSON گیرنده؛ استقرار واقعی و تماس زندهٔ Zernio/Manus همچنان تأیید نشده‌اند.
 - generation منسوخ قبل از task هزینه‌دار متوقف و تنظیمات project/profile عامل برای job مصوب pin شد؛ تغییر default/health metadata یا API Key با انتقال پنهان مالک کار یکی نیست. جزئیات و ZIP در گزارش تحویل است.
+
+- تأیید نهایی GitHub: آخرین کد `5b9ef0d` در PR #20، هر سه check موجود را گذراند (run 34133592889). ZIP سورس + ۲۰ تصویر و شواهد محلی، بدون credential/runtime DB، با manifest commit تحویل شد. این موفقیت، permission مسدودِ deployment یا تست زندهٔ provider را رفع نمی‌کند.

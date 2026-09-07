@@ -42,9 +42,9 @@
 
 ## انتشار و مجوزهای باقی‌مانده
 
-- همهٔ هشت بچ کد روی شاخهٔ جلسه push شدند؛ commit کد/تست بچ ۸: `bfaff2b59c13a1c20f7f58f93c516cbc61c2dd0f`. بررسی نهاییِ بیشتر برای pin تنظیمات عامل و جلوگیری از task منسوخ نیز در همین شاخه تحویل می‌شود.
+- همهٔ هشت بچ کد روی شاخهٔ جلسه push شدند؛ commit کد/تست بچ ۸: `bfaff2b59c13a1c20f7f58f93c516cbc61c2dd0f`. اصلاح نهایی pin تنظیمات عامل و رد task منسوخ در commit `5b9ef0d823597bb757c9088b1a2bbac0e1ac4be7` نیز push شد.
 - **PR #20:** https://github.com/paymanshafayan/bazino-gamenet-portal/pull/20 — از همین شاخه به main، بدون push مستقیم به main و بدون merge خودکار.
-- سه check موجود GitHub روی commit بچ ۸ موفق‌اند: backend build/boot، frontend build و Typecheck/Theme tests. شاهد: https://github.com/paymanshafayan/bazino-gamenet-portal/actions/runs/34131923818 . این سه check با سوئیت ۵۰۶تایی محلی یکی نیستند.
+- سه check موجود GitHub روی **آخرین commit کد `5b9ef0d`** نیز موفق‌اند: backend build/boot (۱۹ثانیه)، frontend build (۲۸ثانیه) و Typecheck/Theme tests (۳۱ثانیه). شاهد: https://github.com/paymanshafayan/bazino-gamenet-portal/actions/runs/34133592889 . این سه check با سوئیت ۵۰۶تایی محلی یکی نیستند.
 - GitHub App اجازهٔ افزودن فایل در `.github/workflows/` نداد؛ قالب کامل CI در `docs/publishing/publishing-v4.workflow.yml` محفوظ است. برای فعال‌سازی، مدیر باید مجوز **workflows** اتصال Arena را فراهم کند یا قالب را در مسیر `.github/workflows/publishing-v4.yml` قرار دهد.
 - اجرای workflow استقرار موجود با `gh workflow run deploy.yml --ref arena/01a07a2f-bazino-gamenet-portal` واقعاً تلاش شد، اما **HTTP 403 Resource not accessible by integration** گرفت؛ permission اجرای Actions در اتصال فعلی کافی نیست. کد برای دورزدن مجوز یا trigger مخفی main merge نشد.
 - Python/curl مستقیم health دامنه TLS/EOF دادند. مسیر جایگزین ابزار fetch موفق شد، ولی در URL health **HTML صفحهٔ عمومی سایت** برگشت، نه JSON گیرندهٔ V4. بنابراین **استقرار روی bazino.pro تأیید نشده/انجام‌شده گزارش نمی‌شود**.
@@ -74,3 +74,7 @@ POST https://bazino.pro/api/webhooks/zernio/analytics
 ### بازبینی نهایی هزینه/عامل
 
 در بازبینی پایانی دو مورد واقعی تکمیل شد: generation صف‌شده‌ای که draft آن به‌صورت دستی عوض شده، پیش از تماس هزینه‌دار superseded می‌شود؛ تغییر project/profile عامل با همان API Key نیز job مصوب قبلی را با تنظیمات تازه اجرا نمی‌کند. hash تنظیمات اجرایی مستقل از rename/زمان health-check است و درست پیش از درخواست عامل نیز کنترل می‌شود. سه آزمون افزوده شد؛ APIهای خارجی همچنان mock هستند.
+
+## بستهٔ تحویل
+
+`bazino-v4.zip` شامل سورسِ آخرین HEAD به‌علاوهٔ JSON/لاگ تست و ۲۰ تصویر واقعی در مسیرهای ignored است؛ داخل `DELIVERY_MANIFEST.json` commit دقیق بسته و مرز تست‌ها ثبت شده است. فایل ZIP و SHA-256 آن در خروجی Arena تحویل می‌شوند و در Git قرار نمی‌گیرند. `node_modules`، `.git`، دیتابیس runtime و credentialهای fixture در بسته نیستند.

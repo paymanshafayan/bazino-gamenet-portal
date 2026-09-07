@@ -1159,3 +1159,7 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - شواهد آزمون: `npm run build` + tsc هر دو پروژه سبز؛ **۵۱۴/۵۱۴** کل سوئیت (API e2e با dist تازه)؛ journey ۲۵ مرحله‌ای `tests/e2e-browser/e2e-journey.mjs` **۲۵/۲۵** روی DB تازهٔ fallback-admin (OTP dev-peek، اسلات TZ، مودال پرداخت حضوری، ثبت‌نام هوشمند تورنمنت، موبایل ۳۹۰px)؛ سفر بصری `tests/e2e-browser/games-page.mjs` **۱۰/۱۰ بدون خطای کنسول** (fa دسکتاپ ×۵، en/tr/ru، fa موبایل ×۲ + redirect)؛ هر ۱۰ اسکرین‌شات `tests/e2e-browser/shots/games/` با چشم بازبینی شد (کارت‌ها، فیلتر kids=۲×PS5، adults=۳ سیستم، فوکوس درخواست بازی، redirect، active-tab «بازی‌ها/OYUNLAR/GAMES»، نوار پایین موبایل).
 - مستندات: `src/themes/README.md` به‌روز شد (onNavigate('games')، alias، deep-link `?category=`، بلوک الزام ناوبری). باگ‌ها E.128–E.130 در `ISSUES_FOUND.md`. جزئیات تحویل در HANDOFF §۲۴.
 - باقی‌مانده: پیشنهاد به‌روزرسانی §۰ هندآف برای `node scripts/prepare-media-tools.mjs` همچنان تأییدنشده است؛ SMTP/POS متوقف و درگاه آنلاین خاموش (بدون تغییر). نویز از قبل: 404 t4/live و embed OSM.
+
+### تکمیل §۰ هندآف — تأیید کاربر (2026-09-08)
+
+- کاربر تأیید کرد («انجام بده»): گام اجباری `node scripts/prepare-media-tools.mjs` (ترمیم executable-bit باینری ffmpeg/ffprobe پس از نصب `--ignore-scripts`؛ بدون آن تست‌های رسانه EACCES) و گام سوئیت کامل (`npm run build` پیش از `npm test` — تست API از `dist/server.cjs`) به بخش ۰ HANDOFF_PROMPT.md اضافه شد؛ سربرگ سند هم به نشست جاری `arena/01a07cd8` (PR #21) و تاریخ ۱۴۰۵/۰۶/۱۷ به‌روز شد.

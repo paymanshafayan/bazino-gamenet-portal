@@ -4,8 +4,8 @@
 > هدف: از صفر تا «سرور زنده + مرورگر واقعی که فارسی را درست رندر می‌کند»، بدون آزمون‌وخطا.
 > سوابق اجرا و تست هر بخش مربوط به همان نشست‌اند؛ نتیجهٔ تحقیق، موارد اجراشده و موارد هنوز آزمایش‌نشده باید از هم تفکیک شوند. وضعیت فعلی پس از مرج **PR #19** در **بخش ۱۶** است: قابلیت‌های batchهای ۱–۱۳ کد و رابط کاربری دارند و در `main` ادغام شده‌اند؛ کار باقی‌مانده **تکمیل شکاف‌ها و راستی‌آزمایی زنده** است، نه ساخت دوبارهٔ بخش‌ها. پروندهٔ سخت‌افزار POS همچنان متوقف است.
 >
-> تاریخ تنظیم: ۱۴۰۵/۰۶/۱۰ (2026-09-01) · آخرین به‌روزرسانی: **۱۴۰۵/۰۶/۱۶ (2026-09-07)**، گزارش قطعی انجام‌شده/باقی‌مانده در **بخش ۲۳**؛ بازاجرای 506 تست و بازبینی ۲۰ تصویر روی `45dd2ad`، مرجع `docs/publishing/V4_DELIVERY.md` · ریپو: `paymanshafayan/bazino-gamenet-portal`
-> برنچ نشست جاری: **`arena/01a07a2f-bazino-gamenet-portal`**، از پایهٔ **`4702133077bdacc478982b8ec0ad1778906fb379`** (`47021330`، merge commitِ PR #19). نشست قبلی `arena/01a07603-bazino-gamenet-portal` با PR #19 و اجرای قبلی batchهای ۱–۵ از `arena/01a070af-bazino-gamenet-portal` با PR #18 (`81f9b84`) در `main` ادغام شده‌اند. نام شاخه‌های نشست‌های قبلی صرفاً سابقه است.
+> تاریخ تنظیم: ۱۴۰۵/۰۶/۱۰ (2026-09-01) · آخرین به‌روزرسانی: **۱۴۰۵/۰۶/۱۷ (2026-09-08)**، صفحهٔ «بازی‌ها» در **بخش ۲۴** (PR #21) و تکمیل بخش ۰ (گام رسانه + سوئیت)؛ گزارش قطعی دورهٔ قبل در **بخش ۲۳** و `docs/publishing/V4_DELIVERY.md` · ریپو: `paymanshafayan/bazino-gamenet-portal`
+> برنچ نشست جاری: **`arena/01a07cd8-bazino-gamenet-portal`**، از پایهٔ merge PR #20 (`627f980`)؛ تحویل صفحهٔ Games با **PR #21** باز است. نشست قبلی `arena/01a07a2f-bazino-gamenet-portal` (از پایهٔ PR #19) با PR #20 در `main` ادغام شده و نشست‌های `arena/01a07603`/`arena/01a070af` (PR #19/#18) سابقه‌اند.
 > **هشدار:** دستورهای fetch/reset/clean و نام شاخهٔ ابتدای بخش ۰، دستورالعمل تاریخی نشست قبل‌اند؛ در این نشست اجرا نشوند. تغییر شاخه یا reset مخرب لازم نیست؛ کار فقط روی شاخهٔ فعلی انجام شود.
 >
 > **وضعیت جاری: بخش ۲۳ — هشت بچ توسعه و تست محلی تکمیل شده‌اند.** 506/506 تست، TypeScript/build و Chromium چهارزبانه با مشاهدهٔ ۲۰ تصویر و restart واقعی دوباره موفق شدند. **استقرار دامنه هنوز تأیید نشده؛ dispatch آخرین بار 403 و health وب HTML است.** این پیگیری فقط اسناد/تحویل را به‌روز می‌کند؛ کار ساخته‌شده از صفر تکرار نشود.
@@ -24,10 +24,12 @@ git fetch origin arena/01a06e3e-bazino-gamenet-portal && git reset --hard FETCH_
 #    همیشه اول `git ls-remote --heads origin arena/01a06e3e-bazino-gamenet-portal` را با HEAD مقایسه کنید.
 #    هرگز روی برنچ دیگری push نکنید — Arena این جلسه را با `arena/01a06e3e-bazino-gamenet-portal` ردیابی می‌کند.
 
-# ── ۲) وابستگی‌ها + کامپایل ماژول native (بدون هیچ دانلود خارجی) ───────────
+# ── ۲) وابستگی‌ها + کامپایل ماژول native + ترمیم ابزار رسانه (بدون هیچ دانلود خارجی) ──
 npm install --ignore-scripts --no-audit --no-fund
 (cd node_modules/better-sqlite3 && npx node-gyp rebuild --release --nodedir=/usr/local)
 node -e "const D=require('better-sqlite3'); new D(':memory:'); console.log('SQLITE OK')"
+# اجرای باینری ffmpeg/ffprobe مجوز اجرا ندارد → تست‌های رسانه در npm test با EACCES می‌میرند؛ این خط اجباری است:
+node scripts/prepare-media-tools.mjs
 
 # ── ۳) سرور زنده ────────────────────────────────────────────────────────────
 npx tsx server.ts        # → http://0.0.0.0:3000   (با ابزار start_process اجرا کنید)
@@ -45,9 +47,15 @@ export CHROMIUM_EXECUTABLE_PATH=/tmp/chromium LD_LIBRARY_PATH=/tmp/al2023/lib \
 # ── ۵) تست ──────────────────────────────────────────────────────────────────
 node verify-env.mjs      # باید بگوید: OK: browser=149.0.7827.0 h1=hello bazino
 node e2e-journey.mjs
+
+# ── ۶) سوئیت کامل (از ریشهٔ ریپو) ───────────────────────────────────────────
+cd /home/user/bazino-gamenet-portal
+# اگر server.ts/server/** عوض شده، اول build — تست API از dist/server.cjs اجرا می‌شود:
+npm run build
+npm test                 # انتظار: همه سبز (۵۱۴/۵۱۴ تا تاریخ بخش ۲۴)
 ```
 
-زمان تقریبی کل: **۳ تا ۴ دقیقه** (بیشترش کامپایل `better-sqlite3` ≈ ۷۰ ثانیه).
+زمان تقریبی کل: **۴ تا ۵ دقیقه** (بیشترش کامپایل `better-sqlite3` ≈ ۷۰ ثانیه و build ≈ ۲۰ ثانیه).
 
 ---
 

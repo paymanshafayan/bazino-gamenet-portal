@@ -2,7 +2,21 @@
 
 > **V4 پیاده‌سازی و محلی تست شد:** شرح فعلی در [راهنمای اجرا](../publishing/DEPLOY_AND_OPERATE.md) و [تحویل](../publishing/V4_DELIVERY.md) است. قراردادهای پایین تاریخچه‌اند: endpoint ساخت لینک شریک و simulator قدیمی بازنشسته، receiver جدید/قدیمی هر دو HMAC، توکن ناشر فقط ingest و لینک تنها برای دوست واجد Gate است.
 
-> **مرجع فعلی — 2026-09-07:** [اصل طرح کاربر](INSTAGRAM_AFFILIATE_DESIGN.md)، [پلن نسخهٔ ۴](INSTAGRAM_MEDIA_ONLY_PLAN.md) و [رویدادها/معماری ناشر قابل‌تعویض](../publishing/ZERNIO_EVENTS_AND_ARCHITECTURE.md) مرجع هدف‌اند. امروز Manus فقط media_id می‌فرستد؛ آینده انتشار مستقیم از پنل با Zernio، همان registry مصوب و موتور افیلیت را تغذیه می‌کند. **کد فقط برای همکار و لینک خصوصی فقط برای دوست پس از Gate.** مطالب پایین شرح کد موجود/سابقه‌اند؛ فاز ۳ قرارداد جدید Manus نیست و هنوز کد آن اصلاح نشده است. Composer ادمین با upload رسانه/کپشن/قالب‌ها نیز در همان پلن آمده است؛ Story و پست عمومی بدون campaign وارد افیلیت نمی‌شوند. سوییچ دستی/عامل و Manus پیش‌فرضِ ذخیره‌شده نیز افزوده شده‌اند؛ در حالت عامل هم فقط media_id به ingest می‌آید و اختیار افیلیت واگذار نمی‌شود. مرجع ادامه: `HANDOFF_PROMPT.md §۲۲`.
+> **مرجع فعلی — 2026-09-07:** [اصل طرح کاربر](INSTAGRAM_AFFILIATE_DESIGN.md) محفوظ و [پلن V4](INSTAGRAM_MEDIA_ONLY_PLAN.md) اجرا شده است. Manus فقط media_id می‌دهد؛ انتشار دستی/عامل به registry مصوب مشترک می‌رسد. کد فقط برای همکار، لینک خصوصی فقط برای دوست؛ Composer، عامل پیش‌فرض و تنظیمات امن پیاده‌اند. نتیجهٔ جاری 506 تست محلی و ۲۰ تصویر بازبینی‌شده است؛ استقرار/تماس زنده تأیید نشده. مرجع ادامه: `HANDOFF_PROMPT.md §۲۳`.
+
+## قراردادهای جاری V4
+
+| مسیر/قابلیت | وضعیت فعلی کد |
+|---|---|
+| `POST /api/integrations/instagram/published-media` | ورودی فقط media_id با توکن ingest؛ registry مصوب account/campaign |
+| `POST /api/webhooks/zernio` و `/api/integrations/zernio/webhook` | هر دو HMAC روی raw body؛ Bearer ناشر جای امضا نیست |
+| `POST /api/webhooks/zernio/analytics` | stream/Secret جدا و پردازش کم‌اولویت |
+| `/ig/invite/:id` | Gate واقعی دوست، consent/ورود و کوپن owner-bound؛ پارامترهای خصوصی را در log قرار ندهید |
+| `partner-invite` و simulator قدیمی | HTTP 410؛ مسیر صدور لینک برای شریک یا کوپن بدون Gate نیستند |
+
+جزئیات تنظیم/استفاده در راهنمای اجراست. **شرح نسخه‌های قبلی پایین فقط تاریخچه است و نباید برای راه‌اندازی جدید کپی شود.**
+
+## تاریخچهٔ قرارداد پیش از V4
 
 > پورتال به Meta وصل نیست. ناشر فقط Media ID می‌فرستد. مغز تصمیم و کد یکتا در پورتال است؛ Zernio فقط دست (PR/DM) است.
 

@@ -10,6 +10,12 @@
 
 ---
 
+## وضعیت استودیوی انتشار و افیلیت V4
+
+پیاده‌سازی هشت بچ در شاخهٔ `arena/01a07a2f-bazino-gamenet-portal` و [PR #20](https://github.com/paymanshafayan/bazino-gamenet-portal/pull/20) موجود است: وب‌هوک امن Zernio، فلو چهارزبانهٔ همکار/دوست، Gate و کوپن، Composer تصویر/ویدئو/Carousel و حالت دستی/عامل با Manus پیش‌فرض.
+
+**آخرین بازاجرای محلی:** 506 تست موفق، TypeScript/build هر دو پروژه، Chromium با ۲۰ تصویر بازبینی‌شده و restart واقعی. **استقرار production تأیید نشده**؛ مجوز deployment اتصال فعلی کافی نیست و سلامت دامنه هنوز JSON گیرنده نیست. جزئیات [انجام‌شده/باقی‌مانده](docs/publishing/V4_DELIVERY.md)، [راهنمای هاست و استفاده](docs/publishing/DEPLOY_AND_OPERATE.md)، [تست‌ها](tests/README.md) و `HANDOFF_PROMPT.md §۲۳` مرجع‌اند. داده/اعتبار واقعی سرویس‌ها در تست محلی استفاده نشده‌اند.
+
 ## ✨ امکانات
 
 | بخش | توضیح |

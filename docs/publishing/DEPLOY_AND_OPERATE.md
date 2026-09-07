@@ -4,6 +4,20 @@
 
 کد در شاخهٔ `arena/01a07a2f-bazino-gamenet-portal` است. اجرای این نشست شامل بک‌اند، UI مشترک سایت/مدیریت، تست و build محلی است؛ **فراخوانی واقعی سرویس‌های دارای اعتبار و استقرار روی bazino.pro بدون شاهد انجام‌شده محسوب نمی‌شوند**. وضعیت دقیق انتشار و اتصال GitHub در `V4_DELIVERY.md` ثبت می‌شود.
 
+## وضعیت عملیاتی جاری و معیار سلامت
+
+آخرین بازاجرای محلی روی `45dd2ad` موفق است: 506 تست، TypeScript/build، Chromium و restart. **آخرین dispatch GitHub استقرار با 403 رد شده و health دامنه هنوز از روش fetch، HTML برمی‌گرداند.** برای انتشار، مدیر PR #20/مسیر Railway را اجرا یا اتصال GitHub در Arena را با مجوزهای لازم اصلاح کند؛ کلید در چت ارسال نشود.
+
+انتظار از health نسخهٔ جدید، پس از تنظیم Secret و deployment:
+
+```json
+{"ok":true,"service":"bazino-zernio-receiver"}
+```
+
+بدون Secret، همین سرویس به‌صورت JSON با `ok:false` و HTTP 503 پاسخ می‌دهد؛ HTML صفحهٔ اصلی، health سالم گیرنده نیست. سپس Test webhook امضاشده باید پاسخ بی‌اثر داشته باشد و فقط بعد از بررسی account/campaign/queue، ارسال واقعی روشن شود.
+
+dispatch طبق مستند GitHub به مجوز repository **Actions: write** نیاز دارد؛ امکان خواندن checkها یا push کد، جای آن نیست. مرجع رسمی: [1](https://docs.github.com/en/rest/actions/workflows). فعال‌سازی template CI نیز نیازمند مجوز مناسب برای فایل workflow است. این نوبت workflow فعال موجود تغییر نکرده است.
+
 ## پیش‌نیازهای هاست
 
 1. Node.js 22؛ `npm ci` و `npm run build`، سپس `npm start` روی سرویس موجود.

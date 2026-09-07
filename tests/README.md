@@ -1,24 +1,39 @@
 # مجموعه تست‌های بازینو — Bazino test suite
 
-یک پروژهٔ تست کامل و **بدون هیچ وابستگی جدید** (نه Jest، نه Vitest) که با
-`tsx` و ماژول‌های خود Node اجرا می‌شود (تنها افزودهٔ dev، `jsdom` برای رندر
-کامپوننت‌هاست). پنج لایه دارد و همه روی کد واقعی پروژه اجرا می‌شوند — نه mock.
+## وضعیت فعلی V4 — 2026-09-07
+
+runner `tests/run-all.mts` اکنون **هشت لایه** دارد و آخرین بازاجرای کد `45dd2ad` با **506/506، صفر failure/skip** کامل شد. همهٔ آزمون‌ها یک ماهیت ندارند: SQLite و Express واقعاً اجرا می‌شوند؛ APIهای خارجی و SQL Server/Mongo در پوشش contract/mock هستند، نه اتصال live.
+
+| لایه | تعداد موفق | ماهیت |
+|---|---:|---|
+| publishing-media | 24 | فایل PNG/JPEG/MP4، Sharp/ffprobe و adapter mock |
+| publishing | 54 | منطق V4 و SQLite واقعی؛ سرویس خارجی mock |
+| management | 41 | قرارداد/تراکنش مدیریت |
+| unit | 99 | منطق خالص |
+| database | 38 | SQLite واقعی |
+| providers | 27 | قرارداد SQL Server/Mongo و mock |
+| ui | 42 | jsdom |
+| api | 181 | Express production + SQLite و دادهٔ آزمایشی |
 
 ```bash
-npm test               # اجرای هر پنج لایه + خلاصهٔ کل
-npm run test:unit      # فقط منطق خالص
-npm run test:db        # فقط دیتابیس
-npm run test:providers # فقط پرووایدرها
-npm run test:ui        # فقط رابط کاربری
-npm run test:api       # فقط end-to-end
-npm test -- unit database   # انتخاب چند لایه
+npm run lint
+npm --prefix "Management App/Bazino" run lint
+npm run build
+npm test
+npm test -- publishing publishing-media
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --prefix tests/e2e-browser
+node scripts/run-publishing-browser.mjs
 ```
 
-خروجی رنگی است و گزارش JSON هر لایه در `tests/reports/` نوشته می‌شود
-(این پوشه git-ignore است و با هر اجرا از نو ساخته می‌شود).
-اگر حتی یک تست شکست بخورد، کد خروجی غیرصفر است — برای CI آماده است.
+پیش از رگرسیون نهایی `npm run build` صریحاً اجرا شود؛ به وجود فایل dist قدیمی به‌عنوان شاهد build نسخهٔ جاری تکیه نکنید. گزارش‌ها در `tests/reports/`، تصاویر در `tests/e2e-browser/shots/v4/` و در Git ignored هستند. runner مرورگر از credential/دادهٔ موقت استفاده می‌کند، ارسال واقعی خاموش است و سرور را برای آزمون ماندگاری restart می‌کند. در آخرین اجرای تازه، ۲۰ تصویر کامل تولید و همه واقعاً بازبینی شدند؛ این موفقیت، تست Zernio/Manus یا هاست واقعی نیست.
+
+راهنمای dependency/native/font و مرزهای استقرار: [DEPLOY_AND_OPERATE](../docs/publishing/DEPLOY_AND_OPERATE.md). نتیجهٔ جاری و سابقهٔ timeout مرورگر: [V4_DELIVERY](../docs/publishing/V4_DELIVERY.md). مقادیر تست (از جمله کوپن/کلیدهای ساختگی) هرگز به‌عنوان دادهٔ واقعی کسب‌وکار معرفی نشوند.
 
 ---
+
+## یادداشت‌های تاریخی نسخه‌های پیش از V4
+
+**آمار مسیرها، شمار لایه‌ها و توضیح رفتارهای قدیمی در ادامه مربوط به همان نسخه‌هاست و قرارداد/نتیجهٔ جاری نیست.** برای اجرای امروز، دستورات و مرزهای بالا و کد تست‌ها ملاک‌اند.
 
 ## لایه‌ها
 

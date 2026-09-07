@@ -1,11 +1,14 @@
+import {mkdirSync as ensureShotDir} from 'node:fs';
+const REVIEW_DIR=process.env.PUBLISHING_REVIEW_DIR||'/home/user/.cache/bazino-v4';
+const SHOTS=process.env.V4_SHOT_DIR||'/home/user/visual-testing/v4';ensureShotDir(SHOTS,{recursive:true});
 import {launch} from './lib.mjs';import {readFileSync,writeFileSync} from 'node:fs';
-const env=Object.fromEntries(readFileSync('/home/user/.cache/bazino-v4/runtime.env','utf8').trim().split('\n').map(l=>l.split('=')));
+const env=Object.fromEntries(readFileSync(`${REVIEW_DIR}/runtime.env`,'utf8').trim().split('\n').map(l=>l.split('=')));
 const base=process.env.BASE||'http://127.0.0.1:3000';const auth=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:env.PREVIEW_PASSWORD})}).then(r=>r.json());
 const {browser,page,errors}=await launch({width:1500,height:1000});await page.addInitScript(token=>{localStorage.setItem('bazino.authToken',token);localStorage.setItem('cyber_lang','fa');},auth.token);
 await page.goto(base+'/management-app/',{waitUntil:'domcontentloaded',timeout:60000});
 await page.getByRole('button',{name:/محتوا/}).first().click({timeout:30000});await page.locator('[data-publishing-studio]').waitFor({timeout:30000});
-await page.locator('[data-pub-tab=agents]').click();await page.locator('[data-agent-card=builtin-manus]').waitFor();await page.screenshot({path:'/home/user/visual-testing/v4/management-agents.png',fullPage:true});
+await page.locator('[data-pub-tab=agents]').click();await page.locator('[data-agent-card=builtin-manus]').waitFor();await page.screenshot({path:`${SHOTS}/management-agents.png`,fullPage:true});
 await page.locator('[data-pub-tab=posts]').click();await page.locator('[data-post-manager]').waitFor();
 await page.locator('.pub-post-card .pub-secondary').last().click();await page.locator('[data-post-title]').waitFor();
-await page.screenshot({path:'/home/user/visual-testing/v4/management-composer.png',fullPage:true});
+await page.screenshot({path:`${SHOTS}/management-composer.png`,fullPage:true});
 console.log(JSON.stringify({sharedStudio:true,errors}));await browser.close();

@@ -121,10 +121,10 @@ export class PublishingService {
     const asset=await this.assets.ready(assetId),ref=fingerprint({jobId,assetId,hash:asset.data.hash});
     const old=await this.core.read('pub-provider-upload',ref);
     if(old&&Date.parse(old.data.expiresAt)>Date.now()+3600000)return old.data.publicUrl as string;
-    const prepared=this.assets.openPrepared(assetId),size=prepared.size;
+    const size=this.assets.preparedSize(assetId);
     const r=await this.client.request('/v1/media/presign','POST',{filename:`${asset.id}.${asset.data.mime==='video/mp4'?'mp4':asset.data.mime==='image/png'?'png':'jpg'}`,contentType:asset.data.mime,size});
     const d=r.data||r,uploadUrl=safeStorageUrl(String(d.uploadUrl)),publicUrl=safeStorageUrl(String(d.publicUrl));
-    const stream=prepared.stream;
+    const stream=this.assets.openPrepared(assetId).stream;
     try{const upload=await this.fetcher(uploadUrl,{method:'PUT',headers:{'Content-Type':asset.data.mime,'Content-Length':String(size)},body:Readable.toWeb(stream),duplex:'half',signal:AbortSignal.timeout(120000),redirect:'error'} as any);if(!upload.ok)fail('PROVIDER_UPLOAD_FAILED',502);}finally{stream.destroy();}
     await this.core.store.runInTransaction(async()=>{const prior=await this.core.read('pub-provider-upload',ref);await this.core.save('pub-provider-upload',ref,{assetId,hash:asset.data.hash,publicUrl,expiresAt:new Date(Date.now()+6*86400000).toISOString()},prior?.version||0);});
     return publicUrl;
@@ -192,7 +192,7 @@ export class PublishingService {
           if(target?.status==='published'&&target.platformPostId)await this.confirmPublished(r,String(target.platformPostId),'provider_reconciliation',target.publishedUrl||target.platformPostUrl||target.url);
           else if(p.status==='failed'||target?.status==='failed')await this.finish(r.id,'failed',{error:'PROVIDER_REPORTED_FAILURE'});
         }else if(r.data.taskId){
-          if((await this.manus.credential(r.data.snapshot.agentId)).fingerprint!==r.data.agentCredentialHash)continue;
+          if((await this.manus.credential(r.data.snapshot.agentId)).fingerprint!==r.data.agentCredentialHash)fail('AGENT_CREDENTIAL_CHANGED',409);
           const result=await this.manus.result(r.data.snapshot.agentId,r.data.taskId);
           if(result.state==='complete'){
             const nativeId=String(result.result?.media_id||'');if(!/^\d{1,40}$/.test(nativeId))fail('AGENT_MEDIA_UNCONFIRMED');
@@ -202,7 +202,10 @@ export class PublishingService {
           }else if(result.state==='failed')await this.finish(r.id,'delivery_unknown',{error:'AGENT_TASK_FAILED_REVIEW_REQUIRED'});
           else if(result.state==='needs_input')await this.core.store.runInTransaction(async()=>{const p=await this.core.read('pub-publication',r.id);if(p)await this.core.save('pub-publication',p.id,{...p.data,error:'AGENT_REQUIRES_ACTION'},p.version);});
         }
-      }catch{/* GET reconciliation failures do not trigger another POST. */}
+      }catch(e:any){
+        // Surface read failures without retrying a side-effecting POST or changing agent/account.
+        await this.core.store.runInTransaction(async()=>{const p=await this.core.read('pub-publication',r.id);if(p?.data.state==='submitted')await this.core.save('pub-publication',p.id,{...p.data,error:safeError(e)},p.version);});
+      }
     }
   }
   async generate(actor:string,id:string,b:any,admin=false){
@@ -220,10 +223,10 @@ export class PublishingService {
     if(b.confirmed!==true)fail('CONFIRMATION_REQUIRED');const r=await this.core.read('pub-agent-task',id);if(!r)fail('NOT_FOUND',404);if(!admin&&r.data.owner!==actor)fail('FORBIDDEN',403);
     if(r.data.status==='submitting')fail('TASK_SUBMISSION_IN_FLIGHT',409);
     if(!['queued','submitted','cancel_unknown'].includes(r.data.status))return {status:r.data.status};
+    await this.core.store.runInTransaction(async()=>{const current=await this.core.read('pub-agent-task',id);if(!current||current.version!==r.version)fail('VERSION_CONFLICT',409);await this.core.save('pub-agent-task',id,{...current.data,status:'cancelling'},current.version);});
     let status='cancelled';
     if(r.data.taskId){
-      if((await this.manus.credential(r.data.agentId)).fingerprint!==r.data.credentialHash)fail('AGENT_CREDENTIAL_CHANGED',409);
-      try{await this.manus.rpc(r.data.agentId,'task.stop','POST',{task_id:r.data.taskId});}catch{status='cancel_unknown';}
+      try{if((await this.manus.credential(r.data.agentId)).fingerprint!==r.data.credentialHash)fail('AGENT_CREDENTIAL_CHANGED',409);await this.manus.rpc(r.data.agentId,'task.stop','POST',{task_id:r.data.taskId});}catch{status='cancel_unknown';}
     }
     await this.core.store.runInTransaction(async()=>{const fresh=await this.core.read('pub-agent-task',id);if(fresh)await this.core.save('pub-agent-task',id,{...fresh.data,status},fresh.version);});return {status,creditsRefunded:false};
   }
@@ -240,7 +243,7 @@ export class PublishingService {
       }else if(d.taskId&&(d.nextPollAt||0)<Date.now()){
         await this.core.store.runInTransaction(async()=>{const current=await this.core.read('pub-agent-task',row.id);if(current?.data.status==='submitted')await this.core.save('pub-agent-task',row.id,{...current.data,nextPollAt:Date.now()+60000},current.version);});
         try{
-          if((await this.manus.credential(d.agentId)).fingerprint!==d.credentialHash)continue;
+          if((await this.manus.credential(d.agentId)).fingerprint!==d.credentialHash)fail('AGENT_CREDENTIAL_CHANGED',409);
           const result=await this.manus.result(d.agentId,d.taskId);
           await this.core.store.runInTransaction(async()=>{
             const r=await this.core.read('pub-agent-task',row.id);if(!r||r.data.status!=='submitted')return;
@@ -260,7 +263,7 @@ export class PublishingService {
             }
             await this.core.save('pub-agent-task',r.id,{...r.data,status,error:result.state==='needs_input'?'AGENT_REQUIRES_ACTION':'',nextPollAt:Date.now()+60000},r.version);
           });
-        }catch{/* Retry reads with a cap on frequency; no duplicate create. */}
+        }catch(e:any){await this.core.store.runInTransaction(async()=>{const r=await this.core.read('pub-agent-task',row.id);if(r?.data.status==='submitted')await this.core.save('pub-agent-task',r.id,{...r.data,error:safeError(e)},r.version);});}
       }
     }
   }

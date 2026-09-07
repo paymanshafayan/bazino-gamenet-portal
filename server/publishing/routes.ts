@@ -35,6 +35,7 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   app.post(`${base}/agents/:id/test`,admin,endpoint(async(req,res)=>res.json(await agents.testConnection((req as any).staff.username,String(req.params.id),req.body||{}))));
   app.get(`${base}/reports`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await reports.report())));
   app.post(`${base}/settlements`,admin,endpoint(async(req,res)=>res.json(await reports.settleMonth((req as any).staff.username,req.body||{}))));
+  app.post(`${base}/outbox/:id/:action`,admin,endpoint(async(req,res)=>res.json(await campaigns.resolveOutbox((req as any).staff.username,String(req.params.id),String(req.params.action),req.body||{}))));
   app.get(`${base}/members`,admin,endpoint(async(_req,res)=>res.json(await campaigns.list())));
   app.get(`${base}/events`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await webhooks.queue.report())));
   let inboxBusy=false,analyticsBusy=false;

@@ -1,6 +1,9 @@
+import {mkdirSync as ensureShotDir} from 'node:fs';
+const REVIEW_DIR=process.env.PUBLISHING_REVIEW_DIR||'/home/user/.cache/bazino-v4';
+const SHOTS=process.env.V4_SHOT_DIR||'/home/user/visual-testing/v4';ensureShotDir(SHOTS,{recursive:true});
 import {launch} from './lib.mjs';
 import {readFileSync,writeFileSync} from 'node:fs';
-const env=Object.fromEntries(readFileSync('/home/user/.cache/bazino-v4/runtime.env','utf8').trim().split('\n').map(l=>l.split('=')));
+const env=Object.fromEntries(readFileSync(`${REVIEW_DIR}/runtime.env`,'utf8').trim().split('\n').map(l=>l.split('=')));
 const base=process.env.BASE||'http://127.0.0.1:3000';
 const auth=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'review_partner',password:env.PREVIEW_PASSWORD})}).then(r=>r.json());
 const {browser,page,errors}=await launch({width:1200,height:900});
@@ -8,5 +11,5 @@ await page.addInitScript(token=>{localStorage.setItem('bazino.authToken',token);
 await page.goto(base+'/profile/affiliate',{waitUntil:'domcontentloaded',timeout:60000});
 await page.locator('[data-partner-code-only]').waitFor({timeout:20000});
 if((await page.locator('[data-profile-affiliate]').innerText()).includes('/?ref='))throw Error('Partner link leak');
-await page.screenshot({path:'/home/user/visual-testing/v4/batch5-profile.png',fullPage:true});
+await page.screenshot({path:`${SHOTS}/batch5-profile.png`,fullPage:true});
 console.log(JSON.stringify({codeOnly:true,errors}));await browser.close();

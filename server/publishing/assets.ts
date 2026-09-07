@@ -88,14 +88,15 @@ export class AssetLibrary {
     return this.core.store.runInTransaction(async()=>{
       const r=await this.owned(id,actor,admin);
       if((await this.core.list('pub-draft')).some(d=>d.data.assetIds?.includes(id)||d.data.coverId===id)||(await this.core.list('pub-publication')).some(p=>p.data.snapshot?.assetIds?.includes(id)||p.data.snapshot?.coverId===id))fail('ASSET_IN_USE',409);
-      await this.core.save('pub-asset',id,{...r.data,status:'cancelled'},r.version);for(const render of [false,true])fs.rmSync(this.file(id,render),{force:true});return {success:true};
-    });
+      await this.core.save('pub-asset',id,{...r.data,status:'cancelled'},r.version);return {success:true};
+    }).then(result=>{for(const render of [false,true])fs.rmSync(this.file(id,render),{force:true});return result;});
   }
   async cleanupExpired(){
     for(const r of (await this.core.list<MediaAsset>('pub-asset')).filter(r=>['uploading','validating'].includes(r.data.status)&&Date.parse(r.data.expiresAt)<Date.now()).slice(0,20)){
       try{await this.cancel(r.data.owner,r.id,true);}catch{/* Referenced assets stay for explicit recovery. */}
     }
   }
+  preparedSize(id:string){return fs.statSync(this.file(id,true)).size;}
   openPrepared(id:string){const file=this.file(id,true);return {stream:fs.createReadStream(file),size:fs.statSync(file).size};}
   async ready(id:string){const r=await this.core.read<MediaAsset>('pub-asset',id);if(!r||r.data.status!=='ready')fail('ASSET_NOT_READY',409);if(!fs.existsSync(this.file(id,true)))fail('MEDIA_NEEDS_REUPLOAD',409);return r;}
   async preview(actor:string,id:string,admin=false){const r=await this.owned(id,actor,admin);await this.ready(id);const until=Date.now()+5*60000;

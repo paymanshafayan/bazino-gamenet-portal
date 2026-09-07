@@ -21,6 +21,8 @@ export class OpsCore {
   async list<T=any>(kind:string):Promise<OpsRecord<T>[]>{return this.store.listOpsRecords(kind);}
   async save<T=any>(kind:string,id:string,data:T,version:number,uniqueKey?:string|null):Promise<OpsRecord<T>> {
     if(!/^[\w.-]{1,50}$/.test(kind)||!id||id.length>100)fail('INVALID_RECORD_ID');
+    // Updates preserve an established business uniqueness claim unless explicitly cleared.
+    if(uniqueKey===undefined&&version>0)uniqueKey=(await this.store.getOpsRecord(kind,id))?.uniqueKey;
     return this.store.saveOpsRecord({kind,id,data,version,uniqueKey,updatedAt:nowISO()},expected(version));
   }
   async settings(){return (await this.read('config','venue'))?.data||{timezone:DEFAULT_TIMEZONE};}

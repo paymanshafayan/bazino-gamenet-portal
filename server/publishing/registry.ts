@@ -28,6 +28,7 @@ export class MediaRegistry {
     return this.core.store.runInTransaction(async()=>{
       const id=mediaKey(accountId,nativeId),existing=await this.lookup(accountId,nativeId);
       if(existing) {
+        if(type!=='unknown'&&existing.data.mediaType!=='unknown'&&type!==existing.data.mediaType)fail('CONFLICTING_MEDIA',409);
         if(existing.data.source==='external_discovery'&&existing.data.approval==='needs_review'&&ready){
           const updated={...existing.data,source,mediaType:type,campaignId,languages:campaign!.data.languages,active:true,approval:'approved' as const,publicationId,providerPostId:b.providerPostId};
           await this.core.save('pub-media',id,updated,existing.version);

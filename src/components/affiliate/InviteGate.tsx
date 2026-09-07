@@ -14,7 +14,7 @@ export default function InviteGate({id,token,user,onAuth,onNavigate}:{id:string;
     STAFF_NOT_ELIGIBLE:t('حساب کارکنان مشمول این پیشنهاد نیست.','Staff accounts are not eligible.','Personel hesapları uygun değil.','Предложение недоступно сотрудникам.'),
     CAMPAIGN_ALREADY_CLAIMED:t('سهمیهٔ این کمپین قبلاً برای حساب شما فعال شده است.','You already claimed this campaign.','Bu kampanyayı zaten kullandınız.','Вы уже воспользовались этой кампанией.'),
   };
-  const load=()=>{setError('');fetch(`/api/instagram/invites/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,{cache:'no-store',referrerPolicy:'no-referrer'}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setData(d);}).catch(e=>setError(e.message));};
+  const load=()=>{setError('');fetch(`/api/instagram/invites/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,{cache:'no-store',referrerPolicy:'no-referrer'}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setData(d);if(d.claimed)setResult({coupon:d.claimedCoupon});}).catch(e=>setError(e.message));};
   useEffect(load,[id,token,user?.username,user?.phoneVerified]);
   async function activate(){setBusy(true);setError('');try{const r=await fetch(`/api/instagram/invites/${encodeURIComponent(id)}/claim`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,consent,likeAttested:liked,handle}),referrerPolicy:'no-referrer'});const d=await r.json();if(!r.ok)throw Error(d.error);setResult(d);}catch(e:any){setError(e.message);}finally{setBusy(false);}}
   return <main className="invite-gate" dir={language==='fa'?'rtl':'ltr'}>

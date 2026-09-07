@@ -1,8 +1,11 @@
+import {mkdirSync as ensureShotDir} from 'node:fs';
+const REVIEW_DIR=process.env.PUBLISHING_REVIEW_DIR||'/home/user/.cache/bazino-v4';
+const SHOTS=process.env.V4_SHOT_DIR||'/home/user/visual-testing/v4';ensureShotDir(SHOTS,{recursive:true});
 import {launch} from './lib.mjs';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {createHmac} from 'node:crypto';
-const env=Object.fromEntries(readFileSync('/home/user/.cache/bazino-v4/runtime.env','utf8').trim().split('\n').map(l=>l.split('=')));
+const env=Object.fromEntries(readFileSync(`${REVIEW_DIR}/runtime.env`,'utf8').trim().split('\n').map(l=>l.split('=')));
 const base=process.env.BASE||'http://127.0.0.1:3000',batch=process.env.BATCH||'1';
 const auth=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:env.PREVIEW_PASSWORD})}).then(r=>r.json());
 if(!auth.token)throw Error('Review login failed');
@@ -41,7 +44,7 @@ if(Number(batch)>=3){
  Object.assign(result,{signedComment:true,queuedNotSent:true,correctLanguage:true});
  await page.reload({waitUntil:'domcontentloaded'});await page.locator('[data-api-tokens]').waitFor({timeout:30000});
 }
-await page.screenshot({path:`/home/user/visual-testing/v4/batch${batch}.png`,fullPage:true});
-writeFileSync(`/home/user/visual-testing/v4/batch${batch}.json`,JSON.stringify({result,errors},null,2));
+await page.screenshot({path:`${SHOTS}/batch${batch}.png`,fullPage:true});
+writeFileSync(`${SHOTS}/batch${batch}.json`,JSON.stringify({result,errors},null,2));
 console.log(JSON.stringify({batch,result,errorCount:errors.length}));
 await browser.close();

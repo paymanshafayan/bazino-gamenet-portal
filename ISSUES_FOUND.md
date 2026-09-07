@@ -558,3 +558,18 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 - اجرا: آپلود قطعه‌ای مالک‌دار و منبع ماندگار، preview خصوصی کوتاه‌عمر، Composer عکس/اسلایدی/ویدئو/کاور، approval immutable و batch سه‌تایی کمپین تکمیل شد. Zernio presign+PUT+posts و Manus v2 task/poll/RSA با تفکیک دستی/عامل، کنترل late callback/unknown delivery و restaging پیاده شد. مسیر قدیمی نشر سوشیال بسته و blog/نسخهٔ نمایشی سخت‌گیرانه شد. Push همچنان به علت GH_TOKEN منقضی مسدود است.
 - آزمون/مرز: ۵۱/۵۱ هستهٔ v4 + ۲۰/۲۰ فایل/نشر؛ TypeScript هر دو پروژه و build مدیریت. PNG/JPEG و MP4 واقعی با ffprobe بررسی شد؛ Chromium در سایت آپلود/ترتیب/تأیید/صف و در مدیریت clone را آزمود، تصاویر واقعی بازبینی شدند. پاسخ APIهای بیرونی mock است؛ هیچ پست زنده منتشر نشد.
 - تاریخ: 2026-09-07. هیچ انتشار/پیام زنده بدون مجوز محتوای مشخص انجام نشده است.
+
+## V4 / Batch 8 — رگرسیون نهایی، شواهد مرورگر و آماده‌سازی تحویل
+
+- TypeScript هر دو پروژه و build کامل production موفق؛ **503/503** تست با صفر failure/skip: 21 media، 54 V4، 41 management، 99 unit، 38 SQLite، 27 provider contract، 42 UI و 181 API.
+- API fixtureها با JWT واقعی، تاریخ معتبر و قرارداد مالی جاری اصلاح شدند؛ تست امنیت receiver/سکرت/آپلود اضافه شد. guardهای ورودی، unique claim پس از update، outbox operator-confirmed، مدیریت خطای نامشخص و بازیابی کوپن پس از reload تقویت شدند.
+- runner Chromium production با دیتابیس/کلیدهای موقت، چهار زبان/موبایل/دسکتاپ و restart واقعی اضافه شد؛ ۱۹ تصویر کامل، بدون خطای JS/overflow. خواندن تصاویر، نبود فونت سیریلیک را آشکار کرد؛ DejaVu Sans افزوده، سوئیت دوباره اجرا و روسی بازبینی شد.
+- قالب کامل Workflow جدید در `docs/publishing/publishing-v4.workflow.yml` و راهنمای `DEPLOY_AND_OPERATE.md` تحویل شد. GitHub App مجوز workflows ندارد و فعال‌سازی در `.github/workflows/` را رد کرد؛ Workflow استقرار موجود جایگزین نشد.
+- push عقب‌ماندهٔ بچ‌های ۵–۷ اکنون موفق است. نتیجهٔ نهایی GitHub/استقرار و مرز تماس زنده در `docs/publishing/V4_DELIVERY.md` ثبت می‌شود؛ TLS دامنه و 403 metadata سکرت‌ها موفقیت هاست را اثبات نکرده‌اند.
+- هیچ پیام/پست/پول واقعی یا اعتبار سرویس مصرف نشده؛ SQL/Mongo زنده و انتشار واقعی جدا تست‌نشده‌اند. بررسی پرداخت آنلاین فقط mock ایزوله بوده است.
+
+- E.123 — فونت سفارشی runner فقط فارسی/لاتین داشت و روسی در screenshot نامرئی بود؛ با مشاهدهٔ واقعی تصویر کشف شد. fallback DejaVu Sans و کنترل CI اضافه، production Chromium دوباره اجرا و روسی مجدداً مشاهده شد. رفع‌شده در هارنس، نه ادعای رفع از روی DOM تنها.
+- E.124 — رگرسیون API از fixtureهای تاریخ غیرواقعی/مجوز قدیمی و مسیرهای مالی بازنشسته استفاده می‌کرد. JWT واقعی، تاریخ معتبر و APIهای مصوب جایگزین شدند و همهٔ 181 تست API (بدون skip) گذشتند؛ 22 خطای تاریخی دیگر در اجرای فعلی باقی نیستند.
+- وضعیت اتصال قبلی GitHub به‌روزرسانی: push واقعی بچ‌های ۵–۷ به `139b825` این نوبت موفق شد. 403 endpoint کاربر/metadata سکرتِ integration با شکست git push یکی نیست؛ درخواست reconnect قبلی دیگر خودکار ملاک وضعیت فعلی نیست.
+
+- E.125 — GitHub App push فایل فعال جدید در `.github/workflows/` را به علت نداشتن `workflows` permission رد کرد. کد و تست‌ها برای رهایی از این مانع تغییر نکردند؛ CI به‌صورت قالب کامل `docs/publishing/publishing-v4.workflow.yml` تحویل می‌شود. فعال‌سازی آن نیازمند مجوز workflows اتصال Arena یا اقدام صاحب ریپو است.

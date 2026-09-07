@@ -24,8 +24,9 @@ export class DurableQueue {
     return id;
   }
   async processInbox(handler:(event:InboxEvent)=>Promise<any>,stream='main',limit=30){
-    const rows=(await this.core.list('pub-inbox')).filter(r=>r.data.stream===stream&&(['pending','processing','waiting_media'].includes(r.data.status)))
-      .sort((a,b)=>a.data.receivedAt.localeCompare(b.data.receivedAt)).slice(0,limit);
+    const priority=(type:string)=>['comment.received','message.received'].includes(type)?0:type.startsWith('account.')?1:type.startsWith('post.external.')?3:2;
+    const rows=(await this.core.list('pub-inbox')).filter(r=>r.data.stream===stream&&(['pending','processing','waiting_media'].includes(r.data.status))&&(r.data.nextAt||0)<=Date.now()&&(r.data.leaseUntil||0)<=Date.now())
+      .sort((a,b)=>priority(a.data.event.type)-priority(b.data.event.type)||a.data.receivedAt.localeCompare(b.data.receivedAt)).slice(0,limit);
     for(const row of rows){
       const token=randomUUID();
       const claimed=await this.core.store.runInTransaction(async()=>{
@@ -43,7 +44,7 @@ export class DurableQueue {
   }
   async sendOutbox(beforeSend?:(data:any)=>Promise<boolean>,afterSend?:(data:any,result:any)=>Promise<void>,prepare?:(data:any)=>Promise<any>){
     if(!(await this.settings.config()).data.outboundEnabled)return;
-    const rows=(await this.core.list('pub-outbox')).filter(r=>['queued','sending'].includes(r.data.status)).sort((a,b)=>a.data.createdAt.localeCompare(b.data.createdAt)).slice(0,10);
+    const rows=(await this.core.list('pub-outbox')).filter(r=>['queued','sending'].includes(r.data.status)&&(r.data.nextAt||0)<=Date.now()).sort((a,b)=>a.data.createdAt.localeCompare(b.data.createdAt)).slice(0,10);
     for(const row of rows){
       const token=randomUUID();
       const input=await this.core.store.runInTransaction(async()=>{
@@ -70,6 +71,6 @@ export class DurableQueue {
   }
   async report(){
     const inbox=await this.core.list('pub-inbox'),outbox=await this.core.list('pub-outbox');
-    return {inbox:inbox.slice(0,100).map(r=>({id:r.id,type:r.data.event.type,status:r.data.status,error:r.data.error,at:r.data.receivedAt})),outbox:outbox.slice(0,100).map(r=>({id:r.id,status:r.data.status,stage:r.data.stage,error:r.data.error,at:r.data.createdAt})),counts:{received:inbox.length,sent:outbox.filter(r=>r.data.status==='sent').length,unknown:outbox.filter(r=>r.data.status==='delivery_unknown').length,queued:outbox.filter(r=>r.data.status==='queued').length}};
+    return {inbox:inbox.slice(0,100).map(r=>({id:r.id,type:r.data.event.type,status:r.data.status,error:r.data.error,at:r.data.receivedAt})),outbox:outbox.slice(0,100).map(r=>({id:r.id,status:r.data.status,stage:r.data.stage,evidence:r.data.sendEvidence||(r.data.status==='sent'?'provider_response':''),error:r.data.error,at:r.data.createdAt})),counts:{received:inbox.length,sent:outbox.filter(r=>r.data.status==='sent').length,unknown:outbox.filter(r=>r.data.status==='delivery_unknown').length,queued:outbox.filter(r=>r.data.status==='queued').length}};
   }
 }

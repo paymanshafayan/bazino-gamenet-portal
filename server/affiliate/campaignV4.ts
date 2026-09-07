@@ -44,7 +44,8 @@ export class InstagramCampaignService {
   }
   async list(){return (await this.core.list<CampaignMember>('pub-member')).map(r=>({id:r.id,role:r.data.role,language:r.data.language,mediaId:r.data.mediaId,campaignId:r.data.campaignId,username:r.data.username,partnerCode:r.data.partnerCode,status:r.data.status,followMethod:r.data.followMethod,shareStatus:r.data.shareStatus,createdAt:r.data.createdAt}));}
   private async saveMember(id:string,data:CampaignMember,version:number){
-    const row=await this.core.save('pub-member',id,data,version);
+    const uniqueKey='ig-member:'+fingerprint({account:data.accountId,campaign:data.campaignId,media:data.mediaId,author:data.igUserId,role:data.role,parent:data.parentId});
+    const row=await this.core.save('pub-member',id,data,version,uniqueKey);
     const patch={status:data.status,followMethod:data.followMethod,shareStatus:data.shareStatus,updatedAt:data.updatedAt};
     if(await this.core.store.getIgMemberById(id))await this.core.store.updateIgMember(id,patch);
     return row;
@@ -136,7 +137,24 @@ export class InstagramCampaignService {
     const r=await this.core.read<CampaignMember>('pub-member',input.memberId);if(!r)return;
     const status=input.stage==='partner_code'?'code_sent':input.stage==='friend_link'?'link_sent':r.data.status;
     await this.saveMember(r.id,{...r.data,status,updatedAt:nowISO()},r.version);
-    await this.core.store.createIgEvent({id:newId('IGE'),memberId:r.id,mediaId:r.data.mediaId,commentId:input.commentId||'',kind:'message_sent',payload:'',result:'sent',verificationMethod:'provider_response',createdAt:nowISO()});
+    await this.core.store.createIgEvent({id:newId('IGE'),memberId:r.id,mediaId:r.data.mediaId,commentId:input.commentId||'',kind:'message_sent',payload:'',result:'sent',verificationMethod:result?.evidence==='operator_confirmed'?'operator_confirmed':'provider_response',createdAt:nowISO()});
+  }
+  async resolveOutbox(actor:string,id:string,action:string,b:any){
+    if(b.confirmed!==true)fail('CONFIRMATION_REQUIRED');
+    return this.core.command(actor,b.idempotencyKey,'outbox.resolve',{id,action,reference:b.messageId||'',noteHash:fingerprint(String(b.note||''))},async()=>{
+      const r=await this.core.read('pub-outbox',id);if(!r)fail('NOT_FOUND',404);
+      if(action==='retry'){
+        if(r.data.status!=='failed'||r.data.attempts>=8)fail('UNSAFE_RETRY',409);
+        if(!await this.beforeSend(r.data))fail('MEDIA_OR_POLICY_INACTIVE',409);
+        if(Date.parse(r.data.expiresAt)<Date.now())fail('MESSAGE_WINDOW_EXPIRED',409);
+        await this.core.save('pub-outbox',id,{...r.data,status:'queued',error:'',nextAt:0},r.version);return {id,status:'queued'};
+      }
+      if(action!=='confirm-observed'||r.data.status!=='delivery_unknown')fail('BAD_STATE',409);
+      const reference=String(b.messageId||'');if(!reference||reference.length>300||/^https?:/i.test(reference)||!String(b.note||'').trim())fail('PROVIDER_REFERENCE_REQUIRED');
+      await this.afterSend(r.data,{messageId:reference,evidence:'operator_confirmed'});
+      await this.core.save('pub-outbox',id,{...r.data,status:'sent',providerMessageId:reference,sendEvidence:'operator_confirmed',resolvedBy:actor,resolvedAt:nowISO(),noteHash:fingerprint(String(b.note)),error:''},r.version);
+      return {id,status:'sent',evidence:'operator_confirmed',sentInThisRequest:false};
+    });
   }
   async dispatch(e:InboxEvent){if(e.type==='comment.received')return this.onComment(e);if(e.type==='message.received')return this.onMessage(e);return {ignored:true};}
 }

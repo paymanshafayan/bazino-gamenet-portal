@@ -118,5 +118,11 @@ test('empty analytics deltas retain their opaque cursor across later events',asy
  const r=await ws.analytics({type:'analytics.synced',accountId:'acc',cursor:'original-opaque-cursor',timestamp:new Date().toISOString()});assert.equal(r.wait,true);assert.equal((await core.read('pub-analytics-cursor','acc'))!.data.nextCursor,'original-opaque-cursor');
  await ws.analytics({type:'analytics.synced',accountId:'acc',cursor:'later-event-cursor',timestamp:new Date().toISOString()});assert.equal((await core.read('pub-analytics-cursor','acc'))!.data.nextCursor,'original-opaque-cursor');
 });
+
+test('a restarted library/provider instance reads the same original and validated media',async()=>{
+ const disk=path.join(tmp,'persistence.sqlite'),root=path.join(tmp,'persisted-assets');const a=new SqliteStore();a.config={filePath:disk};await a.connect();await a.createDatabaseIfNotExist();const one=new PublishingService(new OpsCore(()=>a),fetcher,root);
+ const png=await sharp({create:{width:320,height:400,channels:3,background:'#354678'}}).png().toBuffer();const asset=await one.assets.create('owner',{name:'persist.png',mime:'image/png',size:png.length,idempotencyKey:'persist-upload'});await one.assets.chunk('owner',asset.id,0,png);const ready=await one.assets.finalize('owner',asset.id);
+ const b=new SqliteStore();b.config={filePath:disk};await b.connect();const two=new PublishingService(new OpsCore(()=>b),fetcher,root);const restored=await two.assets.ready(asset.id);assert.equal(restored.data.hash,ready.data.hash);assert.ok(fs.readFileSync(two.assets.file(asset.id)).equals(png));
+});
 await run({title:'Publishing media / approval / adapters',jsonOut:'tests/reports/publishing-media.json'});
 fs.rmSync(tmp,{recursive:true,force:true});

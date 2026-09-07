@@ -10,10 +10,11 @@ export class FriendGateService {
     const r=await this.campaign.verifyLink(id,token),m=r.data;
     if(m.claimedBy&&m.claimedBy!==username)fail('INVITE_ALREADY_CLAIMED',409);
     const u=username?await this.core.store.getUserByUsername(username):undefined;
+    const previous=m.claimedBy===username&&username?await this.core.read('pub-claim',fingerprint({campaign:m.campaignId,username})):undefined;
     return {campaign:m.policy.name,language:m.language,followMethod:m.followMethod,shareStatus:m.shareStatus,requireLikeAttestation:m.policy.requireLikeAttestation,
       expiresAt:m.linkExpiresAt,needsLogin:!u,needsPhoneVerification:!!u&&!u.phoneVerifiedAt,claimed:m.claimedBy===username&&!!username,
       coupon:{enabled:m.policy.couponEnabled&&m.policy.couponValue>0,value:m.policy.couponValue,type:m.policy.couponType,minOrder:m.policy.couponMinOrder,validDays:m.policy.couponDays},
-      verificationMethod:'link_possession',requiresConsent:true};
+      claimedCoupon:previous?.data.coupon||null,verificationMethod:'link_possession',requiresConsent:true};
   }
   async click(id:string,token:string,ip:string,ua:string){
     const r=await this.campaign.verifyLink(id,token);

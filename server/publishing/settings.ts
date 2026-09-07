@@ -5,7 +5,7 @@ import type { AgentProfile, CampaignPolicy, PublishingConfig } from '../../share
 
 export const SECRET_NAMES = ['zernio_api_key', 'zernio_webhook_secret', 'zernio_analytics_webhook_secret', 'invite_signing_key'] as const;
 export function protectedIntegrationSetting(key: string): boolean {
-  return /^(publishing_|zernio_|manus_|agent_|ig_|integration_api_tokens|BAZINO_SECRETS|ZERNIO_|MANUS_)/.test(key);
+  return /(?:api[_-]?key|secret|token|credential)/i.test(key) || /^(publishing_|zernio_|manus_|agent_|ig_|integration_api_tokens|BAZINO_SECRETS|ZERNIO_|MANUS_)/.test(key);
 }
 export class SecretVault {
   constructor(public core: OpsCore) {}
@@ -93,7 +93,7 @@ export class PublishingSettings {
     if (b.selectedMode !== null && !['manual','agent'].includes(b.selectedMode)) fail('INVALID_MODE');
     const agent= b.defaultAgentId ? await this.core.read<AgentProfile>('pub-agent',String(b.defaultAgentId)) : undefined;
     if(b.defaultAgentId&&!agent || b.selectedMode==='agent'&&(!agent||!agent.data.enabled)) fail('AGENT_NOT_AVAILABLE');
-    const base=new URL(String(b.baseUrl || old.data.baseUrl));
+    let base:URL;try{base=new URL(String(b.baseUrl || old.data.baseUrl));}catch{fail('INVALID_BASE_URL');}
     if(base.protocol!=='https:'||base.username||base.password||base.pathname!=='/'||base.search||base.hash) fail('INVALID_BASE_URL');
     const timezone=String(b.timezone||old.data.timezone);try{new Intl.DateTimeFormat('en',{timeZone:timezone});}catch{fail('INVALID_TIMEZONE');}
     if(!await this.core.read('pub-campaign',String(b.defaultCampaignId)))fail('CAMPAIGN_NOT_FOUND');

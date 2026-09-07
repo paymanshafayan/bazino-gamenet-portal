@@ -262,5 +262,24 @@ test('agent edits are CAS protected and stale requests roll back credential chan
  await assert.rejects(()=>agents.save('admin',savedAgent.id,{...savedAgent.data,version:0,apiKey:'must-not-be-stored'}),{code:'VERSION_CONFLICT'});
  assert.equal(await settings.vault.read('agent:'+savedAgent.id),before);
 });
+
+suite('Retry review and queue fairness');
+test('critical comments are not starved by an older external-post backlog',async()=>{
+ const queue=new DurableQueue(core);for(let i=0;i<120;i++)await queue.ingest('bulk-'+i,'h'+i,{type:'post.external.created',accountId:'acc',nativeId:String(4000000+i),timestamp:new Date().toISOString()},'fairness');
+ await queue.ingest('critical-comment','critical-hash',{type:'comment.received',accountId:'acc',timestamp:new Date().toISOString()},'fairness');
+ const seen:string[]=[];await queue.processInbox(async e=>{seen.push(e.type);return {};},'fairness',1);assert.deepEqual(seen,['comment.received']);
+});
+test('business uniqueness is retained across updates, including after activation',async()=>{
+ const row=(await core.read('pub-member',friend2Id))!;assert.ok(row.uniqueKey);await core.save('pub-member',row.id,{...row.data,updatedAt:new Date().toISOString()},row.version);
+ assert.equal((await core.read('pub-member',row.id))!.uniqueKey,row.uniqueKey);
+ await assert.rejects(()=>core.save('pub-member','another-member',row.data,0,row.uniqueKey));
+});
+test('ambiguous delivery cannot be retried blindly; operator observation is recorded separately',async()=>{
+ const id='review-outbox';await core.save('pub-outbox',id,{status:'delivery_unknown',stage:'partner_code',memberId:partnerId,accountId:'acc',mediaId:'1234567',recipientId:'10001',createdAt:new Date().toISOString(),attempts:1,expiresAt:new Date(Date.now()+3600000).toISOString()},0);
+ await assert.rejects(()=>campaign.resolveOutbox('admin',id,'retry',{confirmed:true,idempotencyKey:'unsafe-retry'}),{code:'UNSAFE_RETRY'});
+ await assert.rejects(()=>campaign.resolveOutbox('admin',id,'confirm-observed',{confirmed:true,idempotencyKey:'missing-reference'}),{code:'PROVIDER_REFERENCE_REQUIRED'});
+ const r=await campaign.resolveOutbox('admin',id,'confirm-observed',{confirmed:true,idempotencyKey:'review-done',messageId:'observed-provider-message',note:'Operator reviewed the correct conversation'});assert.equal(r.sentInThisRequest,false);assert.equal(r.evidence,'operator_confirmed');
+ const saved=await core.read('pub-outbox',id);assert.equal(saved!.data.status,'sent');assert.ok(!JSON.stringify(saved).includes('Operator reviewed'));
+});
 await run({title:'Publishing / Instagram v4',jsonOut:'tests/reports/publishing.json'});
 process.env=env;

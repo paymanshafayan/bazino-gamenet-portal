@@ -48,3 +48,6 @@ tmp-shots/
 
 # Runtime media library (private assets; never versioned)
 /media-library/
+
+# Reproducible browser-test artifacts
+/tests/e2e-browser/shots/

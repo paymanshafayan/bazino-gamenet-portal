@@ -586,6 +586,8 @@ async function startServer() {
       next();
     });
   });
+  const publishingJson=express.json({limit:'256kb'});
+  app.use((req,res,next)=>req.path.startsWith('/api/management/publishing/')||req.path==='/api/management/publishing'?publishingJson(req,res,next):next());
   const jsonParser = express.json({
     limit: "260mb",
     verify: (req, _res, buf) => {
@@ -2380,7 +2382,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
       if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
       const st = startTime || "12:00", et = endTime || "14:00";
-      const window = bookingWindow({date,startTime:st,endTime:et,...(params?.startsAt?{startsAt:params.startsAt,endsAt:params.endsAt}:{})},Date.now(),await management.timezone());
+      let window:ReturnType<typeof bookingWindow>;try{window=bookingWindow({date,startTime:st,endTime:et,...(params?.startsAt?{startsAt:params.startsAt,endsAt:params.endsAt}:{})},Date.now(),await management.timezone());}catch{fail('INVALID_RESERVATION_TIME',400);}
       if (Date.parse(window.startsAt) < Date.now()-60000) fail('PAST_RESERVATION');
       const reservationDate = window.date;
       await assertStationFree(management,systemId,window.startsAt,window.endsAt);
@@ -4036,7 +4038,7 @@ namespace GameNet.Infrastructure.Migrations
       // همیشه اولویت دارند — یعنی اگر ادمین چیزی را سفارشی کرده باشد،
       // در هر دو حالت sample/database همان مقدار دیده می‌شود.
       const sampleObj = SAMPLE_SETTINGS.reduce((acc, curr) => {
-        acc[curr.key] = curr.value;
+        if (!SECRET_SETTING_KEYS.has(curr.key) && !protectedIntegrationSetting(curr.key)) acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);
 
@@ -4084,6 +4086,11 @@ namespace GameNet.Infrastructure.Migrations
 
   app.post("/api/admin/sync-settings", async (req, res) => {
     try {
+      if(req.body?.clear===true){
+        if(req.body.confirmed!==true)return res.status(400).json({error:'CONFIRMATION_REQUIRED'});
+        await getActiveDataProvider().setSetting(SYNC_API_KEY_SETTING,'');
+        return res.json({success:true,configured:false,masked:''});
+      }
       const requested = req.body?.generate
         ? randomBytes(32).toString("hex")
         : String(req.body?.apiKey || "").trim();

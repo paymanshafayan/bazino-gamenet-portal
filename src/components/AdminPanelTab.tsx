@@ -71,7 +71,7 @@ export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; 
   tournamentOps:     { fa: 'مدیریت عملیاتی مسابقات', en: 'Tournament Operations', ru: 'Управление турнирами', tr: 'Turnuva Operasyonları', keywords: 'bracket براکت ثبت‌نام حضور نتیجه تیم checkin team result مساقات' },
   messaging:         { fa: 'پیامک گروهی', en: 'Bulk Messaging', ru: 'Рассылки', tr: 'Toplu Mesaj', keywords: 'sms پیامک وایبر واتساپ whatsapp viber کمپین تبلیغات گروهی messaggio campaign' },
   blog:              { fa: 'وبلاگ و اخبار', en: 'Blog & News', ru: 'Блог и новости', tr: 'Blog ve Haberler', keywords: 'article مقاله خبر post' },
-  content:           { fa: 'محتوا و صف انتشار (Manus)', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu', keywords: 'manus سوشیال social instagram telegram صف انتشار queue publish schedule زمانبندی' },
+  content:           { fa: 'استودیوی محتوا و انتشار', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu', keywords: 'manus سوشیال social instagram telegram صف انتشار queue publish schedule زمانبندی' },
   promotions:        { fa: 'کوپن‌ها و ساعات رایگان/نیم‌بها', en: 'Coupons & Free/Half Hours', ru: 'Купоны и бесплатные/льготные часы', tr: 'Kuponlar ve Ücretsiz/Yarım Saatler', keywords: 'coupon کوپن تخفیف discount happy hour رایگان نیم‌بها ساعت ویژه' },
   chat:              { fa: 'اتاق‌های گفتگوی زنده', en: 'Live Chat Rooms', ru: 'Живые чат-комнаты', tr: 'Canlı Sohbet Odaları', keywords: 'room پیام گفتگو message' },
   messages:          { fa: 'پیام‌ها و اعلان‌ها', en: 'Messages & Notifications', ru: 'Сообщения и уведомления', tr: 'Mesajlar ve Bildirimler', keywords: 'notification ایمیل تماس contact inbox' },
@@ -1697,7 +1697,7 @@ export default function AdminPanelTab({
             }`}
           >
             <Send className="w-4 h-4" />
-            <span>{L(language, { fa: 'محتوا و صف انتشار (Manus)', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu' })}</span>
+            <span>{L(language, { fa: 'استودیوی محتوا و انتشار', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu' })}</span>
           </button>
 
           <button

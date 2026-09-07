@@ -72,7 +72,7 @@ export default function GamingAmpHome({
       
       {/* 1. HERO SLIDER */}
       <section className="relative w-full aspect-[21/9] min-h-[600px] flex items-center justify-center border-b-2 border-[#00d8ff]/30" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 95%, 0% 100%)' }}>
-        <img loading="eager" fetchpriority="high"
+        <img loading="eager" fetchPriority="high"
           src={heroImageUrl}
           srcSet={getResponsiveSrcSet(heroImageUrl, [480, 800, 1200, 1600])}
           sizes="100vw"

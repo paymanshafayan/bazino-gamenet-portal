@@ -6,6 +6,7 @@
  * themes/ folder never touch the repo. Every assertion goes through real Express
  * routing, real JWT auth and the real data provider.
  */
+import { createHmac } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, existsSync, symlinkSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,6 +49,11 @@ if (!existsSync(bundle)) {
         NODE_ENV: 'production',
         PORT: String(PORT),
         JWT_SECRET: 'test-secret-for-e2e-suite',
+        ZERNIO_WEBHOOK_SECRET:'e2e-webhook-test-only',
+        ZERNIO_IG_ACCOUNT_ID:'e2e-account',
+        ZERNIO_API_KEY:'',
+        MANUS_API_KEY:'',
+        BAZINO_SECRETS_KEY:'12'.repeat(32),
         BAZINO_STATIC_ROOT: workDir,
         BAZINO_DATA_DIR: path.join(workDir, 'data'),
         // درگاه شبیه‌سازی‌شده تا جریان create → callback → fulfil بدون paytr.com تست شود
@@ -91,6 +97,14 @@ let authToken = '';
 // The fallback admin the server seeds on first boot when the users table is empty.
 let adminToken = '';
 const adminAuth = () => ({ Authorization: `Bearer ${adminToken}` });
+const staffTopup=(phone:string,amount:number,key:string=crypto.randomUUID())=>postJson(`${BASE}/api/sync/wallet/topup`,{phone,amount,method:'cash',confirmed:true,idempotencyKey:key},adminAuth());
+async function staffCashout(username:string,amount:number,key:string=crypto.randomUUID()){
+ const r=await postJson(`${BASE}/api/management/wallet/cashout`,{username,amount,idempotencyKey:key},adminAuth());
+ if(r.status!==200)return r;
+ return postJson(`${BASE}/api/management/cashouts/${r.body.id}/confirm`,{confirmed:true,idempotencyKey:key+':handover'},adminAuth());
+}
+const staffSettle=(id:string,key=`settle:${id}`)=>postJson(`${BASE}/api/sync/onsite-orders/${id}/settle`,{method:'cash',confirmed:true,idempotencyKey:key},adminAuth());
+
 
 if (bootError) {
   suite('17. API');
@@ -102,6 +116,8 @@ if (bootError) {
    17. Boot & health
    ═══════════════════════════════════════════════════════════════════════ */
 suite('17. API — boot & health');
+
+test('staff-only tests authenticate with a real admin JWT', async()=>{const r=await postJson(`${BASE}/api/auth/login`,{username:'admin',password:'admin'});assert.equal(r.status,200);adminToken=r.body.token;});
 
 test('the server process is alive', () => {
   assert.equal(child?.exitCode, null, `server died. Log:\n${serverLog.slice(-800)}`);
@@ -156,15 +172,15 @@ for (const [endpoint, expectedCount] of contentEndpoints) {
 // "managementAppState" setting. It is NOT an aggregate of the shop data, and it
 // is legitimately null until something writes it — so test the round-trip.
 test('GET /api/state is null before anything writes it', async () => {
-  const state = await getJson(`${BASE}/api/state`);
+  const state = await getJson(`${BASE}/api/state`,200,adminAuth());
   assert.equal(state, null, 'expected no persisted management state on a fresh DB');
 });
 
 test('POST /api/state persists a blob that GET returns verbatim', async () => {
   const blob = { stations: [{ id: 'pc-1', busy: true }], revenue: 125000, nested: { ok: true } };
-  const { status } = await postJson(`${BASE}/api/state`, blob);
+  const { status } = await postJson(`${BASE}/api/state`, blob,adminAuth());
   assert.equal(status, 200);
-  assert.deepEqual(await getJson(`${BASE}/api/state`), blob);
+  assert.deepEqual(await getJson(`${BASE}/api/state`,200,adminAuth()), blob);
 });
 
 test('GET /api/data-source reports sample mode by default', async () => {
@@ -214,7 +230,7 @@ test('the generated hardware-pc variants are served', async () => {
 
 test('no API payload leaks an unsplash URL', async () => {
   for (const ep of ['/api/cafe', '/api/accessories', '/api/articles', '/api/app-sliders', '/api/state']) {
-    const body = JSON.stringify(await getJson(`${BASE}${ep}`));
+    const body = JSON.stringify(await getJson(`${BASE}${ep}`,200,ep==='/api/state'?adminAuth():{}));
     assert.ok(!body.includes('unsplash'), `${ep} still serves an unsplash URL`);
   }
 });
@@ -358,19 +374,19 @@ test('ordering more than the available stock is rejected', async () => {
   const item = menu[0];
   const { status, body } = await postJson(`${BASE}/api/cafe/order`, {
     items: [{ item, quantity: item.inventory + 9999 }],
-  });
+  }, {Authorization:`Bearer ${authToken}`});
   assert.equal(status, 400, `stock rule not enforced: ${JSON.stringify(body)}`);
 });
 
 test('an empty cart is rejected', async () => {
-  const { status } = await postJson(`${BASE}/api/cafe/order`, { items: [] });
+  const { status } = await postJson(`${BASE}/api/cafe/order`, { items: [] }, {Authorization:`Bearer ${authToken}`});
   assert.equal(status, 400);
 });
 
 test('ordering an unknown menu item 404s', async () => {
   const { status } = await postJson(`${BASE}/api/cafe/order`, {
     items: [{ item: { id: 'does-not-exist' }, quantity: 1 }],
-  });
+  }, {Authorization:`Bearer ${authToken}`});
   assert.equal(status, 404);
 });
 
@@ -383,12 +399,12 @@ test('a system can be reserved and the price is computed server-side', async () 
   const systems = await getJson(`${BASE}/api/systems`);
   const system = systems.find((s: any) => !s.isReserved) ?? systems[0];
   const { status, body } = await postJson(`${BASE}/api/systems/reserve`, {
-    systemId: system.id, startTime: '08:00', endTime: '10:00', date: 'e2e-day',
+    systemId: system.id, startTime: '08:00', endTime: '10:00', date: new Date(Date.now()+2*86400000).toISOString().slice(0,10),
   }, { Authorization: `Bearer ${authToken}` });
 
   assert.equal(status, 200, `reserve failed: ${JSON.stringify(body)}`);
   const expected = 2 * system.hourlyRate;   // 2 hours
-  const charged = body.reservation?.totalPrice ?? body.totalPrice;
+  const charged = body.amount ?? body.reservation?.totalPrice ?? body.totalPrice;
   assert.equal(charged, expected, `expected ${expected}, charged ${charged}`);
 });
 
@@ -396,17 +412,17 @@ test('double-booking the same slot returns 409', async () => {
   const systems = await getJson(`${BASE}/api/systems`);
   const system = systems[0];
   await postJson(`${BASE}/api/systems/reserve`, {
-    systemId: system.id, startTime: '15:00', endTime: '17:00', date: 'clash-day',
+    systemId: system.id, startTime: '15:00', endTime: '17:00', date: new Date(Date.now()+3*86400000).toISOString().slice(0,10),
   }, { Authorization: `Bearer ${authToken}` });
 
   const { status } = await postJson(`${BASE}/api/systems/reserve`, {
-    systemId: system.id, startTime: '16:00', endTime: '18:00', date: 'clash-day',
+    systemId: system.id, startTime: '16:00', endTime: '18:00', date: new Date(Date.now()+3*86400000).toISOString().slice(0,10),
   }, { Authorization: `Bearer ${authToken}` });
   assert.equal(status, 409, 'overlapping reservation was allowed');
 });
 
 test('reserving an unknown system 404s', async () => {
-  const { status } = await postJson(`${BASE}/api/systems/reserve`, { systemId: 'nope-999' });
+  const { status } = await postJson(`${BASE}/api/systems/reserve`, { systemId: 'nope-999' }, {Authorization:`Bearer ${authToken}`});
   assert.equal(status, 404);
 });
 
@@ -639,7 +655,7 @@ test('/api/sync/* refuses an unconfigured remote caller', async () => {
 
 test('/api/sync/* rejects a wrong or missing key once one is configured', async () => {
   const KEY = 'e2e-sync-key-123';
-  const set = await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: KEY }, adminAuth());
+  const set = await postJson(`${BASE}/api/admin/sync-settings`, { apiKey: KEY }, adminAuth());
   assert.equal(set.status, 200, 'could not configure the sync key');
 
   try {
@@ -660,7 +676,7 @@ test('/api/sync/* rejects a wrong or missing key once one is configured', async 
     assert.ok(Array.isArray(body.reservations), 'reservations should be an array');
   } finally {
     // clear the key so the endpoint is left as we found it
-    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' }, adminAuth());
+    await postJson(`${BASE}/api/admin/sync-settings`, { clear: true, confirmed: true }, adminAuth());
   }
 });
 
@@ -684,7 +700,7 @@ test('admin Web Sync settings generate and mask the shared secret', async () => 
     assert.equal(readBody.configured, true);
     assert.equal(readBody.masked.includes(generatedBody.apiKey), false, 'read endpoint leaked the full key');
   } finally {
-    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' }, adminAuth());
+    await postJson(`${BASE}/api/admin/sync-settings`, { clear: true, confirmed: true }, adminAuth());
   }
 });
 
@@ -695,12 +711,12 @@ test('anonymous callers cannot read Web Sync admin settings', async () => {
 
 test('the sync API key is never exposed through GET /api/settings', async () => {
   const KEY = 'e2e-secret-should-not-leak';
-  await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: KEY }, adminAuth());
+  await postJson(`${BASE}/api/admin/sync-settings`, { apiKey: KEY }, adminAuth());
   try {
     const body = JSON.stringify(await getJson(`${BASE}/api/settings`));
     assert.ok(!body.includes(KEY), 'the sync API key leaked through /api/settings');
   } finally {
-    await postJson(`${BASE}/api/admin/settings`, { key: 'gamenet_sync_api_key', value: '' }, adminAuth());
+    await postJson(`${BASE}/api/admin/sync-settings`, { clear: true, confirmed: true }, adminAuth());
   }
 });
 
@@ -1845,6 +1861,7 @@ test('a cafe order placed while signed in shows up under /api/me/orders', async 
   if (!cafe.length) return skip('cafe order → my orders', 'no cafe items in this DB');
   const order = await postJson(`${BASE}/api/cafe/order`, { items: [{ item: cafe[0], quantity: 1 }], tableNumber: 'T1' }, h);
   if (order.status !== 200) return skip('cafe order → my orders', `order endpoint returned ${order.status}`);
+  if(order.body.orderId) { const settled=await staffSettle(order.body.orderId);assert.equal(settled.status,200,JSON.stringify(settled.body)); }
   const ord: any = await getJson(`${BASE}/api/me/orders`, 200, h);
   assert.equal(ord.cafe.length, 1);
   assert.equal(ord.cafe[0].kind, 'cafe');
@@ -1939,25 +1956,18 @@ test('wallet endpoints require auth; new user starts at 0', async () => {
   assert.deepEqual(w.transactions, []);
 });
 
-test('sync top-up (Management App) credits by phone and is idempotent', async () => {
-  const key = `idem-${wUser}`;
-  const a = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier', idempotencyKey: key });
-  assert.equal(a.status, 200, JSON.stringify(a.body));
-  assert.equal(a.body.username, wUser);
-  assert.equal(a.body.balance, 1000);
-  const b = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier', idempotencyKey: key });
-  assert.equal(b.body.duplicate, true);
-  assert.equal(b.body.balance, 1000, 'duplicate key must not credit twice');
-  const bad = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: -5 });
-  assert.equal(bad.status, 400);
+test('staff top-up records confirmed cash and is idempotent', async()=>{
+ const key=`idem-${wUser}`;
+ const noAuth=await postJson(`${BASE}/api/sync/wallet/topup`,{phone:wPhone,amount:1000,method:'cash',confirmed:true,idempotencyKey:key});assert.equal(noAuth.status,401);
+ const a=await staffTopup(wPhone,1000,key);assert.equal(a.status,200,JSON.stringify(a.body));assert.equal(a.body.transaction.username,wUser);assert.equal(a.body.balance,1000);
+ const b=await staffTopup(wPhone,1000,key);assert.equal(b.body.receipt.id,a.body.receipt.id);assert.equal(b.body.balance,1000);
+ const bad=await staffTopup(wPhone,-5);assert.equal(bad.status,409);assert.equal(bad.body.error,'USE_CASHOUT_FLOW');
 });
 
-test('wallet never goes negative (sync charge over balance is rejected)', async () => {
-  const r = await postJson(`${BASE}/api/sync/wallet/charge`, { phone: wPhone, amount: 5000, operator: 'cashier' });
-  assert.equal(r.status, 402);
-  assert.equal(r.body.code, 'INSUFFICIENT_FUNDS');
-  const w: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
-  assert.equal(w.balance, 1000);
+test('cash-out cannot overdraw and retired wallet charge is not a payment bypass', async()=>{
+ const r=await postJson(`${BASE}/api/management/wallet/cashout`,{username:wUser,amount:5000,idempotencyKey:'overdraw'},adminAuth());assert.equal(r.status,402);assert.equal(r.body.error,'INSUFFICIENT_FUNDS');
+ const retired=await postJson(`${BASE}/api/sync/wallet/charge`,{phone:wPhone,amount:1},adminAuth());assert.equal(retired.status,409);
+ const w:any=await getJson(`${BASE}/api/me/wallet`,200,wAuth());assert.equal(w.balance,1000);
 });
 
 test('reservation paid from wallet: balance deducted, reservation + points created immediately', async () => {
@@ -1981,7 +1991,7 @@ test('wallet checkout refuses when balance is insufficient (402) and for cafe (M
   const t = sample.SAMPLE_TOURNAMENTS.find((x: any) => x.id === 't2');
   // موجودی را تا زیر هزینهٔ ثبت‌نام پایین می‌آوریم (برداشت حضوری از اپ مدیریت)
   const cur: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
-  const drain = await postJson(`${BASE}/api/sync/wallet/charge`, { phone: wPhone, amount: cur.balance - 100, operator: 'cashier', note: 'drain' });
+  const drain = await staffCashout(wUser,cur.balance-100,'drain-test');
   assert.equal(drain.status, 200, JSON.stringify(drain.body));
   const r = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'tournament', params: { tournamentId: t.id, team: { name: 'Rich', leader: wUser, members: [] } } }, wAuth());
   assert.equal(r.status, 402);
@@ -2029,7 +2039,7 @@ test('reservation on-site: dueAt = session start − 10 min; too-late session re
   const hh = String(past.getHours()).padStart(2, '0');
   const late = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: `${hh}:00`, endTime: `${hh}:30`, date: 'امروز' } }, wAuth());
   assert.equal(late.status, 400);
-  assert.equal(late.body.code, 'ONSITE_TOO_LATE');
+  assert.equal(late.body.code, 'PAST_RESERVATION');
 });
 
 test('cafe on-site: order pending, no stock/points until staff settles; then points credited once', async () => {
@@ -2044,31 +2054,23 @@ test('cafe on-site: order pending, no stock/points until staff settles; then poi
   assert.equal(ptsMid.loyaltyPoints, ptsBefore.loyaltyPoints, 'no points before settlement');
   const pending: any = await getJson(`${BASE}/api/sync/onsite-orders?status=pending_onsite`);
   assert.ok(pending.some((o: any) => o.id === cafeOnsiteOrder));
-  const settle = await postJson(`${BASE}/api/sync/onsite-orders/${cafeOnsiteOrder}/settle`, { method: 'cash', operator: 'cashier' });
+  const settle = await staffSettle(cafeOnsiteOrder);
   assert.equal(settle.status, 200, JSON.stringify(settle.body));
   assert.equal(settle.body.status, 'settled');
   assert.equal(settle.body.result.points, Math.floor(item.price / 10));
   const ptsAfter: any = await getJson(`${BASE}/api/me/points`, 200, wAuth());
   assert.equal(ptsAfter.loyaltyPoints, ptsBefore.loyaltyPoints + Math.floor(item.price / 10));
-  const again = await postJson(`${BASE}/api/sync/onsite-orders/${cafeOnsiteOrder}/settle`, { method: 'cash' });
-  assert.equal(again.status, 400);
-  assert.equal(again.body.code, 'BAD_STATE');
+  const again = await staffSettle(cafeOnsiteOrder);
+  assert.equal(again.status,200);assert.equal(again.body.receipt.id,settle.body.receipt.id);
+  const different=await staffSettle(cafeOnsiteOrder,'another-settle');assert.equal(different.status,409);
 });
 
-test('staff settles a pending order from the customer wallet (deducts balance)', async () => {
-  const sys = sample.SAMPLE_SYSTEMS[0];
-  const r = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: '12:00', endTime: '13:00', date: 'فردا' } }, wAuth());
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  // موجودی ناکافی → تسویه از کیف پول رد می‌شود و سفارش pending می‌ماند
-  const low = await postJson(`${BASE}/api/admin/onsite-orders/${r.body.orderId}/settle`, { method: 'wallet' }, adminAuth());
-  assert.equal(low.status, 402);
-  const top = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: wPhone, amount: 1000, operator: 'cashier' });
-  assert.equal(top.status, 200);
-  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
-  const s = await postJson(`${BASE}/api/admin/onsite-orders/${r.body.orderId}/settle`, { method: 'wallet' }, adminAuth());
-  assert.equal(s.status, 200, JSON.stringify(s.body));
-  const after: any = await getJson(`${BASE}/api/me/wallet`, 200, wAuth());
-  assert.equal(after.balance, before.balance - r.body.amount);
+test('in-person settlement rejects wallet and accepts confirmed cash without debiting customer wallet', async()=>{
+ const sys=sample.SAMPLE_SYSTEMS[0];const r=await postJson(`${BASE}/api/checkout/onsite`,{kind:'reservation',params:{systemId:sys.id,startTime:'12:00',endTime:'13:00',date:'فردا'}},wAuth());assert.equal(r.status,200,JSON.stringify(r.body));
+ const before:any=await getJson(`${BASE}/api/me/wallet`,200,wAuth());
+ const invalid=await postJson(`${BASE}/api/admin/onsite-orders/${r.body.orderId}/settle`,{method:'wallet',confirmed:true,idempotencyKey:'invalid-method'},adminAuth());assert.equal(invalid.status,400);assert.equal(invalid.body.error,'METHOD_NOT_ALLOWED');
+ const settled=await staffSettle(r.body.orderId);assert.equal(settled.status,200);assert.equal(settled.body.receipt.confirmation,'operator_cash');
+ const after:any=await getJson(`${BASE}/api/me/wallet`,200,wAuth());assert.equal(after.balance,before.balance);
 });
 
 test('user cancels pending on-site tournament → seat released; cancels wallet-paid reservation → refund', async () => {
@@ -2094,8 +2096,8 @@ test('admin wallet: lookup, manual adjust, transactions list; PayTR gate flag re
   const look: any = await getJson(`${BASE}/api/admin/wallet/${wUser}`, 200, adminAuth());
   assert.equal(look.username, wUser);
   const adj = await postJson(`${BASE}/api/admin/wallet/adjust`, { username: wUser, amount: -look.balance - 1, note: 'over' }, adminAuth());
-  assert.equal(adj.status, 402, 'admin cannot push wallet negative');
-  const adj2 = await postJson(`${BASE}/api/admin/wallet/adjust`, { username: wUser, amount: 50, note: 'cash' }, adminAuth());
+  assert.equal(adj.status,409,'negative adjustment must use explicit cashout flow');
+  const adj2 = await postJson(`${BASE}/api/admin/wallet/adjust`, { username: wUser, amount: 50, note: 'cash',method:'cash',confirmed:true,idempotencyKey:'admin-adjust-cash' }, adminAuth());
   assert.equal(adj2.status, 200);
   assert.equal(adj2.body.balance, look.balance + 50);
   const txs: any = await getJson(`${BASE}/api/admin/wallet/transactions`, 200, adminAuth());
@@ -2159,7 +2161,7 @@ test('wallet checkout with referralCode creates pending commission; cafe does no
   const reg = await postJson(`${BASE}/api/auth/register`, { username: buyerUser, email: `${buyerUser}@t.dev`, password: 'Passw0rd!', phone: buyerPhone });
   assert.equal(reg.status, 200, JSON.stringify(reg.body));
   buyerToken = reg.body.token;
-  const top = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: buyerPhone, amount: 5000, operator: 'cashier', idempotencyKey: `aff-${buyerUser}` });
+  const top = await staffTopup(buyerPhone,5000,`aff-${buyerUser}`);
   assert.equal(top.status, 200, JSON.stringify(top.body));
   const sys = sample.SAMPLE_SYSTEMS.find((s: any) => !s.isReserved) || sample.SAMPLE_SYSTEMS[0];
   const r = await postJson(`${BASE}/api/checkout/wallet`, {
@@ -2179,10 +2181,10 @@ test('wallet checkout with referralCode creates pending commission; cafe does no
     params: { items: [{ item: { id: sample.SAMPLE_CAFE_ITEMS[0].id }, quantity: 1 }], tableNumber: 'A9', referralCode: AFF_CODE },
   }, buyerAuth());
   assert.equal(cafe.status, 200, JSON.stringify(cafe.body));
-  await postJson(`${BASE}/api/admin/onsite-orders/${cafe.body.orderId}/settle`, { method: 'cash' }, adminAuth());
+  await staffSettle(cafe.body.orderId);
   const afterCafe: any = await getJson(`${BASE}/api/admin/affiliates/${affId}`, 200, adminAuth());
   assert.equal((afterCafe.commissions || []).filter((c: any) => c.kind === 'cafe').length, 0);
-  const selfTop = await postJson(`${BASE}/api/sync/wallet/topup`, { phone: affPhone, amount: 2000, operator: 'cashier', idempotencyKey: `aff-self-${affUser}` });
+  const selfTop = await staffTopup(affPhone,2000,`aff-self-${affUser}`);
   assert.equal(selfTop.status, 200, JSON.stringify(selfTop.body));
   const affTok = (await postJson(`${BASE}/api/auth/login`, { username: affUser, password: 'Passw0rd!' })).body.token;
   const sys2 = sample.SAMPLE_SYSTEMS.find((s: any) => s.id !== sys.id) || sys;
@@ -2190,28 +2192,26 @@ test('wallet checkout with referralCode creates pending commission; cafe does no
     kind: 'reservation',
     params: { systemId: sys2.id, startTime: '10:00', endTime: '11:00', date: 'فردا', referralCode: AFF_CODE },
   }, { Authorization: `Bearer ${affTok}` });
-  assert.ok(selfPay.status === 200 || selfPay.status === 409, JSON.stringify(selfPay.body));
+  assert.equal(selfPay.status,400,JSON.stringify(selfPay.body));assert.equal(selfPay.body.code,'INVALID_REFERRAL_CODE');
   const afterSelf: any = await getJson(`${BASE}/api/admin/affiliates/${affId}`, 200, adminAuth());
   assert.equal((afterSelf.commissions || []).filter((c: any) => c.username === affUser).length, 0);
 });
 
-test('sync cashout deducts wallet; SPA shells for affiliate pages', async () => {
-  const before: any = await getJson(`${BASE}/api/me/wallet`, 200, buyerAuth());
-  const out = await postJson(`${BASE}/api/sync/wallet/cashout`, { phone: buyerPhone, amount: 10, operator: 'cashier', note: 'cash', idempotencyKey: `cash-${buyerUser}` });
-  assert.equal(out.status, 200, JSON.stringify(out.body));
-  assert.equal(out.body.balance, before.balance - 10);
-  const dup = await postJson(`${BASE}/api/sync/wallet/cashout`, { phone: buyerPhone, amount: 10, operator: 'cashier', idempotencyKey: `cash-${buyerUser}` });
-  assert.equal(dup.body.duplicate, true);
-  for (const p of ['/admin/affiliates', '/profile/affiliate', '/legal/affiliate']) {
-    const res = await fetch(`${BASE}${p}`);
-    assert.equal(res.status, 200, p);
-    assert.match(res.headers.get('content-type') || '', /text\/html/);
-  }
+test('cashout reserves funds then records real operator confirmation exactly once', async()=>{
+ const before:any=await getJson(`${BASE}/api/me/wallet`,200,buyerAuth());const key=`cash-${buyerUser}`;
+ const requested=await postJson(`${BASE}/api/management/wallet/cashout`,{username:buyerUser,amount:10,idempotencyKey:key},adminAuth());assert.equal(requested.status,200,JSON.stringify(requested.body));assert.equal(requested.body.data.status,'pending_handover');
+ const confirmed=await postJson(`${BASE}/api/management/cashouts/${requested.body.id}/confirm`,{confirmed:true,idempotencyKey:key+':confirm'},adminAuth());assert.equal(confirmed.status,200);assert.equal(confirmed.body.data.status,'paid');assert.equal(confirmed.body.data.receipt.direction,'out');
+ const replay=await postJson(`${BASE}/api/management/cashouts/${requested.body.id}/confirm`,{confirmed:true,idempotencyKey:key+':confirm'},adminAuth());assert.equal(replay.body.data.receipt.id,confirmed.body.data.receipt.id);
+ assert.equal((await getJson(`${BASE}/api/me/wallet`,200,buyerAuth()) as any).balance,before.balance-10);
+ for(const path of ['/admin/affiliates','/profile/affiliate','/legal/affiliate'])assert.equal((await fetch(`${BASE}${path}`)).status,200);
 });
 
 suite('37. API — Instagram Media-ID ingest + Friend Gate simulator');
 
 test('published-media requires portal ingest token; rejects bad type and unknown campaign', async () => {
+  const conf:any=await getJson(`${BASE}/api/management/publishing/config`,200,adminAuth());
+  const policies:any=await getJson(`${BASE}/api/management/publishing/campaigns`,200,adminAuth());const policy=policies.find((p:any)=>p.id==='SQUAD26');
+  const setup=await putJson(`${BASE}/api/management/publishing/campaigns/SQUAD26`,{...policy.data,accountId:'e2e-account',active:true,policyConfirmed:true,version:policy.version,idempotencyKey:'activate-e2e-policy'},adminAuth());assert.equal(setup.status,200,JSON.stringify(setup.body));
   const camp: any = await getJson(`${BASE}/api/admin/ig-campaign`, 200, adminAuth());
   assert.equal(camp.settings.ig_campaign_ids, 'SQUAD26');
   assert.ok(camp.settings.ig_msg_partner2_fa.includes('{{code}}'));
@@ -2238,31 +2238,81 @@ test('published-media requires portal ingest token; rejects bad type and unknown
   assert.equal(conflict.status, 409);
 });
 
-test('admin simulator: keyword PR, follow DM with unique code, friend comment confirms share', async () => {
-  const mediaId = '179555001';
-  const p = await postJson(`${BASE}/api/admin/ig/simulate-comment`, {
-    mediaId, commentId: 'c-ali', text: 'SQUAD', igUserId: 'ig-ali', igUsername: 'ali',
-  }, adminAuth());
-  assert.equal(p.status, 200, JSON.stringify(p.body));
-  assert.equal(p.body.outbound.kind, 'private_reply');
-  const code = p.body.member.partnerCode;
-  assert.match(String(code), /^\d{6}$/);
-  const btn = await postJson(`${BASE}/api/admin/ig/simulate-button`, { memberId: p.body.member.id, followVerified: false }, adminAuth());
-  assert.equal(btn.status, 200, JSON.stringify(btn.body));
-  assert.equal(btn.body.outbound.kind, 'dm');
-  assert.ok(btn.body.outbound.text.includes(code));
-  const friend = await postJson(`${BASE}/api/admin/ig/simulate-comment`, {
-    mediaId, commentId: 'c-veli', text: code, igUserId: 'ig-veli', igUsername: 'veli',
-  }, adminAuth());
-  assert.equal(friend.status, 200, JSON.stringify(friend.body));
-  assert.equal(friend.body.member.shareStatus, 'share_confirmed_by_friend_code');
-  const gate = await postJson(`${BASE}/api/admin/ig/simulate-button`, { memberId: friend.body.member.id }, adminAuth());
-  assert.equal(gate.status, 200, JSON.stringify(gate.body));
-  assert.match(gate.body.member.inviteUrl, /utm_source=instagram/);
-  assert.match(gate.body.member.inviteUrl, new RegExp(`ref=${code}`));
-  const hook = await postJson(`${BASE}/api/integrations/zernio/webhook`, { event: 'comment.received' });
-  assert.equal(hook.status, 401);
+test('retired simulator and partner-invite cannot bypass the signed v4 receiver', async()=>{
+ for(const url of ['/api/admin/ig/simulate-comment','/api/admin/ig/simulate-button','/api/integrations/instagram/partner-invite']){const r=await postJson(`${BASE}${url}`,{},adminAuth());assert.equal(r.status,410);}
+ const bad=await postJson(`${BASE}/api/webhooks/zernio`,{event:'webhook.test'});assert.equal(bad.status,401);
+ const payload={event:'webhook.test'},sig=createHmac('sha256','e2e-webhook-test-only').update(JSON.stringify(payload)).digest('hex');
+ for(const url of ['/api/webhooks/zernio','/api/integrations/zernio/webhook']){const r=await postJson(`${BASE}${url}`,payload,{'X-Zernio-Signature':sig});assert.equal(r.status,200);assert.equal(r.body.outboundSent,false);}
 });
 
+
+suite('38. API — publishing v4 security and real media workflow');
+let v4Asset='',v4Draft:any,v4IngestToken='';
+const pubBase=BASE+'/api/management/publishing';
+const v4Hook=(body:any)=>postJson(BASE+'/api/webhooks/zernio',body,{'X-Zernio-Signature':createHmac('sha256','e2e-webhook-test-only').update(JSON.stringify(body)).digest('hex')});
+test('publishing configuration is staff-only and has a real persisted Manus default',async()=>{
+ assert.equal((await fetch(pubBase+'/config')).status,401);
+ assert.equal((await fetch(pubBase+'/config',{headers:{Authorization:`Bearer ${authToken}`}})).status,403);
+ const cfg:any=await getJson(pubBase+'/config',200,adminAuth());assert.equal(cfg.config.data.defaultAgentId,'builtin-manus');assert.equal(cfg.config.data.outboundEnabled,false);
+ const agents:any=await getJson(pubBase+'/agents',200,adminAuth());assert.ok(agents.some((a:any)=>a.id==='builtin-manus'&&a.data.name==='Manus'));
+});
+test('provider secrets use the private encrypted API and never appear in GET responses',async()=>{
+ const key='zernio-e2e-not-real-api-key';const saved=await putJson(pubBase+'/secrets/zernio_api_key',{value:key},adminAuth());assert.equal(saved.status,200);
+ const cfg:any=await getJson(pubBase+'/config',200,adminAuth());assert.equal(cfg.secrets.zernio_api_key.configured,true);assert.ok(!JSON.stringify(cfg).includes(key));
+ const legacy=await postJson(BASE+'/api/admin/settings',{key:'ZERNIO_WEBHOOK_SECRET',value:'not-allowed'},adminAuth());assert.equal(legacy.status,403);
+ assert.ok(!JSON.stringify(await getJson(BASE+'/api/settings')).includes(key));
+});
+test('agent key CRUD is admin-only and has no plaintext readback',async()=>{
+ const r=await postJson(pubBase+'/agents',{name:'HTTP test agent',adapterId:'manus',enabled:true,profile:'standard',projectId:'',apiKey:'manus-http-test-secret'},adminAuth());assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.status,'configured_untested');assert.ok(!JSON.stringify(r.body).includes('manus-http-test-secret'));
+ const list:any=await getJson(pubBase+'/agents',200,adminAuth());assert.ok(!JSON.stringify(list).includes('manus-http-test-secret'));
+ const denied=await postJson(pubBase+'/agents',{name:'bad'}, {Authorization:`Bearer ${authToken}`});assert.equal(denied.status,403);
+});
+test('a publisher token can report media only, not call webhook or partner-link issuance',async()=>{
+ const r=await postJson(BASE+'/api/admin/api-tokens',{name:'V4 ingress'},adminAuth());assert.equal(r.status,200);v4IngestToken=r.body.token.token;
+ const accepted=await postJson(BASE+'/api/integrations/instagram/published-media',{media_id:'18889990001'}, {Authorization:`Bearer ${v4IngestToken}`});assert.equal(accepted.status,200);assert.equal(accepted.body.accepted,true);assert.ok(!accepted.body.invite_url&&!accepted.body.code);
+ const bypass=await postJson(BASE+'/api/webhooks/zernio',{event:'webhook.test'},{Authorization:`Bearer ${v4IngestToken}`});assert.equal(bypass.status,401);
+ const mint=await postJson(BASE+'/api/integrations/instagram/partner-invite',{ig_user_id:'123'},{Authorization:`Bearer ${v4IngestToken}`});assert.equal(mint.status,410);
+});
+test('webhook validates exact raw bytes and ignores foreign accounts',async()=>{
+ const raw='{  "event" : "webhook.test" }';const sig=createHmac('sha256','e2e-webhook-test-only').update(raw).digest('hex');
+ const r=await fetch(BASE+'/api/webhooks/zernio',{method:'POST',headers:{'Content-Type':'application/json','X-Zernio-Signature':sig},body:raw});assert.equal(r.status,200);assert.equal((await r.json()).outboundSent,false);
+ const tampered=await postJson(BASE+'/api/webhooks/zernio',{event:'webhook.test'},{'X-Zernio-Signature':sig});assert.equal(tampered.status,401);
+ const foreign=await v4Hook({id:'foreign',event:'account.connected',account:{id:'another-account',platform:'instagram'}});assert.equal(foreign.body.ignored,'account_mismatch');
+});
+test('signed comments match only a registered native media ID and stay queued while paused',async()=>{
+ const body={id:'v4-comment-event',event:'comment.received',account:{id:'e2e-account',platform:'instagram'},post:{id:'internal-not-native',platformPostId:'18889990001'},comment:{id:'v4-comment',platformPostId:'18889990001',text:'Ready',author:{id:'199900000001',username:'v4-http-partner'},createdAt:new Date().toISOString()},timestamp:new Date().toISOString()};
+ const a=await v4Hook(body);assert.equal(a.status,200);assert.equal(a.body.accepted,true);const duplicate=await v4Hook(body);assert.equal(duplicate.body.duplicate,true);
+ await waitFor(async()=>{const m:any=await getJson(pubBase+'/members',200,adminAuth());return m.some((x:any)=>x.username==='v4-http-partner'&&x.language==='en'&&x.status==='partner_follow_pending');},12000,200,'v4 comment worker');
+ const events:any=await getJson(pubBase+'/events',200,adminAuth());assert.ok(events.counts.queued>=1);assert.equal(events.counts.sent,0);assert.ok(!JSON.stringify(events).includes('invite_url'));
+});
+test('real binary upload is authenticated, checked, and served only with a short-lived preview token',async()=>{
+ const sharp=(await import('sharp')).default;const png=await sharp({create:{width:320,height:400,channels:3,background:'#123456'}}).png().toBuffer();
+ const r=await postJson(pubBase+'/assets',{name:'http-upload.png',mime:'image/png',size:png.length,idempotencyKey:'http-upload'},adminAuth());assert.equal(r.status,200,JSON.stringify(r.body));v4Asset=r.body.id;
+ const denied=await fetch(pubBase+`/assets/${v4Asset}/chunks/0`,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:png});assert.equal(denied.status,401);
+ const chunk=await fetch(pubBase+`/assets/${v4Asset}/chunks/0`,{method:'PUT',headers:{...adminAuth(),'Content-Type':'application/octet-stream'},body:png});assert.equal(chunk.status,200);assert.equal((await chunk.json()).received,png.length);
+ const complete=await postJson(pubBase+`/assets/${v4Asset}/complete`,{},adminAuth());assert.equal(complete.status,200,JSON.stringify(complete.body));assert.equal(complete.body.data.status,'ready');
+ const url:any=await getJson(pubBase+`/assets/${v4Asset}/preview`,200,adminAuth());assert.ok(!url.url.includes('apiKey'));assert.equal((await fetch(BASE+`/api/publishing-media/${v4Asset}`)).status,401);
+ const image=await fetch(BASE+url.url);assert.equal(image.status,200);assert.match(image.headers.get('content-type')||'',/image\/png/);assert.match(image.headers.get('cache-control')||'',/no-store/);
+});
+test('draft preview approval and paused publication use the same real API and stay idempotent',async()=>{
+ const saved=await postJson(pubBase+'/drafts',{title:'HTTP approved post',caption:'Test caption',format:'image',language:'en',assetIds:[v4Asset],campaignId:'',executionMode:'manual',timezone:'Asia/Famagusta'},adminAuth());assert.equal(saved.status,200,JSON.stringify(saved.body));v4Draft=saved.body;
+ const noConfirm=await postJson(pubBase+`/drafts/${v4Draft.id}/approve`,{version:v4Draft.version},adminAuth());assert.equal(noConfirm.status,400);
+ const approve=await postJson(pubBase+`/drafts/${v4Draft.id}/approve`,{version:v4Draft.version,confirmed:true},adminAuth());assert.equal(approve.status,200);v4Draft=approve.body;
+ const body={version:v4Draft.version,confirmed:true,publishNow:true};const a=await postJson(pubBase+`/drafts/${v4Draft.id}/schedule`,body,adminAuth());assert.equal(a.status,200);assert.equal(a.body.state,'queued');const b=await postJson(pubBase+`/drafts/${v4Draft.id}/schedule`,body,adminAuth());assert.equal(a.body.id,b.body.id);
+ const list:any=await getJson(pubBase+'/publications',200,adminAuth());assert.equal(list.find((j:any)=>j.id===a.body.id).data.state,'queued');assert.ok(!JSON.stringify(list).includes('zernio-e2e-not-real-api-key'));
+});
+test('a content-only operator cannot read another user media or approve publication',async()=>{
+ const grant=await putJson(BASE+`/api/management/access/${uniqueUser}`,{permissions:['content'],version:0,idempotencyKey:'limited-content'},adminAuth());assert.equal(grant.status,200);
+ const operator={Authorization:`Bearer ${authToken}`};const image=await fetch(pubBase+`/assets/${v4Asset}/preview`,{headers:operator});assert.equal(image.status,403);
+ const draftList:any=await getJson(pubBase+'/drafts',200,operator);assert.equal(draftList.length,0);
+ const approval=await postJson(pubBase+`/drafts/${v4Draft.id}/approve`,{version:v4Draft.version,confirmed:true},operator);assert.equal(approval.status,403);
+});
+test('anonymous callers cannot reassign attribution with a username body',async()=>{
+ const r=await postJson(BASE+'/api/affiliate/claim',{username:buyerUser,code:AFF_CODE});assert.equal(r.status,401);
+});
+test('private invitation shell prevents Referer leakage and invalid tokens create no coupon',async()=>{
+ const page=await fetch(BASE+'/ig/invite/not-real?token=private-example');assert.equal(page.status,200);assert.equal(page.headers.get('referrer-policy'),'no-referrer');
+ const r=await fetch(BASE+'/api/instagram/invites/not-real?token=bad');assert.equal(r.status,404);
+});
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

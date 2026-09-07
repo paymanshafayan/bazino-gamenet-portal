@@ -16,6 +16,9 @@
 import express from 'express';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { OpsCore, endpoint, fail, newId, nowISO, stringValue } from './core';
+import { PublishingSettings } from '../publishing/settings';
+import { ManusClient } from '../publishing/manus';
+import { fingerprint } from './core';
 import type { ContentItem, ContentVersion } from '../../shared/management/types';
 
 export type Destination = 'blog' | 'instagram' | 'telegram';
@@ -55,7 +58,7 @@ export class ContentService {
       if (!row) fail('NOT_FOUND', 404);
       if (Number(b.version) !== row.version) fail('VERSION_CONFLICT', 409);
       const data: ContentItem = {
-        ...row.data,
+        ...row.data, approvals: {},
         title: b.title ? stringValue(b.title, 200, true) : row.data.title,
         versions: b.versions ? this.mergeVersions(row.data.versions, b.versions) : row.data.versions,
         destinations: b.destinations ? this.sanitizeDestinations(b.destinations) : row.data.destinations,
@@ -66,6 +69,7 @@ export class ContentService {
       } else if (!['generating', 'publishing'].includes(row.data.status)) {
         data.status = 'draft';
       }
+      for(const dest of Object.keys(data.destinations)) data.destinations[dest]={...data.destinations[dest],status:'draft'};
       return this.core.save('content', id, data, row.version);
     });
   }
@@ -84,7 +88,7 @@ export class ContentService {
       // Simulator mode: no key configured, or an explicit key value/env asking for the
       // simulator. Lets the whole queue be exercised end-to-end without Manus credentials.
       // Real Manus calls remain untested (no live credential in this environment).
-      const simulate = !key || key === 'simulator' || process.env.MANUS_SIMULATE === '1';
+      const simulate = b.simulate === true;
       if (simulate) {
         const sim = this.simulatedDraft(language, dest, row.data.title, prompt, category);
         const versions = { ...row.data.versions, [dest]: { title: sim.title, body: sim.body, language, category: category || undefined } as ContentVersion };
@@ -94,14 +98,14 @@ export class ContentService {
         };
         return this.core.save('content', id, data, row.version);
       }
-      const taskId = await this.manusTaskCreate(key, {
-        title: row.data.title, prompt, language, destination: dest, category,
-      });
-      const data: ContentItem = {
-        ...row.data, status: 'generating', taskId, taskStatus: 'running',
-        destinations: { ...row.data.destinations, [dest]: { status: 'generating', taskId, attemptedAt: nowISO(), requestId: newId('REQ') } as Record<string, any>[string] },
-      };
-      return this.core.save('content', id, data, row.version);
+      if(b.confirmedCost!==true)fail('AGENT_COST_CONFIRMATION_REQUIRED',400);
+      const settings=new PublishingSettings(this.core),agentId=(await settings.config()).data.defaultAgentId;
+      const manus=new ManusClient(this.core),credential=await manus.credential(agentId);
+      const taskKey=newId('GEN');
+      const data:ContentItem={...row.data,status:'generating',taskId:taskKey,taskStatus:'queued',approvals:{},destinations:{...row.data.destinations,[dest]:{...row.data.destinations[dest],status:'generating'}}};
+      const saved=await this.core.save('content',id,data,row.version);
+      await this.core.save('pub-agent-task',taskKey,{legacyContentId:id,legacyVersion:saved.version,legacyDestination:dest,owner:actor,agentId,credentialHash:credential.fingerprint,brief:prompt,title:row.data.title,language,status:'queued',createdAt:nowISO()},0);
+      return saved;
     });
   }
 
@@ -110,10 +114,13 @@ export class ContentService {
     return this.core.command(actor, b.idempotencyKey, 'content-approve', { id }, async () => {
       const row = await this.core.read<ContentItem>('content', id);
       if (!row) fail('NOT_FOUND', 404);
+      if(Number(b.version)!==row.version)fail('VERSION_CONFLICT',409);
+      if(row.data.status==='generating')fail('GENERATION_RUNNING',409);
+      if(row.data.taskStatus==='simulated')fail('SIMULATED_CONTENT_NOT_PUBLISHABLE',409);
       const dest = this.destination(b.destination);
       const v = row.data.versions?.[dest];
       if (!v || !v.body) fail('NO_VERSION_TO_APPROVE', 409);
-      const data: ContentItem = { ...row.data, approvedVersion: Number(b.version) || undefined, approvedBy: actor, status: 'review' };
+      const data: ContentItem = { ...row.data, approvals:{...(row.data.approvals||{}),[dest]:fingerprint(v)}, approvedVersion: row.version, approvedBy: actor, status: 'review' };
       data.destinations = { ...row.data.destinations, [dest]: { ...row.data.destinations[dest], status: 'approved' } };
       return this.core.save('content', id, data, row.version);
     });
@@ -130,7 +137,7 @@ export class ContentService {
       for (const d of dests) {
         const v = data.versions?.[d];
         if (!v?.body) fail('NO_VERSION_TO_APPROVE', 409);
-        if (data.destinations[d].status !== 'approved' && data.destinations[d].status !== 'published') fail('APPROVAL_REQUIRED', 409);
+        if(data.approvals?.[d]!==fingerprint(v))fail('APPROVAL_REQUIRED',409);
       }
       if (b.publishNow) {
         data.status = 'scheduled'; data.scheduledAt = nowISO();
@@ -157,34 +164,22 @@ export class ContentService {
    * item whose time has come, publish per destination and record per-channel results.
    */
   async publishDue() {
-    const results: Array<{ id: string; destination: string; ok: boolean; error?: string; url?: string }> = [];
-    for (const row of await this.core.list<ContentItem>('content')) {
-      const d = row.data;
-      if (d.status !== 'scheduled' || !d.scheduledAt || Date.parse(d.scheduledAt) > Date.now()) continue;
-      await this.core.store.runInTransaction(async () => {
-        const fresh = await this.core.read<ContentItem>('content', row.id);
-        if (!fresh || fresh.data.status !== 'scheduled') return;
-        await this.core.save('content', row.id, { ...fresh.data, status: 'publishing' }, fresh.version);
-      });
-      const fresh = await this.core.read<ContentItem>('content', row.id);
-      if (!fresh || fresh.data.status !== 'publishing') continue;
-      let anyOk = false, anyFail = false;
-      const destinations = { ...fresh.data.destinations };
-      for (const dest of DESTINATIONS) {
-        if (!destinations[dest]) continue;
-        const v = fresh.data.versions?.[dest];
-        if (!v) { destinations[dest] = { ...destinations[dest], status: 'failed', error: 'NO_VERSION' }; anyFail = true; continue; }
-        try {
-          const r = await this.publishOne(dest, fresh.data, v);
-          destinations[dest] = { ...destinations[dest], status: 'published', url: r.url, id: r.externalId, attemptedAt: nowISO() };
-          anyOk = true; results.push({ id: row.id, destination: dest, ok: true, url: r.url });
-        } catch (e: any) {
-          destinations[dest] = { ...destinations[dest], status: 'failed', error: String(e.code || e.message || 'PUBLISH_FAILED'), attemptedAt: nowISO() };
-          anyFail = true; results.push({ id: row.id, destination: dest, ok: false, error: String(e.code || e.message) });
+    const results:Array<{id:string;destination:string;ok:boolean;error?:string;url?:string}>=[];
+    for(const row of await this.core.list<ContentItem>('content')) {
+      if(row.data.status!=='scheduled'||!row.data.scheduledAt||Date.parse(row.data.scheduledAt)>Date.now())continue;
+      await this.core.store.runInTransaction(async()=>{
+        const fresh=await this.core.read<ContentItem>('content',row.id);if(!fresh||fresh.data.status!=='scheduled')return;
+        const d=fresh.data,destinations={...d.destinations};let anyOk=false,anyFail=false;
+        for(const dest of Object.keys(destinations) as Destination[]) {
+          if(destinations[dest].status==='published'){anyOk=true;continue;}
+          const v=d.versions?.[dest];
+          try {
+            if(!v||d.approvals?.[dest]!==fingerprint(v))fail('APPROVAL_REQUIRED',409);
+            const r=await this.publishOne(dest,d,v);destinations[dest]={...destinations[dest],status:'published',url:r.url,id:r.externalId,attemptedAt:nowISO()};anyOk=true;results.push({id:row.id,destination:dest,ok:true,url:r.url});
+          }catch(e:any){const error=e.code||'PUBLISH_FAILED';destinations[dest]={...destinations[dest],status:'failed',error};anyFail=true;results.push({id:row.id,destination:dest,ok:false,error});}
         }
-      }
-      const status = anyOk && anyFail ? 'partial' : anyOk ? 'published' : 'failed';
-      await this.core.save('content', row.id, { ...fresh.data, status, destinations }, fresh.version);
+        await this.core.save('content',row.id,{...d,destinations,status:anyOk&&anyFail?'partial':anyOk?'published':'failed'},fresh.version);
+      });
     }
     return results;
   }
@@ -205,20 +200,7 @@ export class ContentService {
       } as any);
       return { url: `/blog/${id}`, externalId: id };
     }
-    // Social channels require the Zernio webhook (separate from the PR/DM campaign).
-    const webhook = await this.core.store.getSetting(dest === 'instagram' ? 'zernio_publish_webhook' : 'telegram_publish_webhook');
-    if (!webhook) fail('INTEGRATION_NOT_CONFIGURED', 409);
-    // Outbound POST is idempotent via requestId; never throw on missing key here because
-    // the per-channel result already captures the failure. Kept server-side only.
-    const body = JSON.stringify({ destination: dest, title: v.title || item.title, body: v.body, mediaUrl: v.mediaUrl, requestId: `${dest}:${item.taskId || randomUUID()}` });
-    const sig = createHmac('sha256', await this.core.store.getSetting('zernio_api_key') || process.env.ZERNIO_API_KEY || '').update(body).digest('hex');
-    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 15000);
-    try {
-      const r = await fetch(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Zernio-Signature': sig }, body, signal: ctrl.signal });
-      if (!r.ok) fail('PUBLISH_WEBHOOK_FAILED', 502);
-      const out = await r.json().catch(() => ({}));
-      return { url: out.url, externalId: out.id };
-    } finally { clearTimeout(timer); }
+    fail('USE_PUBLISHING_STUDIO',409);
   }
 
   /** Webhook receiver for Manus task completion. HMAC on raw body, idempotent by taskId. */
@@ -258,28 +240,6 @@ export class ContentService {
     return { title, body };
   }
 
-  private async manusTaskCreate(key: string, input: { title: string; prompt: string; language: string; destination: Destination; category?: string }): Promise<string> {
-    const webhookBase = await this.core.store.getSetting('manus_webhook_base_url'); // e.g. https://bazino.pro
-    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 20000);
-    try {
-      const r = await fetch('https://api.manus.ai/v2/task.create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-manus-api-key': key },
-        body: JSON.stringify({
-          model: 'manus-v2l',
-          prompt: `You are a content writer for BAZINO gaming lounge (gamenet/cafe in İskele, KKTC). Write in ${input.language}. Destination: ${input.destination}. Category: ${input.category || 'general'}. Topic/title: ${input.title}. Brief: ${input.prompt}. Return only the final content.`,
-          webhook: webhookBase ? { url: `${webhookBase.replace(/\/$/, '')}/api/management/integrations/manus/webhook` } : undefined,
-        }),
-        signal: ctrl.signal,
-      });
-      if (!r.ok) fail('MANUS_TASK_FAILED', 502);
-      const out = await r.json().catch(() => null);
-      const taskId = out?.task_id || out?.id;
-      if (!taskId) fail('MANUS_TASK_FAILED', 502);
-      return String(taskId);
-    } finally { clearTimeout(timer); }
-  }
-
   private destination(v: unknown): Destination {
     const d = String(v || 'blog');
     if (!DESTINATIONS.includes(d as Destination)) fail('INVALID_DESTINATION');
@@ -311,16 +271,11 @@ export function registerContent(app: express.Express, service: ContentService) {
   app.get(`${base}/content/:id`, core.guard('content'), endpoint(async (req, res) => res.json(await service.get(String(req.params.id)))));
   app.post(`${base}/content`, core.guard('content'), endpoint(async (req, res) => res.json(await service.create((req as any).staff.username, req.body || {}))));
   app.post(`${base}/content/:id`, core.guard('content'), endpoint(async (req, res) => res.json(await service.update((req as any).staff.username, String(req.params.id), req.body || {}))));
-  app.post(`${base}/content/:id/generate`, core.guard('content'), endpoint(async (req, res) => res.json(await service.generate((req as any).staff.username, String(req.params.id), req.body || {}))));
+  app.post(`${base}/content/:id/generate`, core.guard('publish'), endpoint(async (req, res) => res.json(await service.generate((req as any).staff.username, String(req.params.id), req.body || {}))));
   app.post(`${base}/content/:id/approve`, core.guard('publish'), endpoint(async (req, res) => res.json(await service.approve((req as any).staff.username, String(req.params.id), req.body || {}))));
   app.post(`${base}/content/:id/schedule`, core.guard('publish'), endpoint(async (req, res) => res.json(await service.schedule((req as any).staff.username, String(req.params.id), req.body || {}))));
   app.post(`${base}/content/:id/cancel`, core.guard('publish'), endpoint(async (req, res) => res.json(await service.cancel((req as any).staff.username, String(req.params.id), req.body || {}))));
-  // Manus webhook — unauthenticated by staff token, verified by HMAC signature instead.
-  app.post(`${base}/integrations/manus/webhook`, express.raw({ type: '*/*', limit: '1mb' }), endpoint(async (req, res) => {
-    const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
-    const sig = String((req as any).headers['x-manus-signature'] || (req as any).headers['x-signature'] || '');
-    res.json(await service.handleManusWebhook(raw, sig));
-  }));
+  // Live Manus callbacks are RSA-verified by publishing/publicationRoutes.ts.
   // Publish sweeper: every 60s, no external call unless something is due.
   setInterval(() => { service.publishDue().catch(() => {}); }, 60_000).unref?.();
 }

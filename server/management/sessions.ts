@@ -75,7 +75,10 @@ export class SessionService {
     const rate=minor((system?.hourlyRate??station.data.hourlyRate)*(controllers===4?1.5:controllers===2?1.2:1),true)/100;
     const startsAt=new Date(current).toISOString(),endsAt=new Date(current+duration*60000).toISOString();
     await assertStationFree(this.core,station.data.systemId,startsAt,endsAt,booking?.id);
-    const id=newId('SS'),data={stationId:station.id,systemId:station.data.systemId,username,customerName:user?.displayName||username||stringValue(b.customerName,100)||'مشتری آزاد',startedAt:startsAt,endsAt,hourlyRate:rate,controllers,durationMinutes:duration,status:'playing',pauses:[],segments:[{from:startsAt,rate}],reservationId:booking?.id||null,reservationOrderId:booking?.orderId||null,reservationEndsAt:booking?.endsAt||null,prepaidAmount:booking?.paidAmount||0,reservationPrice:booking?.totalAmount||0,startedBy:actor};
+    const attribution=username?await this.core.store.getAttributionForUser(username):undefined;
+    const referralCode=String(b.referralCode||(attribution&&Date.parse(attribution.expiresAt)>Date.now()?attribution.code:'')).trim().toUpperCase();
+    if(referralCode){const affiliate=await this.core.store.getAffiliateByCode(referralCode);if(!affiliate||affiliate.status!=='active'||affiliate.username===username)fail('INVALID_REFERRAL_CODE');}
+    const id=newId('SS'),data={stationId:station.id,systemId:station.data.systemId,username,customerName:user?.displayName||username||stringValue(b.customerName,100)||'مشتری آزاد',startedAt:startsAt,endsAt,hourlyRate:rate,controllers,durationMinutes:duration,status:'playing',pauses:[],segments:[{from:startsAt,rate}],reservationId:booking?.id||null,reservationOrderId:booking?.orderId||null,reservationEndsAt:booking?.endsAt||null,prepaidAmount:booking?.paidAmount||0,reservationPrice:booking?.totalAmount||0,startedBy:actor,referralCode};
     const row=await this.core.save('session',id,data,0);
     if(booking){const meta=await this.core.read('booking',booking.id);await this.core.save('booking',booking.id,{...meta?.data,attendanceStatus:'playing',sessionId:id},meta?.version||0);await this.core.store.setReservationCheckedIn(booking.id);await onReservationAttended(this.core.store,booking.id,username);}
     return row;
@@ -112,10 +115,11 @@ export class SessionService {
     const receipt=await this.finance.receipt(actor,b,current.amount,row.data.username,'session_sale',undefined,id);
     // Linked orders are settled atomically using the same already-recorded collection.
     for(const orderId of current.orderIds){const o=await this.core.store.getOnsiteOrder(orderId);if(!o||o.status!=='pending_onsite')fail('QUOTE_CHANGED',409);const p=JSON.parse(o.payload),old=JSON.parse(o.result||'{}');const result={...old,...await this.finance.deps.fulfil(o.kind as any,{...p,__pointsOnly:!!old.orderId},o.username,{merchantOid:o.id,kind:o.kind,username:o.username}),method:b.method,receiptId:receipt?.id};await this.core.store.updateOnsiteOrder(o.id,{status:'settled',settledAt:nowISO(),settledBy:`${b.method}:${actor}`,payload:JSON.stringify({...p,_ops:{...p._ops,inventoryBooked:true}}),result:JSON.stringify(result),updatedAt:nowISO()});}
-    const closedAt=row.data.settlingAt;const durationSeconds=billableSeconds(row.data);const invoice={id:newId('IV'),sessionId:id,stationId:row.data.stationId,username:row.data.username,customerName:row.data.customerName,startedAt:row.data.startedAt,closedAt,durationSeconds,...current,receipt,actor};
+    const closedAt=row.data.settlingAt;const durationSeconds=billableSeconds(row.data);const invoice={id:newId('IV'),referralCode:row.data.referralCode||'',reservationOrderId:row.data.reservationOrderId||null,sessionId:id,stationId:row.data.stationId,username:row.data.username,customerName:row.data.customerName,startedAt:row.data.startedAt,closedAt,durationSeconds,...current,receipt,actor};
     await this.core.save('invoice',invoice.id,invoice,0);await this.core.save('session',id,{...row.data,closedAt,status:'completed',invoiceId:invoice.id,receiptId:receipt?.id},row.version);
     if(row.data.reservationId){const meta=await this.core.read('booking',row.data.reservationId);await this.core.save('booking',row.data.reservationId,{...meta?.data,attendanceStatus:'completed'},meta?.version||0);}
     if(row.data.username){const stats=await this.core.read('customer-stats',row.data.username);await this.core.save('customer-stats',row.data.username,{...stats?.data,totalSeconds:(stats?.data.totalSeconds||0)+durationSeconds},stats?.version||0);}
+    if(row.data.username && current.newGameCost>0) await this.core.save('commission-job',invoice.id,{username:row.data.username,orderId:invoice.id,kind:'session',amount:current.newGameCost,dueAt:closedAt,payload:{reservationOrderId:row.data.reservationOrderId||null,referralCode:row.data.referralCode||''},status:'pending'},0);
     return {invoice,receipt};
   });}
 }

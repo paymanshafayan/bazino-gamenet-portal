@@ -64,6 +64,7 @@ export function navigateTo(path: string, replace = false): void {
 
 /** صفحات مستقل از قالب که خارج از تب‌ها رندر می‌شوند. */
 export type StandalonePage =
+  | { type: 'invite'; id: string; token: string }
   | { type: 'legal'; slug: string }
   | { type: 'contact' }
   | { type: 'payment'; outcome: 'success' | 'fail'; oid: string }
@@ -72,6 +73,7 @@ export type StandalonePage =
 
 export function standalonePageFromPath(pathname: string, search = ''): StandalonePage {
   const parts = pathname.replace(/^\/+|\/+$/g, '').split('/');
+  if (parts[0] === 'ig' && parts[1] === 'invite' && parts[2]) return {type:'invite',id:parts[2],token:new URLSearchParams(search).get('token')||''};
   if (parts[0] === 'legal') return { type: 'legal', slug: parts[1] || 'terms' };
   if (parts[0] === 'contact') return { type: 'contact' };
   if (parts[0] === 'profile') return { type: 'profile', tab: profileTabFromPath(pathname), ticketId: parts[1] === 'tickets' ? parts[2] : undefined };

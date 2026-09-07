@@ -106,11 +106,11 @@ export function registerAffiliateRoutes(d: AffiliateDeps) {
     } catch (e) { httpError(res, e); }
   });
 
-  app.post('/api/affiliate/claim', async (req, res) => {
+  app.post('/api/affiliate/claim', requireAuth, async (req, res) => {
     try {
       const rates = await loadRates(store());
       if (!rates.programOpen) return res.status(403).json({ error: 'PROGRAM_CLOSED', code: 'PROGRAM_CLOSED' });
-      const username = d.authUsername(req) || String(req.body?.username || '');
+      const username = d.authUsername(req) || ''; // Never attribute another user's account from an unauthenticated body.
       const r = await claimAttribution(store(), {
         code: String(req.body?.code || ''),
         username,
@@ -134,7 +134,12 @@ export function registerAffiliateRoutes(d: AffiliateDeps) {
       const childStats = [];
       for (const ch of children) childStats.push({ code: ch.code, name: ch.name, stats: await statsForAffiliate(store(), ch) });
       const comm = (await store().listAffiliateCommissions({ affiliateId: aff.id })).slice(0, 50).map(stripPii);
-      res.json({ ...publicAffiliateDashboard(aff, stats, childStats, settings), commissions: comm });
+      const dashboard=publicAffiliateDashboard(aff,stats,childStats,settings);
+      if(aff.type==='instagram') {
+        const policy=(await store().getOpsRecord('pub-affiliate-policy',aff.code))?.data?.policy;
+        dashboard.rates=policy?.financialApproved?{newPct:policy.commissionPct,returnPct:0,tournamentPct:0}:null;
+      }
+      res.json({ ...dashboard, commissions: aff.type==='instagram'?[]:comm });
     } catch (e) { httpError(res, e); }
   });
 
@@ -277,7 +282,9 @@ export function registerAffiliateRoutes(d: AffiliateDeps) {
       const c = await store().getAffiliateCommissionById(String(req.params.id));
       if (!c) return res.status(404).json({ error: 'NOT_FOUND' });
       if (c.status !== 'pending') return res.status(400).json({ error: 'BAD_STATE', code: 'BAD_STATE' });
-      await store().updateAffiliateCommission(c.id, { holdUntil: iso(), flag: '', updatedAt: iso() });
+      const policy = await store().getOpsRecord('pub-commission-policy',c.id);
+      if (policy && Date.parse(policy.data.holdUntil)>Date.now()) return res.status(409).json({error:'REFUND_WINDOW_OPEN'});
+      await store().updateAffiliateCommission(c.id, { holdUntil: policy?.data.holdUntil || iso(), flag: '', updatedAt: iso() });
       const n = await approveDueCommissions(store());
       res.json({ success: true, approved: n });
     } catch (e) { httpError(res, e); }

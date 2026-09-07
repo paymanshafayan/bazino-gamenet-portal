@@ -12,8 +12,11 @@ export async function opsRequest(path:string,method='GET',body?:any):Promise<any
   const headers:Record<string,string>={'Content-Type':'application/json'};const token=storage.get(TOKEN);if(token)headers.Authorization=`Bearer ${token}`;
   let payload=body,signature='',pending:any={};
   if(method!=='GET'&&path!=='/login'){
-    signature=JSON.stringify({path,method,body});try{pending=JSON.parse(storage.get(pendingKey)||'{}');}catch{}
-    const key=body?.idempotencyKey||pending[signature]||requestKey();payload={...body,idempotencyKey:key};pending[signature]=key;storage.set(pendingKey,JSON.stringify(pending));
+    // Publishing payloads can contain provider API keys. Never persist those bodies (even transiently).
+    const sensitive=path.startsWith('/publishing/');
+    if(!sensitive){signature=JSON.stringify({path,method,body});try{pending=JSON.parse(storage.get(pendingKey)||'{}');}catch{}}
+    const key=body?.idempotencyKey||(signature?pending[signature]:undefined)||requestKey();payload={...body,idempotencyKey:key};
+    if(signature){pending[signature]=key;storage.set(pendingKey,JSON.stringify(pending));}
   }
   let response:Response;try{response=await fetch(`/api/management${path}`,{method,headers,body:payload===undefined?undefined:JSON.stringify(payload),signal:AbortSignal.timeout(25000)});}catch{throw new OpsError('CONNECTION_LOST',0,method!=='GET');}
   const result=await response.json().catch(()=>null);

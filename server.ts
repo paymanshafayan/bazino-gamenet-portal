@@ -69,6 +69,8 @@ import { registerManagementCore } from './server/management/routes';
 import { registerWalletRoutes } from "./server/wallet/routes";
 import { registerAffiliateRoutes } from "./server/affiliate/routes";
 import { seedAffiliateSettings } from "./server/affiliate/settings";
+import { registerPublishing } from './server/publishing/routes';
+import { protectedIntegrationSetting } from './server/publishing/settings';
 import { registerIgRoutes } from "./server/affiliate/igRoutes";
 import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
 import { onReservationAttended } from "./server/affiliate/engine";
@@ -568,8 +570,24 @@ async function startServer() {
     });
   });
 
+  app.use((req,res,next)=>{if(req.path.startsWith('/ig/invite/')){res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Cache-Control','no-store');}next();});
   // Parse ordinary JSON requests globally. Upload routes must keep the incoming stream
   // untouched so formidable/raw parsers can consume it directly.
+  // Integration signatures bind the exact wire bytes, not re-serialized JSON.
+  const signedPaths = new Set(['/api/webhooks/zernio','/api/webhooks/zernio/analytics','/api/integrations/zernio/webhook','/api/management/integrations/manus/webhook']);
+  const signedParser = express.raw({type:'application/json',limit:'1mb'});
+  app.use((req,res,next)=>{
+    if (!signedPaths.has(req.path)) return next();
+    signedParser(req,res,(err)=>{
+      if(err)return next(err);
+      if(!Buffer.isBuffer(req.body))return res.status(415).json({error:'JSON_REQUIRED'});
+      (req as any).rawBody=Buffer.from(req.body);
+      // Signature is verified by the dedicated handler before parsing business data.
+      next();
+    });
+  });
+  const publishingJson=express.json({limit:'256kb'});
+  app.use((req,res,next)=>req.path.startsWith('/api/management/publishing/')||req.path==='/api/management/publishing'?publishingJson(req,res,next):next());
   const jsonParser = express.json({
     limit: "260mb",
     verify: (req, _res, buf) => {
@@ -581,6 +599,7 @@ async function startServer() {
   });
   app.use((req, res, next) => {
     if (
+      signedPaths.has(req.path) ||
       req.path === "/api/admin/mobile-app/upload-apk" ||
       req.path === "/api/admin/mobile-app/upload-apk/chunk" ||
       req.path === "/api/admin/themes/install"
@@ -833,6 +852,7 @@ async function startServer() {
     shop: async () => resolveMergedList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES),
     tournaments: async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
   });
+  registerPublishing(app,management);
   const finance = new FinanceService(management,{fulfil:paymentFulfil,unfulfil:paymentUnfulfil});
   registerFinance(app,finance);
   const promotions = new PromotionService(management);
@@ -2345,12 +2365,24 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   async function paymentQuote(kind: OrderKind, params: any, username?: string) {
     const store = getActiveDataProvider();
+    params = {...(params || {})};
+    if (String(params.referralCode || '').trim()) {
+      const affiliate = await store.getAffiliateByCode(String(params.referralCode).trim().toUpperCase());
+      if(!affiliate || affiliate.status!=='active' || username && affiliate.username===username)fail('INVALID_REFERRAL_CODE',400);
+    } else if (username) {
+      const attribution=await store.getAttributionForUser(username);
+      if(attribution?.code && Date.parse(attribution.expiresAt)>Date.now()) {
+        const affiliate=await store.getAffiliateByCode(attribution.code);
+        if(affiliate?.status==='active'&&affiliate.username!==username)params.referralCode=affiliate.code;
+      }
+    }
+
     if (kind === "reservation") {
       const { systemId, startTime, endTime, date, couponCode, referralCode } = params || {};
       const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
       if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
       const st = startTime || "12:00", et = endTime || "14:00";
-      const window = bookingWindow({date,startTime:st,endTime:et,...(params?.startsAt?{startsAt:params.startsAt,endsAt:params.endsAt}:{})},Date.now(),await management.timezone());
+      let window:ReturnType<typeof bookingWindow>;try{window=bookingWindow({date,startTime:st,endTime:et,...(params?.startsAt?{startsAt:params.startsAt,endsAt:params.endsAt}:{})},Date.now(),await management.timezone());}catch{fail('INVALID_RESERVATION_TIME',400);}
       if (Date.parse(window.startsAt) < Date.now()-60000) fail('PAST_RESERVATION');
       const reservationDate = window.date;
       await assertStationFree(management,systemId,window.startsAt,window.endsAt);
@@ -3997,7 +4029,7 @@ namespace GameNet.Infrastructure.Migrations
         // Secrets (AI provider keys, the desktop-sync API key) are managed through
         // their own admin-only endpoints; never leak them through the public
         // /api/settings response, which any visitor can read.
-        if (SECRET_SETTING_KEYS.has(curr.key)) return acc;
+        if (SECRET_SETTING_KEYS.has(curr.key) || protectedIntegrationSetting(curr.key)) return acc;
         acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);
@@ -4006,7 +4038,7 @@ namespace GameNet.Infrastructure.Migrations
       // همیشه اولویت دارند — یعنی اگر ادمین چیزی را سفارشی کرده باشد،
       // در هر دو حالت sample/database همان مقدار دیده می‌شود.
       const sampleObj = SAMPLE_SETTINGS.reduce((acc, curr) => {
-        acc[curr.key] = curr.value;
+        if (!SECRET_SETTING_KEYS.has(curr.key) && !protectedIntegrationSetting(curr.key)) acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);
 
@@ -4026,6 +4058,7 @@ namespace GameNet.Infrastructure.Migrations
       if (key === JARVIS_AI_PROVIDERS_SETTING) {
         return res.status(403).json({ error: "Jarvis AI providers must be managed through /api/admin/jarvis-ai-providers" });
       }
+      if (protectedIntegrationSetting(String(key))) return res.status(403).json({error:"USE_PRIVATE_INTEGRATION_SETTINGS"});
       await getActiveDataProvider().setSetting(key, value);
       res.json({ success: true });
     } catch (err) {
@@ -4053,6 +4086,11 @@ namespace GameNet.Infrastructure.Migrations
 
   app.post("/api/admin/sync-settings", async (req, res) => {
     try {
+      if(req.body?.clear===true){
+        if(req.body.confirmed!==true)return res.status(400).json({error:'CONFIRMATION_REQUIRED'});
+        await getActiveDataProvider().setSetting(SYNC_API_KEY_SETTING,'');
+        return res.json({success:true,configured:false,masked:''});
+      }
       const requested = req.body?.generate
         ? randomBytes(32).toString("hex")
         : String(req.body?.apiKey || "").trim();

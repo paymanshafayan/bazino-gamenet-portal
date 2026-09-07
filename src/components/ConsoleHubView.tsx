@@ -56,7 +56,7 @@ export default function ConsoleHubView({
     <div className="fixed inset-0 w-full h-[100dvh] flex flex-col justify-between select-none font-sans text-slate-100 z-30 overflow-hidden pb-[env(safe-area-inset-bottom,0px)]">
       <img
         loading="eager"
-        fetchpriority="high"
+        fetchPriority="high"
         src={hubBackground1536}
         srcSet={`${hubBackground768} 768w, ${hubBackground1536} 1536w`}
         sizes="100vw"

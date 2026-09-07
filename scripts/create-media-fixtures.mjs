@@ -1,0 +1,8 @@
+import fs from 'node:fs';import path from 'node:path';import {execFileSync} from 'node:child_process';import sharp from 'sharp';import ffmpeg from '@ffmpeg-installer/ffmpeg';
+const root=`${process.env.PUBLISHING_REVIEW_DIR||'/home/user/.cache/bazino-v4'}/fixtures`;fs.mkdirSync(root,{recursive:true});
+for(const [i,bg,accent] of [[1,'#0a2634','#65efd4'],[2,'#20223e','#ffcf76']]){
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="800"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="${bg}"/><stop offset="1" stop-color="#080d19"/></linearGradient></defs><rect width="640" height="800" fill="url(#g)"/><circle cx="530" cy="140" r="210" fill="${accent}" opacity=".09"/><rect x="42" y="44" width="556" height="710" rx="24" fill="none" stroke="${accent}" opacity=".25"/><text x="76" y="111" font-family="sans-serif" font-size="24" fill="${accent}" letter-spacing="6">BAZINO PRO</text><text x="72" y="345" font-family="sans-serif" font-weight="bold" font-size="84" fill="#e9f7ff">PLAY.</text><text x="72" y="442" font-family="sans-serif" font-weight="bold" font-size="84" fill="#e9f7ff">TOGETHER.</text><rect x="76" y="520" width="125" height="6" fill="${accent}"/><text x="76" y="642" font-family="sans-serif" font-size="20" fill="#9db7c9">LOCAL REVIEW FIXTURE ${i}</text><text x="76" y="688" font-family="sans-serif" font-size="16" fill="#7290a5">Not a published campaign</text></svg>`;
+ await sharp(Buffer.from(svg)).png().toFile(path.join(root,`slide-${i}.png`));
+}
+execFileSync(ffmpeg.path,['-y','-loop','1','-i',path.join(root,'slide-1.png'),'-t','4','-r','25','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart','-an',path.join(root,'preview.mp4')],{stdio:'pipe'});
+console.log('Local image and MP4 fixtures prepared.');

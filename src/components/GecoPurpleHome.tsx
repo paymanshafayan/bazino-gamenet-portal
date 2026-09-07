@@ -54,7 +54,7 @@ export default function GecoPurpleHome({
       <section className="relative w-full h-[600px] flex items-center justify-center -mt-[90px] pt-[90px]">
         <img
           loading="eager"
-          fetchpriority="high"
+          fetchPriority="high"
           src={vimg("/images/home/esports-1600.webp")}
           srcSet={getResponsiveSrcSet('/images/home/esports-1600.webp', [480, 800, 1200, 1600])}
           sizes="100vw"

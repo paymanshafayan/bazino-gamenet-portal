@@ -22,6 +22,7 @@ export interface ContentVersion { title: string; body: string; mediaUrl?: string
 export interface ContentItem {
   title: string; status: 'draft' | 'generating' | 'review' | 'approved' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'failed' | 'cancelled';
   versions: Partial<Record<'blog' | 'instagram' | 'telegram', ContentVersion>>;
+  approvals?: Record<string,string>;
   approvedVersion?: number; approvedBy?: string; scheduledAt?: string; taskId?: string; taskStatus?: string;
   destinations: Record<string, { status: string; id?: string; url?: string; error?: string; requestId?: string; attemptedAt?: string }>;
 }

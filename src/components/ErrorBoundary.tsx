@@ -1,8 +1,8 @@
-import { Component, ErrorInfo, ComponentChild } from 'preact';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 
 interface Props {
-  children: ComponentChild;
+  children: ReactNode;
 }
 
 interface State {

@@ -539,6 +539,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
       }))
     : featuredGames;
   const activeGame = activeBanners[activeBanner] ?? activeBanners[0];
+  const activeGameTarget = 'target' in activeGame ? activeGame.target : 'reserve';
 
   // props مشترک همه‌ی بخش‌های صفحه‌ی اصلی (به کامپوننت‌های قالب داده می‌شود)
   const regionProps: Partial<ThemeComponentProps> = {
@@ -708,7 +709,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
             {/* فقط تصویر قابل‌مشاهده در DOM است و از لحظه‌ی mount با اولویت LCP دریافت می‌شود. */}
             <img
               loading="eager"
-              fetchpriority="high"
+              fetchPriority="high"
               src={activeGame.imageUrl}
               srcSet={getResponsiveSrcSet(activeGame.imageUrl, [480, 800, 960])}
               sizes="(min-width: 1024px) 960px, 100vw"
@@ -736,14 +737,14 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
               <div className="flex flex-wrap gap-3 mt-2">
                 <button
                   onClick={() => {
-                    const targetRoute = activeGame.target === 'reserve' ? 'reservations' : (activeGame.target || 'reservations');
+                    const targetRoute = activeGameTarget === 'reserve' ? 'reservations' : (activeGameTarget || 'reservations');
                     onNavigate(targetRoute);
                   }}
                   className="px-6 py-3 bg-primary hover:bg-primary-hover text-black font-black text-xs notched-clip-sm shadow-[0_0_20px_rgba(255,184,0,0.4)] border border-primary transition-all flex items-center gap-2 cursor-pointer font-display uppercase tracking-wider"
                 >
-                  {getButtonIcon(activeGame.target || 'reserve')}
+                  {getButtonIcon(activeGameTarget || 'reserve')}
                   <span>
-                    {getButtonText(activeGame.target || 'reserve')[language] || getButtonText(activeGame.target || 'reserve')['en']}
+                    {getButtonText(activeGameTarget || 'reserve')[language] || getButtonText(activeGameTarget || 'reserve')['en']}
                   </span>
                 </button>
               </div>

@@ -34,6 +34,7 @@ const BlogTab = lazy(() => import('./components/BlogTab'));
 const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
 
 const AuthModal = lazy(() => import('./components/AuthModal'));
+const InviteGate = lazy(() => import('./components/affiliate/InviteGate'));
 const ProfilePage = lazy(() => import('./components/profile/ProfilePage'));
 const InstallPage = lazy(() => import('./components/InstallPage'));
 const ChatTab = lazy(() => import('./components/ChatTab'));
@@ -410,9 +411,9 @@ export default function App() {
   };
 
   // بارگذاریِ همه‌ی دیتاست‌ها (برای refresh بعد از تغییرات ادمین/رزرو/سفارش)
-  const refreshAll = () => {
+  const refreshAll = async () => {
     loadedRef.current = new Set(Object.keys(fetchDataset));
-    Object.values(fetchDataset).forEach(fn => void fn());
+    await Promise.all(Object.values(fetchDataset).map(fn => fn()));
   };
   // تسک ۱۳: پس از پرداخت با کیف پول / ثبت حضوری (CheckoutModal) داده‌ها تازه شوند
   useEffect(() => {
@@ -544,7 +545,7 @@ export default function App() {
         body: JSON.stringify({ points, description })
       });
       if (res.ok) {
-        setUser({ ...user, points: user.loyaltyPoints + points });
+        setUser({ ...user, loyaltyPoints: user.loyaltyPoints + points });
         addNotification(L(language, { fa: `${points} امتیاز به شما اضافه شد.`, en: `Added ${points} points.`, ru: `Вам начислено ${points} баллов.`, tr: `${points} puan hesabınıza eklendi.` }), 'success');
       }
     } catch (e) {
@@ -722,6 +723,11 @@ export default function App() {
   // صفحات مستقل از قالب: پیش از ThemeRegionProvider رندر می‌شوند و هیچ قالبی به آن‌ها دسترسی ندارد
   const standalone = standalonePageFromPath(currentPath, window.location.search);
   if (standalone) {
+    if (standalone.type === 'invite') return <>
+      <Suspense fallback={<div className="min-h-screen bg-[#080f1b]"/>}><InviteGate id={standalone.id} token={standalone.token} user={user} onAuth={()=>setIsAuthModalOpen(true)} onNavigate={navigateStandalone}/></Suspense>
+      <Suspense fallback={null}>{isAuthModalOpen&&<AuthModal isOpen={isAuthModalOpen} onClose={()=>setIsAuthModalOpen(false)} onAuthSuccess={u=>setUser(u)} addNotification={addNotification}/>}</Suspense>
+    </>;
+
     if (standalone.type === 'legal') return <LegalPage slug={standalone.slug} onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} />;
     if (standalone.type === 'contact') return <ContactPage onBack={() => navigateStandalone('home')} />;
     if (standalone.type === 'profile') {

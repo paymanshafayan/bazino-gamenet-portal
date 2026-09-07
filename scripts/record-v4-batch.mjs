@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+const [number,title,tests,notes]=process.argv.slice(2);
+if(!number||!title||!tests)throw Error('batch number, title, tests, notes required');
+const section=`\n\n## V4 / Batch ${number} — ${title}\n\n- اجرا: ${notes || title}\n- آزمون/مرز: ${tests}\n- تاریخ: 2026-09-07. هیچ انتشار/پیام زنده بدون مجوز محتوای مشخص انجام نشده است.\n`;
+const log='docs/publishing/V4_EXECUTION_LOG.md';
+if(!fs.existsSync(log))fs.writeFileSync(log,'# اجرای پلن نسخهٔ ۴\n\nکاربر دستور «شروع کن» را صادر کرد؛ همهٔ هشت بچ بدون توقفِ گزارش میانی اجرا می‌شوند.\nشاخه: `arena/01a07a2f-bazino-gamenet-portal`. نتایج این سند اجرای همین نشست‌اند.\n');
+for(const p of [log,'SESSION_SUMMARY.md','ISSUES_FOUND.md'])fs.appendFileSync(p,section);
+const p='HANDOFF_PROMPT.md';let t=fs.readFileSync(p,'utf8');
+t=t.replace(/^> \*\*کار جاری:.*$/m,`> **اجرا شروع شده: پلن نسخهٔ ۴، آخرین بچ ثبت‌شده ${number}.** کاربر «شروع کن» گفت. مرجع وضعیت و شواهد: \`docs/publishing/V4_EXECUTION_LOG.md\`. توسعهٔ مستقل تا انتهای هشت بچ ادامه دارد؛ انتشار واقعی با مجوز و اتصال معتبر جدا تأیید می‌شود.`);
+t+=section;fs.writeFileSync(p,t);
+const plan='docs/payments/INSTAGRAM_MEDIA_ONLY_PLAN.md';let s=fs.readFileSync(plan,'utf8');s=s.replace('وضعیت: **سند کامل دریافت و بررسی شد؛ طراحی نهایی برای تأیید کاربر آماده است. هنوز اجرای کد/استقرار شروع نشده است.**','وضعیت: **کاربر دستور شروع داد؛ اجرا در جریان است. نتایج واقعی در `../publishing/V4_EXECUTION_LOG.md` ثبت می‌شوند؛ بخش‌های تاریخی زیر توصیف زمان طراحی‌اند.**');fs.writeFileSync(plan,s);

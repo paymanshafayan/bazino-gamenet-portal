@@ -1,3 +1,4 @@
+import { PublishingStudio } from '../../shared/publishing/Studio';
 import { OpsProvider } from '../../shared/management/context';
 import { WalletConsole } from '../../shared/management/Wallet';
 /** پنل ادمین — طرح همکاری در فروش (/admin/affiliates) */
@@ -237,103 +238,8 @@ const IG_MSG_KEYS = [
   'ig_btn_follow_tr', 'ig_btn_follow_fa', 'ig_btn_follow_en', 'ig_btn_follow_ru',
 ] as const;
 
-function IgCampaignPanel({ ig, setIg, igSim, setIgSim, igOut, setIgOut, language, inp, th, td, addNotification, load, busy, setBusy }: any) {
-  const s = ig.settings || {};
-  const saveIg = async () => {
-    setBusy('ig');
-    try {
-      const d = await post('/api/admin/ig-campaign', s, 'PUT');
-      setIg((prev: any) => ({ ...prev, settings: d.settings || s }));
-      addNotification(L(language, { fa: 'متن‌ها و تنظیمات اینستاگرام ذخیره شد.', en: 'Instagram texts saved.', ru: 'Тексты Instagram сохранены.', tr: 'Instagram metinleri kaydedildi.' }), 'success');
-    } catch (e: any) { addNotification(e.message, 'error'); } finally { setBusy(''); }
-  };
-  const setS = (k: string, v: string) => setIg((prev: any) => ({ ...prev, settings: { ...prev.settings, [k]: v } }));
-  const registerMedia = async () => {
-    setBusy('ig-media');
-    try {
-      const d = await post('/api/admin/ig/register-media', { media_id: igSim.mediaId, media_type: igSim.mediaType, campaign_id: igSim.campaignId, published_at: new Date().toISOString(), caption_version: 'tr' });
-      setIgOut(d);
-      load();
-    } catch (e: any) { addNotification(e.message, 'error'); } finally { setBusy(''); }
-  };
-  const simComment = async () => {
-    setBusy('ig-cmt');
-    try {
-      const d = await post('/api/admin/ig/simulate-comment', { mediaId: igSim.mediaId, commentId: igSim.commentId || `c-${Date.now()}`, text: igSim.text, igUserId: igSim.igUserId, igUsername: igSim.igUsername });
-      setIgOut(d);
-      load();
-    } catch (e: any) { addNotification(e.message, 'error'); } finally { setBusy(''); }
-  };
-  const simButton = async (memberId: string) => {
-    try {
-      const d = await post('/api/admin/ig/simulate-button', { memberId, followVerified: false });
-      setIgOut(d);
-      load();
-    } catch (e: any) { addNotification(e.message, 'error'); }
-  };
-  return (
-    <section className="bg-black/30 border border-cyan-500/20 rounded-2xl p-4 space-y-4" data-ig-campaign>
-      <h3 className="text-sm font-black text-white">{L(language, { fa: 'کمپین اینستاگرام — Invite Your Squad', en: 'Instagram campaign — Invite Your Squad', ru: 'Кампания Instagram', tr: 'Instagram kampanyası — Invite Your Squad' })}</h3>
-      <p className="text-[11px] text-gray-400">{L(language, { fa: 'پورتال به Meta وصل نیست. ناشر فقط Media ID می‌فرستد. پیام ۱ = یک Private Reply با دکمه؛ پیام ۲ = دایرکت بعد از دکمه با {{code}}. تأیید Share = کامنت همان کد توسط دوست زیر همان پست. لیست فالوور جمع نمی‌شود. کمیسیون فقط از قیف رزرو/پرداخت موجود.', en: 'The portal is not connected to Meta. Publisher sends Media ID only. Message 1 = one private reply with button; message 2 = DM after the button with {{code}}. Share proof = friend comments that code under the same post. No follower list. Commission only via the existing reservation/payment funnel.', ru: 'Портал не подключён к Meta.', tr: 'Portal Meta’ya bağlı değil. Paylaşım kanıtı: arkadaşın aynı gönderiye kodu yorum yapması.' })}</p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {IG_META_FIELDS.map(f => (
-          <label key={f.key} className="text-[11px] text-gray-400 space-y-1">
-            <span>{L(language, f)}</span>
-            <input data-ig-setting={f.key} className={`${inp} w-full`} dir="ltr" value={s[f.key] ?? ''} onChange={e => setS(f.key, e.target.value)} />
-          </label>
-        ))}
-      </div>
-      <div className="text-[11px] text-gray-500" dir="ltr">ingest: POST /api/integrations/instagram/published-media · token: {s.ig_ingest_token ? `${String(s.ig_ingest_token).slice(0, 8)}…` : '—'} · zernio: {ig.zernioConfigured ? 'configured' : 'simulate-only'}</div>
-      <div className="grid md:grid-cols-2 gap-3">
-        {IG_MSG_KEYS.map(k => (
-          <label key={k} className="text-[11px] text-gray-400 space-y-1">
-            <span dir="ltr">{k} {k.includes('partner2') ? '(DM + {{code}})' : k.includes('partner1') ? '(PR + button)' : k.includes('friend') ? '(friend PR)' : k.includes('invite') ? '(link DM)' : '(button label)'}</span>
-            {k.startsWith('ig_btn_') ? (
-              <input data-ig-setting={k} className={`${inp} w-full`} value={s[k] ?? ''} onChange={e => setS(k, e.target.value)} />
-            ) : (
-              <textarea data-ig-setting={k} className={`${inp} w-full min-h-[88px]`} value={s[k] ?? ''} onChange={e => setS(k, e.target.value)} />
-            )}
-          </label>
-        ))}
-      </div>
-      <button disabled={busy === 'ig'} onClick={saveIg} data-save-ig-settings className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-200 text-xs font-bold disabled:opacity-50">{L(language, { fa: 'ذخیره متن‌های اینستاگرام', en: 'Save Instagram texts', ru: 'Сохранить тексты', tr: 'Instagram metinlerini kaydet' })}</button>
-
-      <div className="border-t border-white/10 pt-3 space-y-2">
-        <h4 className="text-xs font-black text-white">{L(language, { fa: 'شبیه‌ساز (بدون Zernio)', en: 'Simulator (no Zernio)', ru: 'Симулятор', tr: 'Simülatör (Zernio yok)' })}</h4>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          {(['mediaId', 'mediaType', 'campaignId', 'commentId', 'text', 'igUserId', 'igUsername'] as const).map(k => (
-            <input key={k} className={inp} placeholder={k} dir="ltr" value={(igSim as any)[k]} onChange={e => setIgSim({ ...igSim, [k]: e.target.value })} data-ig-sim={k} />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy === 'ig-media'} onClick={registerMedia} data-ig-register-media className="px-3 py-1.5 rounded-lg bg-white/10 text-xs text-white">{L(language, { fa: 'ثبت Media ID', en: 'Register Media ID', ru: 'Зарегистрировать Media ID', tr: 'Media ID kaydet' })}</button>
-          <button type="button" disabled={busy === 'ig-cmt'} onClick={simComment} data-ig-sim-comment className="px-3 py-1.5 rounded-lg bg-white/10 text-xs text-white">{L(language, { fa: 'شبیه‌سازی کامنت', en: 'Simulate comment', ru: 'Симуляция комментария', tr: 'Yorum simüle et' })}</button>
-        </div>
-        {igOut && <pre className="text-[10px] text-cyan-200/80 bg-black/40 rounded-lg p-2 overflow-auto max-h-40" dir="ltr" data-ig-outbound>{JSON.stringify(igOut, null, 2)}</pre>}
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead><tr><th className={th}>role</th><th className={th}>user</th><th className={th}>code</th><th className={th}>status</th><th className={th}>share</th><th className={th}></th></tr></thead>
-          <tbody>
-            {(ig.members || []).length === 0 && <tr><td className={`${td} text-gray-500`} colSpan={6}>{L(language, { fa: 'هنوز عضوی در کمپین اینستاگرام نیست.', en: 'No Instagram campaign members yet.', ru: 'Участников нет.', tr: 'Üye yok.' })}</td></tr>}
-            {(ig.members || []).map((m: any) => (
-              <tr key={m.id} className="text-gray-200" data-ig-member={m.id}>
-                <td className={td}>{m.role}</td>
-                <td className={td} dir="ltr">{m.igUsername || m.igUserId}</td>
-                <td className={td} dir="ltr">{m.partnerCode}</td>
-                <td className={td}>{m.status}</td>
-                <td className={td}>{m.shareStatus || '—'}</td>
-                <td className={td}><button type="button" className="text-[10px] text-cyan-300" onClick={() => simButton(m.id)}>{L(language, { fa: 'دکمه فالو', en: 'Follow button', ru: 'Кнопка', tr: 'Takip düğmesi' })}</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <IntegrationTokensPanel inp={inp} addNotification={addNotification} language={language} />
-    </section>
-  );
+function IgCampaignPanel({language,inp,addNotification}:any) {
+ return <OpsProvider language={language}><PublishingStudio initialTab="campaigns"/><IntegrationTokensPanel inp={inp} addNotification={addNotification} language={language}/></OpsProvider>;
 }
 
 /** Standard bearer-token manager for the Manus / Zernio integrations. */
@@ -379,29 +285,17 @@ function IntegrationTokensPanel({ inp, addNotification, language }: { inp: strin
     addNotification(L(language, { fa: 'توکن حذف شد', en: 'Token revoked', ru: 'Токен отозван', tr: 'Token silindi' }), 'info');
   };
 
-  const prompt = `You are integrated with the Bazino (bazino.pro) affiliate system.
-
-TASK: For a new Instagram partner, mint a unique code and a signed invite link.
-
-REQUEST:
-POST https://bazino.pro/api/integrations/instagram/partner-invite
-Authorization: Bearer <PASTE_A_TOKEN_YOU_CREATED_IN_THE_BAZINO_ADMIN_PANEL>
+  const prompt = `After publishing approved Bazino Instagram content, report ONLY the native Instagram post/reel media ID.
+POST https://bazino.pro/api/integrations/instagram/published-media
+Authorization: Bearer <BAZINO_MEDIA_INGEST_TOKEN>
 Content-Type: application/json
+Idempotency-Key: instagram:<MEDIA_ID>
 
-{
-  "ig_user_id": "<numeric Instagram ACCOUNT id of the partner — NOT a post/reel id>",
-  "ig_username": "<partner handle, optional>",
-  "campaign_id": "SQUAD26"
-}
+{"media_id":"<INSTAGRAM_MEDIA_ID>"}
 
-SUCCESS (200):
-{ "ok": true, "code": "482913", "invite_url": "https://bazino.pro/?ref=...&sig=...", "campaign": "SQUAD26", "is_new": true }
-
-RULES:
-- ig_user_id is the Instagram ACCOUNT id; it is NOT the post/reel media id.
-- Send the invite_url to the partner. A friend opening it goes through the gate and, after sign-up, receives a discount coupon.
-- Re-calling with the same ig_user_id + campaign returns the SAME code/link (is_new:false) — safe to retry; do not create duplicates.
-- 401 = token wrong/missing · 400 invalid_ig_user_id · 422 campaign_not_found.`;
+The backend owns campaign approval, partner codes, friend links, coupons and commissions.
+Never call partner-invite or send private invitation links to partners. No Instagram account ID, Zernio internal post ID, or URL may replace the native media_id.
+An accepted ID may require admin review; it does not by itself enable the campaign.`;
 
   return (
     <div className="space-y-3 border-t border-white/10 pt-4" data-api-tokens>
@@ -437,7 +331,7 @@ RULES:
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-gray-500 leading-relaxed">{L(language, { fa: 'همان توکن را برای Manus و Zernio استفاده کنید: Manus با Bearer صدا می‌زند و وب‌هوک زرنیو هم آن را می‌پذیرد. حذف توکن بلافاصله دسترسی را باطل می‌کند.', en: 'Use the same token for Manus and Zernio: Manus sends it as Bearer and the Zernio webhook accepts it too. Deleting a token revokes access immediately.', ru: 'Один токен для Manus и Zernio: Manus шлёт Bearer, вебхук Zernio тоже его принимает. Удаление сразу отзывает доступ.', tr: 'Aynı token hem Manus hem Zernio için: Manus Bearer gönderir, Zernio webhook da kabul eder. Silmek erişimi hemen iptal eder.' })}</p>
+      <p className="text-[10px] text-gray-500 leading-relaxed">{L(language, { fa: 'توکن ناشر فقط برای اعلام Media ID است. گیرندهٔ Zernio امضای مستقل دارد؛ عامل به لینک دوست یا عملیات مالی دسترسی ندارد.', en: 'Publisher tokens report media IDs only. Zernio uses a separate webhook signature; agents cannot mint private links or perform financial actions.', ru: 'Токен издателя только для Media ID. Zernio проверяется отдельной подписью; агент не управляет ссылками и финансами.', tr: 'Yayıncı tokeni yalnızca Media ID içindir. Zernio ayrı imza kullanır; aracı özel bağlantı ve finans işlemi yapamaz.' })}</p>
 
       <details className="bg-black/40 rounded-lg border border-white/10" data-api-prompt>
         <summary className="cursor-pointer text-[11px] font-bold text-cyan-200 p-2.5">{L(language, { fa: 'دستورالعمل API برای Manus (کپی)', en: 'Manus API prompt (copy)', ru: 'Промпт для Manus (копировать)', tr: 'Manus API talimatı (kopyala)' })}</summary>

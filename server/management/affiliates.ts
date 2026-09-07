@@ -33,7 +33,7 @@ export function registerAffiliates(app:express.Express,service:AffiliateService)
  app.post(`${base}/affiliate-settings`,core.guard('affiliates'),endpoint(async(req,res)=>res.json(await service.settings((req as any).staff.username,req.body||{}))));
  app.post(`${base}/affiliate-commissions/:id/:action`,core.guard('affiliates'),endpoint(async(req,res)=>res.json(await core.command((req as any).staff.username,req.body?.idempotencyKey,'commission-action',{id:req.params.id,action:req.params.action,...req.body},async()=>{
   const c=await core.store.getAffiliateCommissionById(String(req.params.id));if(!c)fail('NOT_FOUND',404);if(c.status!=='pending')fail('BAD_STATE',409);
-  if(req.params.action==='approve'){await core.store.updateAffiliateCommission(c.id,{holdUntil:nowISO(),flag:'',updatedAt:nowISO()});await approveDueCommissions(core.store);}
+  if(req.params.action==='approve'){const policy=await core.read('pub-commission-policy',c.id);if(policy&&Date.parse(policy.data.holdUntil)>Date.now())fail('REFUND_WINDOW_OPEN',409);await core.store.updateAffiliateCommission(c.id,{holdUntil:policy?.data.holdUntil||nowISO(),flag:'',updatedAt:nowISO()});await approveDueCommissions(core.store);}
   else if(req.params.action==='reject')await core.store.updateAffiliateCommission(c.id,{status:'rejected',note:stringValue(req.body?.note,500,true),updatedAt:nowISO()});else fail('INVALID_ACTION');
   return {success:true};
  }))));

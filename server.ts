@@ -570,6 +570,7 @@ async function startServer() {
     });
   });
 
+  app.use((req,res,next)=>{if(req.path.startsWith('/ig/invite/')){res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Cache-Control','no-store');}next();});
   // Parse ordinary JSON requests globally. Upload routes must keep the incoming stream
   // untouched so formidable/raw parsers can consume it directly.
   // Integration signatures bind the exact wire bytes, not re-serialized JSON.

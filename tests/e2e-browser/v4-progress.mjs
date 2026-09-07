@@ -7,7 +7,7 @@ const base=process.env.BASE||'http://127.0.0.1:3000',batch=process.env.BATCH||'1
 const auth=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:env.PREVIEW_PASSWORD})}).then(r=>r.json());
 if(!auth.token)throw Error('Review login failed');
 const {browser,page,errors}=await launch();
-await page.addInitScript(({token})=>{localStorage.setItem('bazino.authToken',token);localStorage.setItem('language','fa');}, {token:auth.token});
+await page.addInitScript(({token})=>{localStorage.setItem('bazino.authToken',token);localStorage.setItem('cyber_lang','fa');}, {token:auth.token});
 await page.goto(base+'/admin/affiliates',{waitUntil:'domcontentloaded',timeout:90000});
 await page.locator('[data-api-tokens]').waitFor({timeout:90000});
 const result=await page.evaluate(async(token)=>{

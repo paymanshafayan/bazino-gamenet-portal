@@ -134,5 +134,49 @@ test('all four campaign languages get the matching partner message',async()=>{
    const o=await core.read('pub-outbox',r.outboxId!);assert.equal(o!.data.text,CAMPAIGN_MESSAGES[l].partner1);
  }
 });
+
+suite('Friend web gate and per-customer coupons');
+const {FriendGateService}=await import('../server/affiliate/friendGate');
+const gate=new FriendGateService(core);
+let friendToken='',friend2Id='',friend2Token='';
+test('prepare distinct verified site customers and a coupon-enabled invitation fixture',async()=>{
+ for(const name of ['coupon_friend1','coupon_friend2']){await store.createUser({username:name,password:'local-test-only',email:'',phone:name==='coupon_friend1'?'+15555551001':'+15555551002'});await store.updateUserFields(name,{phoneVerifiedAt:new Date().toISOString()});}
+ const m=(await core.read('pub-member',friendId))!;await core.save('pub-member',friendId,{...m.data,policy:{...m.data.policy,couponEnabled:true,couponValue:15,couponMinOrder:100}},m.version);
+ friendToken=await campaign.linkToken(friendId,(await core.read('pub-member',friendId))!.data);
+});
+test('invalid or partner invitation signatures cannot reach the web gate',async()=>{
+ await assert.rejects(()=>gate.info(friendId,'a'.repeat(64)),{code:'INVITE_INVALID_OR_EXPIRED'});
+ await assert.rejects(()=>gate.info(partnerId,friendToken),{code:'INVITE_INVALID_OR_EXPIRED'});
+});
+test('invitation info is truthful and does not reveal partner identity or private keys',async()=>{
+ const info=await gate.info(friendId,friendToken);assert.equal(info.needsLogin,true);assert.equal(info.followMethod,'button_event_only');assert.equal(info.verificationMethod,'link_possession');
+ assert.ok(!JSON.stringify(info).includes('10001'));assert.ok(!JSON.stringify(info).includes(friendToken));
+});
+test('gate requires authentication, consent and explicit like self-attestation',async()=>{
+ await assert.rejects(()=>gate.claim(friendId,'',{token:friendToken,consent:true}),{code:'AUTH_REQUIRED'});
+ await assert.rejects(()=>gate.claim(friendId,'coupon_friend1',{token:friendToken,likeAttested:true}),{code:'CONSENT_REQUIRED'});
+ await assert.rejects(()=>gate.claim(friendId,'coupon_friend1',{token:friendToken,consent:true}),{code:'LIKE_ATTESTATION_REQUIRED'});
+});
+test('five concurrent claims produce exactly one owner-bound coupon',async()=>{
+ const rs=await Promise.all(Array.from({length:5},()=>gate.claim(friendId,'coupon_friend1',{token:friendToken,consent:true,likeAttested:true,handle:'@test_friend'})));
+ assert.equal(rs.filter(r=>!r.duplicate).length,1);assert.equal(new Set(rs.map(r=>r.coupon.code)).size,1);
+ const coupon=await store.getCouponByCode(rs[0].coupon.code);assert.equal(coupon?.ownerUsername,'coupon_friend1');assert.equal(coupon?.maxUsageCount,1);assert.equal(coupon?.type,'Percent');assert.equal(coupon?.minOrder,100);
+ assert.equal((await store.getAttributionForUser('coupon_friend1'))?.code,partnerCode);
+});
+test('a claimed invitation cannot be moved to another account',async()=>{
+ await assert.rejects(()=>gate.claim(friendId,'coupon_friend2',{token:friendToken,consent:true,likeAttested:true}),{code:'INVITE_ALREADY_CLAIMED'});
+});
+test('another friend of the same partner gets an independent coupon',async()=>{
+ const r=await campaign.onComment(comment('friend-2','10003',partnerCode));friend2Id=r.memberId!;
+ let m=(await core.read('pub-member',friend2Id))!;await core.save('pub-member',friend2Id,{...m.data,policy:{...m.data.policy,couponEnabled:true,couponValue:15}},m.version);
+ m=(await core.read('pub-member',friend2Id))!;await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'10003',participantId:'10003',conversationId:'friend2-conv',button:await campaign.button(friend2Id,m.data),direction:'incoming',timestamp:new Date().toISOString()});
+ await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
+ friend2Token=await campaign.linkToken(friend2Id,(await core.read('pub-member',friend2Id))!.data);
+ const result=await gate.claim(friend2Id,'coupon_friend2',{token:friend2Token,consent:true,likeAttested:true});
+ const claims=await core.list('pub-claim');assert.equal(claims.length,2);assert.notEqual(claims[0].data.coupon.code,claims[1].data.coupon.code);assert.equal((await store.getCouponByCode(result.coupon.code))!.ownerUsername,'coupon_friend2');
+});
+test('gate route is a real standalone route, not just a gate=1 query flag',async()=>{
+ const {standalonePageFromPath}=await import('../src/utils/routes');assert.deepEqual(standalonePageFromPath('/ig/invite/ID','?token=abc'),{type:'invite',id:'ID',token:'abc'});
+});
 await run({title:'Publishing / Instagram v4',jsonOut:'tests/reports/publishing.json'});
 process.env=env;

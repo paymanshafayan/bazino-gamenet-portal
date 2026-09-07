@@ -4,6 +4,7 @@ import { PublishingSettings, SECRET_NAMES } from './settings';
 import { MediaRegistry } from './registry';
 import { WebhookService, registerZernioReceiver } from './webhooks';
 import { InstagramCampaignService } from '../affiliate/campaignV4';
+import { FriendGateService,registerFriendGate } from '../affiliate/friendGate';
 export function publishingAdmin(core:OpsCore):express.RequestHandler {
   return async(req,res,next)=>{try{const staff=await core.authorize(req);if(!staff.admin)fail('ADMIN_ONLY',403);(req as any).staff=staff;next();}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}};
 }
@@ -11,6 +12,7 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   const settings=new PublishingSettings(core),registry=new MediaRegistry(core),admin=publishingAdmin(core),base='/api/management/publishing';
   const webhooks=new WebhookService(core),campaigns=new InstagramCampaignService(core);
   registerZernioReceiver(app,webhooks);
+  registerFriendGate(app,new FriendGateService(core));
   app.get(`${base}/members`,admin,endpoint(async(_req,res)=>res.json(await campaigns.list())));
   app.get(`${base}/events`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await webhooks.queue.report())));
   let inboxBusy=false,analyticsBusy=false;

@@ -6,6 +6,8 @@ export function verifyManusRsa(raw:Buffer,url:string,timestamp:string,signature:
   if(!/^\d{10}$/.test(timestamp)||Math.abs(Date.now()/1000-Number(timestamp))>300||!signature||signature.length>4096)return false;
   try{const verifier=createVerify('RSA-SHA256');verifier.update(`${timestamp}.${url}.${createHash('sha256').update(raw).digest('hex')}`);return verifier.verify(publicKey,signature,'base64');}catch{return false;}
 }
+export function agentConfigurationHash(data:any){return createHash('sha256').update(JSON.stringify({adapterId:data.adapterId,profile:data.profile||'standard',projectId:data.projectId||'',credentialRef:data.credentialRef})).digest('hex');}
+export type ExpectedAgent = {configurationHash:string;credentialHash:string};
 export class ManusClient {
   agents:AgentRegistry;
   constructor(public core:OpsCore,public fetcher:typeof fetch=fetch){this.agents=new AgentRegistry(core,fetcher);}
@@ -14,8 +16,9 @@ export class ManusClient {
     const key=await this.agents.settings.vault.agentKey(a.data);if(!key||key==='simulator')fail('AGENT_KEY_REQUIRED',409);
     return {agent:a,key,fingerprint:createHash('sha256').update(key).digest('hex')};
   }
-  async rpc(agentId:string,path:string,method='GET',body?:any){
-    const {key}=await this.credential(agentId);
+  async rpc(agentId:string,path:string,method='GET',body?:any,expected?:ExpectedAgent){
+    const {key,agent,fingerprint}=await this.credential(agentId);
+    if(expected&&(expected.configurationHash!==agentConfigurationHash(agent.data)||expected.credentialHash!==fingerprint))fail('AGENT_CONFIGURATION_CHANGED',409);
     try{const r=await this.fetcher(`https://api.manus.ai/v2/${path}`,{method,headers:{'x-manus-api-key':key,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000),redirect:'error'});
       if(!r.ok)throw new ProviderFailure(`MANUS_HTTP_${r.status}`,method!=='GET'&&r.status>=500);
       const d=await r.json();if(d.ok!==true)throw new ProviderFailure('MANUS_REQUEST_REJECTED',false);return d;
@@ -26,10 +29,11 @@ export class ManusClient {
       await this.core.store.runInTransaction(async()=>{const old=await this.core.read('pub-manus-key',agentId);await this.core.save('pub-manus-key',agentId,{publicKey:d.public_key,at:nowISO()},old?.version||0);});
     }catch{/* Polling remains available. Never bypass signature checks if key retrieval fails. */}
   }
-  async create(agentId:string,title:string,language:string,prompt:string,purpose:'generate'|'publish'){
-    const {agent}=await this.credential(agentId);
+  async create(agentId:string,title:string,language:string,prompt:string,purpose:'generate'|'publish',expected?:ExpectedAgent){
+    const {agent,fingerprint}=await this.credential(agentId);
+    if(expected&&(expected.configurationHash!==agentConfigurationHash(agent.data)||expected.credentialHash!==fingerprint))fail('AGENT_CONFIGURATION_CHANGED',409);
     const schema=purpose==='publish'?{type:'object',properties:{media_id:{type:'string'},error:{type:'string'}},required:['media_id'],additionalProperties:false}:{type:'object',properties:{title:{type:'string'},body:{type:'string'}},required:['title','body'],additionalProperties:false};
-    const d=await this.rpc(agentId,'task.create','POST',{title,locale:language,agent_profile:agent.data.profile||'standard',...(agent.data.projectId?{project_id:agent.data.projectId}:{}),share_visibility:'private',interactive_mode:false,message:{content:[{type:'text',text:prompt}]},structured_output_schema:schema});
+    const d=await this.rpc(agentId,'task.create','POST',{title,locale:language,agent_profile:agent.data.profile||'standard',...(agent.data.projectId?{project_id:agent.data.projectId}:{}),share_visibility:'private',interactive_mode:false,message:{content:[{type:'text',text:prompt}]},structured_output_schema:schema},expected);
     if(!d.task_id)throw new ProviderFailure('MANUS_TASK_UNCONFIRMED',true);return String(d.task_id);
   }
   async result(agentId:string,taskId:string){

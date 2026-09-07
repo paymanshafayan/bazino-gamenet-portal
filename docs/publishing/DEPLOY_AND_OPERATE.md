@@ -113,3 +113,7 @@ node scripts/run-publishing-browser.mjs
 runner مرورگر، production server و کاربران/کلیدهای **کاملاً آزمایشی** در پوشهٔ موقت می‌سازد؛ ارسال واقعی خاموش است، سپس فرایند سرور را restart و حفظ رسانه/تنظیمات را بررسی می‌کند. فایل‌های test credential در artifact خروجی نیستند. اجرای مستقیم سرور production قبل از runner به JWT/تنظیمات واقعی نیاز دارد؛ این دستور برای آزمون خودبسنده است.
 
 قالب `docs/publishing/publishing-v4.workflow.yml` همین build/tests/Chromium را اجرا و شواهد را artifact می‌کند. اتصال GitHub فعلی اجازهٔ افزودن فایل فعال در `.github/workflows/` نداد؛ مدیر دارای دسترسی باید این فایل کامل را به `.github/workflows/publishing-v4.yml` منتقل کند یا مجوز workflows اتصال Arena را اصلاح کند. قالب خودکار فعال نشده است. سه پروایدر contract coverage دارند؛ این معادل اجرای واقعی روی SQL Server/Mongo میزبان نیست.
+
+## وضعیت انتشار این تحویل
+
+PR #20 کد را در شاخهٔ جلسه دارد. اتصال فعلی GitHub، dispatch workflow استقرار را با 403 رد کرده و برای فایل workflow جدید نیز permission ندارد. مدیر باید PR را merge/استقرار main را اجرا یا مجوز Actions/Workflows اتصال Arena را اصلاح کند. تا health JSON گیرنده و Test امضاشده تأیید نشده، URL در Zernio «تست‌شده» نیست؛ این راهنما ادعای استقرار انجام‌شده ندارد.

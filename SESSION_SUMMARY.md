@@ -1122,7 +1122,14 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 
 - TypeScript هر دو پروژه و build کامل production موفق؛ **503/503** تست با صفر failure/skip: 21 media، 54 V4، 41 management، 99 unit، 38 SQLite، 27 provider contract، 42 UI و 181 API.
 - API fixtureها با JWT واقعی، تاریخ معتبر و قرارداد مالی جاری اصلاح شدند؛ تست امنیت receiver/سکرت/آپلود اضافه شد. guardهای ورودی، unique claim پس از update، outbox operator-confirmed، مدیریت خطای نامشخص و بازیابی کوپن پس از reload تقویت شدند.
-- runner Chromium production با دیتابیس/کلیدهای موقت، چهار زبان/موبایل/دسکتاپ و restart واقعی اضافه شد؛ ۱۹ تصویر کامل، بدون خطای JS/overflow. خواندن تصاویر، نبود فونت سیریلیک را آشکار کرد؛ DejaVu Sans افزوده، سوئیت دوباره اجرا و روسی بازبینی شد.
+- runner Chromium production با دیتابیس/کلیدهای موقت، چهار زبان/موبایل/دسکتاپ و restart واقعی اضافه شد؛ ۲۰ تصویر کامل، بدون خطای JS/overflow. خواندن تصاویر، نبود فونت سیریلیک را آشکار کرد؛ DejaVu Sans افزوده، سوئیت دوباره اجرا و روسی بازبینی شد.
 - قالب کامل Workflow جدید در `docs/publishing/publishing-v4.workflow.yml` و راهنمای `DEPLOY_AND_OPERATE.md` تحویل شد. GitHub App مجوز workflows ندارد و فعال‌سازی در `.github/workflows/` را رد کرد؛ Workflow استقرار موجود جایگزین نشد.
 - push عقب‌ماندهٔ بچ‌های ۵–۷ اکنون موفق است. نتیجهٔ نهایی GitHub/استقرار و مرز تماس زنده در `docs/publishing/V4_DELIVERY.md` ثبت می‌شود؛ TLS دامنه و 403 metadata سکرت‌ها موفقیت هاست را اثبات نکرده‌اند.
 - هیچ پیام/پست/پول واقعی یا اعتبار سرویس مصرف نشده؛ SQL/Mongo زنده و انتشار واقعی جدا تست‌نشده‌اند. بررسی پرداخت آنلاین فقط mock ایزوله بوده است.
+
+
+### V4 — تکمیل نهایی pin عامل و نتیجهٔ انتشار
+
+- سه تست افزوده برای superseded generation پیش از تماس هزینه‌دار، تغییر project/profile عامل با کلید یکسان و fingerprint مستقل از نام/زمان health؛ بازاجرای کامل **506/506** با صفر fail/skip موفق شد؛ TypeScript/build و production Chromium نیز مجدداً گذشتند.
+- push هشت بچ موفق و PR #20 باز شد؛ سه check موجود GitHub روی bfaff2b سبز است. permission ساخت workflow و dispatch استقرار با 403/رد push محدود شد؛ قالب CI تحویل و استقرار production هنوز تأیید نشده است.
+- روش جایگزین fetch برای URL سلامت، HTML سایت برگرداند نه JSON receiver. انجام ارسال live یا رفع مشکل هاست بدون شاهد ادعا نشد؛ مدیر به merge/استقرار یا اصلاح permission اتصال Arena نیاز دارد.

@@ -43,7 +43,7 @@ export interface PostDraft {
 }
 export interface Publication {
   draftId: string; draftRevision: number; snapshot: PostDraft; approvalHash: string;
-  assetHashes: Record<string, string>; agentVersion?: number; credentialVersion?: number; agentCredentialHash?: string;
+  assetHashes: Record<string, string>; agentVersion?: number; agentConfigHash?: string; credentialVersion?: number; agentCredentialHash?: string;
   state: 'queued' | 'preparing' | 'submitting' | 'submitted' | 'published' | 'failed' | 'cancelled' | 'delivery_unknown';
   provider: 'zernio' | 'manus'; providerPostId?: string; taskId?: string;
   nativeMediaId?: string; scheduledAt: string; createdAt: string; updatedAt: string;

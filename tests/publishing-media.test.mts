@@ -3,7 +3,7 @@ import fs from 'node:fs';import os from 'node:os';import path from 'node:path';i
 import sharp from 'sharp';import ffmpeg from '@ffmpeg-installer/ffmpeg';
 import {suite,test,run} from './harness.mts';
 import {SqliteStore} from '../server/dataProviders';import {OpsCore} from '../server/management/core';
-import {PublishingService} from '../server/publishing/publish';import {verifyManusRsa} from '../server/publishing/manus';import {defaultCampaign} from '../server/publishing/settings';
+import {PublishingService} from '../server/publishing/publish';import {agentConfigurationHash,verifyManusRsa} from '../server/publishing/manus';import {defaultCampaign} from '../server/publishing/settings';
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'bazino-media-test-'));
 const store=new SqliteStore();store.config={filePath:':memory:'};await store.connect();await store.createDatabaseIfNotExist();await store.seedMinimal({username:'admin',password:'test',email:'',phone:''});const core=new OpsCore(()=>store);
 process.env.BAZINO_SECRETS_KEY='cd'.repeat(32);process.env.ZERNIO_IG_ACCOUNT_ID='acc';process.env.ZERNIO_API_KEY='fake-zernio-for-contract-tests';process.env.ZERNIO_WEBHOOK_SECRET='fake-hook';
@@ -91,6 +91,22 @@ test('Manus RSA verifies timestamp, canonical URL and exact bytes',()=>{
 test('late agent generation cannot overwrite a manually revised draft',async()=>{
  let d=await service.save('admin',undefined,{...draftInput(),executionMode:'agent',agentId});const task=await service.generate('admin',d.id,{agentId,brief:'Draft a caption',confirmedCost:true});await service.workGenerations();d=await service.save('admin',d.id,{...d.data,caption:'Human revision wins',version:d.version});
  const r=(await core.read('pub-agent-task',task.id))!;await core.save('pub-agent-task',r.id,{...r.data,nextPollAt:0},r.version);await service.workGenerations();assert.equal((await service.owned(d.id,'admin')).data.caption,'Human revision wins');assert.equal((await core.read('pub-agent-task',r.id))!.data.status,'superseded');
+});
+
+test('superseded queued generation never spends credits when delivery is resumed',async()=>{
+ let d=await service.save('admin',undefined,{...draftInput(),executionMode:'agent',agentId});const task=await service.generate('admin',d.id,{agentId,brief:'Queued work that must not run',confirmedCost:true});
+ await service.save('admin',d.id,{...d.data,executionMode:'manual',caption:'Manual draft now',version:d.version});
+ const before=manusCalls;await service.workGenerations();assert.equal(manusCalls,before);assert.equal((await core.read('pub-agent-task',task.id))!.data.status,'superseded');
+});
+test('queued publication cannot use a changed agent project with the same API key',async()=>{
+ let d=await service.save('admin',undefined,{...draftInput(),executionMode:'agent',agentId});d=await service.approve('admin',d.id,{version:d.version,confirmed:true});const job=await service.schedule('admin',d.id,{version:d.version,confirmed:true,confirmedAgentCost:true,publishNow:true});
+ const old=(await service.agents.get(agentId))!;await service.agents.save('admin',agentId,{...old.data,projectId:'different-project',version:old.version});
+ const before=manusCalls;await service.work();assert.equal(manusCalls,before);const result=(await core.read('pub-publication',job.id))!;assert.equal(result.data.state,'failed');assert.equal(result.data.error,'AGENT_CONFIGURATION_CHANGED');
+ const changed=(await service.agents.get(agentId))!;await service.agents.save('admin',agentId,{...old.data,version:changed.version});await service.agents.testConnection('admin',agentId,{confirmed:true});
+});
+test('agent configuration fingerprint pins execution fields but not display or health metadata',()=>{
+ const a={adapterId:'manus',credentialRef:'agent:test',profile:'standard',projectId:'one',name:'Name',checkedAt:'before'};
+ assert.equal(agentConfigurationHash(a),agentConfigurationHash({...a,name:'Renamed',checkedAt:'after'}));assert.notEqual(agentConfigurationHash(a),agentConfigurationHash({...a,projectId:'two'}));
 });
 
 suite('Batch approval, timing and provider registry');

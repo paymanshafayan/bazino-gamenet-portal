@@ -7,7 +7,7 @@ import {AssetLibrary} from './assets';
 import {PublishingSettings} from './settings';
 import {AgentRegistry} from './agents';
 import {ZernioClient,ProviderFailure} from './provider';
-import {ManusClient} from './manus';
+import {ManusClient,agentConfigurationHash} from './manus';
 import {MediaRegistry} from './registry';
 import type {PostDraft,Publication,MediaAsset,CampaignPolicy} from '../../shared/publishing/types';
 export const PUBLISH_CAPABILITIES={formats:['image','carousel','reel','story'],captionLimit:2200,maxCarousel:10,videoSeconds:{min:3,max:90},accountPermissionVerified:false};
@@ -74,12 +74,12 @@ export class PublishingService {
     if(b.confirmed!==true)fail('PUBLICATION_CONFIRMATION_REQUIRED');if(r.data.status!=='approved'||r.version!==Number(b.version))fail('APPROVAL_REQUIRED',409);
     const validation=await this.validate(r.data);if(r.data.approvalHash!==fingerprint({spec:approvalSpec(r.data),assetHashes:validation.assetHashes}))fail('APPROVAL_STALE',409);
     if(!await this.settings.vault.zernio('zernio_api_key'))fail('ZERNIO_NOT_CONFIGURED',409);
-    let agentVersion:number|undefined,credentialHash='';
+    let agentVersion:number|undefined,agentConfigHash='',credentialHash='';
     if(r.data.executionMode==='agent'){
       if(b.confirmedAgentCost!==true)fail('AGENT_COST_CONFIRMATION_REQUIRED');
       const agent=await this.agents.get(r.data.agentId);if(!agent)fail('AGENT_NOT_AVAILABLE');
       if((await this.agents.view(agent)).status!=='ready')fail('AGENT_NOT_READY',409);
-      agentVersion=agent.version;credentialHash=(await this.manus.credential(agent.id)).fingerprint;
+      agentVersion=agent.version;agentConfigHash=agentConfigurationHash(agent.data);credentialHash=(await this.manus.credential(agent.id)).fingerprint;
     }
     let at=Date.now();if(!b.publishNow){try{at=localInstant(String(b.date),String(b.time),r.data.timezone);}catch{fail('INVALID_SCHEDULE');}}
     if(at<Date.now()-60000||at>Date.now()+366*86400000)fail('INVALID_SCHEDULE');
@@ -87,7 +87,7 @@ export class PublishingService {
     return this.core.store.runInTransaction(async()=>{
       const existing=await this.core.read<Publication>('pub-publication',idempotent);if(existing)return existing;
       const fresh=await this.owned(id,actor,admin);if(fresh.version!==r.version)fail('VERSION_CONFLICT',409);
-      const data:Publication={draftId:id,draftRevision:r.data.revision,snapshot:r.data,approvalHash:r.data.approvalHash!,assetHashes:validation.assetHashes,agentVersion,agentCredentialHash:credentialHash,state:'queued',provider:r.data.executionMode==='agent'?'manus':'zernio',scheduledAt:new Date(at).toISOString(),createdAt:nowISO(),updatedAt:nowISO()};
+      const data:Publication={draftId:id,draftRevision:r.data.revision,snapshot:r.data,approvalHash:r.data.approvalHash!,assetHashes:validation.assetHashes,agentVersion,agentConfigHash,agentCredentialHash:credentialHash,state:'queued',provider:r.data.executionMode==='agent'?'manus':'zernio',scheduledAt:new Date(at).toISOString(),createdAt:nowISO(),updatedAt:nowISO()};
       const job=await this.core.save('pub-publication',idempotent,data,0,`publication:${idempotent}`);
       await this.core.save('pub-draft',id,{...r.data,status:'scheduled',publicationId:job.id,scheduledAt:data.scheduledAt},r.version);
       await this.core.audit(actor,'post.schedule',job.id,{mode:r.data.executionMode,scheduledAt:data.scheduledAt});return job;
@@ -159,7 +159,7 @@ export class PublishingService {
         if(cfg.zernioAccountId!==d.accountId)fail('ACCOUNT_CONFIGURATION_CHANGED');
         if((await this.core.read('pub-account',d.accountId))?.data.connected===false)fail('ACCOUNT_DISCONNECTED');
         const v=await this.validate(d);if(fingerprint({spec:approvalSpec(d),assetHashes:v.assetHashes})!==job.data.approvalHash)fail('APPROVAL_STALE');
-        if(job.data.provider==='manus'){const key=await this.manus.credential(d.agentId);if(key.fingerprint!==job.data.agentCredentialHash)fail('AGENT_CREDENTIAL_CHANGED');await this.manus.cachePublicKey(d.agentId);}
+        if(job.data.provider==='manus'){const key=await this.manus.credential(d.agentId);if(key.fingerprint!==job.data.agentCredentialHash)fail('AGENT_CREDENTIAL_CHANGED');if(job.data.agentConfigHash?job.data.agentConfigHash!==agentConfigurationHash(key.agent.data):job.data.agentVersion!==key.agent.version)fail('AGENT_CONFIGURATION_CHANGED');await this.manus.cachePublicKey(d.agentId);}
         const mediaItems=[];for(const id of d.assetIds){const a=await this.assets.ready(id);mediaItems.push({type:a.data.mime.startsWith('video/')?'video':'image',url:await this.stage(id,job.id)});}
         const specifics:any={};if(d.format==='story')specifics.contentType='story';if(d.format==='reel')specifics.shareToFeed=true;if(d.coverId)specifics.instagramThumbnail=await this.stage(d.coverId,job.id);
         const proceed=await this.core.store.runInTransaction(async()=>{
@@ -175,7 +175,7 @@ export class PublishingService {
           if(target?.status==='published'&&target.platformPostId)await this.confirmPublished((await this.core.read('pub-publication',job.id))!,String(target.platformPostId),'provider_response',target.publishedUrl||target.platformPostUrl||target.url);
         }else{
           const prompt=`Publish EXACTLY ONE already approved Instagram ${d.format} for @bazinopro using your authorized publishing connector. Do NOT alter the caption or media order. Do NOT generate affiliate codes, coupons, private invitation links or send DMs. If you cannot access the authorized account, stop and request access; never invent a media ID. Return only the real native Instagram media_id after successful publication. Approved payload: ${JSON.stringify({caption:d.caption,mediaItems,accountId:d.accountId,format:d.format,specifics})}`;
-          const taskId=await this.manus.create(d.agentId,d.title,d.language,prompt,'publish');await this.finish(job.id,'submitted',{taskId});
+          const taskId=await this.manus.create(d.agentId,d.title,d.language,prompt,'publish',{configurationHash:job.data.agentConfigHash||agentConfigurationHash((await this.manus.credential(d.agentId)).agent.data),credentialHash:job.data.agentCredentialHash!});await this.finish(job.id,'submitted',{taskId});
         }
       }catch(e:any){await this.finish(row.id,committedSubmission&&(e.uncertain||!e.code)?'delivery_unknown':'failed',{error:safeError(e)});}
     }
@@ -216,7 +216,7 @@ export class PublishingService {
     const key=fingerprint({id,revision:row.data.revision,agentId,brief});
     return this.core.store.runInTransaction(async()=>{
       const prior=await this.core.read('pub-agent-task',key);if(prior)return {id:key,status:prior.data.status};
-      await this.core.save('pub-agent-task',key,{draftId:id,revision:row.data.revision,owner:row.data.owner,agentId,agentVersion:a.version,credentialHash:credential.fingerprint,brief,language:row.data.language,title:row.data.title,status:'queued',createdAt:nowISO()},0);return {id:key,status:'queued'};
+      await this.core.save('pub-agent-task',key,{draftId:id,revision:row.data.revision,owner:row.data.owner,agentId,agentVersion:a.version,agentConfigHash:agentConfigurationHash(a.data),credentialHash:credential.fingerprint,brief,language:row.data.language,title:row.data.title,status:'queued',createdAt:nowISO()},0);return {id:key,status:'queued'};
     });
   }
   async cancelGeneration(actor:string,id:string,b:any,admin=false){
@@ -236,9 +236,9 @@ export class PublishingService {
     for(const row of rows){const d=row.data;
       if(d.status==='submitting'){if(Date.parse(d.leaseUntil)<Date.now())await this.core.save('pub-agent-task',row.id,{...d,status:'delivery_unknown'},row.version);continue;}
       if(d.status==='queued'){
-        const lease=randomUUID();const claimed=await this.core.store.runInTransaction(async()=>{const r=await this.core.read('pub-agent-task',row.id);if(!r||r.data.status!=='queued')return false;await this.core.save('pub-agent-task',r.id,{...r.data,status:'submitting',lease,leaseUntil:new Date(Date.now()+60000).toISOString()},r.version);return true;});if(!claimed)continue;
+        const lease=randomUUID();const claimed=await this.core.store.runInTransaction(async()=>{const r=await this.core.read('pub-agent-task',row.id);if(!r||r.data.status!=='queued')return false;const draft=await this.core.read(r.data.legacyContentId?'content':'pub-draft',r.data.legacyContentId||r.data.draftId);const current=r.data.legacyContentId?draft?.version===r.data.legacyVersion&&draft.data.status==='generating':draft?.data.revision===r.data.revision&&draft?.data.status==='draft';if(!current){await this.core.save('pub-agent-task',r.id,{...r.data,status:'superseded'},r.version);return false;}await this.core.save('pub-agent-task',r.id,{...r.data,status:'submitting',lease,leaseUntil:new Date(Date.now()+60000).toISOString()},r.version);return true;});if(!claimed)continue;
         let taskId='',error='',uncertain=false;
-        try{if((await this.manus.credential(d.agentId)).fingerprint!==d.credentialHash)fail('AGENT_CREDENTIAL_CHANGED');await this.manus.cachePublicKey(d.agentId);taskId=await this.manus.create(d.agentId,d.title,d.language,`Create only a draft title and Instagram caption in ${d.language}. Do not publish, send messages, or create referral links. Brief: ${d.brief}`,'generate');}catch(e:any){error=safeError(e);uncertain=e.uncertain;}
+        try{const credential=await this.manus.credential(d.agentId);if(credential.fingerprint!==d.credentialHash)fail('AGENT_CREDENTIAL_CHANGED');if(d.agentConfigHash?d.agentConfigHash!==agentConfigurationHash(credential.agent.data):d.agentVersion!==credential.agent.version)fail('AGENT_CONFIGURATION_CHANGED');await this.manus.cachePublicKey(d.agentId);taskId=await this.manus.create(d.agentId,d.title,d.language,`Create only a draft title and Instagram caption in ${d.language}. Do not publish, send messages, or create referral links. Brief: ${d.brief}`,'generate',{configurationHash:d.agentConfigHash||agentConfigurationHash(credential.agent.data),credentialHash:d.credentialHash});}catch(e:any){error=safeError(e);uncertain=e.uncertain;}
         await this.core.store.runInTransaction(async()=>{const r=await this.core.read('pub-agent-task',row.id);if(r?.data.lease===lease)await this.core.save('pub-agent-task',r.id,{...r.data,status:error?uncertain?'delivery_unknown':'failed':'submitted',taskId,error,nextPollAt:Date.now()+10000},r.version);});
       }else if(d.taskId&&(d.nextPollAt||0)<Date.now()){
         await this.core.store.runInTransaction(async()=>{const current=await this.core.read('pub-agent-task',row.id);if(current?.data.status==='submitted')await this.core.save('pub-agent-task',row.id,{...current.data,nextPollAt:Date.now()+60000},current.version);});

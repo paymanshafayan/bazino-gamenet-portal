@@ -69,6 +69,8 @@ import { registerManagementCore } from './server/management/routes';
 import { registerWalletRoutes } from "./server/wallet/routes";
 import { registerAffiliateRoutes } from "./server/affiliate/routes";
 import { seedAffiliateSettings } from "./server/affiliate/settings";
+import { registerPublishing } from './server/publishing/routes';
+import { protectedIntegrationSetting } from './server/publishing/settings';
 import { registerIgRoutes } from "./server/affiliate/igRoutes";
 import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
 import { onReservationAttended } from "./server/affiliate/engine";
@@ -833,6 +835,7 @@ async function startServer() {
     shop: async () => resolveMergedList(await getActiveDataProvider().listAccessories(), SAMPLE_ACCESSORIES),
     tournaments: async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS),
   });
+  registerPublishing(app,management);
   const finance = new FinanceService(management,{fulfil:paymentFulfil,unfulfil:paymentUnfulfil});
   registerFinance(app,finance);
   const promotions = new PromotionService(management);
@@ -3997,7 +4000,7 @@ namespace GameNet.Infrastructure.Migrations
         // Secrets (AI provider keys, the desktop-sync API key) are managed through
         // their own admin-only endpoints; never leak them through the public
         // /api/settings response, which any visitor can read.
-        if (SECRET_SETTING_KEYS.has(curr.key)) return acc;
+        if (SECRET_SETTING_KEYS.has(curr.key) || protectedIntegrationSetting(curr.key)) return acc;
         acc[curr.key] = curr.value;
         return acc;
       }, {} as Record<string, string>);
@@ -4026,6 +4029,7 @@ namespace GameNet.Infrastructure.Migrations
       if (key === JARVIS_AI_PROVIDERS_SETTING) {
         return res.status(403).json({ error: "Jarvis AI providers must be managed through /api/admin/jarvis-ai-providers" });
       }
+      if (protectedIntegrationSetting(String(key))) return res.status(403).json({error:"USE_PRIVATE_INTEGRATION_SETTINGS"});
       await getActiveDataProvider().setSetting(key, value);
       res.json({ success: true });
     } catch (err) {

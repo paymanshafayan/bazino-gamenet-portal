@@ -2,6 +2,8 @@
  * Media-ID ingest + Friend Gate (ادمین + وب‌هوک Zernio). پورتال به Meta وصل نیست.
  */
 import type express from 'express';
+import { OpsCore } from '../management/core';
+import { MediaRegistry } from '../publishing/registry';
 import type { IDataStore } from '../dataProviders';
 import { IG_INGEST_TOKEN_KEY, IG_SETTING_KEYS, readIgSettings, seedIgSettings,
   listApiTokens, createApiToken, renameApiToken, deleteApiToken, isValidApiToken } from './igSettings';
@@ -49,38 +51,19 @@ export function registerIgRoutes(d: IgRouteDeps) {
         return res.status(401).json({ accepted: false, error: 'unauthorized', code: 'unauthorized' });
       }
       const key = String(req.headers['idempotency-key'] || `instagram:${req.body?.media_id || ''}`);
-      const out = await registerPublishedMedia(store(), req.body, key);
-      return res.status(out.status).json(out.json);
+      const registry = new MediaRegistry(new OpsCore(store));
+      const cfg = (await registry.settings.config()).data;
+      if (req.body?.campaign_id && req.body.campaign_id !== cfg.defaultCampaignId) return res.status(422).json({error:'CAMPAIGN_NOT_ALLOWED'});
+      const out = await registry.register('media-ingest', {media_id:req.body?.media_id,media_type:req.body?.media_type,published_at:req.body?.published_at,campaign_id:cfg.defaultCampaignId,accountId:cfg.zernioAccountId});
+      return res.json(out);
     } catch (e) { httpError(res, e); }
   });
 
   // Manus → mint a signed partner invite for an Instagram ACCOUNT id (not a post/reel
   // media id). Returns the unique partner code and the signed invite link; a friend
   // opening the link enters the existing friend gate / coupon flow.
-  app.post('/api/integrations/instagram/partner-invite', async (req, res) => {
-    try {
-      await seedIgSettings(store());
-      if (!(await validIntegrationBearer(store(), req))) {
-        return res.status(401).json({ ok: false, error: 'unauthorized', code: 'unauthorized' });
-      }
-      const b = req.body || {};
-      const out = await createPartnerInvite(store(), {
-        igUserId: String(b.ig_user_id ?? b.igUserId ?? b.instagram_id ?? b.account_id ?? ''),
-        igUsername: b.ig_username ?? b.igUsername ?? b.username ?? '',
-        campaignId: b.campaign_id ?? b.campaignId ?? '',
-      });
-      if (!out.ok) {
-        const status = out.error === 'campaign_not_found' ? 422 : 400;
-        return res.status(status).json({ ok: false, error: out.error, code: out.error });
-      }
-      res.json({
-        ok: true,
-        code: out.code,
-        invite_url: out.invite_url,
-        campaign: out.campaign,
-        is_new: out.isNew,
-      });
-    } catch (e) { httpError(res, e); }
+  app.post('/api/integrations/instagram/partner-invite', (_req, res) => {
+    res.status(410).json({error:'MEDIA_INGEST_ONLY', ingestPath:'/api/integrations/instagram/published-media'});
   });
 
   app.post('/api/integrations/zernio/webhook', async (req, res) => {
@@ -88,7 +71,7 @@ export function registerIgRoutes(d: IgRouteDeps) {
       const raw = (req as any).rawBody as Buffer | undefined;
       const payload = raw || Buffer.from(JSON.stringify(req.body || {}));
       const sigOk = verifyZernioSignature(payload, String(req.headers['x-zernio-signature'] || ''));
-      const bearerOk = await validIntegrationBearer(store(), req);
+      const bearerOk = await isValidApiToken(store(),bearer(req),'webhook:receive');
       if (!sigOk && !bearerOk) {
         return res.status(401).json({ error: 'unauthorized', code: 'unauthorized' });
       }

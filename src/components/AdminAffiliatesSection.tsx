@@ -379,29 +379,17 @@ function IntegrationTokensPanel({ inp, addNotification, language }: { inp: strin
     addNotification(L(language, { fa: 'توکن حذف شد', en: 'Token revoked', ru: 'Токен отозван', tr: 'Token silindi' }), 'info');
   };
 
-  const prompt = `You are integrated with the Bazino (bazino.pro) affiliate system.
-
-TASK: For a new Instagram partner, mint a unique code and a signed invite link.
-
-REQUEST:
-POST https://bazino.pro/api/integrations/instagram/partner-invite
-Authorization: Bearer <PASTE_A_TOKEN_YOU_CREATED_IN_THE_BAZINO_ADMIN_PANEL>
+  const prompt = `After publishing approved Bazino Instagram content, report ONLY the native Instagram post/reel media ID.
+POST https://bazino.pro/api/integrations/instagram/published-media
+Authorization: Bearer <BAZINO_MEDIA_INGEST_TOKEN>
 Content-Type: application/json
+Idempotency-Key: instagram:<MEDIA_ID>
 
-{
-  "ig_user_id": "<numeric Instagram ACCOUNT id of the partner — NOT a post/reel id>",
-  "ig_username": "<partner handle, optional>",
-  "campaign_id": "SQUAD26"
-}
+{"media_id":"<INSTAGRAM_MEDIA_ID>"}
 
-SUCCESS (200):
-{ "ok": true, "code": "482913", "invite_url": "https://bazino.pro/?ref=...&sig=...", "campaign": "SQUAD26", "is_new": true }
-
-RULES:
-- ig_user_id is the Instagram ACCOUNT id; it is NOT the post/reel media id.
-- Send the invite_url to the partner. A friend opening it goes through the gate and, after sign-up, receives a discount coupon.
-- Re-calling with the same ig_user_id + campaign returns the SAME code/link (is_new:false) — safe to retry; do not create duplicates.
-- 401 = token wrong/missing · 400 invalid_ig_user_id · 422 campaign_not_found.`;
+The backend owns campaign approval, partner codes, friend links, coupons and commissions.
+Never call partner-invite or send private invitation links to partners. No Instagram account ID, Zernio internal post ID, or URL may replace the native media_id.
+An accepted ID may require admin review; it does not by itself enable the campaign.`;
 
   return (
     <div className="space-y-3 border-t border-white/10 pt-4" data-api-tokens>
@@ -437,7 +425,7 @@ RULES:
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-gray-500 leading-relaxed">{L(language, { fa: 'همان توکن را برای Manus و Zernio استفاده کنید: Manus با Bearer صدا می‌زند و وب‌هوک زرنیو هم آن را می‌پذیرد. حذف توکن بلافاصله دسترسی را باطل می‌کند.', en: 'Use the same token for Manus and Zernio: Manus sends it as Bearer and the Zernio webhook accepts it too. Deleting a token revokes access immediately.', ru: 'Один токен для Manus и Zernio: Manus шлёт Bearer, вебхук Zernio тоже его принимает. Удаление сразу отзывает доступ.', tr: 'Aynı token hem Manus hem Zernio için: Manus Bearer gönderir, Zernio webhook da kabul eder. Silmek erişimi hemen iptal eder.' })}</p>
+      <p className="text-[10px] text-gray-500 leading-relaxed">{L(language, { fa: 'توکن ناشر فقط برای اعلام Media ID است. گیرندهٔ Zernio امضای مستقل دارد؛ عامل به لینک دوست یا عملیات مالی دسترسی ندارد.', en: 'Publisher tokens report media IDs only. Zernio uses a separate webhook signature; agents cannot mint private links or perform financial actions.', ru: 'Токен издателя только для Media ID. Zernio проверяется отдельной подписью; агент не управляет ссылками и финансами.', tr: 'Yayıncı tokeni yalnızca Media ID içindir. Zernio ayrı imza kullanır; aracı özel bağlantı ve finans işlemi yapamaz.' })}</p>
 
       <details className="bg-black/40 rounded-lg border border-white/10" data-api-prompt>
         <summary className="cursor-pointer text-[11px] font-bold text-cyan-200 p-2.5">{L(language, { fa: 'دستورالعمل API برای Manus (کپی)', en: 'Manus API prompt (copy)', ru: 'Промпт для Manus (копировать)', tr: 'Manus API talimatı (kopyala)' })}</summary>

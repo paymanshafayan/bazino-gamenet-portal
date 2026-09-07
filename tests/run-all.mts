@@ -36,6 +36,7 @@ type Layer = {
 };
 
 const LAYERS: Layer[] = [
+  { id: 'publishing', file: 'publishing.test.mts', report: 'publishing.json', title: 'انتشار/افیلیت — یکپارچه‌سازی نسخهٔ ۴' },
   { id: 'management', file: 'management.test.mts', report: 'management.json', title: 'مدیریت — قرارداد و تراکنش اتمیک' },
   { id: 'unit', file: 'unit.test.mts', report: 'unit.json', title: 'واحد — منطق خالص' },
   { id: 'database', file: 'database.test.mts', report: 'database.json', title: 'دیتابیس — SQLite واقعی' },

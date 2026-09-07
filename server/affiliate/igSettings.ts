@@ -124,7 +124,7 @@ export function knownCampaignIds(settings: Record<string, string>): string[] {
 // admin panel. An integration (Manus ingest/partner-invite, Zernio webhook) can
 // authenticate with any active token.
 export const API_TOKENS_SETTING = 'integration_api_tokens';
-export interface ApiTokenRow { id: string; name: string; token: string; createdAt: string; lastUsedAt: string; }
+export interface ApiTokenRow { id: string; name: string; token: string; scopes?: string[]; createdAt: string; lastUsedAt: string; }
 
 export function generateApiToken(): string {
   return `baz_${randomBytes(24).toString('hex')}`;
@@ -147,7 +147,7 @@ export async function createApiToken(store: any, name: string): Promise<ApiToken
   const tokens = await readTokens(store);
   const row: ApiTokenRow = {
     id: newTokId(), name: String(name || '').slice(0, 80) || 'API token',
-    token: generateApiToken(), createdAt: new Date().toISOString(), lastUsedAt: '',
+    token: generateApiToken(), scopes: ['instagram:ingest'], createdAt: new Date().toISOString(), lastUsedAt: '',
   };
   tokens.push(row); await writeTokens(store, tokens); return row;
 }
@@ -163,12 +163,12 @@ export async function deleteApiToken(store: any, id: string): Promise<boolean> {
   await writeTokens(store, next); return true;
 }
 /** True when `bearer` matches an active integration token (also stamps lastUsedAt). */
-export async function isValidApiToken(store: any, bearer: string): Promise<boolean> {
+export async function isValidApiToken(store: any, bearer: string, scope = 'instagram:ingest'): Promise<boolean> {
   const t = String(bearer || '').trim();
   if (!t || !t.startsWith('baz_')) return false;
   const tokens = await readTokens(store);
   const match = tokens.find(x => x.token === t);
-  if (!match) return false;
+  if (!match || !(match.scopes || ['instagram:ingest']).includes(scope)) return false;
   match.lastUsedAt = new Date().toISOString();
   try { await writeTokens(store, tokens); } catch { /* best-effort stamp */ }
   return true;

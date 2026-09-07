@@ -97,7 +97,7 @@ export default function ConsoleHubView({
         {/* ستون راست / Right Column (20%) */}
         <div className="w-[20%] border-l border-white/10 bg-black/20 backdrop-blur-[2px] flex flex-col p-4 gap-4 overflow-y-auto custom-scrollbar justify-start">
           {[
-            { id: 'reservations', nameFa: 'رزرو', nameEn: 'RESERVE', bg: reservations400, bgLarge: reservations800, width: 400, height: 218 },
+            { id: 'games', nameFa: 'رزرو', nameEn: 'RESERVE', bg: reservations400, bgLarge: reservations800, width: 400, height: 218 },
             { id: 'cafe', nameFa: 'کافه', nameEn: 'CAFE', bg: cafe400, bgLarge: cafe800, width: 400, height: 400 },
             { id: 'shop', nameFa: 'فروشگاه', nameEn: 'STORE', bg: shop400, bgLarge: shop800, width: 400, height: 400 },
             { id: 'tournaments', nameFa: 'مسابقات', nameEn: 'ARENA', bg: tournaments400, bgLarge: tournaments800, width: 400, height: 400 },

@@ -43,7 +43,7 @@ import { L, localeOf, formatJalaliForLanguage } from '../utils/i18n';
 interface Props {
   themeId?: string;
   tournaments: Tournament[];
-  onNavigate: (tab: 'loyalty' | 'reservations' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'csharp') => void;
+  onNavigate: (tab: 'loyalty' | 'reservations' | 'games' | 'cafe' | 'shop' | 'tournaments' | 'blog' | 'csharp') => void;
 }
 
 export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
@@ -415,7 +415,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
   // Lounge Sections Intro data
   const loungeSections = [
     {
-      id: 'reservations',
+      id: 'games',
       title: {
         fa: 'سالن فوق‌حرفه‌ای PC Arena',
         en: 'High-End PC Arena',
@@ -560,7 +560,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
   };
 
   const getButtonText = (target: string) => {
-    const normTarget = target === 'reserve' ? 'reservations' : target;
+    const normTarget = target === 'reserve' ? 'games' : target;
     switch (normTarget) {
       case 'cafe':
         return {
@@ -601,7 +601,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
   };
 
   const getButtonIcon = (target: string) => {
-    const normTarget = target === 'reserve' ? 'reservations' : target;
+    const normTarget = target === 'reserve' ? 'games' : target;
     switch (normTarget) {
       case 'cafe':
         return <Utensils className="w-4 h-4 text-black" />;
@@ -737,7 +737,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
               <div className="flex flex-wrap gap-3 mt-2">
                 <button
                   onClick={() => {
-                    const targetRoute = activeGameTarget === 'reserve' ? 'reservations' : (activeGameTarget || 'reservations');
+                    const targetRoute = activeGameTarget === 'reserve' ? 'games' : (activeGameTarget || 'games');
                     onNavigate(targetRoute);
                   }}
                   className="px-6 py-3 bg-primary hover:bg-primary-hover text-black font-black text-xs notched-clip-sm shadow-[0_0_20px_rgba(255,184,0,0.4)] border border-primary transition-all flex items-center gap-2 cursor-pointer font-display uppercase tracking-wider"
@@ -845,7 +845,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
                   </div>
 
                   <button
-                    onClick={() => onNavigate('reservations')}
+                    onClick={() => onNavigate('games')}
                     className="mt-4 w-full py-2 bg-primary/10 hover:bg-primary border border-primary/30 hover:border-primary text-primary hover:text-black font-black text-[10px] notched-clip-sm transition-all duration-300 font-display uppercase tracking-wider cursor-pointer"
                   >
                     {L(language, { fa: 'مشاهده رزروها', en: 'Launch Session', ru: 'Начать сессию', tr: 'Seansı Başlat' })}
@@ -917,7 +917,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
                   </div>
 
                   <button
-                    onClick={() => onNavigate(sect.id === 'consoles' ? 'reservations' : (sect.id as any))}
+                    onClick={() => onNavigate(sect.id === 'consoles' ? 'games' : (sect.id as any))}
                     className="w-full py-2.5 bg-transparent hover:bg-primary border-2 border-primary/20 hover:border-primary text-gray-300 hover:text-black font-black text-[10px] notched-clip-sm font-display uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <span>{getLocText(sect.btnText)}</span>
@@ -1243,7 +1243,7 @@ export default function HomeTab({ tournaments, onNavigate, themeId }: Props) {
                 </ul>
 
                 <button
-                  onClick={() => onNavigate('reservations')}
+                  onClick={() => onNavigate('games')}
                   className={`w-full py-3 text-xs font-black notched-clip-sm transition-all duration-300 font-display uppercase tracking-widest cursor-pointer border ${
                     pack.popular
                       ? 'bg-primary hover:bg-primary-hover border-primary text-black shadow-[0_0_15px_rgba(255,184,0,0.3)]'

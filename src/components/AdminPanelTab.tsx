@@ -227,7 +227,7 @@ export default function AdminPanelTab({
   const [messagesList, setMessagesList] = useState<any[]>([]);
 
   // Form states for adding items
-  const [newSystem, setNewSystem] = useState({ name: '', type: 'PC', hourlyRate: 25000, isActive: true });
+  const [newSystem, setNewSystem] = useState({ name: '', type: 'PC', hourlyRate: 25000, isActive: true, audience: '' });
   const [newCafe, setNewCafe] = useState({ name: '', category: 'Foods', price: 50000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, inventory: 20, isAvailable: true });
   const [newAccessory, setNewAccessory] = useState({ name: '', description: '', price: 1000, imageUrl: '', mobileImageUrl: '', autoGenerateMobile: true, stock: 5, category: 'Keyboard' });
   const [newTournament, setNewTournament] = useState({ title: '', game: '', registrationFee: 100000, startDate: '۱۴۰۵/۰۵/۰۱', maxTeams: 8 });
@@ -1253,6 +1253,24 @@ export default function AdminPanelTab({
     }
   };
 
+  const handleSetSystemAudience = async (sysId: string, audience: string) => {
+    try {
+      const res = await fetch(`/api/admin/systems/${sysId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audience })
+      });
+      if (res.ok) {
+        addNotification(L(language, { fa: 'دستهٔ مخاطب سیستم به‌روزرسانی شد', en: 'System audience updated', ru: 'Аудитория системы обновлена', tr: 'Sistem hedef kitlesi güncellendi' }), 'success');
+        fetchData();
+      } else {
+        addNotification(L(language, { fa: 'خطا در بروزرسانی دستهٔ مخاطب', en: 'Failed to update audience', ru: 'Не удалось обновить аудиторию', tr: 'Hedef kitle güncellenemedi' }), 'error');
+      }
+    } catch (e) {
+      addNotification(L(language, { fa: 'خطا در بروزرسانی دستهٔ مخاطب', en: 'Failed to update audience', ru: 'Не удалось обновить аудиторию', tr: 'Hedef kitle güncellenemedi' }), 'error');
+    }
+  };
+
   const handleDeleteSystem = async (sysId: string) => {
     try {
       const res = await fetch(`/api/admin/systems/${sysId}`, { method: 'DELETE' }).then(r => r.json());
@@ -1388,7 +1406,7 @@ export default function AdminPanelTab({
       });
       if (res.ok) {
         addNotification(savedNote(L(language, { fa: 'سیستم گیمینگ جدید با موفقیت به سرور افزوده شد', en: 'New gaming system added to the server', ru: 'Новая игровая система добавлена на сервер', tr: 'Yeni oyun sistemi sunucuya eklendi' })), 'success');
-        setNewSystem({ name: '', type: 'PC', hourlyRate: 25000, isActive: true });
+        setNewSystem({ name: '', type: 'PC', hourlyRate: 25000, isActive: true, audience: '' });
         fetchData();
       } else {
         addNotification(await serverError(res, L(language, { fa: 'خطا در ثبت سیستم جدید', en: 'Failed to add new system', ru: 'Не удалось добавить систему', tr: 'Yeni sistem kaydedilemedi' })), 'error');
@@ -2797,6 +2815,18 @@ export default function AdminPanelTab({
                     </select>
                   </div>
                   <div>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'دستهٔ مخاطب (صفحهٔ Games)', en: 'Audience (Games page)', ru: 'Аудитория (стр. Games)', tr: 'Hedef kitle (Games sayfası)' })}</label>
+                    <select
+                      value={newSystem.audience}
+                      onChange={(e) => setNewSystem({ ...newSystem, audience: e.target.value })}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-bold"
+                    >
+                      <option value="">{L(language, { fa: 'همه (پیش‌فرض)', en: 'Everyone (default)', ru: 'Все (по умолчанию)', tr: 'Herkes (varsayılan)' })}</option>
+                      <option value="kids">{L(language, { fa: 'کودکان (KIDS)', en: 'Kids', ru: 'Дети', tr: 'Çocuklar' })}</option>
+                      <option value="adults">{L(language, { fa: 'بزرگسالان (ADULTS)', en: 'Adults', ru: 'Взрослые', tr: 'Yetişkinler' })}</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نرخ هر ساعت (TL)', en: 'Hourly rate (TL)', ru: 'Тариф в час (TL)', tr: 'Saatlik ücret (TL)' })}</label>
                     <input 
                       type="number" 
@@ -2830,6 +2860,16 @@ export default function AdminPanelTab({
                           <span>{sys.name}</span>
                         </h4>
                         <p className="text-[10px] text-gray-400 mt-1 font-mono">{sys.type} — {sys.hourlyRate.toLocaleString(localeOf(language))} {L(language, { fa: 'لیر/ساعت', en: 'TL/hr', ru: 'туман/час', tr: 'TL/saat' })}</p>
+                        <select
+                          value={sys.audience || ''}
+                          title={L(language, { fa: 'دستهٔ مخاطب در صفحهٔ Games', en: 'Audience on the Games page', ru: 'Аудитория на странице Games', tr: 'Games sayfasında hedef kitle' })}
+                          onChange={(e) => handleSetSystemAudience(sys.id, e.target.value)}
+                          className="mt-1.5 bg-[#0d122b] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-gray-300 focus:outline-none focus:border-primary cursor-pointer"
+                        >
+                          <option value="">{L(language, { fa: 'همه', en: 'Everyone', ru: 'Все', tr: 'Herkes' })}</option>
+                          <option value="kids">{L(language, { fa: 'کودکان', en: 'Kids', ru: 'Дети', tr: 'Çocuklar' })}</option>
+                          <option value="adults">{L(language, { fa: 'بزرگسالان', en: 'Adults', ru: 'Взрослые', tr: 'Yetişkinler' })}</option>
+                        </select>
                       </div>
 
                       <div className="flex items-center gap-2">

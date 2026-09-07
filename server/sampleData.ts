@@ -36,10 +36,10 @@ export const SAMPLE_CHAT_ROOMS: string[] = ['عمومی (General)', 'CS2', 'FIFA
 
 /* ---------- سیستم‌های گیمینگ (۵ مورد) ---------- */
 export const SAMPLE_SYSTEMS: SystemRow[] = [
-  { id: 's1', name: 'سیستم شماره ۱ (VIP PC)', nameFa: 'سیستم شماره ۱ (VIP PC)', nameEn: 'System #1 (VIP PC)', nameRu: 'Система №1 (VIP PC)', nameTr: 'Sistem No.1 (VIP PC)', type: 'PC', hourlyRate: 150, isActive: true, isReserved: false },
-  { id: 's2', name: 'سیستم شماره ۲ (VIP PC)', nameFa: 'سیستم شماره ۲ (VIP PC)', nameEn: 'System #2 (VIP PC)', nameRu: 'Система №2 (VIP PC)', nameTr: 'Sistem No.2 (VIP PC)', type: 'PC', hourlyRate: 150, isActive: true, isReserved: true },
-  { id: 's3', name: 'سیستم شماره ۳ (Standard)', nameFa: 'سیستم شماره ۳ (Standard)', nameEn: 'System #3 (Standard)', nameRu: 'Система №3 (Standard)', nameTr: 'Sistem No.3 (Standard)', type: 'PC', hourlyRate: 100, isActive: true, isReserved: false },
-  { id: 's4', name: 'سیستم شماره ۴ (Standard)', nameFa: 'سیستم شماره ۴ (Standard)', nameEn: 'System #4 (Standard)', nameRu: 'Система №4 (Standard)', nameTr: 'Sistem No.4 (Standard)', type: 'PC', hourlyRate: 100, isActive: true, isReserved: false },
+  { id: 's1', name: 'سیستم شماره ۱ (VIP PC)', nameFa: 'سیستم شماره ۱ (VIP PC)', nameEn: 'System #1 (VIP PC)', nameRu: 'Система №1 (VIP PC)', nameTr: 'Sistem No.1 (VIP PC)', type: 'PC', hourlyRate: 150, isActive: true, isReserved: false, audience: 'adults' },
+  { id: 's2', name: 'سیستم شماره ۲ (VIP PC)', nameFa: 'سیستم شماره ۲ (VIP PC)', nameEn: 'System #2 (VIP PC)', nameRu: 'Система №2 (VIP PC)', nameTr: 'Sistem No.2 (VIP PC)', type: 'PC', hourlyRate: 150, isActive: true, isReserved: true, audience: 'adults' },
+  { id: 's3', name: 'سیستم شماره ۳ (Standard)', nameFa: 'سیستم شماره ۳ (Standard)', nameEn: 'System #3 (Standard)', nameRu: 'Система №3 (Standard)', nameTr: 'Sistem No.3 (Standard)', type: 'PC', hourlyRate: 100, isActive: true, isReserved: false, audience: 'kids' },
+  { id: 's4', name: 'سیستم شماره ۴ (Standard)', nameFa: 'سیستم شماره ۴ (Standard)', nameEn: 'System #4 (Standard)', nameRu: 'Система №4 (Standard)', nameTr: 'Sistem No.4 (Standard)', type: 'PC', hourlyRate: 100, isActive: true, isReserved: false, audience: 'kids' },
   { id: 's5', name: 'کنسول پلی‌استیشن ۵ (VIP Booth)', nameFa: 'کنسول پلی‌استیشن ۵ (VIP Booth)', nameEn: 'PlayStation 5 Console (VIP Booth)', nameRu: 'Консоль PlayStation 5 (VIP-кабина)', nameTr: 'PlayStation 5 Konsolu (VIP Kabin)', type: 'PS5', hourlyRate: 200, isActive: true, isReserved: true }
 ];
 

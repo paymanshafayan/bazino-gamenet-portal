@@ -26,7 +26,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
 const HomeTab = lazy(() => import('./components/HomeTab'));
 const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
-const ReservationsTab = lazy(() => import('./components/ReservationsTab'));
+const GamesTab = lazy(() => import('./components/GamesTab'));
 const CafeTab = lazy(() => import('./components/CafeTab'));
 const ShopTab = lazy(() => import('./components/ShopTab'));
 const TournamentsTab = lazy(() => import('./components/tournaments/EventsTab'));
@@ -48,9 +48,10 @@ import { L, localizeList, localeOf } from './utils/i18n';
 import { 
   Trophy, Monitor, Coffee, ShoppingBag, Newspaper, Award, Code, Flame, Coins, X, HelpCircle,
   Sparkles, Home, Instagram, Send, Youtube, Twitter, Facebook, Settings, ChevronDown,
-  Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight
+  Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight,
+  Gamepad2
 } from 'lucide-react';
-import { tabFromPath, pathFromTab, standalonePageFromPath } from './utils/routes';
+import { tabFromPath, pathFromTab, standalonePageFromPath, LEGACY_TAB_ALIASES } from './utils/routes';
 import { claimStoredRef } from './utils/affiliateCapture';
 // صفحات قانونی/تماس/پرداخت عمداً lazy نیستند تا هرگز به قالب و ThemeRegion وابسته نباشند
 import { LegalPage } from './legal/LegalPage';
@@ -117,7 +118,7 @@ loadThemeStylesheet(__initialTheme);
  * شوند (رفع ممیزی Lighthouse «Avoid chaining critical requests»).
  */
 const TAB_DATASETS: Record<string, string[]> = {
-  reservations: ['systems'],
+  games: ['systems', 'coupons'],
   cafe: ['cafe'],
   shop: ['accessories'],
   tournaments: ['tournaments'],
@@ -171,7 +172,9 @@ export default function App() {
   const [activeTab, setActiveTabState] = useState(() => tabFromPath(window.location.pathname));
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-  const setActiveTab = useCallback((tab: string) => {
+  const setActiveTab = useCallback((rawTab: string) => {
+    // alias تب‌های قدیمی (مثل 'reservations' از اسلایدهای ذخیره‌شده) → تب فعلی
+    const tab = LEGACY_TAB_ALIASES[rawTab] || rawTab;
     setActiveTabState(tab);
     const target = pathFromTab(tab);
     const cur = window.location.pathname;
@@ -271,7 +274,7 @@ export default function App() {
           id: s.id || `slide-${i}`,
           imageUrl: s.imageUrl,
           mobileImageUrl: s.mobileImageUrl,
-          target: s.target || 'reservations',
+          target: s.target || 'games',
           title: { fa: s.titleFa || s.titleEn || '', en: s.titleEn || s.titleFa || '', ru: s.titleRu || s.titleEn || s.titleFa || '', tr: s.titleTr || s.titleEn || s.titleFa || '' },
           desc: { fa: s.descFa || '', en: s.descEn || '', ru: s.descRu || s.descEn || '', tr: s.descTr || s.descEn || '' },
         })));
@@ -314,6 +317,15 @@ export default function App() {
     }
     window.scrollTo({ top: 0 });
   }, [setActiveTab]);
+
+  // Alias قدیمی: اگر کاربر با /reservations آمد (لینک قدیمی/اسلایدهای قبلی ادمین)،
+  // آدرس نوار به /games نرمال می‌شود — بدون ورود اضافه به تاریخچهٔ مرورگر.
+  useEffect(() => {
+    if (/^\/reservations\/?$/.test(window.location.pathname)) {
+      window.history.replaceState({}, '', '/games');
+      setCurrentPath('/games');
+    }
+  }, []);
 
   // Keep the LCP-only LandingHero as the first commit. HomeTab contains all below-fold
   // cards and effects, so mounting it only after the load event's first idle window avoids
@@ -613,7 +625,7 @@ export default function App() {
   }, [themeScript.ready, themeRegistered]);
   const homePlaceholder = themeOwnsHero
     ? <div className="w-full min-h-[340px]" aria-hidden="true" data-hero-pending="" />
-    : <LandingHero onNavigate={() => setActiveTab('reservations')} />;
+    : <LandingHero onNavigate={() => setActiveTab('games')} />;
 
   const renderTabContent = () => (
     <Suspense fallback={
@@ -672,7 +684,7 @@ export default function App() {
         )
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
-      {activeTab === 'reservations' && <ReservationsTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
+      {activeTab === 'games' && <GamesTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
       {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
       {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
       {activeTab === 'tournaments' && <TournamentsTab />}
@@ -785,7 +797,7 @@ export default function App() {
   // راهی برای رسیدن به آن‌ها نداشت.
   const NAV_TABS = [
     { id: 'home',         label: L(language, { fa: 'خانه', en: 'Home', ru: 'ГЛАВНАЯ', tr: 'ANASAYFA' }),      icon: Home },
-    { id: 'reservations', label: L(language, { fa: 'رزرو', en: 'Reserve', ru: 'БРОНЬ', tr: 'REZERV' }),   icon: Monitor },
+    { id: 'games',        label: L(language, { fa: 'بازی‌ها', en: 'Games', ru: 'ИГРЫ', tr: 'OYUNLAR' }),        icon: Gamepad2 },
     { id: 'cafe',         label: L(language, { fa: 'کافه', en: 'Cafe', ru: 'КАФЕ', tr: 'KAFE' }),      icon: Coffee },
     { id: 'shop',         label: L(language, { fa: 'فروشگاه', en: 'Shop', ru: 'МАГАЗИН', tr: 'MAĞAZA' }),      icon: ShoppingBag },
     { id: 'tournaments',  label: L(language, { fa: 'مسابقات', en: 'Arena', ru: 'АРЕНА', tr: 'ARENA' }),     icon: Trophy },

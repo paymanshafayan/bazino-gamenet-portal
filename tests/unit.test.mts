@@ -419,7 +419,15 @@ test('ts(): theme strings fall back language → en → first → key', () => {
 
 test('routes: browser path ↔ tab / admin section mapping', () => {
   assert.equal(routes.tabFromPath('/'), 'home');
-  assert.equal(routes.tabFromPath('/reservations'), 'reservations');
+  // تب Reserve → صفحهٔ Games منتقل شد؛ /reservations حالا alias دائمی games است
+  assert.equal(routes.tabFromPath('/reservations'), 'games');
+  assert.equal(routes.tabFromPath('/games'), 'games');
+  assert.ok((routes.PUBLIC_TABS as readonly string[]).includes('games'), 'games must be a public tab');
+  assert.ok(!(routes.PUBLIC_TABS as readonly string[]).includes('reservations'), 'reservations is no longer a standalone public tab');
+  assert.equal(routes.pathFromTab('reservations'), '/games');
+  assert.equal(routes.pathFromTab('games'), '/games');
+  // تب رزروهای خصوصی پروفایل دست‌نخورده می‌ماند
+  assert.equal(routes.profileTabFromPath('/profile/reservations'), 'reservations');
   assert.equal(routes.tabFromPath('/admin/themes'), 'admin');
   assert.equal(routes.tabFromPath('/nope'), 'home');
   assert.equal(routes.pathFromTab('home'), '/');
@@ -429,6 +437,25 @@ test('routes: browser path ↔ tab / admin section mapping', () => {
   assert.equal(routes.adminSectionFromPath('/admin/unknown'), 'dashboard');
   assert.equal(routes.pathFromAdminSection('dashboard'), '/admin');
   assert.equal(routes.pathFromAdminSection('themes'), '/admin/themes');
+});
+
+test('games: audience whitelist + filtering keeps unclassified systems visible', async () => {
+  const games = await import('../shared/games.ts');
+  assert.equal(games.normalizeAudience('KIDS'), 'kids');
+  assert.equal(games.normalizeAudience(' adults '), 'adults');
+  assert.equal(games.normalizeAudience('vip'), '');
+  assert.equal(games.normalizeAudience(undefined), '');
+  const systems = [
+    { id: 'a', audience: 'kids' },
+    { id: 'b', audience: 'adults' },
+    { id: 'c', audience: '' },
+    { id: 'd' },
+  ];
+  assert.deepEqual(games.filterSystemsForAudience(systems, 'kids').map((s: any) => s.id), ['a', 'c', 'd']);
+  assert.deepEqual(games.filterSystemsForAudience(systems, 'adults').map((s: any) => s.id), ['b', 'c', 'd']);
+  assert.equal(games.filterSystemsForAudience(systems, null).length, 4);
+  assert.equal(games.sanitizeRequestedGame('  FIFA   26  '), 'FIFA 26');
+  assert.equal(games.sanitizeRequestedGame('x'.repeat(200)).length, 80);
 });
 
 test('parseThemeZip rejects non-zip input instead of throwing', () => {

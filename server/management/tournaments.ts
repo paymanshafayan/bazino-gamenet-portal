@@ -91,7 +91,7 @@ export interface BracketMatch {
 }
 
 export class TournamentService {
-  constructor(public core: OpsCore, public finance: FinanceService) {}
+  constructor(public core: OpsCore, public finance: FinanceService, public sampleFallback?: () => Promise<any[]>) {}
 
   /** In-process pub/sub for live bracket updates (SSE). Single-server is enough. */
   private listeners = new Map<string, Set<(version: number) => void>>();
@@ -503,9 +503,15 @@ export class TournamentService {
   // ─── Public read models (website tournaments page; staff-token free) ──────
   private async mergedTournaments() {
     const store = this.core.store;
-    const rows = await store.listTournaments();
+    // نصب تازه با data_source=sample هیچ ردیفی در DB ندارد؛ view عمومی باید همان
+    // دیدگاه merged (نمونه + DB) را ببیند که صفحهٔ قدیمی /api/tournaments می‌بیند —
+    // وگرنه تب ثبت‌نام روی کلوپ جدید همیشه خالی است (با سفر E2E گرفته شد).
+    const rows = (await (this as any).sampleFallback?.()) ?? [];
+    const dbRows = await store.listTournaments();
+    const seen = new Set(dbRows.map((t: any) => t.id));
+    const all = [...dbRows, ...(Array.isArray(rows) ? rows : []).filter((t: any) => !seen.has(t.id))];
     const out = [];
-    for (const t of rows) {
+    for (const t of all) {
       const overlay = await this.core.read('tournament', t.id);
       out.push({ row: t, overlay });
     }

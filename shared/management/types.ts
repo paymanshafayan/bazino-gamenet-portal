@@ -11,6 +11,8 @@ export interface BookingView {
   bookingStatus: 'held' | 'confirmed' | 'cancelled' | 'expired' | 'completed' | 'unknown';
   attendanceStatus: 'not_arrived' | 'checked_in' | 'playing' | 'completed' | 'no_show';
   paymentMethod: string | null; paymentDueAt: string; source: string; version: number; sessionId?: string;
+  /** بازی درخواستی مشتری هنگام رزرو (صفحهٔ Games) — اختیاری */
+  requestedGame?: string;
 }
 export type OpsTab = 'stations' | 'buffet' | 'shop' | 'customers' | 'affiliates' | 'promotions' | 'content' | 'tournaments' | 'accounting' | 'operators' | 'settings';
 export interface Receipt {

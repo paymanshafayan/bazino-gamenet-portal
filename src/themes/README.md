@@ -59,7 +59,7 @@ theme.zip
     return R.createElement('section', { className: 'arena-hero', dir: p.dir },
       R.createElement('video', { src: p.assetsBase + '/intro.mp4', autoPlay: true, muted: true, loop: true, playsInline: true }),
       R.createElement('h1', null, p.ts('heroTitle')),
-      R.createElement('button', { onClick: function () { p.onNavigate('reservations'); } }, p.ts('cta')));
+      R.createElement('button', { onClick: function () { p.onNavigate('games'); } }, p.ts('cta')));
   } });
   ```
   توصیه (نه اجبار): اگر ادمین اسلایدی تعریف کرده (`p.slides.length > 0`)، متن/لینک آن را جایی نشان دهید تا محتوای پنل بی‌اثر نماند.
@@ -229,7 +229,7 @@ SDK.registerComponent('home.location', { apiVersion: 2, render: function (p) {
 | `tokens` | توکن‌های طراحی قالب (جدید در v2) |
 | `slides` | اسلایدهای ادمین، نرمال‌شده و چهارزبانه: `{id, imageUrl, mobileImageUrl, target, title{fa,en,ru,tr}, desc{…}}` (جدید در v2) |
 | `region`, `activeTab`, `user` | نام بخش در حال رندر، تب فعال، کاربر واردشده (جدید در v2) |
-| `onNavigate(tab)` | رفتن به تب (reservations, cafe, shop, tournaments, blog, loyalty, chat) |
+| `onNavigate(tab)` | رفتن به تب (games, cafe, shop, tournaments, blog, loyalty, chat — تب قدیمی «Reserve/rزرو» به صفحهٔ `games` منتقل شده و alias آن هم پذیرفته می‌شود) |
 | `featuredGames` | اسلایدهای اصلی (array با title/desc/imageUrl به‌صورت چندزبانه) |
 | `gameGenres`, `matchHistory`, `pricingPackages`, `loungeSections`, `staffTeam` | بخش‌های محتوایی هوم |
 | `tournaments` | تورنمنت‌های فعال |
@@ -341,7 +341,7 @@ body[data-theme='neon-storm'] {
       var s = p.slides[0];
       return R.createElement('section', { className: 'my-hero', dir: p.dir },
         R.createElement('h1', null, s ? s.title[p.language] : p.ts('title')),
-        R.createElement('button', { onClick: function () { p.onNavigate(s ? s.target : 'reservations'); } }, p.ts('cta'))
+        R.createElement('button', { onClick: function () { p.onNavigate(s ? s.target : 'games'); } }, p.ts('cta'))
       );
     }
   });
@@ -430,7 +430,16 @@ cd my-theme && zip -r ../my-theme.zip theme.json theme.css theme.js assets
   `.theme-<id> .btn` و ...
 
 چون کلاس `theme-<id>` روی ریشه‌ی اپلیکیشن (`<div class="theme-...">`) قرار دارد، این قوانین
-روی **همه‌ی تب‌ها** اعمال می‌شوند: خانه، رزرو، کافه، فروشگاه، مسابقات، باشگاه، بلاگ، چت، مودال‌ها و ادمین.
+روی **همه‌ی تب‌ها** اعمال می‌شوند: خانه، بازی‌ها (Games — شامل کارت‌های KIDS/ADULTS/Game Requests و جریان رزرو)، کافه، فروشگاه، مسابقات، باشگاه، بلاگ، چت، مودال‌ها و ادمین.
+
+> **🏷️ ناوبری از نسخهٔ «صفحهٔ Games» (تغییر الزامی):** تب سطح‌بالای «Reserve/رزرو» حذف شده و
+> با تب **«Games/بازی‌ها»** جایگزین شده است (`/games`). سه کارت KIDS / ADULTS / GAME REQUESTS
+> دارد؛ انتخاب KIDS یا ADULTS همان جریان رزرو قبلی را با فیلتر مخاطب سیستم‌ها باز می‌کند.
+> برای قالب‌ها:
+> - در `theme.js` و CTAها از `onNavigate('games')` استفاده کنید؛ `onNavigate('reservations')`
+>   و `target: 'reservations'` اسلایدهای قدیمی هم همچنان کار می‌کنند (alias دائمی → games).
+> - پیش‌فرض `target` اسلایدهای جدید ادمین `games` است؛ `target` های ذخیره‌شدهٔ قبلی نیازی به مهاجرت ندارند.
+> - deep-link دسته: `/games?category=kids|adults|requests`.
 
 ### ۲) بارگذاری فقط قالب فعال
 `index.ts` با `import.meta.glob` تمام فایل‌های CSS را به‌صورت ماژول‌های جداگانه باندل می‌کند

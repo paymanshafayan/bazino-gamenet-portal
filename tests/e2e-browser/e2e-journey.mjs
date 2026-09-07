@@ -17,6 +17,8 @@ const STAMP = Date.now().toString().slice(-6);
 const USER = { username: `Gamer_${STAMP}`, email: `gamer${STAMP}@bazino.test`, phone: `0912${STAMP}123`.slice(0, 11), password: 'Test@12345' };
 
 const { browser, page, errors } = await launch({ width: 1440, height: 900 });
+// سفر با سلکتورهای فارسی نوشته شده — زبان را صریح fa قفل می‌کنیم (وگرنه GeoIP می‌تواند en بدهد)
+await page.context().addInitScript(() => { try { localStorage.setItem('cyber_lang', 'fa'); } catch {} });
 const netFails = [];
 page.on('response', (r) => { if (r.status() >= 400) netFails.push(`${r.status()} ${r.request().method()} ${r.url().replace(BASE, '')}`); });
 page.on('requestfailed', (r) => netFails.push(`FAILED ${r.url().replace(BASE, '')} ${r.failure()?.errorText || ''}`));
@@ -59,6 +61,25 @@ const mobileNav = async (label) => {
   return page.locator('[role=dialog] button', { hasText: new RegExp(`^${label}$`) }).first().click({ timeout: 15000 });
 };
 const toastTexts = () => page.locator('.fixed.top-6 > div span').allInnerTexts().catch(() => []);
+/** بستن هر مودال باز (CheckoutModal/جزئیات رزرو) تا مراحل بعدی بلاک نشوند */
+const closeAnyModal = async () => {
+  for (let i = 0; i < 3; i++) {
+    const close = page.locator('[role="dialog"] button[aria-label="close"], div[class*="fixed"] button[aria-label="close"]').first();
+    if (!(await close.count().catch(() => 0))) break;
+    await close.click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(800);
+  }
+};
+/** تکمیل CheckoutModal با روش «پرداخت در محل» و انتظار برای توست */
+const completeCheckoutOnsite = async (toastRe) => {
+  await page.waitForTimeout(1500);
+  // تیک پذیرش شرایط پرداخت حضوری (بدون آن دکمه تأیید کار نمی‌کند)
+  const accept = page.locator('[data-onsite-accept] input[type=checkbox]');
+  if (await accept.count()) await accept.check({ timeout: 5000 }).catch(() => {});
+  await page.locator('[data-checkout-confirm]').click({ timeout: 20000 }).catch(async e => { await closeAnyModal(); throw e; });
+  try { const t = await waitToast(toastRe); await page.waitForTimeout(2000); await closeAnyModal(); return t; }
+  catch (e) { await closeAnyModal(); throw e; }
+};
 async function waitToast(re, timeout = 12000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) {
@@ -97,30 +118,47 @@ await step('logout-to-guest', async (rec) => {
   return { loginButtonVisible: await page.locator('header button', { hasText: /ورود|Login/ }).count() };
 });
 
-/* ── 03 · Register a brand-new account ─────────────────────────── */
-await step('register-new-account', async (rec) => {
+/* ── 03 · Sign in with OTP (real UI + mock-SMS dev peek) ───────── *
+ * ثبت‌نام جداگانه از تسک ۱۲ حذف شده: اولین ورود موفق با OTP حساب می‌سازد. */
+await step('otp-login-new-account', async (rec) => {
+  const otpPhone = `+9055${STAMP}12345`.slice(0, 14);
+  rec.notes.push('phone=' + otpPhone);
   await page.locator('header button', { hasText: /ورود|Login/ }).first().click({ timeout: 15000 });
   await page.waitForTimeout(1200);
-  await page.locator('button', { hasText: /ثبت‌نام|ثبت نام|Register|Sign Up/ }).first().click();
-  await page.waitForTimeout(600);
-  await page.fill('input[placeholder="e.g. Sina_ProGamer"]', USER.username);
-  await page.fill('input[placeholder="name@gmail.com"]', USER.email);
-  await page.fill('input[placeholder="09123456789"]', USER.phone);
-  await page.fill('input[placeholder="••••••••"]', USER.password);
-  rec.notes.push(JSON.stringify(USER));
-  await page.locator('form button[type=submit]').first().click();
+  await page.fill('#auth-phone', otpPhone);
+  await page.locator('[data-otp-step="phone"] button[type=submit]').click();
+  await page.waitForTimeout(2500);
+  // کد از مسیر dev-peek خوانده می‌شود (فقط درایور mock + خارج از production)
+  const peek = await page.evaluate(async (p) => {
+    const r = await fetch('/api/auth/otp/dev-peek?phone=' + encodeURIComponent(p));
+    if (!r.ok) throw new Error('dev-peek failed: ' + r.status);
+    return r.json();
+  }, otpPhone);
+  if (!/^\d{6}$/.test(peek.code)) throw new Error('no 6-digit code via dev-peek');
+  await page.fill('#auth-code', peek.code);
+  await page.locator('[data-otp-step="code"] button[type=submit]').click();
   await page.waitForTimeout(3500);
-  // لوگوی «BAZINO PRO» هم کلاس text-primary دارد؛ نام کاربر با @ شروع می‌شود.
+  // نام کاربری خودکار = شماره بدون +
   const who = await page.locator('header span').filter({ hasText: /^@/ }).first().innerText().catch(() => null);
-  if (!who || !who.includes(USER.username)) throw new Error('header does not show new user, got: ' + who);
+  if (!who || !who.includes(otpPhone.replace(/^\+/, ''))) throw new Error('header does not show OTP user, got: ' + who);
   return { headerUser: who };
 });
 
-/* ── 04 · Reserve a gaming station ─────────────────────────────── */
-await step('reservation-select-system', async (rec) => {
-  await nav('رزرو').click({ timeout: 20000 });
+/* ── 04 · Reserve a gaming station (از صفحهٔ Games) ────────────── */
+await step('games-open-reservation', async (rec) => {
+  await nav('بازی‌ها').click({ timeout: 20000 });
   await page.waitForTimeout(3000);
-  const free = page.locator('button').filter({ hasText: /تومان \/ ساعت/ }).filter({ hasNot: page.locator('text=مشغول') });
+  // سه کارت جدا: KIDS / ADULTS / GAME REQUESTS
+  const kids = await page.locator('[data-testid="games-card-kids"]').count();
+  const adults = await page.locator('[data-testid="games-card-adults"]').count();
+  const requests = await page.locator('[data-testid="games-card-requests"]').count();
+  rec.notes.push(`cards kids=${kids} adults=${adults} requests=${requests}`);
+  if (!kids || !adults || !requests) throw new Error('Games page did not show the three category cards');
+  await page.locator('[data-testid="games-card-adults"]').click();
+  await page.waitForTimeout(3000);
+});
+await step('reservation-select-system', async (rec) => {
+  const free = page.locator('button').filter({ hasText: /لیر \/ ساعت|تومان \/ ساعت|TL \/ hour/ }).filter({ hasNot: page.locator('text=مشغول') });
   const count = await free.count();
   rec.notes.push('selectable systems: ' + count);
   await free.first().click();
@@ -145,9 +183,9 @@ await step('reservation-hours-and-coupon', async (rec) => {
 
 await step('reservation-confirm', async (rec) => {
   await page.locator('button', { hasText: /پرداخت و تایید نهایی رزرو/ }).first().click({ timeout: 15000 });
-  const t = await waitToast(/رزرو|موفق|ثبت/);
+  // CheckoutModal (کیف پول / پرداخت در محل) باز می‌شود — تسک ۱۳
+  const t = await completeCheckoutOnsite(/رزرو|موفق|ثبت/);
   rec.notes.push('toast: ' + t);
-  await page.waitForTimeout(2500);
   return { toast: t };
 });
 
@@ -175,14 +213,15 @@ await step('cafe-add-to-cart', async (rec) => {
 
 await step('cafe-checkout', async (rec) => {
   await page.locator('button', { hasText: /ثبت نهایی سفارش|سفارش بوفه/ }).first().click({ timeout: 15000 });
-  const t = await waitToast(/سفارش|موفق|ثبت/);
+  // CheckoutModal (فقط پرداخت در محل برای بوفه) — تسک ۱۳
+  const t = await completeCheckoutOnsite(/سفارش|موفق|ثبت/);
   rec.notes.push('toast: ' + t);
-  await page.waitForTimeout(2000);
   return { toast: t };
 });
 
 /* ── 06 · Buy from the gear shop ───────────────────────────────── */
 await step('shop-add-and-checkout', async (rec) => {
+  await closeAnyModal();
   await nav('فروشگاه').click({ timeout: 20000 });
   await page.waitForTimeout(3000);
   const buy = page.locator('button', { hasText: /خرید فوری کالا/ });
@@ -190,10 +229,10 @@ await step('shop-add-and-checkout', async (rec) => {
   await buy.nth(0).click(); await page.waitForTimeout(700);
   await buy.nth(2).click(); await page.waitForTimeout(900);
   const checkout = page.locator('button', { hasText: /پرداخت نهایی و تسویه|Finalize & Checkout/ }).first();
-  await checkout.click({ timeout: 15000 });
-  const t = await waitToast(/پرداخت با موفقیت|ACC-/);
+    await checkout.click({ timeout: 15000 });
+  // CheckoutModal (فقط پرداخت در محل برای فروشگاه) — تسک ۱۳
+  const t = await completeCheckoutOnsite(/پرداخت|ACC-|موفق|سفارش/);
   rec.notes.push('toast: ' + t);
-  await page.waitForTimeout(1500);
   return { toast: t };
 });
 
@@ -201,18 +240,39 @@ await step('shop-add-and-checkout', async (rec) => {
 await step('tournament-register-team', async (rec) => {
   await nav('مسابقات').click({ timeout: 20000 });
   await page.waitForTimeout(3500);
-  await page.selectOption('select', { index: 0 }).catch(() => {});
-  await page.fill('input[placeholder="e.g. Persis Esports"]', `Team_${STAMP}`);
-  await page.fill('input[placeholder="e.g. Sina_Gamer"]', USER.username);
-  await page.fill('input[placeholder="Gamertag"]', `Mate_${STAMP}`);
-  await page.locator('input[placeholder="Gamertag"]').locator('xpath=following::button[1]').click().catch(() => {});
+  // EventsTab پنج‌تبه: فرم ثبت‌نام در تب «ثبت‌نام» است (بچ ۱۰)
+  await page.locator('button', { hasText: /^ثبت‌نام$/ }).first().click({ timeout: 15000 }).catch(async () => {
+    await page.locator('button', { hasText: /ثبت‌نام/ }).first().click({ timeout: 10000 });
+  });
+  await page.waitForTimeout(1500);
+  // انتخاب یک تورنمنتِ پُرنشده (پیش‌فرض فرم ممکن است تورنمنت کامل ۸/۸ باشد → TOURNAMENT_FULL)
+  await page.evaluate(() => {
+    const sel = document.querySelector('select');
+    if (!sel) return;
+    const opt = Array.from(sel.options).find(o => /Counter-Strike|Dota|FIFA/.test(o.textContent || '') && !/Valo|والورانت/.test(o.textContent || ''));
+    const value = opt ? opt.value : sel.options[sel.options.length - 1].value;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+    setter.call(sel, value);
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.waitForTimeout(600);
-  await page.locator('button', { hasText: /پرداخت ورودی و ثبت‌نام تیم/ }).first().click({ timeout: 15000 });
-  const t = await waitToast(/ثبت|تیم|موفق/);
-  rec.notes.push('toast: ' + t);
-  await page.waitForTimeout(2500);
+  await page.fill('input[placeholder="e.g. Persis Esports"]', `Team_${STAMP}`);
+  await page.fill('input[placeholder="e.g. Sina_Gamer"]', 'Gamer_' + STAMP);
+  await page.locator('button', { hasText: /ثبت‌نام تیم|REGISTER TEAM/ }).first().click({ timeout: 15000 });
+  await page.waitForTimeout(1800);
+  // ثبت‌نام یا مودال پرداخت (در محل) باز می‌کند یا پیام داخلی «تیم … ثبت شد» می‌دهد
+  let t = null;
+  if (await page.locator('[data-checkout-confirm]').count()) {
+    t = await completeCheckoutOnsite(/ثبت|تیم|موفق/);
+  } else {
+    try { t = await waitToast(/ثبت|تیم|موفق/, 6000); } catch {}
+    if (!t) t = await page.locator('body').innerText().then(x => (x.match(/تیم [«“][^»”]+[»”] ثبت شد|registered/)?.[0]) || null).catch(() => null);
+  }
+  if (!t) throw new Error('tournament registration success message not found');
+  rec.notes.push('result: ' + t);
+  await page.waitForTimeout(1500);
   const list = await page.locator('body').innerText();
-  return { toast: t, teamVisibleInList: list.includes(`Team_${STAMP}`) };
+  return { result: t, teamVisibleInList: list.includes(`Team_${STAMP}`) };
 });
 
 /* ── 08 · Loyalty club: redeem points ──────────────────────────── */
@@ -279,8 +339,11 @@ await step('chat-tab', async (rec) => {
 });
 
 /* ── 12 · Mobile sweep ─────────────────────────────────────────── */
+await closeAnyModal();
+await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 90000 });
+await page.waitForTimeout(4000);
 await page.setViewportSize({ width: 390, height: 844 });
-for (const tab of ['خانه', 'رزرو', 'کافه', 'فروشگاه', 'مسابقات', 'باشگاه', 'بلاگ', 'گفتگو']) {
+for (const tab of ['خانه', 'بازی‌ها', 'کافه', 'فروشگاه', 'مسابقات', 'باشگاه', 'بلاگ', 'گفتگو']) {
   await step(`mobile-${tab}`, async (rec) => {
     await mobileNav(tab);
     await page.waitForTimeout(2800);

@@ -2,7 +2,8 @@
  * نگاشت ساده‌ی مسیر مرورگر ↔ تب/بخش (بدون کتابخانه‌ی روتر).
  *
  *   /                → home
- *   /reservations    → reservations   (و بقیه‌ی تب‌های عمومی)
+ *   /games           → games (صفحهٔ بازی‌ها؛ شامل جریان رزرو بعد از انتخاب دسته)
+ *   /reservations    → games (alias قدیمی تب Reserve — همان صفحه رندر می‌شود)
  *   /admin           → admin (بخش dashboard)
  *   /admin/themes    → admin (بخش themes)
  *   /app-download    → صفحه‌ی دانلود اپ (خارج از تب‌ها؛ در App.tsx جدا رندر می‌شود)
@@ -14,7 +15,14 @@
  * هدف: آدرس مرورگر همیشه صفحه‌ی فعلی را نشان دهد و رفرش کاربر را به همان
  * صفحه (حتی داخل پنل مدیریت) برگرداند.
  */
-export const PUBLIC_TABS = ['home', 'loyalty', 'reservations', 'cafe', 'shop', 'tournaments', 'blog', 'chat', 'admin'] as const;
+export const PUBLIC_TABS = ['home', 'loyalty', 'games', 'cafe', 'shop', 'tournaments', 'blog', 'chat', 'admin'] as const;
+
+/**
+ * Alias تب‌های قدیمی → جدید. تب مستقل «Reserve» به صفحهٔ Games منتقل شده؛
+ * مسیرهای /reservations و target='reservations' (اسلایدهای ادمین ذخیره‌شده در DB،
+ * لینک‌های قدیمی) برای همیشه به games نگاشت می‌شوند تا deep-linkها نشکنند.
+ */
+export const LEGACY_TAB_ALIASES: Record<string, string> = { reservations: 'games' };
 
 export const ADMIN_SECTIONS = [
   'dashboard', 'systems', 'cafe', 'shop', 'tournaments', 'tournamentOps', 'blog', 'content', 'promotions', 'chat', 'migrations', 'messages',
@@ -35,12 +43,14 @@ export type AdminSection = typeof ADMIN_SECTIONS[number];
 export function tabFromPath(pathname: string): string {
   const first = pathname.replace(/^\/+|\/+$/g, '').split('/')[0] || '';
   if (!first) return 'home';
-  return (PUBLIC_TABS as readonly string[]).includes(first) ? first : 'home';
+  const canonical = LEGACY_TAB_ALIASES[first] || first;
+  return (PUBLIC_TABS as readonly string[]).includes(canonical) ? canonical : 'home';
 }
 
 export function pathFromTab(tab: string): string {
-  if (tab === 'home') return '/';
-  return (PUBLIC_TABS as readonly string[]).includes(tab) ? `/${tab}` : '/';
+  const canonical = LEGACY_TAB_ALIASES[tab] || tab;
+  if (canonical === 'home') return '/';
+  return (PUBLIC_TABS as readonly string[]).includes(canonical) ? `/${canonical}` : '/';
 }
 
 export function adminSectionFromPath(pathname: string): AdminSection {

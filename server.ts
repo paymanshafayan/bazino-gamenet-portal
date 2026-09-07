@@ -2363,6 +2363,18 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   async function paymentQuote(kind: OrderKind, params: any, username?: string) {
     const store = getActiveDataProvider();
+    params = {...(params || {})};
+    if (String(params.referralCode || '').trim()) {
+      const affiliate = await store.getAffiliateByCode(String(params.referralCode).trim().toUpperCase());
+      if(!affiliate || affiliate.status!=='active' || username && affiliate.username===username)fail('INVALID_REFERRAL_CODE',400);
+    } else if (username) {
+      const attribution=await store.getAttributionForUser(username);
+      if(attribution?.code && Date.parse(attribution.expiresAt)>Date.now()) {
+        const affiliate=await store.getAffiliateByCode(attribution.code);
+        if(affiliate?.status==='active'&&affiliate.username!==username)params.referralCode=affiliate.code;
+      }
+    }
+
     if (kind === "reservation") {
       const { systemId, startTime, endTime, date, couponCode, referralCode } = params || {};
       const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);

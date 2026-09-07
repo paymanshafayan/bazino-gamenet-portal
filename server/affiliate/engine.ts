@@ -84,7 +84,9 @@ export async function claimAttribution(store: IDataStore, opts: {
     return { ok: false, error: 'SELF_REFERRAL' };
   }
   const rates = await loadRates(store);
-  const expiresAt = iso(Date.now() + rates.windowDays * 86400000);
+  const social = await store.getOpsRecord?.('pub-affiliate-policy', aff.code);
+  const windowDays = social?.data.policy?.attributionDays || rates.windowDays;
+  const expiresAt = iso(Date.now() + windowDays * 86400000);
   const now = iso();
   const row = {
     id: newAffId('ATT'),
@@ -142,8 +144,20 @@ export async function onOrderPaid(store: IDataStore, opts: {
   payload?: any;
   userRole?: string;
 }): Promise<AffiliateCommissionRow[]> {
-  if (opts.kind !== 'reservation' && opts.kind !== 'tournament') return [];
-  const amount = round2(Number(opts.amount) || 0);
+  return store.runInTransaction(() => onOrderPaidAtomic(store, opts));
+}
+
+async function onOrderPaidAtomic(store: IDataStore, opts: {
+  username: string;
+  orderId: string;
+  kind: string;
+  amount: number;
+  dueAt?: string;
+  payload?: any;
+  userRole?: string;
+}): Promise<AffiliateCommissionRow[]> {
+  if (!['reservation','tournament','session'].includes(opts.kind)) return [];
+  let amount = round2(Number(opts.amount) || 0);
   if (!(amount > 0)) return [];
   const rates = await loadRates(store);
   const role = String(opts.userRole || 'gamer').toLowerCase();
@@ -151,23 +165,53 @@ export async function onOrderPaid(store: IDataStore, opts: {
 
   const formCode = normalizeCode(opts.payload?.referralCode);
   if (formCode) {
-    await claimAttribution(store, { code: formCode, username: opts.username, source: 'form' });
+    const claimed = await claimAttribution(store, { code: formCode, username: opts.username, source: 'form' });
+    if (!claimed.ok) return []; // Never fall back to an older affiliate after an invalid explicit code.
   }
   const resolved = await attributionForUser(store, opts.username);
   if (!resolved) return [];
   const { aff } = resolved;
   const socialPolicy = await store.getOpsRecord?.('pub-affiliate-policy', aff.code);
-  if (socialPolicy && !socialPolicy.data.policy?.financialApproved) return [];
+  const social = socialPolicy?.data?.policy;
+  if (socialPolicy && (!social?.financialApproved || !social.responsible || social.refundDays < 1)) return [];
+  if (opts.kind === 'session' && !social) return [];
+  if (social) {
+    const u = await store.getUserByUsername(opts.username);
+    const staff = await store.getOpsRecord('access', opts.username);
+    if (!u || u.role === 'admin' || staff?.data?.permissions?.length || opts.payload?.test === true) return [];
+    if (opts.kind === 'session') {
+      const invoice = (await store.getOpsRecord('invoice', opts.orderId))?.data;
+      const receipt = invoice?.receipt?.id ? (await store.getOpsRecord('receipt', invoice.receipt.id))?.data : null;
+      if (!invoice || invoice.username !== opts.username || !receipt || receipt.direction !== 'in' || !['operator_cash','operator_pos_manual'].includes(receipt.confirmation)) return [];
+      if (invoice.reservationOrderId) return []; // A prepaid reservation is never rewarded again as a session.
+      amount = round2(Math.min(Number(invoice.newGameCost)||0, Number(receipt.amount)||0));
+    } else {
+      const order = await store.getOnsiteOrder(opts.orderId);
+      if (!order || order.status !== 'settled' || order.username !== opts.username || order.kind !== opts.kind) return [];
+      amount = round2(Number(order.amount)||0);
+    }
+    if (!(amount > 0)) return [];
+  }
   if (aff.username && aff.username.toLowerCase() === opts.username.toLowerCase()) return [];
 
   const existing = (await store.listAffiliateCommissions({ orderId: opts.orderId }))
     .filter(c => c.eventType !== 'override');
   if (existing.length) return existing;
 
-  const returning = await hasPriorPaid(store, opts.username, opts.orderId);
+  let returning = await hasPriorPaid(store, opts.username, opts.orderId);
+  if (social) {
+    const priorOrders = await store.listOnsiteOrders({username: opts.username});
+    const priorInvoices = await store.listOpsRecords('invoice');
+    returning = priorOrders.some(o=>o.id!==opts.orderId && o.status==='settled' && o.amount>0)
+      || priorInvoices.some(r=>r.id!==opts.orderId && r.data.username===opts.username && r.data.receipt?.amount>0);
+    if (social.newCustomerOnly && returning) return [];
+  }
   let eventType: string;
   let pct: number;
-  if (opts.kind === 'tournament') {
+  if (social) {
+    eventType = opts.kind === 'session' ? 'new_onsite' : 'new';
+    pct = Number(social.commissionPct);
+  } else if (opts.kind === 'tournament') {
     eventType = 'tournament';
     pct = inheritRate(aff.tournamentPct, rates.tournamentPct);
   } else if (returning) {
@@ -179,7 +223,7 @@ export async function onOrderPaid(store: IDataStore, opts: {
   }
   if (!(pct > 0)) return [];
 
-  const holdUntil = opts.dueAt && Date.parse(opts.dueAt) > Date.now() ? opts.dueAt : iso();
+  const holdUntil = social ? iso(Math.max(Date.now(), Date.parse(opts.dueAt || '') || 0) + Number(social.refundDays) * 86400000) : opts.dueAt && Date.parse(opts.dueAt) > Date.now() ? opts.dueAt : iso();
   const now = iso();
   const commission: AffiliateCommissionRow = {
     id: newAffId('COM'),
@@ -206,6 +250,9 @@ export async function onOrderPaid(store: IDataStore, opts: {
     attendedAt: '',
   };
   await store.createAffiliateCommission(commission);
+  if (social) await store.saveOpsRecord({kind:'pub-commission-policy',id:commission.id,version:0,uniqueKey:`ig-order:${opts.orderId}`,updatedAt:now,
+    data:{campaignId:socialPolicy!.data.campaignId,policyVersion:socialPolicy!.data.policyVersion,policy:social,holdUntil,orderId:opts.orderId}},0);
+
   await store.createAffiliateAudit({
     id: newAffId('AUD'), affiliateId: aff.id, commissionId: commission.id, actor: 'system',
     action: 'create', fromStatus: '', toStatus: 'pending',
@@ -214,7 +261,7 @@ export async function onOrderPaid(store: IDataStore, opts: {
 
   const created = [commission];
   const overridePct = inheritRate(aff.overridePct, rates.overridePct);
-  if (aff.parentId && overridePct > 0) {
+  if (!social && aff.parentId && overridePct > 0) {
     const parent = await store.getAffiliateById(aff.parentId);
     if (parent && parent.status === 'active') {
       const ov: AffiliateCommissionRow = {
@@ -235,11 +282,14 @@ export async function onOrderPaid(store: IDataStore, opts: {
 }
 
 export async function onOrderReversed(store: IDataStore, orderId: string, actor = 'system'): Promise<number> {
+  return store.runInTransaction(()=>onOrderReversedAtomic(store,orderId,actor));
+}
+async function onOrderReversedAtomic(store: IDataStore, orderId: string, actor: string): Promise<number> {
   const list = await store.listAffiliateCommissions({ orderId });
   let n = 0;
   for (const c of list) {
     if (c.status === 'reversed' || c.status === 'rejected') continue;
-    if (c.status === 'paid_out' && c.walletTxId) {
+    if (['paid_out','wallet_credited'].includes(c.status) && c.walletTxId) {
       const aff = await store.getAffiliateById(c.affiliateId);
       if (aff?.username && c.commissionAmount > 0) {
         try {
@@ -312,6 +362,16 @@ async function approveDueCommissionsAtomic(store: IDataStore): Promise<number> {
       await store.updateAffiliateCommission(c.id, { flag: 'no_wallet_user', updatedAt: iso() });
       continue;
     }
+    const socialMeta = await store.getOpsRecord?.('pub-commission-policy', c.id);
+    if (socialMeta) {
+      if (Date.parse(socialMeta.data.holdUntil) > now) continue;
+      if (aff.username === c.username) { await store.updateAffiliateCommission(c.id,{status:'rejected',flag:'self_referral',updatedAt:iso()}); continue; }
+      const evidence = c.kind === 'session' ? (await store.getOpsRecord('invoice',c.orderId))?.data : await store.getOnsiteOrder(c.orderId);
+      if (!evidence || c.kind !== 'session' && evidence.status !== 'settled') { await store.updateAffiliateCommission(c.id,{status:'reversed',reversedAt:iso(),updatedAt:iso()}); continue; }
+      await store.updateAffiliateCommission(c.id,{status:'approved',approvedAt:iso(),updatedAt:iso()});
+      await store.createAffiliateAudit({id:newAffId('AUD'),affiliateId:aff.id,commissionId:c.id,actor:'system',action:'approve_after_refund_window',fromStatus:'pending',toStatus:'approved',detail:'Wallet settlement requires an explicit monthly action',createdAt:iso()});
+      n++; continue;
+    }
     const approvedAt = iso();
     await store.updateAffiliateCommission(c.id, { status: 'approved', approvedAt, updatedAt: approvedAt });
     let txId = '';
@@ -350,6 +410,7 @@ export function funnelOf(clicks: number, leads: number, reserved: number, paid: 
 }
 
 export interface AffiliateStats {
+  walletCredited: number;
   clicks: number;
   leads: number;
   reserved: number;
@@ -365,7 +426,7 @@ export interface AffiliateStats {
 }
 
 export function emptyStats(): AffiliateStats {
-  return { clicks: 0, leads: 0, reserved: 0, paid: 0, attended: 0, netSales: 0, pending: 0, approved: 0, paidOut: 0, reversed: 0, rejected: 0, commissionCost: 0 };
+  return { walletCredited: 0, clicks: 0, leads: 0, reserved: 0, paid: 0, attended: 0, netSales: 0, pending: 0, approved: 0, paidOut: 0, reversed: 0, rejected: 0, commissionCost: 0 };
 }
 
 export function addStats(a: AffiliateStats, b: AffiliateStats): AffiliateStats {
@@ -394,6 +455,7 @@ export async function statsForAffiliate(store: IDataStore, aff: AffiliateRow, si
     }
     if (c.status === 'pending') s.pending += c.commissionAmount;
     else if (c.status === 'approved') s.approved += c.commissionAmount;
+    else if (c.status === 'wallet_credited') { s.walletCredited += c.commissionAmount; s.approved += c.commissionAmount; s.commissionCost += c.commissionAmount; }
     else if (c.status === 'paid_out') { s.paidOut += c.commissionAmount; s.approved += c.commissionAmount; s.commissionCost += c.commissionAmount; }
     else if (c.status === 'reversed') s.reversed += c.commissionAmount;
     else if (c.status === 'rejected') s.rejected += c.commissionAmount;
@@ -409,7 +471,7 @@ export function publicAffiliateDashboard(aff: AffiliateRow, stats: AffiliateStat
     language: aff.language,
     destination: aff.destination,
     status: aff.status,
-    link: `/?ref=${aff.code}`,
+    link: aff.type === 'instagram' ? null : `/?ref=${aff.code}`,
     rates: {
       newPct: aff.newPct != null && aff.newPct >= 0 ? aff.newPct : Number(settings.affiliate_new_pct),
       returnPct: aff.returnPct != null && aff.returnPct >= 0 ? aff.returnPct : Number(settings.affiliate_return_pct),

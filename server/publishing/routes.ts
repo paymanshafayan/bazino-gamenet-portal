@@ -2,6 +2,7 @@ import type express from 'express';
 import { OpsCore, endpoint, fail } from '../management/core';
 import { PublishingSettings, SECRET_NAMES } from './settings';
 import { MediaRegistry } from './registry';
+import { PublishingReports } from './reports';
 import { WebhookService, registerZernioReceiver } from './webhooks';
 import { InstagramCampaignService } from '../affiliate/campaignV4';
 import { FriendGateService,registerFriendGate } from '../affiliate/friendGate';
@@ -13,6 +14,9 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   const webhooks=new WebhookService(core),campaigns=new InstagramCampaignService(core);
   registerZernioReceiver(app,webhooks);
   registerFriendGate(app,new FriendGateService(core));
+  const reports=new PublishingReports(core);
+  app.get(`${base}/reports`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await reports.report())));
+  app.post(`${base}/settlements`,admin,endpoint(async(req,res)=>res.json(await reports.settleMonth((req as any).staff.username,req.body||{}))));
   app.get(`${base}/members`,admin,endpoint(async(_req,res)=>res.json(await campaigns.list())));
   app.get(`${base}/events`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await webhooks.queue.report())));
   let inboxBusy=false,analyticsBusy=false;

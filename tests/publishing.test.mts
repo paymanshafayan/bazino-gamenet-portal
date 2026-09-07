@@ -178,5 +178,62 @@ test('another friend of the same partner gets an independent coupon',async()=>{
 test('gate route is a real standalone route, not just a gate=1 query flag',async()=>{
  const {standalonePageFromPath}=await import('../src/utils/routes');assert.deepEqual(standalonePageFromPath('/ig/invite/ID','?token=abc'),{type:'invite',id:'ID',token:'abc'});
 });
+
+suite('Financial attribution, refund hold and monthly wallet settlement');
+const af=await import('../server/affiliate/engine');const {PublishingReports}=await import('../server/publishing/reports');
+const financial=new PublishingReports(core);
+let commissionId='';
+async function paidOrder(id:string,user:string,status='settled',amount=200){const n=new Date().toISOString();await store.createOnsiteOrder({id,username:user,kind:'reservation',amount,status,dueAt:n,payload:JSON.stringify({referralCode:partnerCode}),description:'V4 financial test',result:'{}',createdAt:n,updatedAt:n,settledAt:status==='settled'?n:'',settledBy:'cash:admin'});}
+test('financial policy must be approved; unpaid orders never create commissions',async()=>{
+ await store.createUser({username:'finance_buyer',password:'test',email:'',phone:''});await paidOrder('v4-unpaid','finance_buyer','pending_onsite');
+ assert.equal((await af.onOrderPaid(store,{username:'finance_buyer',orderId:'v4-unpaid',kind:'reservation',amount:200,payload:{referralCode:partnerCode}})).length,0);
+ const r=(await core.read('pub-affiliate-policy',partnerCode))!;await core.save('pub-affiliate-policy',partnerCode,{...r.data,policy:{...r.data.policy,financialApproved:true,commissionPct:10,refundDays:7,responsible:'owner-confirmed-test',payoutMin:0}},r.version);
+ assert.equal((await af.onOrderPaid(store,{username:'finance_buyer',orderId:'v4-unpaid',kind:'reservation',amount:200,payload:{referralCode:partnerCode}})).length,0);
+});
+test('concurrent paid callbacks use actual net amount and create one commission',async()=>{
+ await paidOrder('v4-paid','finance_buyer');const rs=await Promise.all(Array.from({length:5},()=>af.onOrderPaid(store,{username:'finance_buyer',orderId:'v4-paid',kind:'reservation',amount:999999,payload:{referralCode:partnerCode}})));
+ assert.equal(new Set(rs.map(r=>r[0].id)).size,1);commissionId=rs[0][0].id;assert.equal(rs[0][0].commissionAmount,20);assert.ok(Date.parse(rs[0][0].holdUntil)>Date.now()+6*86400000);
+});
+test('invalid explicit referral never falls back to the previous valid attribution',async()=>{
+ await store.createUser({username:'invalid_ref_buyer',password:'test',email:'',phone:''});await af.claimAttribution(store,{username:'invalid_ref_buyer',code:partnerCode,source:'link'});await paidOrder('invalid-ref-paid','invalid_ref_buyer');
+ assert.equal((await af.onOrderPaid(store,{username:'invalid_ref_buyer',orderId:'invalid-ref-paid',kind:'reservation',amount:200,payload:{referralCode:'NOTEXIST'}})).length,0);
+});
+test('returning customers and staff do not get a new-customer commission',async()=>{
+ await paidOrder('v4-return','finance_buyer');assert.equal((await af.onOrderPaid(store,{username:'finance_buyer',orderId:'v4-return',kind:'reservation',amount:200,payload:{referralCode:partnerCode}})).length,0);
+ await paidOrder('v4-admin','admin');assert.equal((await af.onOrderPaid(store,{username:'admin',orderId:'v4-admin',kind:'reservation',amount:200,userRole:'gamer',payload:{referralCode:partnerCode}})).length,0);
+});
+test('refund hold cannot be bypassed and approval does not silently pay cash or credit wallet',async()=>{
+ await store.createUser({username:'commission_owner',password:'test',email:'',phone:''});const a=(await store.getAffiliateByCode(partnerCode))!;await store.updateAffiliate(a.id,{username:'commission_owner'});
+ await af.approveDueCommissions(store);assert.equal((await store.getAffiliateCommissionById(commissionId))!.status,'pending');assert.equal(await store.getWalletBalance('commission_owner'),0);
+ await store.updateAffiliateCommission(commissionId,{holdUntil:'2020-01-01T00:00:00Z'});await af.approveDueCommissions(store);assert.equal((await store.getAffiliateCommissionById(commissionId))!.status,'pending');
+ const meta=(await core.read('pub-commission-policy',commissionId))!;await core.save('pub-commission-policy',commissionId,{...meta.data,holdUntil:'2020-01-01T00:00:00Z'},meta.version);
+ await af.approveDueCommissions(store);assert.equal((await store.getAffiliateCommissionById(commissionId))!.status,'approved');assert.equal(await store.getWalletBalance('commission_owner'),0);
+});
+test('open-month settlement is rejected and a refund reverses the approved commission',async()=>{
+ await assert.rejects(()=>financial.settleMonth('admin',{confirmed:true,period:new Date().toISOString().slice(0,7),idempotencyKey:'openmonth'}),{code:'SETTLEMENT_PERIOD_OPEN'});
+ await af.onOrderReversed(store,'v4-paid','admin');assert.equal((await store.getAffiliateCommissionById(commissionId))!.status,'reversed');
+});
+test('campaign reports count unpaid reservations separately and no cash is inferred from wallet credits',async()=>{
+ const r=await financial.report();const c=r.campaigns.find(x=>x.id==='SQUAD26')!;assert.ok(c.reserved>c.paid);assert.equal(r.financial.physicalHandoverIsAllWallets,true);assert.equal(r.financial.walletCredited,0);
+});
+
+test('closed-month settlement credits wallet once, never claims physical cash payout, and can reverse',async()=>{
+ const realNow=Date.now, date=new Date();date.setUTCDate(2);date.setUTCMonth(date.getUTCMonth()-1);const past=date.getTime(),period=date.toISOString().slice(0,7);
+ await store.createUser({username:'past_buyer',password:'test',email:'',phone:''});await paidOrder('v4-past','past_buyer');
+ let c:any;try{Date.now=()=>past;c=(await af.onOrderPaid(store,{username:'past_buyer',orderId:'v4-past',kind:'reservation',amount:200,payload:{referralCode:partnerCode}}))[0];}finally{Date.now=realNow;}
+ assert.ok(c);await af.approveDueCommissions(store);
+ const b={confirmed:true,period,idempotencyKey:'settle-month-test'};const a=await financial.settleMonth('admin',b);const replay=await financial.settleMonth('admin',b);
+ assert.equal(a.credited,20);assert.deepEqual(replay,a);assert.equal(a.physicalCashPaid,false);assert.equal(await store.getWalletBalance('commission_owner'),20);assert.equal((await store.getAffiliateCommissionById(c.id))!.status,'wallet_credited');
+ await af.onOrderReversed(store,'v4-past');assert.equal(await store.getWalletBalance('commission_owner'),0);
+});
+test('paid walk-in invoice uses only actual new gameplay cost, not linked food or prepaid bookings',async()=>{
+ await store.createUser({username:'walkin_buyer',password:'test',email:'',phone:''});await af.claimAttribution(store,{username:'walkin_buyer',code:partnerCode,source:'walkin'});
+ const receipt={id:'walkin-receipt',amount:250,direction:'in',confirmation:'operator_pos_manual'};await core.save('receipt',receipt.id,receipt,0);
+ await core.save('invoice','walkin-invoice',{username:'walkin_buyer',newGameCost:150,amount:250,receipt},0);
+ const c=await af.onOrderPaid(store,{username:'walkin_buyer',orderId:'walkin-invoice',kind:'session',amount:250});assert.equal(c[0].netAmount,150);assert.equal(c[0].commissionAmount,15);
+ await store.createUser({username:'prepaid_buyer',password:'test',email:'',phone:''});await af.claimAttribution(store,{username:'prepaid_buyer',code:partnerCode,source:'link'});
+ await core.save('invoice','prepaid-invoice',{username:'prepaid_buyer',newGameCost:150,receipt,reservationOrderId:'already-paid'},0);
+ assert.equal((await af.onOrderPaid(store,{username:'prepaid_buyer',orderId:'prepaid-invoice',kind:'session',amount:250})).length,0);
+});
 await run({title:'Publishing / Instagram v4',jsonOut:'tests/reports/publishing.json'});
 process.env=env;

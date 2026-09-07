@@ -1,7 +1,7 @@
 /** داشبورد همکار در پروفایل — /profile/affiliate */
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
-import { L } from '../../utils/i18n';
+import { L, localeOf } from '../../utils/i18n';
 import { LEGAL_PALETTE } from '../../legal/LegalShell';
 
 export default function ProfileAffiliate() {
@@ -28,17 +28,18 @@ export default function ProfileAffiliate() {
   if (!data) return <div data-profile-affiliate className="text-xs" style={{ color: LEGAL_PALETTE.muted }}>…</div>;
 
   const copy = () => {
-    const url = `${window.location.origin}/?ref=${data.code}`;
+    if(!data.link)return;
+    const url = `${window.location.origin}${data.link}`;
     navigator.clipboard?.writeText(url).catch(() => {});
   };
-  const money = (n: number) => `${Number(n || 0).toLocaleString()} TL`;
+  const money = (n: number) => `${Number(n || 0).toLocaleString(localeOf(language))} TL`;
 
   return (
     <div data-profile-affiliate className="space-y-4 text-sm" style={{ color: LEGAL_PALETTE.text }}>
       <div>
         <div className="text-xs" style={{ color: LEGAL_PALETTE.muted }}>{L(language, { fa: 'کد معرفی شما', en: 'Your referral code', ru: 'Ваш код', tr: 'Referans kodunuz' })}</div>
         <div className="font-black text-lg" dir="ltr">{data.code}</div>
-        <button type="button" onClick={copy} className="mt-1 text-xs underline" dir="ltr">{data.link || `/?ref=${data.code}`}</button>
+        {data.link ? <button type="button" onClick={copy} className="mt-1 text-xs underline" dir="ltr">{data.link}</button> : <p className="mt-2 text-xs" data-partner-code-only>{L(language,{fa:'در این کمپین فقط کد خود را برای دوست بفرستید؛ لینک خصوصی پس از تکمیل گیت مستقیماً برای دوست ارسال می‌شود.',en:'Share your code only. The private link is sent directly to your friend after the gate.',tr:'Yalnızca kodunuzu paylaşın. Özel bağlantı koşullardan sonra arkadaşınıza gönderilir.',ru:'Делитесь только кодом. Личная ссылка отправляется другу после выполнения условий.'})}</p>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         {([
@@ -53,10 +54,11 @@ export default function ProfileAffiliate() {
           </div>
         ))}
       </div>
-      <div className="text-xs">
+      {data.rates && <div className="text-xs">
         {L(language, { fa: 'نرخ‌ها', en: 'Rates', ru: 'Ставки', tr: 'Oranlar' })}:
         {' '}new {data.rates?.newPct}% · return {data.rates?.returnPct}% · tournament {data.rates?.tournamentPct}%
-      </div>
+      </div>}
+      {data.type==='instagram'&&<div className="text-xs">{L(language,{fa:'اعتبار واریزشده به کیف پول (نه تحویل نقد)',en:'Credited to wallet (not cash handed over)',tr:'Cüzdan kredisi (nakit teslim değil)',ru:'Зачислено в кошелёк (не выдача наличных)'})}: {money(data.stats?.walletCredited)}</div>}
       <div className="text-xs">{L(language, { fa: 'کمیسیون پرداخت‌شده', en: 'Paid out', ru: 'Выплачено', tr: 'Ödenen komisyon' })}: <b dir="ltr">{money(data.stats?.paidOut)}</b> · {L(language, { fa: 'در انتظار', en: 'pending', ru: 'ожидает', tr: 'beklemede' })} <b dir="ltr">{money(data.stats?.pending)}</b></div>
       {data.children?.length > 0 && (
         <div>
@@ -65,7 +67,7 @@ export default function ProfileAffiliate() {
         </div>
       )}
       <p className="text-[11px]" style={{ color: LEGAL_PALETTE.muted }}>
-        {L(language, { fa: 'نقد کردن موجودی کیف پول فقط حضوری در گیم‌نت ثبت می‌شود. کمیسیون پس از پایان مهلت لغو به کیف پول واریز می‌شود.', en: 'Wallet cash-out is recorded in person at the venue. Commission is credited after the cancellation window.', ru: 'Вывод — только на месте. Комиссия после окна отмены.', tr: 'Cüzdan nakde çevirme mekânda kaydedilir. Komisyon iptal penceresinden sonra yatırılır.' })}
+        {data.type==='instagram'?L(language,{fa:'تأیید کمیسیون پس از مهلت بازپرداخت است؛ واریز کیف پول با تسویهٔ ماهانهٔ مصوب و تحویل نقد فقط حضوری انجام می‌شود.',en:'Commissions are approved after the refund window. Wallet credit requires an approved monthly settlement; cash handover is in person.',tr:'Komisyon iade süresi sonunda onaylanır. Cüzdan kredisi onaylı aylık mutabakatla; nakit teslim yerinde yapılır.',ru:'Комиссии утверждаются после срока возврата. Кошелёк пополняется при месячном расчёте; наличные выдаются на месте.'}):L(language, { fa: 'نقد کردن موجودی کیف پول فقط حضوری در گیم‌نت ثبت می‌شود. کمیسیون پس از پایان مهلت لغو به کیف پول واریز می‌شود.', en: 'Wallet cash-out is recorded in person at the venue. Commission is credited after the cancellation window.', ru: 'Вывод — только на месте. Комиссия после окна отмены.', tr: 'Cüzdan nakde çevirme mekânda kaydedilir. Komisyon iptal penceresinden sonra yatırılır.' })}
       </p>
     </div>
   );

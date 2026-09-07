@@ -572,6 +572,19 @@ async function startServer() {
 
   // Parse ordinary JSON requests globally. Upload routes must keep the incoming stream
   // untouched so formidable/raw parsers can consume it directly.
+  // Integration signatures bind the exact wire bytes, not re-serialized JSON.
+  const signedPaths = new Set(['/api/webhooks/zernio','/api/webhooks/zernio/analytics','/api/integrations/zernio/webhook','/api/management/integrations/manus/webhook']);
+  const signedParser = express.raw({type:'application/json',limit:'1mb'});
+  app.use((req,res,next)=>{
+    if (!signedPaths.has(req.path)) return next();
+    signedParser(req,res,(err)=>{
+      if(err)return next(err);
+      if(!Buffer.isBuffer(req.body))return res.status(415).json({error:'JSON_REQUIRED'});
+      (req as any).rawBody=Buffer.from(req.body);
+      // Signature is verified by the dedicated handler before parsing business data.
+      next();
+    });
+  });
   const jsonParser = express.json({
     limit: "260mb",
     verify: (req, _res, buf) => {
@@ -583,6 +596,7 @@ async function startServer() {
   });
   app.use((req, res, next) => {
     if (
+      signedPaths.has(req.path) ||
       req.path === "/api/admin/mobile-app/upload-apk" ||
       req.path === "/api/admin/mobile-app/upload-apk/chunk" ||
       req.path === "/api/admin/themes/install"

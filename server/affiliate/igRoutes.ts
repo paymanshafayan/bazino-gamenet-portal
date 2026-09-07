@@ -66,49 +66,6 @@ export function registerIgRoutes(d: IgRouteDeps) {
     res.status(410).json({error:'MEDIA_INGEST_ONLY', ingestPath:'/api/integrations/instagram/published-media'});
   });
 
-  app.post('/api/integrations/zernio/webhook', async (req, res) => {
-    try {
-      const raw = (req as any).rawBody as Buffer | undefined;
-      const payload = raw || Buffer.from(JSON.stringify(req.body || {}));
-      const sigOk = verifyZernioSignature(payload, String(req.headers['x-zernio-signature'] || ''));
-      const bearerOk = await isValidApiToken(store(),bearer(req),'webhook:receive');
-      if (!sigOk && !bearerOk) {
-        return res.status(401).json({ error: 'unauthorized', code: 'unauthorized' });
-      }
-      const body = req.body || {};
-      const event = String(body.event || body.type || '');
-      let outboundSent = false;
-      if (event === 'comment.received' || body.comment) {
-        const c = body.comment || {};
-        const mediaId = String(c.platformPostId || c.mediaId || body.platformPostId || '');
-        const r = await onCampaignComment(store(), {
-          mediaId,
-          commentId: String(c.id || c.commentId || ''),
-          text: String(c.text || c.message || ''),
-          igUserId: String(c.author?.id || c.authorId || c.igUserId || ''),
-          igUsername: String(c.author?.username || c.username || ''),
-        });
-        if (r.ok && r.outbound) {
-          const sent = await dispatchIgOutbound(r.outbound, mediaId);
-          outboundSent = !!sent.sent;
-        }
-      } else if (event === 'message.received' || body.button || body.postback) {
-        const payloadStr = String(body.button?.payload || body.postback?.payload || body.message?.payload || body.payload || '');
-        const memberId = parseFollowPayload(payloadStr);
-        if (memberId) {
-          const verified = await zernioFollowStatus(String(body.sender?.id || body.message?.sender?.id || ''));
-          const r = await onFollowButton(store(), memberId, verified === true);
-          if (r.ok && r.outbound) {
-            const mediaId = r.member?.mediaId || '';
-            const sent = await dispatchIgOutbound(r.outbound, mediaId);
-            outboundSent = !!sent.sent;
-          }
-        }
-      }
-      res.json({ ok: true, outboundSent });
-    } catch (e) { httpError(res, e); }
-  });
-
   // Integration API tokens (Manus / Zernio). Admin only (mounted under /api/admin).
   app.get('/api/admin/api-tokens', async (_req, res) => {
     try { res.json({ tokens: await listApiTokens(store()) }); } catch (e) { httpError(res, e); }

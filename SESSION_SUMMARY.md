@@ -1051,3 +1051,11 @@ TTFB 240ms و ریدایرکت 307 → تنظیمات Cloudflare؛ بیکن Clou
 - معماری: Generator مستقل، Content/Approval موجود، adapters بیرونی/Zernio، registry مشترک رسانهٔ منتشرشدهٔ مصوب و Affiliate Engine موجود. discovery مجوز کمپین نمی‌سازد؛ تغییر ناشر فقط برای job جدید و بدون failover کور در timeout.
 - Handoff §۲۰، سند ادامه، راهنمای افیلیت و issues به‌روز شدند؛ همهٔ تغییرات مرتبط طبق قانون ۳ commit/push می‌شوند.
 - بررسی انجام‌شده: Changelog/Analytics/Accounts رسمی و مدل‌های SDK از GitHub، بازبینی `ContentService.publishOne` و کنترل اسناد. صفحات پوسته‌ای Posts/Inbox شاهد محتوا فرض نشدند. بدون تغییر کد محصول، اشتراک، سکرت، نصب، تست برنامه/Chromium، انتشار پیام/پست یا deployment.
+
+## ۱۴۰۵/۰۶/۱۶ — پلن نسخهٔ ۳: انتشار دستی ادمین با تصویر/ویدئو/کپشن/قالب
+
+- درخواست ادمین برای upload واقعی فایل و انتخاب قالب انتشار، به Composer مشترک و بچ ۷ افزوده شد؛ تعداد بچ‌ها ۸ و فهرست تیک‌های اصلی ۲۳ ثابت است. اصل متن سند افیلیت تغییر نکرد.
+- قالب‌های هدف: تک‌تصویر، Carousel ترکیبی، Reel و Story مجاز؛ مدیریت ترتیب/جایگزینی، thumbnail/پخش/کاور، caption، preview و تأیید نسخه، اکنون یا زمان‌بندی با timezone. Story یا پست عمومی خودکار وارد کمپین نمی‌شود.
+- طراحی media library خصوصی/پایدار با assetId/version/hash، upload امن/قطعه‌ای و staging نزدیک نشر؛ عمر temp/URL زرنیو با ماندگاری اصل فایل اشتباه نمی‌شود. API Key فقط سرور و دادهٔ انتشار مصوب ثابت است.
+- `ContentConsole` و `ContentVersion`/sanitizer، مسیرهای storage و مستندات رسمی presign/Media Uploads/Instagram بررسی شدند؛ نبود Composer و خطر انقضای asset در E.118/E.119 ثبت شد.
+- هندآف §۲۱، سند ادامه، پلن v3 و معماری §۵٫۱ به‌روز شدند و طبق قانون ۳ commit/push می‌شوند. این نوبت فقط طراحی/اسناد است: بدون کد محصول، نصب، upload، تست برنامه/Chromium، تغییر subscription/هاست یا انتشار واقعی.

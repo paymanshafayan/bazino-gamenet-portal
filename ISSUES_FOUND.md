@@ -488,3 +488,12 @@ main آن کار خاصی جز «require کردن `server.cjs` درون‌پرد
 | E.117 | رویدادهای آمار/اکتشاف می‌توانند مسیر تعامل را شلوغ کنند | ریسک طراحی، نه رخداد تأییدشدهٔ production | ⏳ پیشنهاد ۲۳ event اصلی، subscription/صف جدا برای analytics.synced، delta cursor و اولویت کامنت در سند معماری ثبت شد. خرابی/افت سرعت واقعی هاست ادعا نمی‌شود؛ تست بار در بچ ۸ انجام خواهد شد |
 
 مرجع: `docs/publishing/ZERNIO_EVENTS_AND_ARCHITECTURE.md` و پلن افیلیت نسخهٔ ۲. صرف انتخاب eventها، پیاده‌سازی گیرنده یا مجوز انتشار واقعی نیست.
+
+## ۱۴۰۵/۰۶/۱۶ — Composer ادمین و ماندگاری رسانهٔ انتشار
+
+| # | مورد | نوع | وضعیت |
+|---|---|---|---|
+| E.118 | فرم فعلی محتوا uploader/Carousel Composer ندارد و مدل مدیا تک‌مقداری است | فاصلهٔ کد با درخواست ادمین | ⏳ در `shared/management/Content.tsx` فقط متن/پیش‌نویس و در `ContentVersion`/sanitizer فقط mediaUrl/mediaType دیده شد. upload، ordered assets، caption/format/cover/preview و publish UI مشترک در پلن v3 بچ ۷ ثبت شده؛ هنوز پیاده نشده |
+| E.119 | URL موقت Zernio برای draft و زمان‌بندی طولانی کافی نیست | ریسک طراحی/نگه‌داری فایل | ⏳ طبق راهنمای رسمی uploadUrl یک ساعت و temp هفت روز است؛ source file خصوصی/پایدار و staging نزدیک نشر، همراه اعتبارسنجی asset/session و تست persistence لازم است. صرف BAZINO_DATA_DIR متفاوت اثبات Volume نیست؛ خرابی واقعی هاست یا تست موفق ادعا نشده |
+
+مرجع: `docs/publishing/ZERNIO_EVENTS_AND_ARCHITECTURE.md §۵٫۱` و پلن نسخهٔ ۳. سقف upload عمومی با قابلیت انتشار Instagram و موفقیت بارگذاری با published اشتباه نشود.

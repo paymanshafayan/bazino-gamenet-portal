@@ -127,26 +127,7 @@ export function registerIgRoutes(d: IgRouteDeps) {
     } catch (e) { httpError(res, e); }
   });
 
-  app.post('/api/admin/ig/simulate-comment', async (req, res) => {
-    try {
-      const b = req.body || {};
-      const r = await onCampaignComment(store(), {
-        mediaId: String(b.mediaId || ''),
-        commentId: String(b.commentId || ''),
-        text: String(b.text || ''),
-        igUserId: String(b.igUserId || ''),
-        igUsername: String(b.igUsername || ''),
-      });
-      if (!r.ok) return res.status(400).json({ error: r.error, code: r.error });
-      res.json({ success: true, member: r.member, outbound: r.outbound });
-    } catch (e) { httpError(res, e); }
-  });
+  // Legacy simulators mutated real coupons without the V4 gate; do not retain that bypass.
+  for (const route of ['/api/admin/ig/simulate-comment','/api/admin/ig/simulate-button']) app.post(route,(_req,res)=>res.status(410).json({error:'LEGACY_SIMULATOR_RETIRED'}));
 
-  app.post('/api/admin/ig/simulate-button', async (req, res) => {
-    try {
-      const r = await onFollowButton(store(), String((req.body || {}).memberId || ''), !!(req.body || {}).followVerified);
-      if (!r.ok) return res.status(400).json({ error: r.error, code: r.error });
-      res.json({ success: true, member: r.member, outbound: r.outbound });
-    } catch (e) { httpError(res, e); }
-  });
 }

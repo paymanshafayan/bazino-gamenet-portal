@@ -41,7 +41,7 @@ export class DurableQueue {
       });
     }
   }
-  async sendOutbox(beforeSend?:(data:any)=>Promise<boolean>,afterSend?:(data:any,result:any)=>Promise<void>){
+  async sendOutbox(beforeSend?:(data:any)=>Promise<boolean>,afterSend?:(data:any,result:any)=>Promise<void>,prepare?:(data:any)=>Promise<any>){
     if(!(await this.settings.config()).data.outboundEnabled)return;
     const rows=(await this.core.list('pub-outbox')).filter(r=>['queued','sending'].includes(r.data.status)).sort((a,b)=>a.data.createdAt.localeCompare(b.data.createdAt)).slice(0,10);
     for(const row of rows){
@@ -59,7 +59,7 @@ export class DurableQueue {
       let status='sent',error='',result:any,delay=0;
       try{
         if(beforeSend && !await beforeSend(input)){status='blocked';error='MEDIA_OR_POLICY_INACTIVE';}
-        else result=await this.client.send(input,row.id);
+        else result=await this.client.send(prepare?await prepare(input):input,row.id);
       }catch(e:any){status=e instanceof ProviderFailure&&e.uncertain?'delivery_unknown':'failed';error=e.code||'SEND_ERROR';if(e.retryAfter){status='queued';delay=e.retryAfter*1000;}}
       await this.core.store.runInTransaction(async()=>{
         const r=await this.core.read('pub-outbox',row.id);if(!r||r.data.leaseToken!==token)return;

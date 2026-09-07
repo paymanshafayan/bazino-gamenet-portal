@@ -26,6 +26,21 @@ if(Number(batch)>=2){
   return {rawHmac:true,legacyAlias:true};
  },{token:auth.token,secret,raw,sig});Object.assign(result,probe);
 }
+if(Number(batch)>=3){
+ await page.evaluate(async(token)=>{
+  const h={Authorization:`Bearer ${token}`,'Content-Type':'application/json'};
+  const api=async(p,m='GET',b)=>{const r=await fetch('/api/management/publishing'+p,{method:m,headers:h,body:b?JSON.stringify({...b,idempotencyKey:crypto.randomUUID()}):undefined});const d=await r.json();if(!r.ok)throw Error(d.error);return d;};
+  const c=await api('/config');await api('/config','PUT',{...c.config.data,zernioAccountId:'local-account',outboundEnabled:false,version:c.config.version});
+  const cp=(await api('/campaigns'))[0];await api('/campaigns/'+cp.id,'PUT',{...cp.data,accountId:'local-account',active:true,policyConfirmed:true,version:cp.version});
+  await api('/media','POST',{media_id:'18109137383324992',media_type:'post',accountId:'local-account',campaign_id:cp.id});
+ },auth.token);
+ const ev={id:'browser-event-'+batch,event:'comment.received',account:{id:'local-account',platform:'instagram'},post:{platformPostId:'18109137383324992'},comment:{id:'browser-comment-'+batch,platformPostId:'18109137383324992',author:{id:String(99000+Number(batch)),username:'browser-fixture-'+batch},text:'Ready',createdAt:new Date().toISOString()},timestamp:new Date().toISOString()};
+ const raw=JSON.stringify(ev),sig=createHmac('sha256','local-browser-hook-only').update(raw).digest('hex');
+ await page.evaluate(async({raw,sig})=>{const r=await fetch('/api/webhooks/zernio',{method:'POST',headers:{'Content-Type':'application/json','X-Zernio-Signature':sig},body:raw});if(!r.ok)throw Error('Comment webhook failed');},{raw,sig});
+ await page.waitForFunction(async({token,batch})=>{const r=await fetch('/api/management/publishing/members',{headers:{Authorization:`Bearer ${token}`}});if(!r.ok)return false;return (await r.json()).some(m=>m.username==='browser-fixture-'+batch&&m.status==='partner_follow_pending'&&m.language==='en');},{token:auth.token,batch},{timeout:15000});
+ Object.assign(result,{signedComment:true,queuedNotSent:true,correctLanguage:true});
+ await page.reload({waitUntil:'domcontentloaded'});await page.locator('[data-api-tokens]').waitFor({timeout:30000});
+}
 await page.screenshot({path:`/home/user/visual-testing/v4/batch${batch}.png`,fullPage:true});
 writeFileSync(`/home/user/visual-testing/v4/batch${batch}.json`,JSON.stringify({result,errors},null,2));
 console.log(JSON.stringify({batch,result,errorCount:errors.length}));

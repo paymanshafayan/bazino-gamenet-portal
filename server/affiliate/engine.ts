@@ -156,6 +156,8 @@ export async function onOrderPaid(store: IDataStore, opts: {
   const resolved = await attributionForUser(store, opts.username);
   if (!resolved) return [];
   const { aff } = resolved;
+  const socialPolicy = await store.getOpsRecord?.('pub-affiliate-policy', aff.code);
+  if (socialPolicy && !socialPolicy.data.policy?.financialApproved) return [];
   if (aff.username && aff.username.toLowerCase() === opts.username.toLowerCase()) return [];
 
   const existing = (await store.listAffiliateCommissions({ orderId: opts.orderId }))

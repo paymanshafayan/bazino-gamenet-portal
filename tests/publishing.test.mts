@@ -68,5 +68,71 @@ test('timed-out sends become unknown and are not retried blindly',async()=>{
  const id=await q.enqueue({kind:'private_reply',accountId:'acc',commentId:'timeout',mediaId:'1234567',memberId:'test',text:'x',expiresAt:new Date(Date.now()+60000).toISOString()},'partner1');
  await q.sendOutbox();const count=calls;await q.sendOutbox();assert.equal(calls,count);assert.equal((await core.read('pub-outbox',id))!.data.status,'delivery_unknown');
 });
+
+suite('Four-language partner/friend state machine');
+const {InstagramCampaignService,wholeKeyword,commentLanguage,renderCampaign}=await import('../server/affiliate/campaignV4');
+const {CAMPAIGN_MESSAGES}=await import('../shared/publishing/messages');
+const sent:any[]=[];
+const fetcher:typeof fetch=async(url,init)=>{
+ if(String(url).includes('follow-status'))return new Response(JSON.stringify({isFollower:null}),{status:200});
+ sent.push({url:String(url),body:JSON.parse(String(init?.body))});return new Response(JSON.stringify({messageId:`message-${sent.length}`}),{status:200});
+};
+const campaign=new InstagramCampaignService(core,fetcher);
+let partnerId='',friendId='',partnerCode='';
+const comment=(id:string,authorId:string,text:string)=>({type:'comment.received',accountId:'acc',nativeId:'1234567',commentId:id,authorId,username:`test-${authorId}`,text,createdAt:new Date().toISOString(),timestamp:new Date().toISOString()});
+test('Unicode whole-word and Turkish casing; ambiguous language does not auto-select',()=>{
+ assert.ok(wholeKeyword('من آماده هستم!','آماده','fa'));assert.ok(!wholeKeyword('آماده‌ای؟','آماده','fa'));
+ assert.ok(wholeKeyword('HAZIR!','Hazır','tr'));assert.ok(!wholeKeyword('Already','Ready','en'));
+ assert.ok(wholeKeyword('Я Готово!','Готово','ru'));assert.equal(commentLanguage('Ready آماده',defaultCampaign(),['fa','en']),'ambiguous');
+});
+test('partner comment queues first PR without recording sent before delivery',async()=>{
+ const r=await campaign.onComment(comment('partner-1','10001','Ready'));assert.ok(r.ok);partnerId=r.memberId!;
+ let m=(await core.read('pub-member',partnerId))!;partnerCode=m.data.partnerCode;assert.equal(m.data.language,'en');assert.equal(m.data.status,'partner_follow_pending');
+ const o=await core.read('pub-outbox',r.outboxId!);assert.equal(o!.data.status,'queued');assert.ok(!o!.data.text.includes('/ig/invite/'));assert.ok(!o!.data.text.includes(partnerCode));
+ await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));assert.equal((await core.read('pub-outbox',r.outboxId!))!.data.status,'sent');
+});
+test('button must belong to the actual sender and conversation',async()=>{
+ const m=(await core.read('pub-member',partnerId))!,button=await campaign.button(partnerId,m.data);
+ const bad=await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'99999',conversationId:'wrong',button,direction:'incoming',timestamp:new Date().toISOString()});assert.ok(bad.ignored);assert.equal((await core.read('pub-member',partnerId))!.data.status,'partner_follow_pending');
+});
+test('partner DM is code plus approved text, never an invitation link',async()=>{
+ const m=(await core.read('pub-member',partnerId))!,button=await campaign.button(partnerId,m.data);
+ await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'10001',participantId:'10001',conversationId:'partner-conv',button,direction:'incoming',timestamp:new Date().toISOString()});
+ await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
+ assert.equal((await core.read('pub-member',partnerId))!.data.status,'code_sent');assert.equal((await core.read('pub-member',partnerId))!.data.followMethod,'button_event_only');
+ const last=sent.at(-1);assert.ok(last.url.endsWith('/partner-conv/messages'));assert.ok(last.body.message.includes(partnerCode));assert.ok(!last.body.message.includes('/ig/invite/'));
+});
+test('friend code on another media and self-referral never pass',async()=>{
+ assert.ok((await campaign.onComment(comment('self','10001',partnerCode))).ignored);
+ const r=await campaign.onComment({...comment('other-media','10002',partnerCode),nativeId:'999888'});assert.ok(r.wait);
+});
+test('friend comment inherits partner language and records indirect share evidence',async()=>{
+ const r=await campaign.onComment(comment('friend-1','10002',partnerCode));friendId=r.memberId!;
+ const m=(await core.read('pub-member',friendId))!;assert.equal(m.data.language,'en');assert.equal(m.data.shareStatus,'share_confirmed_by_friend_code');assert.equal(m.data.status,'friend_follow_pending');
+ await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
+});
+test('only friend receives the private link; raw URL is absent from persisted outbox/admin report',async()=>{
+ const m=(await core.read('pub-member',friendId))!,button=await campaign.button(friendId,m.data);
+ const r=await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'10002',participantId:'10002',conversationId:'friend-conv',button,direction:'incoming',timestamp:new Date().toISOString()});
+ const out=await core.read('pub-outbox',r.outboxId!);assert.ok(!JSON.stringify(out).includes('/ig/invite/'));
+ await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
+ assert.ok(sent.at(-1).url.endsWith('/friend-conv/messages'));assert.ok(sent.at(-1).body.message.includes('/ig/invite/'));
+ assert.ok(!JSON.stringify(await campaign.list()).includes('token='));
+ await assert.rejects(async()=>campaign.linkToken(partnerId,(await core.read('pub-member',partnerId))!.data),{code:'FRIEND_GATE_REQUIRED'});
+});
+test('concurrent repeats cannot add extra PRs or replace saved language',async()=>{
+ const before=(await core.list('pub-outbox')).length;
+ await Promise.all([campaign.onComment(comment('partner-1','10001','آماده')),campaign.onComment(comment('partner-1','10001','Ready'))]);
+ assert.equal((await core.list('pub-outbox')).length,before);assert.equal((await core.read('pub-member',partnerId))!.data.language,'en');
+});
+test('approved Persian second message is preserved except for its code placeholder',()=>{
+ assert.equal(renderCampaign(CAMPAIGN_MESSAGES.fa.partner2,'123456'),CAMPAIGN_MESSAGES.fa.partner2.replace('[عدد یکتا]','123456'));
+});
+test('all four campaign languages get the matching partner message',async()=>{
+ for(const [i,l] of ['fa','tr','en','ru'].entries()){
+   const r=await campaign.onComment(comment(`lang-${l}`,String(20000+i),defaultCampaign().keywords[l]));const m=await core.read('pub-member',r.memberId!);assert.equal(m!.data.language,l);
+   const o=await core.read('pub-outbox',r.outboxId!);assert.equal(o!.data.text,CAMPAIGN_MESSAGES[l].partner1);
+ }
+});
 await run({title:'Publishing / Instagram v4',jsonOut:'tests/reports/publishing.json'});
 process.env=env;

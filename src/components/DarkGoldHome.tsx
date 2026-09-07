@@ -102,7 +102,7 @@ export default function DarkGoldHome({
   };
 
   const getButtonText = (target: string) => {
-    const normTarget = target === 'reserve' ? 'reservations' : target;
+    const normTarget = target === 'reserve' ? 'games' : target;
     switch (normTarget) {
       case 'cafe':
         return {
@@ -143,7 +143,7 @@ export default function DarkGoldHome({
   };
 
   const getButtonIcon = (target: string) => {
-    const normTarget = target === 'reserve' ? 'reservations' : target;
+    const normTarget = target === 'reserve' ? 'games' : target;
     switch (normTarget) {
       case 'cafe':
         return <Utensils className="w-4 h-4 text-black" />;
@@ -217,7 +217,7 @@ export default function DarkGoldHome({
               </p>
               
               <div className="flex gap-4 mt-8 transform skew-x-12">
-                <button onClick={() => onNavigate('reservations')} className="bg-primary text-black px-8 py-4 font-black uppercase text-sm -skew-x-12 hover:bg-white transition-colors border-none">
+                <button onClick={() => onNavigate('games')} className="bg-primary text-black px-8 py-4 font-black uppercase text-sm -skew-x-12 hover:bg-white transition-colors border-none">
                   <span className="block skew-x-12">{L(language, { fa: 'همین حالا رزرو کن', en: 'GET STARTED', ru: 'ЗАБРОНИРОВАТЬ СЕЙЧАС', tr: 'HEMEN REZERVE ET' })}</span>
                 </button>
               </div>
@@ -249,7 +249,7 @@ export default function DarkGoldHome({
             </p>
             
             <div className="flex flex-wrap gap-6">
-              <button onClick={() => onNavigate('reservations')} className="theme-btn px-10 py-4 bg-[#00f0ff] text-black font-black uppercase text-sm hover:bg-white hover:text-black transition-colors relative group overflow-hidden">
+              <button onClick={() => onNavigate('games')} className="theme-btn px-10 py-4 bg-[#00f0ff] text-black font-black uppercase text-sm hover:bg-white hover:text-black transition-colors relative group overflow-hidden">
                 <span className="relative z-10">{L(language, { fa: 'شروع هک سیستم', en: 'INITIATE PROTOCOL', ru: 'ЗАПУСТИТЬ ПРОТОКОЛ', tr: 'PROTOKOLÜ BAŞLAT' })}</span>
                 <div className="absolute inset-0 bg-[#ff003c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-in-out z-0"></div>
                 <span className="relative z-10 group-hover:text-white transition-colors duration-300"> {L(language, { fa: 'شروع هک سیستم', en: 'INITIATE PROTOCOL', ru: 'ЗАПУСТИТЬ ПРОТОКОЛ', tr: 'PROTOKOLÜ BAŞLAT' })}</span>
@@ -301,7 +301,7 @@ export default function DarkGoldHome({
                   <div className="flex flex-wrap gap-3 mt-2">
                     <button
                       onClick={() => {
-                        const targetRoute = activeGame.target === 'reserve' ? 'reservations' : (activeGame.target || 'reservations');
+                        const targetRoute = activeGame.target === 'reserve' ? 'games' : (activeGame.target || 'games');
                         onNavigate(targetRoute);
                       }}
                       className="btn btn-primary-outline display-4 flex items-center gap-2 notched-clip-sm"
@@ -384,7 +384,7 @@ export default function DarkGoldHome({
                   </div>
 
                   <button
-                    onClick={() => onNavigate('reservations')}
+                    onClick={() => onNavigate('games')}
                     className="mt-4 w-full py-2.5 bg-primary/20 hover:bg-primary text-primary hover:text-black font-black text-xs border border-primary/40 hover:border-primary transition-all duration-200 cursor-pointer flex items-center justify-center gap-1 notched-clip-sm"
                   >
                     <span>{L(language, { fa: 'مشاهده رزروها', en: 'Launch Session', ru: 'Начать сессию', tr: 'Seansı Başlat' })}</span>
@@ -457,7 +457,7 @@ export default function DarkGoldHome({
                 </div>
 
                 <button
-                  onClick={() => onNavigate(sect.id === 'consoles' ? 'reservations' : (sect.id as any))}
+                  onClick={() => onNavigate(sect.id === 'consoles' ? 'games' : (sect.id as any))}
                   className="w-full py-2.5 btn btn-primary-outline display-4 text-xs flex items-center justify-center gap-1.5 theme-btn"
                 >
                   <span>{getLocText(sect.btnText)}</span>
@@ -767,7 +767,7 @@ export default function DarkGoldHome({
                       </li>
                     ))}
                   </ul>
-                  <button onClick={() => onNavigate('reservations')} className="w-full py-3 btn btn-primary-outline display-4 text-xs flex items-center justify-center theme-btn">
+                  <button onClick={() => onNavigate('games')} className="w-full py-3 btn btn-primary-outline display-4 text-xs flex items-center justify-center theme-btn">
                     {L(language, { fa: 'شارژ حساب و خرید پکیج', en: 'Purchase Pass Ticket', ru: 'Купить абонемент', tr: 'Pass Satın Al' })}
                   </button>
                 </div>

@@ -148,10 +148,10 @@ await step('mobile-navigation-availability', async (rec) => {
   return info;
 });
 
-for (const [label, tab] of [['رزرو', 'reservations'], ['کافه', 'cafe'], ['فروشگاه', 'shop'], ['مسابقات', 'tournaments'], ['باشگاه', 'loyalty']]) {
+for (const [label, tab] of [['بازی‌ها', 'games'], ['کافه', 'cafe'], ['فروشگاه', 'shop'], ['مسابقات', 'tournaments'], ['باشگاه', 'loyalty']]) {
   await step(`mobile-tab-${tab}`, async (rec) => {
     // reach the tab the only way a phone user can: home CTA buttons
-    const cta = page.locator('button', { hasText: new RegExp(label === 'رزرو' ? 'رزرو' : label) }).first();
+    const cta = page.locator('button', { hasText: new RegExp(label === 'بازی‌ها' ? 'رزرو|بازی' : label) }).first();
     if (await cta.count()) { await cta.click({ timeout: 15000 }).catch(() => {}); }
     else rec.notes.push('no mobile entry point for ' + label);
     await page.waitForTimeout(3000);

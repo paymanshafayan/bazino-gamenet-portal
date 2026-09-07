@@ -2314,5 +2314,55 @@ test('private invitation shell prevents Referer leakage and invalid tokens creat
  const page=await fetch(BASE+'/ig/invite/not-real?token=private-example');assert.equal(page.status,200);assert.equal(page.headers.get('referrer-policy'),'no-referrer');
  const r=await fetch(BASE+'/api/instagram/invites/not-real?token=bad');assert.equal(r.status,404);
 });
+suite('39. API — Games page: system audience + requested game on reservations');
+
+let gamesKidsSystemId = '';
+
+test('admin can tag a system audience; invalid values are rejected; list exposes audience', async () => {
+  const created = await postJson(`${BASE}/api/admin/systems`, { name: 'GamesKids PC', type: 'PC', hourlyRate: 90, isActive: true, audience: 'kids' }, adminAuth());
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  gamesKidsSystemId = created.body.systems.find((s: any) => s.name === 'GamesKids PC').id;
+  const invalid = await postJson(`${BASE}/api/admin/systems`, { name: 'BadAudience', type: 'PC', hourlyRate: 90, audience: 'vip-lounge' }, adminAuth());
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.body.code, 'INVALID_AUDIENCE');
+  const updated = await putJson(`${BASE}/api/admin/systems/${gamesKidsSystemId}`, { audience: 'adults' }, adminAuth());
+  assert.equal(updated.status, 200);
+  const after = updated.body.systems.find((s: any) => s.id === gamesKidsSystemId);
+  assert.equal(after.audience, 'adults');
+  const back = await putJson(`${BASE}/api/admin/systems/${gamesKidsSystemId}`, { audience: 'kids' }, adminAuth());
+  assert.equal(back.status, 200);
+  const anonList: any = await getJson(`${BASE}/api/systems`, 200);
+  assert.equal(anonList.find((s: any) => s.id === gamesKidsSystemId).audience, 'kids');
+});
+
+test('a reserved station records the requested game; it shows for the customer and the admin', async () => {
+  const rgUser = `rg-${Date.now()}`;
+  const rgPhone = `+90555${String(Date.now()).slice(-7)}`;
+  const reg = await postJson(`${BASE}/api/auth/register`, { username: rgUser, email: `${rgUser}@t.dev`, password: 'Passw0rd!', phone: rgPhone });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  const rgAuth = { Authorization: `Bearer ${reg.body.token}` };
+  const top = await staffTopup(rgPhone, 1000);
+  assert.equal(top.status, 200, JSON.stringify(top.body));
+  const sys: any = sample.SAMPLE_SYSTEMS.find((s: any) => !s.isReserved);
+  const r = await postJson(`${BASE}/api/checkout/wallet`, { kind: 'reservation', params: { systemId: sys.id, startTime: '21:00', endTime: '22:00', date: 'فردا', requestedGame: '  FIFA   26  ' } }, rgAuth);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.result.reservationId);
+  const mine: any = await getJson(`${BASE}/api/reservations`, 200, rgAuth);
+  const mineRow = mine.find((x: any) => x.id === r.body.result.reservationId);
+  assert.ok(mineRow, 'reservation missing for its owner');
+  assert.equal(mineRow.requestedGame, 'FIFA 26');
+  const adminList: any = await getJson(`${BASE}/api/reservations`, 200, adminAuth());
+  assert.equal(adminList.find((x: any) => x.id === r.body.result.reservationId).requestedGame, 'FIFA 26');
+});
+
+test('management booking view carries requestedGame for the front desk', async () => {
+  // نرم‌افزار مدیریت رزروها را از /api/management/floor می‌خواند (bookingViews)
+  const floor = await fetch(`${BASE}/api/management/floor`, { headers: adminAuth() });
+  assert.equal(floor.status, 200);
+  const rows: any = await floor.json();
+  const hit = (rows.reservations || []).find((x: any) => x.id && x.requestedGame === 'FIFA 26');
+  assert.ok(hit, 'requestedGame missing from management booking views');
+});
+
 await run({ title: 'Bazino — API & end-to-end tests', jsonOut: 'tests/reports/api.json' });
 shutdown();

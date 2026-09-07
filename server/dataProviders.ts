@@ -144,8 +144,8 @@ export interface TransactionRow { id: string; points: number; description: strin
 /** ownerUsername: رشته‌ی خالی = کد تبلیغاتی عمومی؛ نام کاربری = کد شخصیِ حاصل از تبدیل امتیاز
  *  که فقط خودِ آن کاربر باید ببیند و خرج کند. */
 export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; ownerUsername?: string; scopes?: string; }
-export interface SystemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; }
-export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; }
+export interface SystemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; audience?: string; }
+export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; requestedGame?: string; }
 export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; }
 export interface CafeOrderRow { id: string; items: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; tableNumber: string; date: string; status: string; username?: string; }
 export interface AccessoryRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; description: string; descriptionFa?: string; descriptionEn?: string; descriptionRu?: string; descriptionTr?: string; price: number; imageUrl: string; mobileImageUrl?: string; stock: number; category: string; }
@@ -479,8 +479,8 @@ export class SqliteStore implements IDataStore {
       CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, room TEXT, username TEXT, message TEXT, timestamp TEXT);
       CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, points INTEGER, description TEXT, type TEXT, date TEXT);
       CREATE TABLE IF NOT EXISTS active_coupons (code TEXT PRIMARY KEY, type TEXT, value REAL, minOrder REAL, expiry TEXT, expiryDate TEXT, maxUsageCount INTEGER DEFAULT 1, usageCount INTEGER DEFAULT 0, isActive INTEGER DEFAULT 1);
-      CREATE TABLE IF NOT EXISTS systems (id TEXT PRIMARY KEY, name TEXT, type TEXT, hourlyRate REAL, isActive INTEGER DEFAULT 1, isReserved INTEGER DEFAULT 0);
-      CREATE TABLE IF NOT EXISTS reservation_logs (id TEXT PRIMARY KEY, systemId TEXT, username TEXT, systemName TEXT, startTime TEXT, endTime TEXT, totalPrice REAL, date TEXT, checkedIn INTEGER DEFAULT 0, timestamp TEXT);
+      CREATE TABLE IF NOT EXISTS systems (id TEXT PRIMARY KEY, name TEXT, type TEXT, hourlyRate REAL, isActive INTEGER DEFAULT 1, isReserved INTEGER DEFAULT 0, audience TEXT DEFAULT '');
+      CREATE TABLE IF NOT EXISTS reservation_logs (id TEXT PRIMARY KEY, systemId TEXT, username TEXT, systemName TEXT, startTime TEXT, endTime TEXT, totalPrice REAL, date TEXT, checkedIn INTEGER DEFAULT 0, timestamp TEXT, requestedGame TEXT DEFAULT '');
       CREATE TABLE IF NOT EXISTS cafe_items (id TEXT PRIMARY KEY, name TEXT, category TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, inventory INTEGER, isAvailable INTEGER DEFAULT 1);
       CREATE TABLE IF NOT EXISTS cafe_orders (id TEXT PRIMARY KEY, items TEXT, totalPrice REAL, discountApplied REAL, finalAmount REAL, couponCode TEXT, tableNumber TEXT, date TEXT, status TEXT);
       CREATE TABLE IF NOT EXISTS accessories (id TEXT PRIMARY KEY, name TEXT, description TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, stock INTEGER, category TEXT);
@@ -561,6 +561,9 @@ export class SqliteStore implements IDataStore {
       // مالکیت سفارش‌ها برای «سفارش‌های من»
       { table: 'cafe_orders', column: 'username', type: "TEXT DEFAULT ''" },
       { table: 'shop_orders', column: 'username', type: "TEXT DEFAULT ''" },
+      // صفحهٔ Games: دستهٔ مخاطب سیستم + بازی درخواستی رزرو
+      { table: 'systems', column: 'audience', type: "TEXT DEFAULT ''" },
+      { table: 'reservation_logs', column: 'requestedGame', type: "TEXT DEFAULT ''" },
     ];
     for (const { table, column, type } of wanted) {
       try {
@@ -663,15 +666,15 @@ export class SqliteStore implements IDataStore {
     return row ? { ...row, isActive: !!row.isActive, isReserved: !!row.isReserved } : undefined;
   }
   async createSystem(s: SystemRow) {
-    this.db.prepare(`INSERT INTO systems (id, name, type, hourlyRate, isActive, isReserved) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(s.id, s.name, s.type, s.hourlyRate, s.isActive ? 1 : 0, s.isReserved ? 1 : 0);
+    this.db.prepare(`INSERT INTO systems (id, name, type, hourlyRate, isActive, isReserved, audience) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(s.id, s.name, s.type, s.hourlyRate, s.isActive ? 1 : 0, s.isReserved ? 1 : 0, s.audience || '');
   }
   async updateSystem(id: string, f: Partial<SystemRow>) {
     const current = await this.getSystemById(id);
     if (!current) return;
     const merged = { ...current, ...f };
-    this.db.prepare(`UPDATE systems SET name=?, type=?, hourlyRate=?, isActive=?, isReserved=? WHERE id=?`)
-      .run(merged.name, merged.type, merged.hourlyRate, merged.isActive ? 1 : 0, merged.isReserved ? 1 : 0, id);
+    this.db.prepare(`UPDATE systems SET name=?, type=?, hourlyRate=?, isActive=?, isReserved=?, audience=? WHERE id=?`)
+      .run(merged.name, merged.type, merged.hourlyRate, merged.isActive ? 1 : 0, merged.isReserved ? 1 : 0, merged.audience || '', id);
   }
   async setSystemReserved(id: string, reserved: boolean) {
     this.db.prepare(`UPDATE systems SET isReserved = ? WHERE id = ?`).run(reserved ? 1 : 0, id);
@@ -691,8 +694,8 @@ export class SqliteStore implements IDataStore {
     return row ? { ...row, checkedIn: !!row.checkedIn } : undefined;
   }
   async addReservationLog(l: ReservationLogRow) {
-    this.db.prepare(`INSERT INTO reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(l.id, l.systemId, l.username || '', l.systemName, l.startTime, l.endTime, l.totalPrice, l.date, l.checkedIn ? 1 : 0, l.timestamp);
+    this.db.prepare(`INSERT INTO reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp, requestedGame) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(l.id, l.systemId, l.username || '', l.systemName, l.startTime, l.endTime, l.totalPrice, l.date, l.checkedIn ? 1 : 0, l.timestamp, l.requestedGame || '');
   }
   async setReservationCheckedIn(id: string) { this.db.prepare(`UPDATE reservation_logs SET checkedIn = 1 WHERE id = ?`).run(id); }
   async deleteReservationLog(id: string) { this.db.prepare(`DELETE FROM reservation_logs WHERE id = ?`).run(id); }
@@ -1136,8 +1139,8 @@ export class SqlServerStore implements IDataStore {
       IF OBJECT_ID('dbo.chat_messages','U') IS NULL CREATE TABLE dbo.chat_messages (id NVARCHAR(50) PRIMARY KEY, room NVARCHAR(200), username NVARCHAR(100), message NVARCHAR(MAX), timestamp NVARCHAR(50));
       IF OBJECT_ID('dbo.transactions','U') IS NULL CREATE TABLE dbo.transactions (id NVARCHAR(50) PRIMARY KEY, points INT, description NVARCHAR(MAX), type NVARCHAR(50), date NVARCHAR(50));
       IF OBJECT_ID('dbo.active_coupons','U') IS NULL CREATE TABLE dbo.active_coupons (code NVARCHAR(50) PRIMARY KEY, type NVARCHAR(20), value FLOAT, minOrder FLOAT, expiry NVARCHAR(50), expiryDate NVARCHAR(50), maxUsageCount INT DEFAULT 1, usageCount INT DEFAULT 0, isActive BIT DEFAULT 1);
-      IF OBJECT_ID('dbo.systems','U') IS NULL CREATE TABLE dbo.systems (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), type NVARCHAR(50), hourlyRate FLOAT, isActive BIT DEFAULT 1, isReserved BIT DEFAULT 0);
-      IF OBJECT_ID('dbo.reservation_logs','U') IS NULL CREATE TABLE dbo.reservation_logs (id NVARCHAR(50) PRIMARY KEY, systemId NVARCHAR(50), username NVARCHAR(100), systemName NVARCHAR(200), startTime NVARCHAR(20), endTime NVARCHAR(20), totalPrice FLOAT, date NVARCHAR(50), checkedIn BIT DEFAULT 0, timestamp NVARCHAR(50));
+      IF OBJECT_ID('dbo.systems','U') IS NULL CREATE TABLE dbo.systems (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), type NVARCHAR(50), hourlyRate FLOAT, isActive BIT DEFAULT 1, isReserved BIT DEFAULT 0, audience NVARCHAR(20) DEFAULT '');
+      IF OBJECT_ID('dbo.reservation_logs','U') IS NULL CREATE TABLE dbo.reservation_logs (id NVARCHAR(50) PRIMARY KEY, systemId NVARCHAR(50), username NVARCHAR(100), systemName NVARCHAR(200), startTime NVARCHAR(20), endTime NVARCHAR(20), totalPrice FLOAT, date NVARCHAR(50), checkedIn BIT DEFAULT 0, timestamp NVARCHAR(50), requestedGame NVARCHAR(200) DEFAULT '');
       IF OBJECT_ID('dbo.cafe_items','U') IS NULL CREATE TABLE dbo.cafe_items (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), category NVARCHAR(50), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), inventory INT, isAvailable BIT DEFAULT 1);
       IF OBJECT_ID('dbo.cafe_orders','U') IS NULL CREATE TABLE dbo.cafe_orders (id NVARCHAR(50) PRIMARY KEY, items NVARCHAR(MAX), totalPrice FLOAT, discountApplied FLOAT, finalAmount FLOAT, couponCode NVARCHAR(50), tableNumber NVARCHAR(50), date NVARCHAR(50), status NVARCHAR(50));
       IF OBJECT_ID('dbo.accessories','U') IS NULL CREATE TABLE dbo.accessories (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), description NVARCHAR(MAX), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), stock INT, category NVARCHAR(50));
@@ -1168,6 +1171,8 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.users','city') IS NULL ALTER TABLE dbo.users ADD city NVARCHAR(100) NULL;
       IF COL_LENGTH('dbo.users','birthDate') IS NULL ALTER TABLE dbo.users ADD birthDate NVARCHAR(20) NULL;
       IF COL_LENGTH('dbo.users','phoneVerifiedAt') IS NULL ALTER TABLE dbo.users ADD phoneVerifiedAt NVARCHAR(50) NULL;
+      IF COL_LENGTH('dbo.systems','audience') IS NULL ALTER TABLE dbo.systems ADD audience NVARCHAR(20) NULL;
+      IF COL_LENGTH('dbo.reservation_logs','requestedGame') IS NULL ALTER TABLE dbo.reservation_logs ADD requestedGame NVARCHAR(200) NULL;
       IF COL_LENGTH('dbo.users','hasPassword') IS NULL ALTER TABLE dbo.users ADD hasPassword INT DEFAULT 1;
       IF COL_LENGTH('dbo.users','createdAt') IS NULL ALTER TABLE dbo.users ADD createdAt NVARCHAR(50) NULL;
       IF COL_LENGTH('dbo.users','walletBalance') IS NULL ALTER TABLE dbo.users ADD walletBalance FLOAT DEFAULT 0;
@@ -1303,7 +1308,8 @@ export class SqlServerStore implements IDataStore {
   async createSystem(s: SystemRow) {
     await this.r().input('id', this.sql.NVarChar, s.id).input('n', this.sql.NVarChar, s.name).input('t', this.sql.NVarChar, s.type)
       .input('hr', this.sql.Float, s.hourlyRate).input('a', this.sql.Bit, s.isActive).input('rv', this.sql.Bit, s.isReserved)
-      .query(`INSERT INTO dbo.systems (id, name, type, hourlyRate, isActive, isReserved) VALUES (@id, @n, @t, @hr, @a, @rv)`);
+      .input('au', this.sql.NVarChar, s.audience || '')
+      .query(`INSERT INTO dbo.systems (id, name, type, hourlyRate, isActive, isReserved, audience) VALUES (@id, @n, @t, @hr, @a, @rv, @au)`);
   }
   async updateSystem(id: string, f: Partial<SystemRow>) {
     const current = await this.getSystemById(id);
@@ -1311,7 +1317,8 @@ export class SqlServerStore implements IDataStore {
     const m = { ...current, ...f };
     await this.r().input('id', this.sql.NVarChar, id).input('n', this.sql.NVarChar, m.name).input('t', this.sql.NVarChar, m.type)
       .input('hr', this.sql.Float, m.hourlyRate).input('a', this.sql.Bit, m.isActive).input('rv', this.sql.Bit, m.isReserved)
-      .query(`UPDATE dbo.systems SET name=@n, type=@t, hourlyRate=@hr, isActive=@a, isReserved=@rv WHERE id=@id`);
+      .input('au', this.sql.NVarChar, m.audience || '')
+      .query(`UPDATE dbo.systems SET name=@n, type=@t, hourlyRate=@hr, isActive=@a, isReserved=@rv, audience=@au WHERE id=@id`);
   }
   async setSystemReserved(id: string, reserved: boolean) {
     await this.r().input('id', this.sql.NVarChar, id).input('rv', this.sql.Bit, reserved).query(`UPDATE dbo.systems SET isReserved = @rv WHERE id = @id`);
@@ -1334,7 +1341,8 @@ export class SqlServerStore implements IDataStore {
       .input('un', this.sql.NVarChar, l.username || '')
       .input('sn', this.sql.NVarChar, l.systemName).input('st', this.sql.NVarChar, l.startTime).input('et', this.sql.NVarChar, l.endTime)
       .input('tp', this.sql.Float, l.totalPrice).input('d', this.sql.NVarChar, l.date).input('ci', this.sql.Bit, l.checkedIn).input('ts', this.sql.NVarChar, l.timestamp)
-      .query(`INSERT INTO dbo.reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp) VALUES (@id, @sid, @un, @sn, @st, @et, @tp, @d, @ci, @ts)`);
+      .input('rg', this.sql.NVarChar, l.requestedGame || '')
+      .query(`INSERT INTO dbo.reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp, requestedGame) VALUES (@id, @sid, @un, @sn, @st, @et, @tp, @d, @ci, @ts, @rg)`);
   }
   async setReservationCheckedIn(id: string) { await this.r().input('id', this.sql.NVarChar, id).query(`UPDATE dbo.reservation_logs SET checkedIn = 1 WHERE id = @id`); }
   async deleteReservationLog(id: string) { await this.r().input('id', this.sql.NVarChar, id).query(`DELETE FROM dbo.reservation_logs WHERE id = @id`); }

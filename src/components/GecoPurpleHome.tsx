@@ -79,7 +79,7 @@ export default function GecoPurpleHome({
             {L(language, { fa: 'مدرن‌ترین مرکز گیمینگ و ورزش‌های الکترونیکی. مجهز به سیستم‌های فوق قدرتمند، اتاق‌های VIP مجهز به PS5، بوفه هوشمند آنلاین و مسابقات هفتگی با جوایز نفیس.', en: 'The most advanced gaming and esports center. Equipped with high-end RTX workstations, custom VIP PS5 booths, smart online café ordering, and pro tournaments.', ru: 'Самый современный центр гейминга и киберспорта: мощные RTX-станции, VIP-комнаты с PS5, умный онлайн-заказ из кафе и еженедельные турниры с ценными призами.', tr: 'En modern oyun ve espor merkezi: üst düzey RTX sistemler, PS5’li özel VIP odalar, akıllı online kafe siparişi ve değerli ödüllü haftalık turnuvalar.' })}
           </p>
           <button 
-            onClick={() => onNavigate('reservations')} 
+            onClick={() => onNavigate('games')} 
             className="bg-[#ffb800] hover:bg-white text-black font-black uppercase tracking-wider px-10 py-4 transform -skew-x-12 hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,184,0,0.3)] cursor-pointer"
           >
             <span className="transform skew-x-12 inline-block">
@@ -95,7 +95,7 @@ export default function GecoPurpleHome({
           {loungeSections?.map((section: any, idx: number) => (
             <div 
               key={section.id || idx} 
-              onClick={() => onNavigate('reservations')}
+              onClick={() => onNavigate('games')}
               className="flex flex-col items-center gap-3 group cursor-pointer w-28 md:w-32"
             >
               <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-[#111119] border-2 border-white/10 flex items-center justify-center hover:border-[#ffb800] hover:scale-110 hover:shadow-[0_0_25px_rgba(255,184,0,0.4)] transition-transform duration-300">
@@ -122,7 +122,7 @@ export default function GecoPurpleHome({
             </h2>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => onNavigate('reservations')} className="px-5 py-2.5 bg-white/5 border border-white/10 hover:border-[#ffb800] text-[#ffb800] font-black text-xs uppercase tracking-wider transform -skew-x-12 hover:scale-105 transition-transform cursor-pointer">
+            <button onClick={() => onNavigate('games')} className="px-5 py-2.5 bg-white/5 border border-white/10 hover:border-[#ffb800] text-[#ffb800] font-black text-xs uppercase tracking-wider transform -skew-x-12 hover:scale-105 transition-transform cursor-pointer">
               <span className="transform skew-x-12 inline-block">
                 {L(language, { fa: 'مشاهده کاتالوگ', en: 'VIEW ALL', ru: 'СМОТРЕТЬ ВСЕ', tr: 'TÜMÜNÜ GÖR' })}
               </span>
@@ -132,7 +132,7 @@ export default function GecoPurpleHome({
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {featuredGames?.slice(0, 3).map((game: any, i: number) => (
-            <div key={i} className="group cursor-pointer bg-[#111119] border border-white/5 p-4 transition-all hover:border-[#ffb800]/20" onClick={() => onNavigate('reservations')}>
+            <div key={i} className="group cursor-pointer bg-[#111119] border border-white/5 p-4 transition-all hover:border-[#ffb800]/20" onClick={() => onNavigate('games')}>
               <div className="relative aspect-video overflow-hidden border border-white/10 mb-6">
                 <img loading="lazy" src={game.imageUrl} srcSet={getResponsiveSrcSet(game.imageUrl, [320, 640, 800])} sizes="(min-width: 768px) 33vw, 100vw" width="800" height="450" alt={getLocText(game.title)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 <div className="absolute bottom-4 left-4 bg-[#ffb800] text-black text-[10px] font-black px-3 py-1 uppercase tracking-wider">
@@ -185,7 +185,7 @@ export default function GecoPurpleHome({
                 <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">{L(language, { fa: 'قدرتمندترین کارت گرافیک', en: 'ULTIMATE GRAPHICS', ru: 'МАКСИМАЛЬНАЯ ГРАФИКА', tr: 'EN GÜÇLÜ EKRAN KARTI' })}</div>
               </div>
             </div>
-            <button onClick={() => onNavigate('reservations')} className="bg-[#ffb800] hover:bg-white text-black font-black uppercase tracking-wider px-8 py-3.5 transform -skew-x-12 hover:scale-105 transition-transform cursor-pointer">
+            <button onClick={() => onNavigate('games')} className="bg-[#ffb800] hover:bg-white text-black font-black uppercase tracking-wider px-8 py-3.5 transform -skew-x-12 hover:scale-105 transition-transform cursor-pointer">
               <span className="transform skew-x-12 inline-block">{L(language, { fa: 'همین حالا رزرو کنید', en: 'BOOK A STATION', ru: 'ЗАБРОНИРОВАТЬ СТАНЦИЮ', tr: 'HEMEN REZERVE EDİN' })}</span>
             </button>
           </div>
@@ -371,7 +371,7 @@ export default function GecoPurpleHome({
               tag: L(language, { fa: 'سخت‌افزار', en: 'HARDWARE', ru: 'ОБОРУДОВАНИЕ', tr: 'DONANIM' }),
               title: L(language, { fa: 'سیستم‌های بسیار قدرتمند گیمینگ', en: 'High-end Gaming Rigs', ru: 'Мощнейшие игровые системы', tr: 'Üst Düzey Oyun Sistemleri' }),
               desc: L(language, { fa: 'تمام سیستم‌های کلوپ بازینو مجهز به جدیدترین کارت‌های گرافیک RTX و مانیتورهای ۳۶۰ هرتز هستند.', en: 'All Bazino systems are equipped with the latest RTX graphic cards and 360Hz ultra-fast gaming monitors.', ru: 'Все системы Bazino оснащены новейшими видеокартами RTX и мониторами 360 Гц.', tr: 'Tüm Bazino sistemleri en yeni RTX ekran kartları ve 360Hz oyun monitörleriyle donatılmıştır.' }),
-              targetTab: 'reservations'
+              targetTab: 'games'
             },
             {
               tag: L(language, { fa: 'کافه بوفه', en: 'BUFFET', ru: 'БУФЕТ', tr: 'BÜFE' }),

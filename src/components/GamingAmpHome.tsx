@@ -23,7 +23,7 @@ export default function GamingAmpHome({
   };
 
   const getButtonText = (target: string) => {
-    const normTarget = target === 'reserve' ? 'reservations' : target;
+    const normTarget = target === 'reserve' ? 'games' : target;
     switch (normTarget) {
       case 'cafe':
         return {
@@ -100,7 +100,7 @@ export default function GamingAmpHome({
           <div className="flex gap-4">
             <button 
               onClick={() => {
-                const targetRoute = heroGame?.target === 'reserve' ? 'reservations' : (heroGame?.target || 'reservations');
+                const targetRoute = heroGame?.target === 'reserve' ? 'games' : (heroGame?.target || 'games');
                 onNavigate(targetRoute);
               }}
               className="bg-[#00d8ff] text-[#111119] px-8 py-3 rounded-sm text-sm font-black tracking-widest hover:bg-white hover:text-black transition-colors uppercase shadow-[0_0_20px_rgba(0,216,255,0.4)]"
@@ -132,7 +132,7 @@ export default function GamingAmpHome({
                     {getLocText(game.desc)}
                   </p>
                   <button 
-                    onClick={() => onNavigate('reservations')}
+                    onClick={() => onNavigate('games')}
                     className="self-start border-2 border-[#00d8ff] text-[#00d8ff] px-8 py-3 rounded-sm text-xs font-black tracking-[0.2em] hover:bg-[#00d8ff] hover:text-black transition-colors uppercase"
                   >
                     {L(language, { fa: 'بازی کنید', en: 'PLAY NOW', ru: 'ИГРАТЬ', tr: 'ŞİMDİ OYNA' })}
@@ -164,7 +164,7 @@ export default function GamingAmpHome({
                      {getLocText(zone.desc)}
                    </p>
                    <button 
-                     onClick={() => onNavigate(zone.id === 'cafe' ? 'cafe' : 'reservations')}
+                     onClick={() => onNavigate(zone.id === 'cafe' ? 'cafe' : 'games')}
                      className="bg-transparent border border-white text-white px-8 py-3 rounded-sm text-xs font-black tracking-[0.2em] hover:bg-white hover:text-black transition-colors uppercase"
                    >
                      {getLocText(zone.btnText)}

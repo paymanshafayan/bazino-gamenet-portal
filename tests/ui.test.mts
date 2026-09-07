@@ -683,5 +683,81 @@ test('formatDue renders a readable local date/time and onsiteRuleText mentions t
   assert.match(CheckoutMod.onsiteRuleText('cafe', 'en'), /venue|club|delivery/i);
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   39. UI — GamesTab: سه کارت، فیلتر مخاطب و فیلد بازی درخواستی
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('39. UI — GamesTab cards, audience filter and requested-game field');
+
+const GamesTab = (await loadModule('/src/components/GamesTab.tsx')).default;
+
+const gamesSystems = [
+  { id: 'k1', name: 'Kids PC 1', type: 'PC', hourlyRate: 80, isActive: true, isReserved: false, audience: 'kids' },
+  { id: 'a1', name: 'Adults PC 1', type: 'PC', hourlyRate: 150, isActive: true, isReserved: false, audience: 'adults' },
+  { id: 'any1', name: 'Family PS5', type: 'PS5', hourlyRate: 200, isActive: true, isReserved: false, audience: '' },
+];
+
+const gamesProps = () => ({
+  systems: gamesSystems,
+  activeCoupons: [],
+  onAddLoyaltyPoints: () => {},
+  addNotification: () => {},
+});
+
+async function mountGames(props: any = {}) {
+  // URL بین تست‌ها دست‌نخورده می‌ماند (deep-link ?category= واقعاً کار می‌کند) — ریست می‌کنیم
+  getWindow().history.replaceState({}, '', '/games');
+  stubFetch(async () => ({ ok: true, status: 200, json: async () => [] }));
+  const Wrapper = () => withLanguage(React.createElement(GamesTab, { ...gamesProps(), ...props }));
+  const el = await mount(Wrapper, {});
+  await act(async () => { await new Promise(r => setTimeout(r, 60)); });
+  return el;
+}
+
+test('Games page shows exactly three separated category cards', async () => {
+  const el = await mountGames();
+  const html = el.html();
+  assert.ok(el.find('[data-testid="games-card-kids"]'), 'KIDS card missing');
+  assert.ok(el.find('[data-testid="games-card-adults"]'), 'ADULTS card missing');
+  assert.ok(el.find('[data-testid="games-card-requests"]'), 'GAME REQUESTS card missing');
+  assert.ok(html.includes('KIDS') && html.includes('ADULTS') && html.includes('GAME REQUESTS'), 'card titles missing');
+  await el.unmount(); restoreFetch();
+});
+
+test('choosing KIDS opens the real reservation flow filtered to kids/uncategorized systems', async () => {
+  const el = await mountGames();
+  await act(async () => { await el.click('[data-testid="games-card-kids"]'); });
+  const html = el.html();
+  assert.ok(html.includes('Kids PC 1'), 'kids system not visible');
+  assert.ok(html.includes('Family PS5'), 'uncategorized system must stay visible for kids');
+  assert.ok(!html.includes('Adults PC 1'), 'adults system must be filtered out of the kids category');
+  assert.ok(html.includes('رزرو') || html.includes('booking') || html.includes('Booking') || html.includes('Reserve'), 'reservation flow not rendered');
+  await el.unmount(); restoreFetch();
+});
+
+test('ADULTS category filters out kids systems; back returns to the three cards', async () => {
+  const el = await mountGames();
+  await act(async () => { await el.click('[data-testid="games-card-adults"]'); });
+  let html = el.html();
+  assert.ok(html.includes('Adults PC 1'), 'adults system not visible');
+  assert.ok(!html.includes('Kids PC 1'), 'kids system must be filtered out of the adults category');
+  await act(async () => { await el.click('[data-testid="games-back"]'); });
+  html = el.html();
+  assert.ok(el.find('[data-testid="games-card-requests"]'), 'back button did not return to category cards');
+  await el.unmount(); restoreFetch();
+});
+
+test('GAME REQUESTS opens the booking flow with the requested-game input', async () => {
+  const el = await mountGames({ });
+  await act(async () => { await el.click('[data-testid="games-card-requests"]'); });
+  const html = el.html();
+  assert.ok(html.includes('Adults PC 1') && html.includes('Kids PC 1'), 'requests flow should show every system');
+  // فیلد «بازی درخواستی» جزو فرم جزئیات رزرو است — بعد از انتخاب سیستم ظاهر می‌شود
+  const sysBtn = Array.from(getDocument().querySelectorAll('button')).find(b => ((b as HTMLElement).textContent || '').includes('Family PS5'));
+  assert.ok(sysBtn, 'system button not found in requests flow');
+  await act(async () => { await el.click(sysBtn); });
+  assert.ok(el.find('[data-requested-game-input]'), 'requested-game input missing');
+  await el.unmount(); restoreFetch();
+});
+
 await run({ title: 'Bazino — UI component tests', jsonOut: 'tests/reports/ui.json' });
 await teardownDom();

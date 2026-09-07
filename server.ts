@@ -52,6 +52,7 @@ import {
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
+import { normalizeAudience, sanitizeRequestedGame } from "./shared/games";
 import { registerPaymentRoutes, type OrderKind } from "./server/payments/routes";
 import { AffiliateService, registerAffiliates } from './server/management/affiliates';
 import { registerReports } from './server/management/reports';
@@ -863,7 +864,7 @@ async function startServer() {
   registerOrders(app,orders);
   const affiliateOperations = new AffiliateService(management);
   registerAffiliates(app,affiliateOperations);
-  const tournamentOps = new TournamentService(management,finance);
+  const tournamentOps = new TournamentService(management,finance,async () => resolveMergedList(await getActiveDataProvider().listTournaments(), SAMPLE_TOURNAMENTS));
   registerTournaments(app,tournamentOps);
   registerPublicTournamentRoutes(app,tournamentOps);
   const messagingOps = new MessagingService(management);
@@ -1325,7 +1326,8 @@ async function startServer() {
         totalPrice,
         date: reservationDate,
         checkedIn: false,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        requestedGame: sanitizeRequestedGame(req.body.requestedGame)
       };
       await store.addReservationLog(log);
 
@@ -2393,7 +2395,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       return {
         amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
         basket: [{ name: `${system.name} (${durationHours}h)`, unitPrice: amount, qty: 1 }],
-        payload: { ...window, systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name },
+        payload: { ...window, systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name, requestedGame: sanitizeRequestedGame((params as any)?.requestedGame) },
       };
     }
     if (kind === "cafe") {
@@ -2455,7 +2457,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز بابت رزرو ${p.systemName} (پرداخت در محل)`) };
       await store.setSystemReserved(p.systemId, true);
       const id = newOperationId('RES');
-      await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString() });
+      await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString(), requestedGame: sanitizeRequestedGame(p.requestedGame) });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
       return { reservationId: id, points };
@@ -2732,7 +2734,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Game systems CRUD
   app.post("/api/admin/systems", async (req, res) => {
     try {
-      const { name, type, hourlyRate, isActive } = req.body;
+      const { name, type, hourlyRate, isActive, audience } = req.body;
+      if (audience !== undefined && normalizeAudience(audience) !== String(audience ?? '').trim().toLowerCase()) {
+        return res.status(400).json({ error: "Invalid audience", code: "INVALID_AUDIENCE" });
+      }
       const store = getActiveDataProvider();
       const nextId = await nextEntityId("sys", async (id) =>
         Boolean(await store.getSystemById(id)) || SAMPLE_SYSTEMS.some(x => x.id === id));
@@ -2743,7 +2748,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         type,
         hourlyRate: Number(hourlyRate),
         isActive: isActive !== false,
-        isReserved: false
+        isReserved: false,
+        audience: normalizeAudience(audience)
       });
 
       const list = await store.listSystems();
@@ -2757,17 +2763,21 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/systems/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, type, hourlyRate, isActive, isReserved } = req.body;
+      const { name, type, hourlyRate, isActive, isReserved, audience } = req.body;
       const store = getActiveDataProvider();
       const system = await store.getSystemById(id);
 
       if (system) {
+        if (audience !== undefined && normalizeAudience(audience) !== String(audience ?? '').trim().toLowerCase()) {
+          return res.status(400).json({ error: "Invalid audience", code: "INVALID_AUDIENCE" });
+        }
         await store.updateSystem(id, {
           name: name !== undefined ? name : system.name,
           type: type !== undefined ? type : system.type,
           hourlyRate: hourlyRate !== undefined ? Number(hourlyRate) : system.hourlyRate,
           isActive: isActive !== undefined ? !!isActive : system.isActive,
           isReserved: isReserved !== undefined ? !!isReserved : system.isReserved,
+          audience: audience !== undefined ? normalizeAudience(audience) : system.audience,
         });
 
         const list = await store.listSystems();

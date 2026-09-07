@@ -39,6 +39,8 @@ export interface GameSystem {
   hourlyRate: number; // in TL (Turkish lira)
   isActive: boolean;
   isReserved: boolean;
+  /** دستهٔ مخاطب در صفحهٔ Games: 'kids' | 'adults' | '' (خالی = هر دو دسته) */
+  audience?: string;
 }
 
 export interface Reservation {

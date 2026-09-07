@@ -15,7 +15,8 @@ export async function bookingViews(core:OpsCore):Promise<BookingView[]> {
       startsAt:window.startsAt,endsAt:window.endsAt,totalAmount:Number(o?.amount??r.totalPrice??0),paidAmount:paid?Number(o.amount):0,currency:'TRY',
       paymentStatus:paid?(Number(o.amount)===0?'free':'paid'):cancelled&&o?.settledBy==='wallet'?'refunded':o?'pending':'unknown',
       bookingStatus:expired?'expired':cancelled?'cancelled':extra.attendanceStatus==='completed'?'completed':paid?'confirmed':o?'held':'unknown',
-      attendanceStatus:extra.attendanceStatus||(r.checkedIn?'checked_in':'not_arrived'),paymentMethod:payment.method||(o?.settledBy==='wallet'?'wallet':null),paymentDueAt:o?.dueAt||'',source:p._ops?.source||'online',version:meta?.version||0,sessionId:extra.sessionId};
+      attendanceStatus:extra.attendanceStatus||(r.checkedIn?'checked_in':'not_arrived'),paymentMethod:payment.method||(o?.settledBy==='wallet'?'wallet':null),paymentDueAt:o?.dueAt||'',source:p._ops?.source||'online',version:meta?.version||0,sessionId:extra.sessionId,
+      requestedGame:(r.requestedGame||p.requestedGame||'')||undefined};
     result.push(view);seen.add(r.id);
   }
   for(const r of logs){const o=orders.find(o=>parseJSON(o.result).reservationId===r.id);make(r,o);}

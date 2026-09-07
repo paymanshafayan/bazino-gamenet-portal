@@ -4,6 +4,7 @@ import { Monitor, Cpu, Sparkles, Clock, Check, X, ShieldAlert, CreditCard, QrCod
 import QrCodeImage from './QrCodeImage';
 import { useLanguage } from '../context/LanguageContext';
 import { L, localeOf } from '../utils/i18n';
+import { filterSystemsForAudience, sanitizeRequestedGame } from '../../shared/games';
 import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
 import { storedRef } from '../utils/affiliateCapture';
 
@@ -13,6 +14,10 @@ interface Props {
   activeCoupons: DiscountCode[];
   onAddLoyaltyPoints: (points: number, desc: string) => void;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  /** دستهٔ انتخاب‌شده در صفحهٔ Games — فقط سیستم‌های همان دسته (یا بدون دسته) نمایش داده می‌شوند */
+  audienceFilter?: 'kids' | 'adults' | null;
+  /** کارت GAME REQUESTS: فوکوس خودکار روی فیلد «بازی مورد درخواست» */
+  focusRequestedGame?: boolean;
 }
 
 export default function ReservationsTab({
@@ -20,6 +25,8 @@ export default function ReservationsTab({
   activeCoupons,
   onAddLoyaltyPoints,
   addNotification,
+  audienceFilter,
+  focusRequestedGame,
 }: Props) {
   const { t, dir, language } = useLanguage();
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
@@ -27,6 +34,11 @@ export default function ReservationsTab({
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<DiscountCode | null>(null);
   const [referralCode, setReferralCode] = useState(() => storedRef());
+  const [requestedGame, setRequestedGame] = useState('');
+  const requestedGameRef = React.useRef<HTMLInputElement | null>(null);
+
+  // صفحهٔ Games: فقط سیستم‌های مجاز دستهٔ انتخابی (سیستم‌های بدون دسته در همهٔ دسته‌ها هستند)
+  const visibleSystems = React.useMemo(() => filterSystemsForAudience(systems, audienceFilter), [systems, audienceFilter]);
 
   // QR Code check-in and active reservations states
   const [reservations, setReservations] = useState<any[]>([]);
@@ -52,6 +64,14 @@ export default function ReservationsTab({
   React.useEffect(() => {
     fetchReservations();
   }, []);
+
+  // کارت GAME REQUESTS: فوکوس خودکار فیلد «بازی مورد درخواست» — هم هنگام ورود
+  // و هم بعد از آن‌که کاربر سیستمی انتخاب کرد و فرم رزرو رندر شد.
+  React.useEffect(() => {
+    if (!focusRequestedGame) return;
+    const timer = window.setTimeout(() => requestedGameRef.current?.focus(), 400);
+    return () => window.clearTimeout(timer);
+  }, [focusRequestedGame, selectedSystemId]);
 
   const handleSimulateCheckIn = async (resId: string) => {
     setScanningId(resId);
@@ -146,8 +166,41 @@ export default function ReservationsTab({
     const descMsg = L(language, { fa: `رزرو آنلاین ${selectedSystem.name} به مدت ${hours} ساعت`, en: `Online booking of ${selectedSystem.name} for ${hours} hours`, ru: `Онлайн бронирование ${selectedSystem.name} на ${hours} ч.`, tr: `${selectedSystem.name} için ${hours} saatlik online rezervasyon` });
 
     // تسک ۱۳: انتخاب روش پرداخت (کیف پول / در محل / آنلاین اگر فعال) — مستقل از قالب؛
-    // رزرو و امتیاز را سرور پس از تأیید روش ثبت می‌کند.
-    setCheckout({ params: { systemId: selectedSystem.id, startTime: '14:00', endTime: `${14 + hours}:00`, date: 'امروز', couponCode: appliedCoupon?.code || '', referralCode: referralCode.trim() }, amount: finalAmount, title: descMsg });
+    // رزرو و امتیاز را سرور پس از تأیید روش ثبت می‌کند. «بازی درخواستی» (صفحهٔ Games)
+    // اختیاری است و عیناً در رکورد رزرو ثبت می‌شود.
+    //
+    // شروع سانس = اولین ساعت کاملِ آینده. قبلاً فرم همیشه «۱۴:۰۰ امروز» را رزرو
+    // می‌کرد؛ بعد از ساعت ۱۴ سرور PAST_RESERVATION می‌داد و رزرو از طرف بعدازظهر
+    // عملاً غیرممکن بود (باگ از قبل موجود — با سفر E2E گرفته شد). عبور از نیمه‌شب
+    // را خودِ bookingWindow سمت سرور هندل می‌کند.
+    //
+    // نکتهٔ منطقهٔ زمانی (باگ دوم — همین سفر گرفته شد): سرور ساعت را با منطقهٔ
+    // زمانی کلاب (Asia/Famagusta) تفسیر می‌کند، نه منطقهٔ مرورگر. ساعت‌ها را با
+    // Intl در TZ کلاب می‌سازیم تا «امروز ۲۳:۰۰» به اشتباه گذشته محسوب نشود.
+    const CLUB_TZ = 'Asia/Famagusta';
+    const partsInClubTz = (d: Date) => {
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: CLUB_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+      const p: Record<string, string> = {};
+      for (const x of fmt.formatToParts(d)) p[x.type] = x.value;
+      return p;
+    };
+    const nextFullHourInClubTz = () => {
+      // یک ساعت بعد از «الان»، گردشده به پایین به ساعت کامل، در TZ کلاب
+      const probe = new Date(Date.now() + 90 * 60000);
+      const p = partsInClubTz(probe);
+      return { day: `${p.year}-${p.month}-${p.day}`, hour: String(Number(p.hour === '24' ? '00' : p.hour)).padStart(2, '0') };
+    };
+    const { day: startDay, hour: startHour } = nextFullHourInClubTz();
+    const endHour = (() => {
+      const total = (Number(startHour) + hours) % 24;
+      return String(total).padStart(2, '0');
+    })();
+    const [y, m, d] = startDay.split('-');
+    const todayParts = partsInClubTz(new Date());
+    const isTomorrow = startDay !== `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
+    const dateLabel = isTomorrow ? 'فردا' : 'امروز';
+    const trimmedRequestedGame = sanitizeRequestedGame(requestedGame);
+    setCheckout({ params: { systemId: selectedSystem.id, startTime: `${startHour}:00`, endTime: `${endHour}:00`, date: dateLabel, couponCode: appliedCoupon?.code || '', referralCode: referralCode.trim(), ...(trimmedRequestedGame ? { requestedGame: trimmedRequestedGame } : {}) }, amount: finalAmount, title: descMsg });
   };
 
   const onCheckoutDone = (r: CheckoutResult) => {
@@ -163,6 +216,7 @@ export default function ReservationsTab({
     setHours(2);
     setAppliedCoupon(null);
     setCouponCode('');
+    setRequestedGame('');
   };
 
   // Sort reservations by timestamp (latest first)
@@ -270,7 +324,24 @@ export default function ReservationsTab({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-            {systems.map((sys) => {
+            {visibleSystems.length === 0 && (
+              <div className="col-span-full text-center py-12 text-gray-500 border border-dashed border-white/10 rounded-xl">
+                <Cpu className="w-10 h-10 mx-auto text-gray-700 mb-3 opacity-40" />
+                <p className="text-sm font-bold">
+                  {language === 'fa' && 'فعلاً سیستمی برای این دسته تعریف نشده است.'}
+                  {language === 'en' && 'No systems are available in this category yet.'}
+                  {language === 'ru' && 'В этой категории пока нет систем.'}
+                  {language === 'tr' && 'Bu kategoride henüz sistem yok.'}
+                </p>
+                <p className="text-xs text-gray-600 mt-2 font-medium">
+                  {language === 'fa' && 'از کارت‌های بالای صفحهٔ Games دستهٔ دیگری را انتخاب کنید.'}
+                  {language === 'en' && 'Pick another category from the Games page cards.'}
+                  {language === 'ru' && 'Выберите другую категорию на странице Games.'}
+                  {language === 'tr' && 'Games sayfasındaki kartlardan başka bir kategori seçin.'}
+                </p>
+              </div>
+            )}
+            {visibleSystems.map((sys) => {
               const isSelected = selectedSystemId === sys.id;
               return (
                 <button
@@ -418,6 +489,12 @@ export default function ReservationsTab({
                             <span className="text-gray-600 block text-[10px] uppercase">{L(language, { fa: 'هزینه پرداخت شده:', en: 'Price:', ru: 'Оплачено:', tr: 'Ödenen tutar:' })}</span>
                             <span className="text-primary font-black">{(res.totalPrice || 0).toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                           </div>
+                          {res.requestedGame ? (
+                            <div className="col-span-2">
+                              <span className="text-gray-600 block text-[10px] uppercase">{L(language, { fa: 'بازی درخواستی:', en: 'Requested game:', ru: 'Запрошенная игра:', tr: 'İstenen oyun:' })}</span>
+                              <span className="text-gray-300 font-bold" data-requested-game>{res.requestedGame}</span>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
@@ -718,6 +795,24 @@ export default function ReservationsTab({
               <div className="border-t border-white/5 pt-4">
                 <label className="text-[10px] text-gray-500 font-bold block mb-1">{L(language, { fa: 'کد معرفی همکار (اختیاری، جدا از تخفیف)', en: 'Affiliate code (optional, not a coupon)', ru: 'Код партнёра (не промокод)', tr: 'Satış ortağı kodu (kupon değil)' })}</label>
                 <input type="text" data-referral-code value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="e.g. ALI12" className="w-full px-3.5 py-2.5 bg-card-2 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono" />
+              </div>
+
+              {/* بازی درخواستی (صفحهٔ Games — کارت GAME REQUESTS) */}
+              <div className="border-t border-white/5 pt-4">
+                <label className="text-[10px] text-gray-500 font-bold block mb-1">{L(language, { fa: '🎮 بازی مورد درخواست (اختیاری)', en: '🎮 Requested game (optional)', ru: '🎮 Запрошенная игра (необязательно)', tr: '🎮 İstenen oyun (isteğe bağlı)' })}</label>
+                <input
+                  type="text"
+                  data-requested-game-input
+                  ref={requestedGameRef}
+                  maxLength={80}
+                  value={requestedGame}
+                  onChange={e => setRequestedGame(e.target.value)}
+                  placeholder={L(language, { fa: 'مثلاً: FIFA 26، Mortal Kombat 1…', en: 'e.g. FIFA 26, Mortal Kombat 1…', ru: 'напр. FIFA 26, Mortal Kombat 1…', tr: 'örn. FIFA 26, Mortal Kombat 1…' })}
+                  className={`w-full px-3.5 py-2.5 bg-card-2 border rounded-lg text-xs text-white focus:outline-none font-mono transition-all ${focusRequestedGame ? 'border-primary ring-2 ring-primary/30' : 'border-white/10 focus:border-primary'}`}
+                />
+                <p className="text-[10px] text-gray-600 mt-1 font-medium">
+                  {L(language, { fa: 'اگر بازی موردعلاقه‌ات را در سالن نداریم، اینجا بنویس تا برای رزروت آماده‌اش کنیم؛ پیشنهادت به تیم ما هم می‌رسد.', en: "If we don't have your favourite game yet, write it here and we'll get it ready for your session — your suggestion also reaches our team.", ru: 'Если вашей любимой игры ещё нет, напишите её здесь — мы подготовим её к вашему сеансу.', tr: 'Favori oyununuz henüz yoksa buraya yazın; seansınız için hazırlayalım.' })}
+                </p>
               </div>
 
               {/* Promo code field */}

@@ -70,6 +70,12 @@ export interface ZipThemeMeta {
   regions?: string[];
   /** حداقل نسخه‌ی SDK مورد نیاز */
   sdkVersion?: number;
+  /**
+   * چینش سایت وقتی این قالب فعال است:
+   *  - classic (پیش‌فرض): هدر/تب‌های کلاسیک پرتال
+   *  - hub: کروم و صفحات `hub.*` قالب، مسیرهای /games /events /shop …
+   */
+  layout?: 'classic' | 'hub';
   [extra: string]: unknown;
 }
 
@@ -139,6 +145,20 @@ export function stripCommonRootFolder(files: Record<string, Uint8Array>): Record
 
 function normalizeEntryPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
+}
+
+/** ورودی پوشهٔ ZIP (slash انتهایی یا کلید خالی بدون پسوند که بعد از نرمال‌سازی با فایل تداخل می‌کند). */
+function isZipDirectoryEntry(raw: string, bytes?: Uint8Array): boolean {
+  if (!raw || raw.endsWith('/') || raw.endsWith('\\')) return true;
+  const norm = normalizeEntryPath(raw);
+  if (!norm) return true;
+  const base = norm.split('/').pop() || '';
+  if ((!bytes || bytes.byteLength === 0) && !/\.[A-Za-z0-9]{1,8}$/.test(base)) return true;
+  return false;
+}
+
+function normalizeThemeLayout(raw: unknown): 'classic' | 'hub' | undefined {
+  return raw === 'hub' || raw === 'classic' ? raw : undefined;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -211,14 +231,20 @@ export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZi
   }
   const knownKeys = new Set([jsonKey, cssKey, jsKey, 'theme.json', 'theme.css', 'theme.js'].filter(Boolean));
   for (const raw of Object.keys(files)) {
+    if (isZipDirectoryEntry(raw, files[raw])) continue;
     const norm = normalizeEntryPath(raw);
-    if (knownKeys.has(norm)) continue;
+    if (!norm || knownKeys.has(norm)) continue;
     if (norm.startsWith('assets/')) {
-      assets[norm.slice('assets/'.length)] = files[raw];
+      const rel = norm.slice('assets/'.length);
+      if (!rel || isZipDirectoryEntry(rel, files[raw])) continue;
+      assets[rel] = files[raw];
     } else if (norm.startsWith('bazino/')) {
       const rel = norm.slice('bazino/'.length);
-      if (rel.startsWith('assets/')) assets[rel.slice('assets/'.length)] = files[raw];
-      else ignoredFiles.push(norm);
+      if (rel.startsWith('assets/')) {
+        const assetRel = rel.slice('assets/'.length);
+        if (!assetRel || isZipDirectoryEntry(assetRel, files[raw])) continue;
+        assets[assetRel] = files[raw];
+      } else ignoredFiles.push(norm);
     } else {
       ignoredFiles.push(norm);
     }
@@ -256,6 +282,7 @@ export function parseThemeZip(data: Uint8Array, fallbackName?: string): ParsedZi
       ...meta, id, name, colors,
       version: typeof meta.version === 'string' ? meta.version : undefined,
       description: typeof meta.description === 'string' ? meta.description : undefined,
+      layout: normalizeThemeLayout(meta.layout),
       strings, tokens, regions,
     },
     css,

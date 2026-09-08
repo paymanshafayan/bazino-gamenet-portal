@@ -11,6 +11,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "audit:theme": "tsx scripts/audit-theme-package.mts",
+    "build:hub-theme": "tsx scripts/build-hub-theme.mts",
     "test:theme-performance": "tsx scripts/test-theme-performance.mts",
     "test": "tsx tests/run-all.mts",
     "test:unit": "tsx tests/unit.test.mts",

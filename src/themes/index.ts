@@ -72,6 +72,8 @@ export interface ThemeInfo {
   /** توکن‌های طراحی (theme.json.tokens) → متغیرهای --bz-* */
   tokens?: Record<string, string>;
   author?: string;
+  /** چینش: classic یا hub — از theme.json قالب سروری */
+  layout?: 'classic' | 'hub';
 }
 
 /* ---------- توکن‌های طراحی ----------

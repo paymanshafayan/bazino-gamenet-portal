@@ -1,0 +1,102 @@
+@import "@fontsource/orbitron/700.css";
+@import "@fontsource/orbitron/800.css";
+@import "@fontsource/orbitron/900.css";
+@import "@fontsource/rajdhani/500.css";
+@import "@fontsource/rajdhani/600.css";
+@import "@fontsource/rajdhani/700.css";
+@import "@fontsource/pacifico/400.css";
+@import "@fontsource/great-vibes/400.css";
+
+/* ═══════════════════════════════════════════════════════════════════
+   HUB DESIGN TOKENS — single source of visual truth for every Hub page.
+   Import this (via hub.css) on any new page so palette / type / radii stay
+   identical. Measured from the Hasti Tournament Brackets mockup.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.hub-page {
+  --hub-cyan: #3ccaf5;
+  --hub-cyan-hi: #d8fbff;
+  --hub-azure: #68a7e6;
+  --hub-purple: #b067e9;
+  --hub-magenta: #da6ad2;
+  --hub-magenta-hi: #ffe1fb;
+  --hub-pink: #ff2db0;
+  --hub-green: #22ff88;
+  --hub-orange: #eab03d;
+  --hub-orange-deep: #dc9e28;
+  --hub-gold: #fdcf1c;
+  --hub-gold-hi: #ffe7b0;
+  --hub-red: #ff6b6b;
+
+  --hub-bg: #070b16;
+  --hub-bg-2: #0a0f1f;
+  --hub-panel: rgba(10, 16, 32, 0.88);
+  --hub-card: #10182c;
+  --hub-line: rgba(90, 120, 220, 0.28);
+  --hub-text: #e7ecff;
+  --hub-muted: #7f8fc0;
+  --hub-dim: #5f6da6;
+
+  --hub-font-display: "Orbitron", "Rajdhani", sans-serif;
+  --hub-font-body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --hub-font-script: "Pacifico", "Great Vibes", "Segoe Script", cursive;
+
+  --hub-radius-sm: 8px;
+  --hub-radius-md: 12px;
+  --hub-radius-lg: 16px;
+  --hub-radius-pill: 999px;
+
+  --hub-header-h: 64px;
+  --hub-footer-h: 72px;
+
+  /* Bracket metrics — tuned so the whole 32-player tree fits a 1600px+ laptop
+     screen without horizontal scrolling (PDF §14: "see the full 32 bracket"). */
+  --hub-mcard-w: 124px;
+  --hub-bcol: 126px;
+  --hub-bcol-final: 168px;
+  --hub-bgap: 10px;
+  --hub-bmin: 1256px;
+
+  --hub-wire-cyan: #3ccaf5;
+  --hub-wire-magenta: #e070d4;
+  --hub-wire-gold: #eab03d;
+  --hub-wire-green: #22ff88;
+  --hub-wire-purple: #b067e9;
+  --hub-wire-azure: #68a7e6;
+
+  font-family: var(--hub-font-body);
+  background: var(--hub-bg);
+  color: var(--hub-text);
+  min-height: 100px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  letter-spacing: 0.02em;
+  overflow-x: auto;
+}
+
+.hub-page h1,
+.hub-page h2,
+.hub-page h3,
+.hub-page h4,
+.hub-page b,
+.hub-page .hub-display {
+  font-family: var(--hub-font-display);
+  letter-spacing: 0.04em;
+}
+
+.hub-page button,
+.hub-page a {
+  font-family: inherit;
+}
+
+/* Wide desktops get the roomier original bracket metrics. */
+@media (min-width: 1900px) {
+  .hub-page {
+    --hub-mcard-w: 138px;
+    --hub-bcol: 140px;
+    --hub-bcol-final: 200px;
+    --hub-bgap: 18px;
+    --hub-bmin: 1440px;
+  }
+}

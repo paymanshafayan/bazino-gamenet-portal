@@ -417,6 +417,24 @@ test('ts(): theme strings fall back language → en → first → key', () => {
   assert.equal(makeThemeStrings(undefined, 'fa')('zzz'), 'zzz');
 });
 
+test('parseThemeZip skips ZIP directory entries and persists layout=hub', async () => {
+  const { zipSync, strToU8 } = await import('fflate');
+  const css = "body[data-theme='hub-dir'] { color: #3ccaf5; }\n.theme-hub-dir .x { color: red; }";
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const zip = zipSync({
+    'theme.json': strToU8(JSON.stringify({ id: 'hub-dir', name: 'Hub Dir', layout: 'hub' })),
+    'theme.css': strToU8(css),
+    'theme.js': strToU8("window.BazinoThemeSDK.registerComponent('hub.home', { render: function () { return null; } });"),
+    'assets/covers/': new Uint8Array(0),
+    'assets/covers/fc26.png': png,
+  });
+  const parsed = parseThemeZip(zip, 'hub-dir.zip') as any;
+  assert.ok(!isZipParseError(parsed), parsed.error);
+  assert.deepEqual(Object.keys(parsed.assets).sort(), ['covers/fc26.png']);
+  assert.equal(parsed.assets.covers, undefined);
+  assert.equal(parsed.meta.layout, 'hub');
+});
+
 test('routes: browser path ↔ tab / admin section mapping', () => {
   assert.equal(routes.tabFromPath('/'), 'home');
   // تب Reserve → صفحهٔ Games منتقل شد؛ /reservations حالا alias دائمی games است
@@ -437,6 +455,25 @@ test('routes: browser path ↔ tab / admin section mapping', () => {
   assert.equal(routes.adminSectionFromPath('/admin/unknown'), 'dashboard');
   assert.equal(routes.pathFromAdminSection('dashboard'), '/admin');
   assert.equal(routes.pathFromAdminSection('themes'), '/admin/themes');
+  assert.equal(routes.tabFromPath('/events'), 'tournaments');
+  assert.equal(routes.tabFromPath('/events/weekly'), 'tournaments');
+  assert.equal(routes.tabFromPath('/food'), 'cafe');
+  assert.equal(routes.tabFromPath('/club'), 'loyalty');
+  assert.equal(routes.hubPageFromPath('/'), 'home');
+  assert.equal(routes.hubPageFromPath('/games'), 'games');
+  assert.equal(routes.hubPageFromPath('/events'), 'events');
+  assert.equal(routes.hubPageFromPath('/events/weekly'), 'weekly');
+  assert.equal(routes.hubPageFromPath('/events/special'), 'special');
+  assert.equal(routes.hubPageFromPath('/events/season'), 'season');
+  assert.equal(routes.hubPageFromPath('/events/brackets'), 'brackets');
+  assert.equal(routes.hubPageFromPath('/events/register'), 'register');
+  assert.equal(routes.hubPageFromPath('/food'), 'food');
+  assert.equal(routes.hubPageFromPath('/club'), 'club');
+  assert.equal(routes.hubPageFromPath('/contact'), 'contact');
+  assert.equal(routes.hubPageFromPath('/rules'), 'rules');
+  assert.equal(routes.hubPageFromPath('/admin'), null);
+  assert.equal(routes.hubPageFromPath('/profile'), null);
+  assert.equal(routes.hubPageFromPath('/legal/privacy'), null);
 });
 
 test('games: audience whitelist + filtering keeps unclassified systems visible', async () => {

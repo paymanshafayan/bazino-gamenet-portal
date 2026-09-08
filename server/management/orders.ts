@@ -64,7 +64,8 @@ export class OrderService {
   const id=b.id?stringValue(b.id,100):newId(kind==='cafe'?'CFI':'SKU'),metadata=await this.core.read('catalog-version',id),existing=(await this.catalog(kind)).find(p=>p.id===id);
   if((metadata?.version||0)!==expected(b.version))fail('VERSION_CONFLICT',409);
   const stock=Number(b.stock);if(!Number.isSafeInteger(stock)||stock<0||stock>1_000_000)fail('INVALID_STOCK');
-  const common={id,name:stringValue(b.name,160,true),category:stringValue(b.category,50,true),price:minor(b.price,true)/100,imageUrl:stringValue(b.imageUrl,500)||existing?.imageUrl||'/images/home/energy-drink-400.webp'};
+  const creditPrice=Number(b.creditPrice??existing?.creditPrice??0);if(!Number.isSafeInteger(creditPrice)||creditPrice<0||creditPrice>1_000_000)fail('INVALID_CREDIT_PRICE');
+  const common={id,name:stringValue(b.name,160,true),category:stringValue(b.category,50,true),price:minor(b.price,true)/100,imageUrl:stringValue(b.imageUrl,500)||existing?.imageUrl||'/images/home/energy-drink-400.webp',creditPrice};
   if(kind==='cafe'){const data={...common,inventory:stock,isAvailable:b.active!==false};if(await this.core.store.getCafeItemById(id))await this.core.store.updateCafeItem(id,data);else await this.core.store.createCafeItem(data);}
   else{const data={...common,stock,description:stringValue(b.description,2000)};if(await this.core.store.getAccessoryById(id))await this.core.store.updateAccessory(id,data);else await this.core.store.createAccessory(data);}
   await this.core.save('stock-movement',newId('SM'),{kind,itemId:id,reason:'inventory-adjustment',before:existing?(kind==='cafe'?existing.inventory:existing.stock):0,after:stock,actor,at:nowISO()},0);

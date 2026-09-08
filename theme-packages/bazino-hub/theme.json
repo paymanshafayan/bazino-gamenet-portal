@@ -1,0 +1,103 @@
+{
+  "id": "bazino-hub",
+  "name": "Bazino Hub",
+  "version": "1.0.0",
+  "layout": "hub",
+  "description": "Neon Hub layout for Bazino — full chrome and hub.* pages on live portal data.",
+  "author": "Bazino",
+  "sdkVersion": 2,
+  "colors": {
+    "primary": "#3ccaf5",
+    "bg": "#070b16",
+    "card": "#10182c"
+  },
+  "tokens": {
+    "primary": "#3ccaf5",
+    "bg": "#070b16",
+    "card": "#10182c",
+    "card-2": "#10182c",
+    "surface": "#0a0f1f",
+    "success": "#22ff88",
+    "info": "#3ccaf5"
+  },
+  "regions": [
+    "header",
+    "footer",
+    "mobileNav",
+    "home",
+    "hub.home",
+    "hub.games",
+    "hub.events",
+    "hub.weekly",
+    "hub.special",
+    "hub.season",
+    "hub.brackets",
+    "hub.register",
+    "hub.shop",
+    "hub.food",
+    "hub.club",
+    "hub.blog",
+    "hub.chat",
+    "hub.contact",
+    "hub.rules",
+    "hub.privacy"
+  ],
+  "strings": {
+    "en": {
+      "home": "HOME",
+      "games": "GAMES",
+      "events": "EVENTS",
+      "shop": "SHOP",
+      "food": "FOOD & DRINKS",
+      "club": "CLUB",
+      "blog": "BLOG",
+      "chat": "CHAT",
+      "login": "LOGIN",
+      "join": "JOIN",
+      "holdBay": "HOLD MY BAY",
+      "holdSeat": "HOLD MY SEAT"
+    },
+    "fa": {
+      "home": "خانه",
+      "games": "بازی‌ها",
+      "events": "رویدادها",
+      "shop": "فروشگاه",
+      "food": "غذا و نوشیدنی",
+      "club": "باشگاه",
+      "blog": "بلاگ",
+      "chat": "گفتگو",
+      "login": "ورود",
+      "join": "عضویت",
+      "holdBay": "رزرو جایگاه",
+      "holdSeat": "رزرو صندلی مسابقه"
+    },
+    "ru": {
+      "home": "ГЛАВНАЯ",
+      "games": "ИГРЫ",
+      "events": "СОБЫТИЯ",
+      "shop": "МАГАЗИН",
+      "food": "ЕДА И НАПИТКИ",
+      "club": "КЛУБ",
+      "blog": "БЛОГ",
+      "chat": "ЧАТ",
+      "login": "ВОЙТИ",
+      "join": "ВСТУПИТЬ",
+      "holdBay": "ЗАБРОНИРОВАТЬ",
+      "holdSeat": "ЗАБРОНИРОВАТЬ МЕСТО"
+    },
+    "tr": {
+      "home": "ANASAYFA",
+      "games": "OYUNLAR",
+      "events": "ETKİNLİKLER",
+      "shop": "MAĞAZA",
+      "food": "YİYECEK & İÇECEK",
+      "club": "KULÜP",
+      "blog": "BLOG",
+      "chat": "SOHBET",
+      "login": "GİRİŞ",
+      "join": "KATIL",
+      "holdBay": "YERİMİ TUT",
+      "holdSeat": "KOLTUĞUMU TUT"
+    }
+  }
+}

@@ -794,13 +794,13 @@ async function startServer() {
     const tokenUsername = (req && (req as any).authUsername) || "Guest";
 
     if (tokenUsername === "Guest") {
-      return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
+      return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, credits: 0, role: "gamer" };
     }
 
     const row = await store.getUserByUsername(tokenUsername);
     if (row) return publicUser(row);
 
-    return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" };
+    return { username: "Guest", email: "", phone: "", loyaltyPoints: 0, credits: 0, role: "gamer" };
   }
 
   /** آیا این نام کاربری نقش admin دارد؟ نقش هر بار از دیتابیس خوانده می‌شود، نه از توکن،
@@ -1001,7 +1001,7 @@ async function startServer() {
     try {
       // JWT logout is client-side: the browser discards the token. Nothing is
       // stored server-side for a session, so there is nothing to clear here.
-      res.json({ success: true, user: { username: "Guest", email: "", phone: "", loyaltyPoints: 0, role: "gamer" } });
+      res.json({ success: true, user: { username: "Guest", email: "", phone: "", loyaltyPoints: 0, credits: 0, role: "gamer" } });
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
@@ -2365,6 +2365,17 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     return {source:'online',systemId,stationId:station?.id||null,sessionId:session?.id||null};
   }
 
+  /** خواندن یک تنظیم عددی با پیش‌فرض امن — نرخ‌ها از «سفارشی‌سازی کلوپ» قابل ویرایش‌اند */
+  async function numSetting(key: string, fallback: number, min = 0, max = 1_000_000): Promise<number> {
+    try {
+      const raw = await getActiveDataProvider().getSetting(key);
+      if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(max, Math.max(min, n));
+    } catch { return fallback; }
+  }
+
   async function paymentQuote(kind: OrderKind, params: any, username?: string) {
     const store = getActiveDataProvider();
     params = {...(params || {})};
@@ -2383,19 +2394,32 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const { systemId, startTime, endTime, date, couponCode, referralCode } = params || {};
       const system = await resolveSampleById(() => store.getSystemById(systemId), SAMPLE_SYSTEMS, systemId);
       if (!system) throw Object.assign(new Error("System not found"), { statusCode: 404 });
+      // دستهٔ اضافه فقط برای کنسول‌ها (PS5/Xbox) — قیمت پایه شامل ۲ دسته است
+      const extraRaw = Number((params as any)?.extraControllers ?? 0);
+      if (!Number.isSafeInteger(extraRaw) || extraRaw < 0 || extraRaw > 6) fail('INVALID_EXTRA_CONTROLLERS', 400);
+      const extraControllers = extraRaw;
+      if (extraControllers > 0 && system.type !== 'PS5' && system.type !== 'Xbox') fail('EXTRA_CONTROLLERS_CONSOLE_ONLY', 400);
       const st = startTime || "12:00", et = endTime || "14:00";
       let window:ReturnType<typeof bookingWindow>;try{window=bookingWindow({date,startTime:st,endTime:et,...(params?.startsAt?{startsAt:params.startsAt,endsAt:params.endsAt}:{})},Date.now(),await management.timezone());}catch{fail('INVALID_RESERVATION_TIME',400);}
       if (Date.parse(window.startsAt) < Date.now()-60000) fail('PAST_RESERVATION');
       const reservationDate = window.date;
       await assertStationFree(management,systemId,window.startsAt,window.endsAt);
       const durationHours = (Date.parse(window.endsAt)-Date.parse(window.startsAt))/3600000;
-      const baseTotal = Math.round(durationHours * system.hourlyRate * 100)/100;
+      const controllerHourly = await numSetting('extra_controller_hourly', 25);
+      const extraControllersAmount = Math.round(extraControllers * controllerHourly * durationHours * 100) / 100;
+      const baseTotal = Math.round((durationHours * system.hourlyRate + extraControllersAmount) * 100)/100;
       const { discountAmount, coupon } = await validateCouponServerSide(baseTotal, couponCode, username, 'reservation');
       const amount = Math.max(0, baseTotal - discountAmount);
+      // هزینهٔ کردیتی (BC) برای «پرداخت با کردیت»: نرخ تخت زمانی، مستقل از نرخ لیری سیستم
+      const creditsPerHour = await numSetting('gaming_credits_per_hour', 100);
+      const controllerCreditsPerHour = await numSetting('extra_controller_credits_per_hour', 20);
+      const creditsCost = Math.max(0, Math.ceil(durationHours * creditsPerHour) + extraControllers * Math.ceil(durationHours * controllerCreditsPerHour));
+      // نام سبد یک خطی می‌ماند تا جمع اقلام با مبلغ نهایی نخواند (قرارداد PayTR)
+      const basketName = `${system.name} (${durationHours}h${extraControllers > 0 ? ` +${extraControllers} extra pad${extraControllers > 1 ? 's' : ''}` : ''})`;
       return {
-        amount, description: `Rezervasyon: ${system.name} ${st}-${et}`,
-        basket: [{ name: `${system.name} (${durationHours}h)`, unitPrice: amount, qty: 1 }],
-        payload: { ...window, systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, systemName: system.name, requestedGame: sanitizeRequestedGame((params as any)?.requestedGame) },
+        amount, creditsCost, description: `Rezervasyon: ${system.name} ${st}-${et}`,
+        basket: [{ name: basketName, unitPrice: amount, qty: 1 }],
+        payload: { ...window, systemId, startTime: st, endTime: et, date: reservationDate, couponCode: coupon ? couponCode : "", referralCode: String(referralCode || "").trim(), amount, creditsCost, systemName: system.name, requestedGame: sanitizeRequestedGame((params as any)?.requestedGame), extraControllers, extraControllersAmount },
       };
     }
     if (kind === "cafe") {
@@ -2457,7 +2481,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       if (p?.__pointsOnly) return { points: await creditPoints(username, p.amount, `امتیاز بابت رزرو ${p.systemName} (پرداخت در محل)`) };
       await store.setSystemReserved(p.systemId, true);
       const id = newOperationId('RES');
-      await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString(), requestedGame: sanitizeRequestedGame(p.requestedGame) });
+      await store.addReservationLog({ id, systemId: p.systemId, username, systemName: p.systemName, startTime: p.startTime, endTime: p.endTime, totalPrice: p.amount, date: p.date, checkedIn: false, timestamp: new Date().toISOString(), requestedGame: sanitizeRequestedGame(p.requestedGame), extraControllers: Number(p.extraControllers) || 0 });
       if (p.couponCode) await store.recordCouponUsage(p.couponCode);
       const points = noPoints ? 0 : await creditPoints(username, p.amount, `امتیاز بابت رزرو آنلاین ${p.systemName}`);
       return { reservationId: id, points };
@@ -2805,7 +2829,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Cafe Items CRUD
   app.post("/api/admin/cafe", async (req, res) => {
     try {
-      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable, creditPrice } = req.body;
       const store = getActiveDataProvider();
       const nextId = await nextEntityId("cafe", async (id) =>
         Boolean(await store.getCafeItemById(id)) || SAMPLE_CAFE_ITEMS.some(x => x.id === id));
@@ -2824,7 +2848,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         imageUrl: finalImageUrl,
         mobileImageUrl: finalMobileUrl,
         inventory: Number(inventory),
-        isAvailable: isAvailable !== false
+        isAvailable: isAvailable !== false,
+        creditPrice: Math.max(0, Math.floor(Number(creditPrice) || 0))
       });
 
       const list = await store.listCafeItems();
@@ -2838,7 +2863,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/cafe/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable } = req.body;
+      const { name, category, price, imageUrl, mobileImageUrl, autoGenerateMobile, inventory, isAvailable, creditPrice } = req.body;
       const store = getActiveDataProvider();
       const item = await store.getCafeItemById(id);
 
@@ -2859,6 +2884,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           mobileImageUrl: finalMobileUrl,
           inventory: inventory !== undefined ? Number(inventory) : item.inventory,
           isAvailable: isAvailable !== undefined ? !!isAvailable : item.isAvailable,
+          creditPrice: creditPrice !== undefined ? Math.max(0, Math.floor(Number(creditPrice) || 0)) : (item.creditPrice || 0),
         });
 
         const list = await store.listCafeItems();
@@ -2906,7 +2932,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   // Accessory Shop CRUD
   app.post("/api/admin/accessories", async (req, res) => {
     try {
-      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category, creditPrice } = req.body;
       const store = getActiveDataProvider();
       const nextId = await nextEntityId("acc", async (id) =>
         Boolean(await store.getAccessoryById(id)) || SAMPLE_ACCESSORIES.some(x => x.id === id));
@@ -2922,7 +2948,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         imageUrl: finalImageUrl,
         mobileImageUrl: finalMobileUrl,
         stock: Number(stock),
-        category
+        category,
+        creditPrice: Math.max(0, Math.floor(Number(creditPrice) || 0))
       });
 
       const list = await store.listAccessories();
@@ -2936,7 +2963,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.put("/api/admin/accessories/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category } = req.body;
+      const { name, description, price, imageUrl, mobileImageUrl, autoGenerateMobile, stock, category, creditPrice } = req.body;
       const store = getActiveDataProvider();
       const acc = await store.getAccessoryById(id);
 
@@ -2955,6 +2982,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
           mobileImageUrl: finalMobileUrl,
           stock: stock !== undefined ? Number(stock) : acc.stock,
           category: category !== undefined ? category : acc.category,
+          creditPrice: creditPrice !== undefined ? Math.max(0, Math.floor(Number(creditPrice) || 0)) : (acc.creditPrice || 0),
         });
 
         const list = await store.listAccessories();
@@ -4074,6 +4102,38 @@ namespace GameNet.Infrastructure.Migrations
     } catch (err) {
       console.error("Error saving setting:", err);
       res.status(500).json({ error: "Failed to save setting" });
+    }
+  });
+
+  // شارژ/کسر دستی کردیت بازینو (BC) توسط ادمین — تا وقتی روش‌های کسب کردیت نهایی نشده،
+  // این مسیر رسمی شارژ حساب کاربر است. هر حرکت در تراکنش‌ها با نوع Credits ثبت می‌شود.
+  app.post("/api/admin/credits/adjust", async (req, res) => {
+    try {
+      const username = String(req.body?.username || "").trim();
+      const delta = Number(req.body?.delta);
+      const note = String(req.body?.note || "").slice(0, 200);
+      if (!username) return res.status(400).json({ error: "Username is required", code: "USERNAME_REQUIRED" });
+      if (!Number.isSafeInteger(delta) || delta === 0 || Math.abs(delta) > 1_000_000) {
+        return res.status(400).json({ error: "Delta must be a non-zero integer", code: "INVALID_DELTA" });
+      }
+      const store = getActiveDataProvider();
+      const user = await store.getUserByUsername(username);
+      if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+      const before = Number(user.credits) || 0;
+      if (before + delta < 0) return res.status(400).json({ error: "Insufficient credits", code: "INSUFFICIENT_CREDITS" });
+      await store.addCreditsToUser(username, delta);
+      await store.addTransaction({
+        id: Math.random().toString(36).substring(2, 9),
+        points: delta,
+        description: delta > 0 ? `شارژ ${delta} کردیت (BC) توسط ادمین${note ? ` — ${note}` : ""}` : `کسر ${Math.abs(delta)} کردیت (BC) توسط ادمین${note ? ` — ${note}` : ""}`,
+        type: "Credits",
+        date: "امروز",
+        username,
+      });
+      res.json({ success: true, username, delta, credits: before + delta });
+    } catch (err) {
+      console.error("Error adjusting credits:", err);
+      res.status(500).json({ error: "Failed to adjust credits" });
     }
   });
 

@@ -32,6 +32,17 @@ export interface ThemeRegionBase {
   assetsBase: string;
   /** آیا theme.js قالب فعال بارگذاری شده (یا اصلاً ندارد)؟ تا قبل از آن fallback نشان نده تا فلش نشود */
   ready: boolean;
+  onLogin?: () => void;
+  onLogout?: () => void;
+  onLanguage?: (lang: string) => void;
+  onCheckout?: (kind: string, params: Record<string, unknown>, estimatedAmount?: number) => void;
+  systems?: any[];
+  season?: any;
+  eventsFeed?: any;
+  bracket?: any;
+  articles?: any[];
+  hubPage?: string;
+  pathname?: string;
 }
 
 const ThemeRegionContext = createContext<ThemeRegionBase | null>(null);
@@ -83,6 +94,17 @@ export default function ThemeRegion({ name, fallback, props, className, pending 
       assetsBase: base.assetsBase,
       themeId: base.themeId,
       region: name,
+      onLogin: base.onLogin,
+      onLogout: base.onLogout,
+      onLanguage: base.onLanguage,
+      onCheckout: base.onCheckout,
+      systems: base.systems,
+      season: base.season,
+      eventsFeed: base.eventsFeed,
+      bracket: base.bracket,
+      articles: base.articles,
+      hubPage: base.hubPage,
+      pathname: base.pathname,
       ...(props || {}),
     };
     mountComponent(name, hostRef.current, full);

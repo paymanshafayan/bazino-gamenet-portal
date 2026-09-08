@@ -1,0 +1,118 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Neon gradient border — shared by every Hub card / box / chip.
+   Usage: class="hub-neon-box" plus optional tone:
+     hub-neon-box--cyan | --magenta | --gold | --green | --purple
+   Existing primitives (.hub-mcard, .hub-game, .hub-panel, …) inherit
+   this automatically so new pages stay consistent.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.hub-page .hub-neon-box,
+.hub-page .hub-mcard,
+.hub-page .hub-game,
+.hub-page .hub-panel,
+.hub-page .hub-side,
+.hub-page .hub-tab,
+.hub-page .hub-chip,
+.hub-page .hub-user,
+.hub-page .hub-filters button,
+.hub-page .hub-panel-banner {
+  --hub-box-from: #b8fbff;
+  --hub-box-mid: #3ccaf5;
+  --hub-box-to: #b067e9;
+  --hub-box-glow: #3ccaf5;
+  --hub-box-bw: 1.5px;
+  position: relative;
+  isolation: isolate;
+  border: var(--hub-box-bw) solid transparent;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--hub-box-glow) 42%, transparent),
+    0 0 22px color-mix(in srgb, var(--hub-box-glow) 16%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--hub-box-glow) 11%, transparent);
+}
+
+.hub-page .hub-neon-box::before,
+.hub-page .hub-mcard::before,
+.hub-page .hub-game::before,
+.hub-page .hub-panel::before,
+.hub-page .hub-side::before,
+.hub-page .hub-tab::before,
+.hub-page .hub-chip::before,
+.hub-page .hub-user::before,
+.hub-page .hub-filters button::before,
+.hub-page .hub-panel-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: var(--hub-box-bw);
+  background: linear-gradient(
+    135deg,
+    var(--hub-box-from) 0%,
+    var(--hub-box-mid) 45%,
+    var(--hub-box-to) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.hub-page .hub-neon-box--cyan,
+.hub-page .hub-tab.is-cyan {
+  --hub-box-from: #e7fcff;
+  --hub-box-mid: #3ccaf5;
+  --hub-box-to: #4a7dff;
+  --hub-box-glow: #3ccaf5;
+}
+
+.hub-page .hub-neon-box--magenta,
+.hub-page .hub-game.is-on,
+.hub-page .hub-tab.is-magenta.is-on,
+.hub-page .hub-filters button.is-on:not(.is-green) {
+  --hub-box-from: #ffe1fb;
+  --hub-box-mid: #da6ad2;
+  --hub-box-to: #7a3adf;
+  --hub-box-glow: #da6ad2;
+}
+
+.hub-page .hub-neon-box--gold,
+.hub-page .hub-mcard.is-gold {
+  --hub-box-from: #fff6c4;
+  --hub-box-mid: #fdcf1c;
+  --hub-box-to: #eab03d;
+  --hub-box-glow: #eab03d;
+  --hub-box-bw: 2px;
+}
+
+.hub-page .hub-neon-box--green,
+.hub-page .hub-filters button.is-on.is-green {
+  --hub-box-from: #e9ffe8;
+  --hub-box-mid: #22ff88;
+  --hub-box-to: #12b86a;
+  --hub-box-glow: #22ff88;
+}
+
+.hub-page .hub-neon-box--purple,
+.hub-page .hub-side {
+  --hub-box-from: #c9b8ff;
+  --hub-box-mid: #b067e9;
+  --hub-box-to: #3ccaf5;
+  --hub-box-glow: #b067e9;
+}
+
+.hub-panel {
+  --hub-box-from: #b8fbff;
+  --hub-box-mid: #3ccaf5;
+  --hub-box-to: #68a7e6;
+  --hub-box-glow: #3ccaf5;
+  --hub-box-bw: 1.6px;
+}
+
+.hub-mcard { --hub-box-bw: 1.35px; }
+.hub-chip,
+.hub-user,
+.hub-filters button { --hub-box-bw: 1.25px; }

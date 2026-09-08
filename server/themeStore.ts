@@ -81,12 +81,17 @@ export interface InstalledThemeInfo {
   /** توکن‌های طراحی */
   tokens?: Record<string, string>;
   author?: string;
+  /** چینش: classic (پیش‌فرض) یا hub (کروم و صفحات hub.*) */
+  layout?: "classic" | "hub";
 }
 
 /** بخش‌های شناخته‌شده‌ی سایت (باید با src/themeSdk/sdk.ts THEME_REGIONS یکی باشد) */
 export const KNOWN_REGIONS = [
   "home", "header", "hero", "home.genres", "home.lounges", "home.results",
   "home.tournaments", "home.pricing", "home.staff", "home.location", "footer", "mobileNav",
+  "hub.home", "hub.games", "hub.events", "hub.weekly", "hub.special", "hub.season",
+  "hub.brackets", "hub.register", "hub.shop", "hub.food", "hub.club", "hub.blog",
+  "hub.chat", "hub.contact", "hub.rules", "hub.privacy",
 ];
 
 /** استخراج نام بخش‌هایی که theme.js با registerComponent('<name>') ثبت می‌کند */
@@ -144,6 +149,7 @@ export function listInstalledThemes(): InstalledThemeInfo[] {
       regions,
       strings: meta.strings && typeof meta.strings === "object" ? meta.strings : undefined,
       tokens: meta.tokens && typeof meta.tokens === "object" ? meta.tokens : undefined,
+      layout: meta.layout === "hub" || meta.layout === "classic" ? meta.layout : undefined,
     });
   }
   return themes;
@@ -242,6 +248,7 @@ export async function installThemeZip(buffer: Uint8Array, fallbackName?: string,
     strings: optimized.meta.strings || undefined,
     regions: detectRegisteredRegions(optimized.componentJs),
     sdkVersion: 2,
+    layout: optimized.meta.layout === "hub" || optimized.meta.layout === "classic" ? optimized.meta.layout : undefined,
   };
   fs.writeFileSync(path.join(dir, "theme.json"), JSON.stringify(meta, null, 2), "utf8");
 

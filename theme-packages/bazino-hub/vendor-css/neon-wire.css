@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════════════════════════
+   NeonWire — reusable SVG neon connectors
+   Use anywhere two Hub pieces must be joined (brackets, timelines,
+   feature cards, ranking ladders).
+
+   Markup (static):
+     <svg class="hub-wire-svg" viewBox="0 0 80 120">
+       <g class="hub-wire hub-wire--cyan">
+         <path class="hub-wire-glow" d="..." />
+         <path class="hub-wire-mid"  d="..." />
+         <path class="hub-wire-core" d="..." />
+       </g>
+     </svg>
+
+   Preferred: <NeonWireLayer> + <WirePort id> + <NeonLink from to />
+   ═══════════════════════════════════════════════════════════════════ */
+
+.hub-wire-layer {
+  position: relative;
+}
+
+.hub-wire-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hub-wire-layer > *:not(.hub-wire-svg) {
+  position: relative;
+  z-index: 2;
+}
+
+.hub-wire {
+  --hub-wire: var(--hub-wire-cyan);
+  --hub-wire-core: #e7fcff;
+}
+
+.hub-wire--cyan    { --hub-wire: var(--hub-wire-cyan);    --hub-wire-core: #e7fcff; }
+.hub-wire--magenta { --hub-wire: var(--hub-wire-magenta); --hub-wire-core: #ffe8fb; }
+.hub-wire--gold    { --hub-wire: var(--hub-wire-gold);    --hub-wire-core: #fff4c8; }
+.hub-wire--green   { --hub-wire: var(--hub-wire-green);   --hub-wire-core: #e9ffe8; }
+.hub-wire--purple  { --hub-wire: var(--hub-wire-purple);  --hub-wire-core: #f0e4ff; }
+.hub-wire--azure   { --hub-wire: var(--hub-wire-azure);   --hub-wire-core: #e4f1ff; }
+
+.hub-wire-glow,
+.hub-wire-mid,
+.hub-wire-core {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hub-wire-glow {
+  stroke: var(--hub-wire);
+  stroke-width: 8;
+  opacity: 0.42;
+  filter: blur(2.6px);
+}
+
+.hub-wire-mid {
+  stroke: var(--hub-wire);
+  stroke-width: 2.4;
+  opacity: 0.95;
+  filter: drop-shadow(0 0 4px var(--hub-wire));
+}
+
+.hub-wire-core {
+  stroke: var(--hub-wire-core);
+  stroke-width: 1.15;
+  opacity: 0.92;
+}
+
+/* Static helper: a 1-unit-high neon rule (dividers, underlines) */
+.hub-neon-rule {
+  height: 2px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--hub-cyan), var(--hub-magenta), transparent);
+  box-shadow: 0 0 10px rgba(60, 202, 245, 0.45);
+}

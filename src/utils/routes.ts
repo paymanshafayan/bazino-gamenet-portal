@@ -24,6 +24,41 @@ export const PUBLIC_TABS = ['home', 'loyalty', 'games', 'cafe', 'shop', 'tournam
  */
 export const LEGACY_TAB_ALIASES: Record<string, string> = { reservations: 'games' };
 
+/** مسیرهای قالب Hub → تب کلاسیک پرتال (برای setActiveTab / داده‌های تب). */
+export const HUB_PATH_ALIASES: Record<string, string> = {
+  events: 'tournaments',
+  food: 'cafe',
+  club: 'loyalty',
+};
+
+/** صفحات قالب Hub که theme.js با regionهای hub.* رندر می‌کند. */
+export const HUB_PAGES = [
+  'home', 'games', 'events', 'weekly', 'special', 'season', 'brackets', 'register',
+  'shop', 'food', 'club', 'blog', 'chat', 'contact', 'rules', 'privacy',
+] as const;
+export type HubPage = typeof HUB_PAGES[number];
+
+export function hubPageFromPath(pathname: string): HubPage | null {
+  const parts = pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  if (parts.length === 0) return 'home';
+  const first = parts[0];
+  const sub = parts[1] || '';
+  if (first === 'events' || first === 'tournaments') {
+    if (sub === 'weekly' || sub === 'special' || sub === 'season' || sub === 'brackets' || sub === 'register') return sub;
+    return 'events';
+  }
+  if (first === 'games' || first === 'reservations') return 'games';
+  if (first === 'shop') return 'shop';
+  if (first === 'food' || first === 'cafe') return 'food';
+  if (first === 'club' || first === 'loyalty') return 'club';
+  if (first === 'blog') return 'blog';
+  if (first === 'chat') return 'chat';
+  if (first === 'contact') return 'contact';
+  if (first === 'rules') return 'rules';
+  if (first === 'privacy') return 'privacy';
+  return null;
+}
+
 export const ADMIN_SECTIONS = [
   'dashboard', 'systems', 'cafe', 'shop', 'tournaments', 'tournamentOps', 'blog', 'content', 'promotions', 'chat', 'migrations', 'messages',
   'themes', 'appSlider', 'mobileAppDownload', 'customization', 'dbLogs', 'apiKeys', 'presentation', 'tickets', 'wallet', 'affiliates', 'messaging',
@@ -43,7 +78,7 @@ export type AdminSection = typeof ADMIN_SECTIONS[number];
 export function tabFromPath(pathname: string): string {
   const first = pathname.replace(/^\/+|\/+$/g, '').split('/')[0] || '';
   if (!first) return 'home';
-  const canonical = LEGACY_TAB_ALIASES[first] || first;
+  const canonical = LEGACY_TAB_ALIASES[first] || HUB_PATH_ALIASES[first] || first;
   return (PUBLIC_TABS as readonly string[]).includes(canonical) ? canonical : 'home';
 }
 

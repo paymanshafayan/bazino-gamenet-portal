@@ -24,6 +24,7 @@ import { LanguageMenu, LanguageRow } from './components/LanguageMenu';
 import { postJson, errorMessage } from './services/postJson';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
+import ComingSoonPanel from './components/ComingSoonPanel';
 const HomeTab = lazy(() => import('./components/HomeTab'));
 const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const GamesTab = lazy(() => import('./components/GamesTab'));
@@ -43,6 +44,7 @@ const ConsoleGridClassic = lazy(() => import('./components/ConsoleGridClassic'))
 const VisualHelpGuide = lazy(() => import('./components/VisualHelpGuide'));
 const MobileAppDownloadPage = lazy(() => import('./components/MobileAppDownloadPage'));
 const MobileAppDownloadWidget = lazy(() => import('./components/MobileAppDownloadWidget'));
+const CheckoutModal = lazy(() => import('./legal/CheckoutModal').then(m => ({ default: m.CheckoutModal })));
 import { useLanguage } from './context/LanguageContext';
 import { L, localizeList, localeOf } from './utils/i18n';
 import { 
@@ -51,7 +53,7 @@ import {
   Smartphone, QrCode, Download, Menu, MessageSquare, LogIn, Search, User, LogOut, ArrowLeft, ArrowRight,
   Gamepad2
 } from 'lucide-react';
-import { tabFromPath, pathFromTab, standalonePageFromPath, LEGACY_TAB_ALIASES } from './utils/routes';
+import { tabFromPath, pathFromTab, standalonePageFromPath, LEGACY_TAB_ALIASES, hubPageFromPath } from './utils/routes';
 import { claimStoredRef } from './utils/affiliateCapture';
 // صفحات قانونی/تماس/پرداخت عمداً lazy نیستند تا هرگز به قالب و ThemeRegion وابسته نباشند
 import { LegalPage } from './legal/LegalPage';
@@ -97,6 +99,7 @@ function serverThemeToInfo(t: any): ThemeInfo {
     strings: t.strings,
     tokens: t.tokens,
     author: t.author,
+    layout: t.layout === 'hub' || t.layout === 'classic' ? t.layout : undefined,
   };
 }
 
@@ -264,7 +267,63 @@ export default function App() {
   ), [activeTheme]);
   const themeScript = useThemeScript(themeScriptSource);
   const themeRegistered = themeScript.registered;
+  const isZipHub = activeTheme.layout === 'hub';
+  const hubPage = isZipHub ? hubPageFromPath(currentPath) : null;
   const [themeSlides, setThemeSlides] = useState<ThemeSlide[]>([]);
+  const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
+  const [hubEvents, setHubEvents] = useState<any>(null);
+  const [hubSeason, setHubSeason] = useState<any>(null);
+  const [hubBracket, setHubBracket] = useState<any>(null);
+  const [checkoutRequest, setCheckoutRequest] = useState<{
+    kind: 'reservation' | 'tournament' | 'cafe' | 'shop';
+    params: Record<string, unknown>;
+    amount?: number;
+    title?: string;
+  } | null>(null);
+  const openCheckout = useCallback((kind: string, params: Record<string, unknown>, estimatedAmount?: number, title?: string) => {
+    const k = kind === 'tournament' || kind === 'cafe' || kind === 'shop' ? kind : 'reservation';
+    setCheckoutRequest({ kind: k, params: params || {}, amount: estimatedAmount, title });
+  }, []);
+  useEffect(() => {
+    const onEvt = (e: Event) => {
+      const d = ((e as CustomEvent).detail || {}) as { kind?: string; params?: Record<string, unknown>; amount?: number; title?: string };
+      if (d.kind) openCheckout(d.kind, d.params || {}, d.amount, d.title);
+    };
+    window.addEventListener('bazino:checkout', onEvt as EventListener);
+    return () => window.removeEventListener('bazino:checkout', onEvt as EventListener);
+  }, [openCheckout]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetch('/api/settings', BG_FETCH).then(r => r.json()).then((j: Record<string, string>) => {
+        if (j && typeof j === 'object') setSiteSettings(j);
+      }).catch(() => {});
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!isZipHub) return;
+    const timer = window.setTimeout(() => {
+      fetch('/api/tournaments/events', BG_FETCH).then(r => r.json()).then(setHubEvents).catch(() => {});
+      fetch('/api/season-ranking', BG_FETCH).then(r => r.json()).then(setHubSeason).catch(() => {});
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [isZipHub, themeStoreVersion]);
+  useEffect(() => {
+    if (!isZipHub || hubPage !== 'brackets') return;
+    const liveId = hubEvents && hubEvents.live && hubEvents.live.id;
+    if (!liveId) { setHubBracket(null); return; }
+    let cancelled = false;
+    const load = () => {
+      fetch('/api/tournaments/' + encodeURIComponent(liveId) + '/live', BG_FETCH)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (!cancelled && d) setHubBracket(d); })
+        .catch(() => {});
+    };
+    load();
+    const es = new EventSource('/api/tournaments/' + encodeURIComponent(liveId) + '/stream');
+    es.addEventListener('bracket-update', () => load());
+    return () => { cancelled = true; es.close(); };
+  }, [isZipHub, hubPage, hubEvents]);
   useEffect(() => {
     // اسلایدهای ادمین (چهارزبانه) برای بخش‌های قالب — کم‌اولویت
     const timer = window.setTimeout(() => {
@@ -312,10 +371,23 @@ export default function App() {
     if (pathOrTab.startsWith('/')) {
       if (window.location.pathname !== pathOrTab) window.history.pushState({}, '', pathOrTab);
       setCurrentPath(pathOrTab);
+      setActiveTabState(tabFromPath(pathOrTab));
     } else {
       setActiveTab(pathOrTab);
     }
     window.scrollTo({ top: 0 });
+  }, [setActiveTab]);
+
+  /** ناوبری قالب Hub: مسیر مطلق (/events/weekly) بدون بازنویسی به تب کلاسیک. */
+  const navigateTheme = useCallback((dest: string) => {
+    if (dest.charAt(0) === '/') {
+      if (window.location.pathname !== dest) window.history.pushState({}, '', dest);
+      setCurrentPath(dest);
+      setActiveTabState(tabFromPath(dest));
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    setActiveTab(dest);
   }, [setActiveTab]);
 
   // Alias قدیمی: اگر کاربر با /reservations آمد (لینک قدیمی/اسلایدهای قبلی ادمین)،
@@ -447,12 +519,12 @@ export default function App() {
   // نشان می‌دهند، پس در آن حالت‌ها همه‌ی دیتاست‌ها بارگذاری می‌شوند. این افکت
   // با تغییر قالب/نما هم دوباره اجرا می‌شود.
   useEffect(() => {
-    const comprehensive = themeId === 'console-grid' || layoutMode === 'hub';
+    const comprehensive = themeId === 'console-grid' || layoutMode === 'hub' || isZipHub;
     // مسابقات از بوت‌استرپ HTML می‌آید؛ اگر تزریق نشده بود (dev/static) همان
     // fetch قبلی انجام می‌شود. «user» دیگر اینجا نیست — پایین‌تر با تأخیر بیشتر.
     const keys = comprehensive ? Object.keys(fetchDataset) : (BOOTSTRAP_TOURNAMENTS ? [] : ['tournaments']);
     if (keys.length > 0) scheduleIdle(() => ensureLoaded(keys));
-  }, [themeId, layoutMode]);
+  }, [themeId, layoutMode, isZipHub]);
 
   // وضعیت ورود کاربر هیچ نقشی در رندر/LCP اولیه ندارد؛ فقط بعد از load کامل
   // صفحه و در زمان idle (با اولویت شبکه‌ی low) دریافت می‌شود تا /api/user از
@@ -507,7 +579,7 @@ export default function App() {
   // کارت QR دانلود اپلیکیشن عمداً بعد از LCP و در idle mount می‌شود تا chunk کوچک
   // خودش و درخواست تصویر QR وارد مسیر بحرانی صفحه اصلی/GTmetrix نشوند.
   useEffect(() => {
-    if (activeTab !== 'home' || layoutMode === 'hub' || !isHomeContentReady) {
+    if (activeTab !== 'home' || layoutMode === 'hub' || isZipHub || !isHomeContentReady) {
       setIsAppDownloadWidgetReady(false);
       return;
     }
@@ -525,7 +597,7 @@ export default function App() {
       if (timer !== undefined && typeof win.cancelIdleCallback === 'function') win.cancelIdleCallback(timer);
       else if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [activeTab, layoutMode, isHomeContentReady]);
+  }, [activeTab, layoutMode, isZipHub, isHomeContentReady]);
 
   // فقط تعداد امتیاز فرستاده می‌شود. ارزش کوپن و خودِ کد را سرور تعیین می‌کند —
   // قبلاً هر سه از کلاینت می‌رفتند و می‌شد با ۱ امتیاز کوپن دلخواه ساخت.
@@ -618,22 +690,58 @@ export default function App() {
   // جای‌نگهدار LCP صفحه‌ی اصلی: اسلایدر پیش‌فرض فقط وقتی paint می‌شود که مطمئن باشیم
   // قالب فعال بخش hero/home اختصاصی ندارد؛ وگرنه (theme.js در حال بارگذاری یا بخش ثبت‌شده)
   // یک بلوک خالی هم‌ارتفاع نشان می‌دهیم تا اسلایدر یک لحظه «فلش» نکند (E.86).
-  const themeOwnsHero = !themeScript.ready || themeRegistered.includes('hero') || themeRegistered.includes('home');
+  const themeOwnsHero = !themeScript.ready || themeRegistered.includes('hero') || themeRegistered.includes('home') || themeRegistered.includes('hub.home') || isZipHub;
   // وقتی قالب خودش hero/home دارد، تأخیر LCP معنایی ندارد → HomeTab بلافاصله mount می‌شود
   useEffect(() => {
-    if (themeScript.ready && (themeRegistered.includes('hero') || themeRegistered.includes('home'))) setIsHomeContentReady(true);
-  }, [themeScript.ready, themeRegistered]);
+    if (themeScript.ready && (themeRegistered.includes('hero') || themeRegistered.includes('home') || themeRegistered.includes('hub.home') || isZipHub)) setIsHomeContentReady(true);
+  }, [themeScript.ready, themeRegistered, isZipHub]);
   const homePlaceholder = themeOwnsHero
     ? <div className="w-full min-h-[340px]" aria-hidden="true" data-hero-pending="" />
     : <LandingHero onNavigate={() => setActiveTab('games')} />;
 
-  const renderTabContent = () => (
+  const renderTabContent = () => {
+    if (isZipHub && hubPage && activeTab !== 'admin') {
+      const regionName = hubPage === 'home' ? 'home' : ('hub.' + hubPage);
+      const hubFallback =
+        hubPage === 'games' ? <GamesTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/> :
+        hubPage === 'shop' ? <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={shopComingSoon}/> :
+        hubPage === 'food' ? <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={foodComingSoon}/> :
+        hubPage === 'club' ? <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/> :
+        hubPage === 'blog' ? <BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/> :
+        hubPage === 'chat' ? (chatEnabled ? <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} /> : <ComingSoonPanel kind="chat" />) :
+        hubPage === 'contact' ? <ContactPage onBack={() => navigateStandalone('home')} /> :
+        hubPage === 'rules' ? <LegalPage slug="rules" onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} /> :
+        hubPage === 'privacy' ? <LegalPage slug="privacy" onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} /> :
+        (hubPage === 'events' || hubPage === 'weekly' || hubPage === 'special' || hubPage === 'season' || hubPage === 'brackets' || hubPage === 'register') ? <TournamentsTab /> :
+        hubPage === 'home' ? (
+          !isHomeContentReady ? homePlaceholder : (
+            <HomeTab themeId={themeId} tournaments={tournaments} onNavigate={setActiveTab} />
+          )
+        ) : null;
+      return (
+        <Suspense fallback={<div className="w-full min-h-[600px]" aria-hidden="true" />}>
+          <div className="w-full flex-grow relative">
+            <ThemeRegion
+              name={regionName}
+              className="w-full"
+              fallback={hubFallback}
+              props={{
+                systems, tournaments, articles,
+                season: hubSeason, eventsFeed: hubEvents, bracket: hubBracket,
+                hubPage, pathname: currentPath,
+              }}
+            />
+          </div>
+        </Suspense>
+      );
+    }
+    return (
     <Suspense fallback={
       <div className="w-full min-h-[600px]" aria-hidden="true" />
     }>
     <div className="max-w-7xl mx-auto w-full flex-grow relative pb-20">
       {activeTab === 'home' && (
-        layoutMode === 'hub' ? (
+        layoutMode === 'hub' && !isZipHub ? (
           <ConsoleHubView 
             themeId={themeId} 
             systems={systems} 
@@ -685,8 +793,8 @@ export default function App() {
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
       {activeTab === 'games' && <GamesTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
-      {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
-      {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
+      {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={foodComingSoon}/>}
+      {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={shopComingSoon}/>}
       {activeTab === 'tournaments' && <TournamentsTab />}
       {activeTab === 'blog' && <BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/>}
       {activeTab === 'admin' && (
@@ -702,10 +810,11 @@ export default function App() {
         />
       )}
 
-      {activeTab === 'chat' && <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} />}
+      {activeTab === 'chat' && (chatEnabled ? <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} /> : <ComingSoonPanel kind="chat" />)}
     </div>
     </Suspense>
-  );
+    );
+  };
 
   if (isInstalled === null) {
     return (
@@ -741,7 +850,8 @@ export default function App() {
     </>;
 
     if (standalone.type === 'legal') return <LegalPage slug={standalone.slug} onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} />;
-    if (standalone.type === 'contact') return <ContactPage onBack={() => navigateStandalone('home')} />;
+    // /contact در قالب Hub به region hub.contact می‌رود؛ ContactPage کلاسیک فقط وقتی layout!==hub است.
+    if (standalone.type === 'contact' && !isZipHub) return <ContactPage onBack={() => navigateStandalone('home')} />;
     if (standalone.type === 'profile') {
       return (
         <>
@@ -776,7 +886,8 @@ export default function App() {
         </>
       );
     }
-    return <PaymentResultPage outcome={standalone.outcome} oid={standalone.oid} onBack={() => navigateStandalone('home')} onGoTo={navigateStandalone} />;
+    if (standalone.type === 'payment') return <PaymentResultPage outcome={standalone.outcome} oid={standalone.oid} onBack={() => navigateStandalone('home')} onGoTo={navigateStandalone} />;
+    // contact + قالب Hub: از این شاخه عبور می‌کند تا ThemeRegion hub.contact رندر شود
   }
 
   if (currentPath === '/app-download') {
@@ -791,6 +902,10 @@ export default function App() {
     );
   }
 
+  // پرچم‌های قابلیت (از /api/settings): چت فقط وقتی در منو هست که ادمین فعالش کرده باشد
+  const chatEnabled = siteSettings.chat_enabled === 'true';
+  const foodComingSoon = siteSettings.food_coming_soon !== 'false';
+  const shopComingSoon = siteSettings.shop_coming_soon !== 'false';
   // یک منبع واحد برای ناوبری، تا هدر دسکتاپ و نوار پایین موبایل هرگز از هم جدا نیفتند.
   // «بلاگ» و «چت» تا امروز هیچ ورودی‌ای در رابط کاربری نداشتند: صفحه‌شان ساخته شده
   // بود و ادمین می‌توانست مقاله منتشر کند و اتاق گفتگو بسازد، ولی هیچ بازدیدکننده‌ای
@@ -803,7 +918,8 @@ export default function App() {
     { id: 'tournaments',  label: L(language, { fa: 'مسابقات', en: 'Arena', ru: 'АРЕНА', tr: 'ARENA' }),     icon: Trophy },
     { id: 'loyalty',      label: L(language, { fa: 'باشگاه', en: 'Club', ru: 'КЛУБ', tr: 'KULÜP' }),      icon: Award },
     { id: 'blog',         label: L(language, { fa: 'بلاگ', en: 'Blog', ru: 'БЛОГ', tr: 'BLOG' }),      icon: Newspaper },
-    { id: 'chat',         label: L(language, { fa: 'گفتگو', en: 'Chat', ru: 'ЧАТ', tr: 'SOHBET' }),      icon: MessageSquare },
+    // چت غیرفعال است (فقط از منو حذف شده؛ کد و مدیریت ادمین دست‌نخورده)
+    ...(chatEnabled ? [{ id: 'chat', label: L(language, { fa: 'گفتگو', en: 'Chat', ru: 'ЧАТ', tr: 'SOHBET' }), icon: MessageSquare }] : []),
   ];
   // روی موبایل هشت آیکون در ۳۹۰ پیکسل جا نمی‌شود (هر کدام کمتر از ۵۰px می‌شد و
   // هدف لمس بسیار کوچک). پنج تای اول در نوار می‌مانند و بقیه پشت دکمه‌ی «بیشتر».
@@ -811,8 +927,9 @@ export default function App() {
   const MOBILE_MORE_TABS = NAV_TABS.slice(5);
 
   const isAdminView = activeTab === 'admin';
-  // نوار پایین موبایل در پنل ادمین و حالت hub نمایش داده نمی‌شود (مثل هدر).
-  const showMobileNav = !(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin';
+  const zipHubChrome = isZipHub && !isAdminView;
+  // نوار پایین موبایل در پنل ادمین و حالت console-hub نمایش داده نمی‌شود؛ قالب ZIP Hub کروم خودش را ثبت می‌کند.
+  const showMobileNav = zipHubChrome || (!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin');
   const adminShellVars = isAdminView ? {
     '--primary-color': '#00e5ff',
     '--primary-hover-color': '#67e8f9',
@@ -834,19 +951,30 @@ export default function App() {
     strings: activeTheme.strings,
     tokens: resolveThemeTokens(activeTheme),
     slides: themeSlides,
-    onNavigate: (tab: string) => setActiveTab(tab),
+    onNavigate: navigateTheme,
     activeTab,
-    user: user ? { username: user.username, points: (user as any).points, role: user.role } : null,
-    settings: {},
-    logoUrl: '/logo.png',
+    user: user ? { username: user.username, points: user.loyaltyPoints, credits: Number(user.credits) || 0, role: user.role, displayName: user.displayName || user.gamerTag || user.username } : null,
+    settings: siteSettings,
+    logoUrl: siteSettings.logo_url || siteSettings.club_logo || '/logo.png',
     assetsBase: activeTheme.assetsBase || '',
     ready: themeScript.ready,
+    onLogin: () => setIsAuthModalOpen(true),
+    onLogout: handleLogout,
+    onLanguage: (lang: string) => { if (lang === 'fa' || lang === 'en' || lang === 'ru' || lang === 'tr') setLanguage(lang); },
+    onCheckout: (kind, params, amount) => openCheckout(kind, params, amount),
+    systems,
+    season: hubSeason,
+    eventsFeed: hubEvents,
+    bracket: hubBracket,
+    articles,
+    hubPage: hubPage || undefined,
+    pathname: currentPath,
   };
 
   return (
     <ThemeRegionProvider value={themeRegionBase}>
     <div 
-      className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${layoutMode === 'hub' && activeTab === 'home' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} ${showMobileNav ? 'pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'} w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
+      className={`${isAdminView ? 'admin-shell' : `theme-${themeId || "dark-gold"}`} ${zipHubChrome ? 'hub-page' : ''} ${layoutMode === 'hub' && activeTab === 'home' && !isZipHub ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'} ${showMobileNav && !zipHubChrome ? 'pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'} w-full text-gray-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-primary/30 app-bg-main`} 
       style={adminShellVars}
       dir={dir}
     >
@@ -902,8 +1030,8 @@ export default function App() {
         ))}
       </div>
 
-      {!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin' && (
-        <ThemeRegion name="header" className="sticky top-0 z-40 w-full" fallback={
+      {activeTab !== 'admin' && (zipHubChrome || !(layoutMode === 'hub' && activeTab === 'home')) && (
+        <ThemeRegion name="header" className="sticky top-0 z-40 w-full" fallback={zipHubChrome ? null : (
         <header className="site-header h-[70px] border-b border-white/10 bg-dark-card/90 backdrop-blur-xl px-4 md:px-8 flex justify-between items-center z-40 sticky top-0 shrink-0 shadow-lg">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
                <img src={bazinoLogo} alt="Bazino Pro" width="40" height="40" className="brand-logo-guard h-10 w-auto" />
@@ -947,7 +1075,7 @@ export default function App() {
                <LanguageMenu language={language} setLanguage={setLanguage} open={langDropdownOpen} setOpen={setLangDropdownOpen} />
             </div>
           </header>
-        } />
+        )} />
       )}
 
       {activeTab === 'admin' && (
@@ -1013,9 +1141,21 @@ export default function App() {
             onAuthSuccess={setUser}
           />
         )}
+        {checkoutRequest && (
+          <CheckoutModal
+            kind={checkoutRequest.kind}
+            params={checkoutRequest.params}
+            estimatedAmount={checkoutRequest.amount}
+            title={checkoutRequest.title}
+            isLoggedIn={!!user}
+            onRequireLogin={() => setIsAuthModalOpen(true)}
+            onDone={() => { setCheckoutRequest(null); void refreshAll(); }}
+            onClose={() => setCheckoutRequest(null)}
+          />
+        )}
       </Suspense>
 
-      {activeTab === 'home' && layoutMode !== 'hub' && isAppDownloadWidgetReady && (
+      {activeTab === 'home' && layoutMode !== 'hub' && !isZipHub && isAppDownloadWidgetReady && (
         <Suspense fallback={null}>
           <MobileAppDownloadWidget onOpenDownloadPage={openAppDownloadPage} />
         </Suspense>
@@ -1075,7 +1215,7 @@ export default function App() {
           CTA داخل صفحه بود و برای کافه/فروشگاه/باشگاه حتی همان هم نبود.
           ────────────────────────────────────────────────────────────── */}
       {showMobileNav && (
-        <ThemeRegion name="mobileNav" fallback={<>
+        <ThemeRegion name="mobileNav" fallback={zipHubChrome ? null : <>
           {isMobileMoreOpen && (
             <div
               className="md:hidden fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
@@ -1136,7 +1276,7 @@ export default function App() {
         </>} />
       )}
 
-      {activeTab !== 'admin' && !(layoutMode === 'hub' && activeTab === 'home') && (
+      {activeTab !== 'admin' && (zipHubChrome || !(layoutMode === 'hub' && activeTab === 'home')) && (
         <ThemeRegion name="footer" fallback={null} className="w-full" />
       )}
       {/* نوار قانونی ثابت: خارج از ThemeRegion؛ قالب‌ها نمی‌توانند آن را جایگزین یا پنهان کنند */}

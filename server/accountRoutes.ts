@@ -67,6 +67,7 @@ export function publicUser(row: UserRow) {
     email: row.email || '',
     phone: row.phone || '',
     loyaltyPoints: row.loyaltyPoints,
+    credits: Number(row.credits) || 0,
     role: row.role || 'gamer',
     displayName: row.displayName || '',
     avatarUrl: row.avatarUrl || '',

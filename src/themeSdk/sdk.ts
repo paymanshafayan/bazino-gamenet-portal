@@ -42,6 +42,22 @@ export const THEME_REGIONS = [
   'home.location',
   'footer',
   'mobileNav',
+  'hub.home',
+  'hub.games',
+  'hub.events',
+  'hub.weekly',
+  'hub.special',
+  'hub.season',
+  'hub.brackets',
+  'hub.register',
+  'hub.shop',
+  'hub.food',
+  'hub.club',
+  'hub.blog',
+  'hub.chat',
+  'hub.contact',
+  'hub.rules',
+  'hub.privacy',
 ] as const;
 export type ThemeRegion = typeof THEME_REGIONS[number];
 
@@ -72,7 +88,7 @@ export interface ThemeComponentProps {
   slides: ThemeSlide[];
   onNavigate: (tab: ThemeTab | string) => void;
   activeTab?: string;
-  user?: { username: string; points?: number; role?: string } | null;
+  user?: { username: string; points?: number; credits?: number; role?: string; displayName?: string } | null;
   featuredGames: any[];
   gameGenres?: any[];
   matchHistory?: any[];
@@ -88,6 +104,17 @@ export interface ThemeComponentProps {
   themeId: string;
   /** نام بخشی که در حال رندر است */
   region: string;
+  onLogin?: () => void;
+  onLogout?: () => void;
+  onLanguage?: (lang: string) => void;
+  onCheckout?: (kind: string, params: Record<string, unknown>, estimatedAmount?: number) => void;
+  systems?: any[];
+  season?: any;
+  eventsFeed?: any;
+  bracket?: any;
+  articles?: any[];
+  hubPage?: string;
+  pathname?: string;
 }
 
 export interface ThemeComponentDefinition {

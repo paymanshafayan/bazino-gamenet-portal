@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { postJson, errorMessage, toServerCart } from '../services/postJson';
 import { CheckoutModal, type CheckoutResult } from '../legal/CheckoutModal';
 import { L, localeOf } from '../utils/i18n';
+import ComingSoonPanel from './ComingSoonPanel';
 
 interface Props {
   themeId?: string;
@@ -13,6 +14,8 @@ interface Props {
   /** پس از ثبت موفق سفارش، وضعیت تازه‌ی سرور (کاربر، تراکنش‌ها، موجودی منو) را بالا می‌فرستد. */
   onServerState: (data: any) => void;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  /** پرچم food_coming_soon — وقتی روشن است فقط پنل «به‌زودی» نمایش داده می‌شود */
+  comingSoon?: boolean;
 }
 
 export default function CafeTab({
@@ -20,6 +23,7 @@ export default function CafeTab({
   activeCoupons,
   onServerState,
   addNotification,
+  comingSoon,
 }: Props) {
   const { t, dir, language } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -168,6 +172,9 @@ export default function CafeTab({
   const subtotal = getSubtotal();
   const discount = getDiscountAmount();
   const total = subtotal - discount;
+
+  // حالت «به‌زودی»: ساختار سفارش دست‌نخورده می‌ماند تا بعداً (تبلت/رستوران همکار) فعال شود
+  if (comingSoon) return <ComingSoonPanel kind="food" />;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>

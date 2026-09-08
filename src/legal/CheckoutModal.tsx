@@ -1,6 +1,7 @@
 /**
  * تسک ۱۳ — مودال واحد انتخاب روش پرداخت (مستقل از قالب، Portal روی body):
  *   • کیف پول   → POST /api/checkout/wallet  (کسر فوری + تکمیل سفارش)
+ *   • کردیت     → POST /api/checkout/credits (کسر فوری از کردیت بازینو + تکمیل؛ فعلاً فقط رزرو)
  *   • در محل    → POST /api/checkout/onsite  (ثبت با مهلت: رزرو ≥۱۰ دقیقه قبل از سانس، تورنمنت ≥۴۸ ساعت قبل)
  *   • آنلاین    → PaymentCheckout (PayTR) فقط اگر سرور اعلام کند فعال است
  * روش‌های مجاز هر نوع سفارش از GET /api/payments/methods خوانده می‌شود (بوفه/فروشگاه: فقط در محل).
@@ -18,7 +19,7 @@ import { getAuthToken } from '../services/authToken';
 export const OPEN_AUTH_EVENT = 'bazino:open-auth';
 export function requestLogin() { window.dispatchEvent(new CustomEvent(OPEN_AUTH_EVENT)); }
 
-export type PayMethod = 'wallet' | 'onsite' | 'online';
+export type PayMethod = 'wallet' | 'credits' | 'onsite' | 'online';
 
 export interface PaymentMethods { online: boolean; currency: string; methods: Record<PaymentKind, PayMethod[]>; onsiteLeadMinutes: { reservation: number; tournament: number } }
 
@@ -41,6 +42,8 @@ export interface CheckoutResult {
   dueAt?: string;
   startsAt?: string;
   balance?: number;
+  creditsCost?: number;
+  creditsBalance?: number;
   result?: any;
 }
 
@@ -48,6 +51,8 @@ interface Props {
   kind: PaymentKind;
   params: Record<string, unknown>;
   estimatedAmount?: number;
+  /** برآورد هزینهٔ کردیتی (BC) — فقط رزرو؛ مبنای نهایی سرور است */
+  estimatedCredits?: number;
   title?: string;
   /** کاربر لاگین است؟ (پیش‌فرض: وجود توکن) */
   isLoggedIn?: boolean;
@@ -78,6 +83,17 @@ export function onsiteRuleText(kind: PaymentKind, language: string): string {
   });
 }
 
+/** برآورد هزینهٔ کردیتی رزرو از روی params + نرخ‌ها (فقط نمایش؛ مبنای نهایی سرور است) */
+export function estimateCreditsFromParams(params: Record<string, unknown>, rates: { g: number; c: number }): number {
+  const p = params as any;
+  const parse = (s: unknown) => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) + Number(m[2]) / 60 : NaN; };
+  const st = parse(p.startTime), et = parse(p.endTime);
+  if (!Number.isFinite(st) || !Number.isFinite(et)) return 0;
+  let dur = et - st; if (dur <= 0) dur += 24; if (dur <= 0 || dur > 12) return 0;
+  const ex = Math.min(6, Math.max(0, Math.trunc(Number(p.extraControllers) || 0)));
+  return Math.ceil(dur * rates.g) + ex * Math.ceil(dur * rates.c);
+}
+
 export function formatDue(dueAt: string | undefined, language: string): string {
   if (!dueAt) return '';
   const d = new Date(dueAt);
@@ -86,11 +102,13 @@ export function formatDue(dueAt: string | undefined, language: string): string {
   return d.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn: loggedInProp, onRequireLogin = requestLogin, onDone, onClose }: Props) {
+export function CheckoutModal({ kind, params, estimatedAmount, estimatedCredits, title, isLoggedIn: loggedInProp, onRequireLogin = requestLogin, onDone, onClose }: Props) {
   const { language, dir } = useLanguage();
   const isLoggedIn = loggedInProp ?? !!getAuthToken();
   const [methods, setMethods] = useState<PaymentMethods | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const [creditsBalance, setCreditsBalance] = useState<number | null>(null);
+  const [creditRates, setCreditRates] = useState<{ g: number; c: number } | null>(null);
   const [selected, setSelected] = useState<PayMethod | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -109,13 +127,29 @@ export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn
     const walletP: Promise<number | null> = isLoggedIn
       ? fetch('/api/me/wallet').then(r => (r.ok ? r.json() : null)).then(d => (d ? Number(d.balance) || 0 : null)).catch(() => null)
       : Promise.resolve(null);
-    Promise.all([getPaymentMethods(true), walletP]).then(([m, bal]) => {
+    const creditsP: Promise<number | null> = isLoggedIn
+      ? fetch('/api/user').then(r => (r.ok ? r.json() : null)).then(d => (d && d.user ? Number(d.user.credits) || 0 : null)).catch(() => null)
+      : Promise.resolve(null);
+    // نرخ‌های کردیت فقط وقتی لازم‌اند که برآورد از بیرون نیامده باشد (مثلاً مسیر هاب)
+    const ratesP: Promise<{ g: number; c: number } | null> = (kind === 'reservation' && estimatedCredits === undefined)
+      ? fetch('/api/settings').then(r => (r.ok ? r.json() : null)).then((j: any) => {
+        if (!j || typeof j !== 'object') return null;
+        const num = (k: string, fb: number) => { const n = Number(j[k]); return Number.isFinite(n) && n >= 0 ? n : fb; };
+        return { g: num('gaming_credits_per_hour', 100), c: num('extra_controller_credits_per_hour', 20) };
+      }).catch(() => null)
+      : Promise.resolve(null);
+    Promise.all([getPaymentMethods(true), walletP, creditsP, ratesP]).then(([m, bal, cr, rt]) => {
       if (cancelled) return;
       setMethods(m);
       if (bal !== null) setBalance(bal);
+      if (cr !== null) setCreditsBalance(cr);
+      if (rt !== null) setCreditRates(rt);
       const allowed = m.methods[kind] || [];
-      // اگر موجودی کیف پول کافی نیست، پیش‌فرض «پرداخت در محل» انتخاب شود
-      const first = allowed[0] === 'wallet' && (bal ?? 0) < estimatedAmount && allowed.includes('onsite') ? 'onsite' : allowed[0];
+      // اگر موجودی کیف پول کافی نیست: اول کردیت (اگر کافی است)، وگرنه «پرداخت در محل»
+      const creditsEst = typeof estimatedCredits === 'number' ? estimatedCredits : (kind === 'reservation' && rt ? estimateCreditsFromParams(params, rt) : 0);
+      const first = allowed[0] === 'wallet' && (bal ?? 0) < amount
+        ? (allowed.includes('credits') && creditsEst > 0 && (cr ?? 0) >= creditsEst ? 'credits' : allowed.includes('onsite') ? 'onsite' : allowed[0])
+        : allowed[0];
       setSelected(first || null);
     });
     return () => { cancelled = true; };
@@ -123,13 +157,21 @@ export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn
 
   const allowed = methods ? (methods.methods[kind] || []) : [];
   const amount = typeof estimatedAmount === 'number' ? estimatedAmount : 0;
+  // برآورد خودکار از روی params وقتی بیرون پاس نداده (مسیر هاب) — مبنای نهایی همیشه سرور است
+  const autoCredits = kind === 'reservation' && creditRates ? estimateCreditsFromParams(params, creditRates) : 0;
+  const credits = typeof estimatedCredits === 'number' ? estimatedCredits : autoCredits;
   const walletShort = balance !== null && amount > balance;
+  const creditsShort = creditsBalance !== null && credits > creditsBalance;
   const needsRule = kind === 'reservation' || kind === 'tournament';
 
   const labels: Record<PayMethod, { title: string; desc: string }> = {
     wallet: {
       title: L(language, { fa: 'کیف پول بازینو', en: 'Bazino wallet', ru: 'Кошелёк Bazino', tr: 'Bazino cüzdanı' }),
       desc: L(language, { fa: 'کسر فوری از موجودی؛ شارژ حضوری در کلاب انجام می‌شود.', en: 'Deducted instantly from your balance; top up in person at the club.', ru: 'Списывается сразу с баланса; пополнение — лично в клубе.', tr: 'Bakiyenizden anında düşülür; yükleme kulüpte yüz yüze yapılır.' }),
+    },
+    credits: {
+      title: L(language, { fa: 'کردیت بازینو (BC)', en: 'Bazino credits (BC)', ru: 'Кредиты Bazino (BC)', tr: 'Bazino kredisi (BC)' }),
+      desc: L(language, { fa: 'کسر فوری از موجودی کردیت؛ شارژ از طریق کلاب انجام می‌شود.', en: 'Deducted instantly from your credit balance; top up through the club.', ru: 'Списывается сразу с баланса кредитов; пополнение — через клуб.', tr: 'Kredi bakiyenizden anında düşülür; yükleme kulüp aracılığıyla yapılır.' }),
     },
     onsite: {
       title: L(language, { fa: 'پرداخت در محل', en: 'Pay at the venue', ru: 'Оплата на месте', tr: 'Mekânda ödeme' }),
@@ -153,13 +195,14 @@ export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn
     try {
       const signature=JSON.stringify({kind,params,selected});
       let idempotencyKey=localStorage.getItem('bazino.checkout.'+signature);if(!idempotencyKey){idempotencyKey=crypto.randomUUID();localStorage.setItem('bazino.checkout.'+signature,idempotencyKey);}
-      const r = await postJson<any>(selected === 'wallet' ? '/api/checkout/wallet' : '/api/checkout/onsite', { kind, params, idempotencyKey });
+      const r = await postJson<any>(selected === 'wallet' ? '/api/checkout/wallet' : selected === 'credits' ? '/api/checkout/credits' : '/api/checkout/onsite', { kind, params, idempotencyKey });
       localStorage.removeItem('bazino.checkout.'+signature);
       window.dispatchEvent(new CustomEvent('bazino:refresh-data'));
-      onDone({ method: selected, orderId: r.orderId, amount: r.amount, status: r.status, dueAt: r.dueAt, startsAt: r.startsAt, balance: r.balance, result: r.result });
+      onDone({ method: selected, orderId: r.orderId, amount: r.amount, status: r.status, dueAt: r.dueAt, startsAt: r.startsAt, balance: r.balance, creditsCost: r.creditsCost, creditsBalance: r.creditsBalance, result: r.result });
     } catch (e) {
       const msg = errorMessage(e, '');
-      if (msg === 'INSUFFICIENT_FUNDS') setError(L(language, { fa: 'موجودی کیف پول کافی نیست. لطفاً در کلاب کیف پول خود را شارژ کنید یا «پرداخت در محل» را انتخاب کنید.', en: 'Insufficient wallet balance. Top up at the club or choose “Pay at the venue”.', ru: 'Недостаточно средств в кошельке. Пополните в клубе или выберите «Оплата на месте».', tr: 'Cüzdan bakiyesi yetersiz. Kulüpte yükleme yapın veya “Mekânda ödeme” seçin.' }));
+      if (msg === 'INSUFFICIENT_CREDITS') setError(L(language, { fa: 'کردیت بازینو کافی نیست. لطفاً از کلاب کردیت بگیرید یا روش دیگری انتخاب کنید.', en: 'Insufficient Bazino credits. Get credits from the club or choose another method.', ru: 'Недостаточно кредитов Bazino. Пополните через клуб или выберите другой способ.', tr: 'Bazino kredisi yetersiz. Kulüpten kredi alın veya başka bir yöntem seçin.' }));
+      else if (msg === 'INSUFFICIENT_FUNDS') setError(L(language, { fa: 'موجودی کیف پول کافی نیست. لطفاً در کلاب کیف پول خود را شارژ کنید یا «پرداخت در محل» را انتخاب کنید.', en: 'Insufficient wallet balance. Top up at the club or choose “Pay at the venue”.', ru: 'Недостаточно средств в кошельке. Пополните в клубе или выберите «Оплата на месте».', tr: 'Cüzdan bakiyesi yetersiz. Kulüpte yükleme yapın veya “Mekânda ödeme” seçin.' }));
       else if (msg === 'Too late for on-site payment') setError(L(language, { fa: 'مهلت پرداخت حضوری برای این زمان گذشته است؛ لطفاً با کیف پول پرداخت کنید یا زمان دیگری انتخاب کنید.', en: 'The on-site payment window for this time has passed; pay with your wallet or choose another time.', ru: 'Срок оплаты на месте для этого времени истёк; оплатите кошельком или выберите другое время.', tr: 'Bu saat için mekânda ödeme süresi geçti; cüzdanla ödeyin veya başka bir zaman seçin.' }));
       else setError(msg || L(language, { fa: 'ثبت انجام نشد. دوباره تلاش کنید.', en: 'Could not complete. Please try again.', ru: 'Не удалось выполнить. Попробуйте снова.', tr: 'Tamamlanamadı. Lütfen tekrar deneyin.' }));
     } finally { setBusy(false); }
@@ -182,10 +225,16 @@ export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn
               <strong dir="ltr" data-checkout-amount>{estimatedAmount.toLocaleString()} TL</strong>
             </div>
           )}
+          {credits > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span style={{ color: LEGAL_PALETTE.muted }}>{L(language, { fa: 'هزینهٔ کردیتی (برآورد)', en: 'Credit cost (estimate)', ru: 'Стоимость в кредитах (оценка)', tr: 'Kredi tutarı (tahmini)' })}</span>
+              <strong dir="ltr" data-checkout-credits>{credits.toLocaleString()} BC</strong>
+            </div>
+          )}
           {!methods && <div style={{ color: LEGAL_PALETTE.muted, fontSize: 13 }}>…</div>}
           {methods && allowed.map(m => {
             const active = selected === m;
-            const disabled = m === 'wallet' && isLoggedIn && walletShort;
+            const disabled = (m === 'wallet' && isLoggedIn && walletShort) || (m === 'credits' && isLoggedIn && creditsShort);
             return (
               <label key={m} data-pay-method={m} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 12, borderRadius: 12, cursor: 'pointer', border: `1px solid ${active ? LEGAL_PALETTE.accent : LEGAL_PALETTE.border}`, background: active ? 'rgba(255,255,255,0.03)' : 'transparent', opacity: disabled ? 0.7 : 1 }}>
                 <input type="radio" name="pay-method" checked={active} onChange={() => { setSelected(m); setError(''); }} style={{ marginTop: 4 }} />
@@ -197,10 +246,18 @@ export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn
                         {L(language, { fa: 'موجودی:', en: 'Balance:', ru: 'Баланс:', tr: 'Bakiye:' })} {balance.toLocaleString()} TL
                       </span>
                     )}
+                    {m === 'credits' && isLoggedIn && creditsBalance !== null && (
+                      <span dir="ltr" data-credits-balance style={{ fontSize: 12, color: creditsShort ? LEGAL_PALETTE.danger : LEGAL_PALETTE.accent, fontWeight: 700 }}>
+                        {L(language, { fa: 'موجودی:', en: 'Balance:', ru: 'Баланс:', tr: 'Bakiye:' })} {creditsBalance.toLocaleString()} BC
+                      </span>
+                    )}
                   </span>
                   <span style={{ fontSize: 12.5, color: LEGAL_PALETTE.muted, lineHeight: 1.6 }}>{labels[m].desc}</span>
                   {m === 'wallet' && isLoggedIn && walletShort && (
                     <span style={{ fontSize: 12, color: LEGAL_PALETTE.danger }}>{L(language, { fa: 'موجودی کافی نیست — در کلاب شارژ کنید.', en: 'Not enough balance — top up at the club.', ru: 'Недостаточно средств — пополните в клубе.', tr: 'Bakiye yetersiz — kulüpte yükleyin.' })}</span>
+                  )}
+                  {m === 'credits' && isLoggedIn && creditsShort && (
+                    <span style={{ fontSize: 12, color: LEGAL_PALETTE.danger }}>{L(language, { fa: 'کردیت کافی نیست — از کلاب کردیت بگیرید.', en: 'Not enough credits — get credits from the club.', ru: 'Недостаточно кредитов — обратитесь в клуб.', tr: 'Kredi yetersiz — kulüpten kredi alın.' })}</span>
                   )}
                 </span>
               </label>
@@ -220,11 +277,12 @@ export function CheckoutModal({ kind, params, estimatedAmount, title, isLoggedIn
             </label>
           )}
           {error && <div style={{ color: LEGAL_PALETTE.danger, fontSize: 13 }} data-error>{error}</div>}
-          <button type="button" className="bz-legal-btn bz-legal-btn-primary" data-checkout-confirm disabled={busy || !selected || (selected === 'wallet' && isLoggedIn && walletShort)} onClick={confirm}
-            style={{ opacity: busy || !selected || (selected === 'wallet' && isLoggedIn && walletShort) ? 0.55 : 1, padding: '12px 18px', fontSize: 15 }}>
+          <button type="button" className="bz-legal-btn bz-legal-btn-primary" data-checkout-confirm disabled={busy || !selected || (selected === 'wallet' && isLoggedIn && walletShort) || (selected === 'credits' && isLoggedIn && creditsShort)} onClick={confirm}
+            style={{ opacity: busy || !selected || (selected === 'wallet' && isLoggedIn && walletShort) || (selected === 'credits' && isLoggedIn && creditsShort) ? 0.55 : 1, padding: '12px 18px', fontSize: 15 }}>
             {busy ? '…' : !isLoggedIn && selected !== 'online'
               ? L(language, { fa: 'ورود و ادامه', en: 'Sign in & continue', ru: 'Войти и продолжить', tr: 'Giriş yap ve devam et' })
               : selected === 'wallet' ? L(language, { fa: 'پرداخت از کیف پول', en: 'Pay from wallet', ru: 'Оплатить из кошелька', tr: 'Cüzdandan öde' })
+              : selected === 'credits' ? L(language, { fa: 'پرداخت با کردیت', en: 'Pay with credits', ru: 'Оплатить кредитами', tr: 'Krediyle öde' })
               : selected === 'onsite' ? L(language, { fa: 'ثبت با پرداخت در محل', en: 'Register with on-site payment', ru: 'Оформить с оплатой на месте', tr: 'Mekânda ödeme ile kaydet' })
               : L(language, { fa: 'ادامه به درگاه', en: 'Continue to gateway', ru: 'Перейти к оплате', tr: 'Ödemeye geç' })}
           </button>

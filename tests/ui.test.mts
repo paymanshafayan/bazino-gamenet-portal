@@ -405,34 +405,26 @@ async function mountWidget(onOpen: () => void) {
   return mount(Wrapper, {});
 }
 
-test('renders a QR code and a download call-to-action', async () => {
+test('renders a compact floating bubble with a mobile icon instead of a QR card', async () => {
   const el = await mountWidget(() => {});
   assert.ok(el.html().length > 0, 'widget rendered nothing');
-  const qr = el.find('img');
-  assert.ok(qr, 'no QR image rendered');
-  assert.ok((qr.getAttribute('alt') ?? '').length > 0, 'QR image has no alt text');
-  assert.ok(el.findAll('button').length >= 2, 'expected a close button and a download button');
+  const bubble = el.find('button[data-app-download-bubble]');
+  assert.ok(bubble, 'floating bubble button missing');
+  assert.ok(bubble.querySelector('svg'), 'mobile icon missing inside bubble');
+  assert.ok((bubble.getAttribute('aria-label') ?? '').length > 0, 'bubble has no accessible label');
+  assert.match(bubble.className, /rounded-full/);
+  assert.match(bubble.className, /h-14 w-14/);
+  assert.equal(el.find('img'), null, 'the old QR card must not render anymore');
+  assert.equal(el.findAll('button').length, 1, 'the bubble is now the only action');
   await el.unmount();
 });
 
-test('the download button calls onOpenDownloadPage', async () => {
+test('the floating bubble calls onOpenDownloadPage', async () => {
   let opened = 0;
   const el = await mountWidget(() => { opened++; });
-  // the first button is "close"; the download CTA is the last one
-  const buttons = el.findAll('button');
-  await el.click(buttons[buttons.length - 1]);
-  assert.equal(opened, 1, 'the download button did not call onOpenDownloadPage');
-  await el.unmount();
-});
-
-test('the close button hides the widget without navigating', async () => {
-  let opened = 0;
-  const el = await mountWidget(() => { opened++; });
-  const closeBtn = el.findAll('button')[0];
-  await el.click(closeBtn);
-  assert.equal(opened, 0, 'closing the widget must not trigger navigation');
-  const card = el.find('aside');
-  assert.equal(card?.style?.display, 'none', 'the widget did not hide itself');
+  const bubble = el.find('button[data-app-download-bubble]');
+  await el.click(bubble);
+  assert.equal(opened, 1, 'the bubble did not call onOpenDownloadPage');
   await el.unmount();
 });
 

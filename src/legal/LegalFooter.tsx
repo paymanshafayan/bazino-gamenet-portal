@@ -1,14 +1,12 @@
 /**
  * نوار قانونی ثابت پایین همهٔ صفحات عمومی — خارج از ThemeRegion و بدون توکن قالب.
- * لینک‌های متن‌های قانونی، تماس، نشان‌های کارت/امنیت و مشخصات شرکت.
+ * لینک‌های متن‌های قانونی، تماس و مشخصات شرکت.
  */
-import React, { useEffect, useState } from 'react';
-import { getPaymentMethods } from './CheckoutModal';
+import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { L } from '../utils/i18n';
 import { LEGAL_SLUGS, LEGAL_TITLES, type Lang4 } from './legalContent';
 import { ensureLegalStyles, LEGAL_PALETTE } from './LegalShell';
-import { PaymentBadgeRow } from './PaymentBadges';
 import { useCompanyInfo } from './useCompanyInfo';
 
 export function legalPath(slug: string) { return `/legal/${slug}`; }
@@ -19,8 +17,6 @@ export function LegalFooter({ onNavigate }: { onNavigate: (path: string) => void
   const { info, settings } = useCompanyInfo();
   ensureLegalStyles();
   const go = (path: string) => (e: React.MouseEvent) => { e.preventDefault(); onNavigate(path); };
-  const [online, setOnline] = useState<boolean | null>(null);
-  useEffect(() => { let c = false; getPaymentMethods().then(m => { if (!c) setOnline(!!m.online); }).catch(() => {}); return () => { c = true; }; }, []);
   const year = new Date().getFullYear();
   return (
     <footer className="bz-legal" dir={dir} data-bz-legal-footer style={{ borderTop: `1px solid ${LEGAL_PALETTE.border}`, background: '#0a0e15', padding: '22px 20px 90px' }}>
@@ -43,13 +39,6 @@ export function LegalFooter({ onNavigate }: { onNavigate: (path: string) => void
             {info.email && <a href={`mailto:${info.email}`} style={{ color: LEGAL_PALETTE.muted }}>{info.email}</a>}
             {info.taxNo && <span>{L(language, { fa: 'شمارهٔ مالیاتی', en: 'Tax No', ru: 'Налоговый №', tr: 'Vergi No' })}: {info.taxNo}</span>}
           </div>
-        </div>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 8 }}>{online ? L(language, { fa: 'پرداخت امن', en: 'Secure payment', ru: 'Безопасная оплата', tr: 'Güvenli Ödeme' }) : L(language, { fa: 'روش‌های پرداخت', en: 'Payment methods', ru: 'Способы оплаты', tr: 'Ödeme yöntemleri' })}</div>
-          {online && <PaymentBadgeRow height={26} />}
-          <p style={{ fontSize: 11, color: LEGAL_PALETTE.muted, margin: '10px 0 0' }} data-footer-pay-note>
-            {online === false ? L(language, { fa: 'پرداخت با کیف پول بازینو یا حضوری در کلاب (نقدی/کارت). شارژ کیف پول فقط حضوری انجام می‌شود؛ درگاه آنلاین موقتاً غیرفعال است.', en: 'Pay with your Bazino wallet or in person at the club (cash/card). Wallet top-ups are in person only; online payment is temporarily unavailable.', ru: 'Оплата кошельком Bazino или лично в клубе (наличные/карта). Пополнение — только лично; онлайн-оплата временно недоступна.', tr: 'Bazino cüzdanı ile veya kulüpte yüz yüze (nakit/kart) ödeyin. Cüzdan yüklemesi yalnızca yüz yüze yapılır; online ödeme geçici olarak kapalıdır.' }) : L(language, { fa: 'پرداخت‌ها با 3D Secure از طریق زیرساخت PayTR انجام می‌شود؛ اطلاعات کارت شما نزد ما ذخیره نمی‌شود.', en: 'Payments are processed with 3D Secure via PayTR; your card details are never stored by us.', ru: 'Платежи проходят с 3D Secure через PayTR; данные карты у нас не хранятся.', tr: 'Ödemeler PayTR altyapısı üzerinden 3D Secure ile alınır; kart bilgileriniz tarafımızca saklanmaz.' })}
-          </p>
         </div>
       </div>
       <div style={{ maxWidth: 1180, margin: '18px auto 0', paddingTop: 12, borderTop: `1px solid ${LEGAL_PALETTE.border}`, fontSize: 11, color: LEGAL_PALETTE.muted, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>

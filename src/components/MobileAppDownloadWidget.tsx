@@ -1,73 +1,34 @@
-import { Download, QrCode, Smartphone, X } from 'lucide-react';
-import QrCodeImage from './QrCodeImage';
+import { Smartphone } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { L } from '../utils/i18n';
 
 interface Props {
   onOpenDownloadPage: () => void;
 }
 
 export default function MobileAppDownloadWidget({ onOpenDownloadPage }: Props) {
-  const { language, dir } = useLanguage();
-  const [isFa, isRu, isTr] = [language === 'fa', language === 'ru', language === 'tr'];
-  const pageUrl = `${window.location.origin}/app-download`;
-
-  const copy = {
-    title: isFa ? 'اپلیکیشن موبایل بازینو' : isRu ? 'Мобильное приложение Bazino' : isTr ? 'Bazino Mobil Uygulaması' : 'Bazino Mobile App',
-    body: isFa
-      ? 'برای رزرو سریع سیستم، مشاهده مسابقات و دریافت اعلان‌های باشگاه، اپلیکیشن را نصب کنید.'
-      : isRu
-        ? 'Установите приложение для быстрого бронирования, турниров и уведомлений клуба.'
-        : isTr
-          ? 'Hızlı rezervasyon, turnuvalar ve kulüp bildirimleri için mobil uygulamayı yükleyin.'
-          : 'Install the app for quick reservations, tournaments, and club notifications.',
-    button: isFa ? 'رفتن به صفحه دانلود' : isRu ? 'Страница загрузки' : isTr ? 'İndirme sayfasına git' : 'Open download page',
-    scan: isFa ? 'اسکن برای دانلود' : isRu ? 'Сканировать' : isTr ? 'İndirmek için tara' : 'Scan to download',
-    close: isFa ? 'بستن' : isRu ? 'Закрыть' : isTr ? 'Kapat' : 'Close',
-  };
+  const { language } = useLanguage();
+  const label = L(language, {
+    fa: 'دانلود اپلیکیشن موبایل بازینو',
+    en: 'Download the Bazino mobile app',
+    ru: 'Скачать мобильное приложение Bazino',
+    tr: 'Bazino mobil uygulamasını indir',
+  });
 
   return (
-    <aside
-      dir={dir}
-      aria-label={copy.title}
-      className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px)+1rem)] md:bottom-5 right-5 left-5 sm:left-auto sm:w-[360px] z-[55] rounded-[28px] border border-white/10 bg-[#070b16]/95 text-white shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl overflow-hidden"
-      style={{ colorScheme: 'dark' }}
+    <button
+      type="button"
+      onClick={onOpenDownloadPage}
+      aria-label={label}
+      title={label}
+      data-app-download-bubble
+      className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px)+1rem)] right-5 z-[55] grid h-14 w-14 place-items-center rounded-full border border-white/30 shadow-[0_18px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-transform duration-200 hover:-translate-y-1 active:translate-y-0"
+      style={{
+        background: 'linear-gradient(135deg, var(--bz-primary, var(--primary-color, #ffb800)), var(--bz-primary-hover, var(--primary-hover-color, #e09900)))',
+        color: '#07111f',
+      }}
     >
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-violet-400 to-amber-300" />
-      <div className="p-4 flex gap-4 items-center">
-        <div className="shrink-0 rounded-2xl bg-white p-2 shadow-lg shadow-cyan-500/10">
-          <QrCodeImage value={pageUrl} size={112} color="#070913" background="#ffffff" alt={copy.scan} className="block w-28 h-28" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-400/10 border border-cyan-300/20 px-2.5 py-1 text-[10px] font-black text-cyan-200">
-              <QrCode className="w-3.5 h-3.5" />
-              {copy.scan}
-            </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                const card = (e.currentTarget.closest('aside') as HTMLElement | null);
-                if (card) card.style.display = 'none';
-              }}
-              aria-label={copy.close}
-              className="rounded-full p-1.5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <h2 className="mt-3 text-base font-black tracking-tight text-white">{copy.title}</h2>
-          <p className="mt-1.5 text-[11px] leading-5 text-slate-300">{copy.body}</p>
-          <button
-            type="button"
-            onClick={onOpenDownloadPage}
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#07111f] shadow-lg shadow-white/10 transition-transform hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <Smartphone className="w-4 h-4" />
-            <span>{copy.button}</span>
-            <Download className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </aside>
+      <Smartphone className="h-6 w-6" strokeWidth={2.4} />
+    </button>
   );
 }

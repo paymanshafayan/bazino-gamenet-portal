@@ -21,7 +21,10 @@ export function ProfileSecurity({ user, onUserChange, addNotification }: Profile
     if (newPassword !== confirm) return setMsg({ kind: 'err', text: L(language, { fa: 'تکرار رمز عبور مطابقت ندارد.', en: 'Passwords do not match.', ru: 'Пароли не совпадают.', tr: 'Şifreler eşleşmiyor.' }) });
     setBusy(true);
     try {
-      const r = await fetch('/api/me/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oldPassword, newPassword }) });
+      // حساب OTP-only هنوز «رمز فعلی» ندارد؛ فقط رمز جدید ارسال می‌شود تا
+      // اولین تنظیم رمز نیازی به مقدار قدیمی نداشته باشد.
+      const payload = hasPassword ? { oldPassword, newPassword } : { newPassword };
+      const r = await fetch('/api/me/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Error');
       onUserChange({ ...user, hasPassword: true });

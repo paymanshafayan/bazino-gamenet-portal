@@ -63,14 +63,16 @@ export default function ProfileWallet({ addNotification }: Props) {
       const r = await fetch(`/api/checkout/onsite/${encodeURIComponent(id)}/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Error');
-      addNotification(d.refunded > 0
+      addNotification(Number(d.refundedCredits) > 0
+        ? L(language, { fa: `لغو شد و ${Number(d.refundedCredits).toLocaleString()} کردیت (BC) برگشت.`, en: `Cancelled; ${Number(d.refundedCredits).toLocaleString()} credits (BC) refunded.`, ru: `Отменено; возвращено ${Number(d.refundedCredits).toLocaleString()} кредитов (BC).`, tr: `İptal edildi; ${Number(d.refundedCredits).toLocaleString()} kredi (BC) iade edildi.` })
+        : d.refunded > 0
         ? L(language, { fa: `لغو شد و ${Number(d.refunded).toLocaleString()} TL به کیف پول برگشت.`, en: `Cancelled; ${Number(d.refunded).toLocaleString()} TL refunded to your wallet.`, ru: `Отменено; ${Number(d.refunded).toLocaleString()} TL возвращено в кошелёк.`, tr: `İptal edildi; ${Number(d.refunded).toLocaleString()} TL cüzdanınıza iade edildi.` })
         : L(language, { fa: 'لغو شد.', en: 'Cancelled.', ru: 'Отменено.', tr: 'İptal edildi.' }), 'success');
       load();
     } catch (e: any) { addNotification(e.message, 'error'); } finally { setBusy(''); }
   };
 
-  const cancellableWallet = (o: any) => o.status === 'settled' && String(o.settledBy || '') === 'wallet' && o.dueAt && Date.parse(o.dueAt) > Date.now();
+  const cancellableWallet = (o: any) => o.status === 'settled' && (String(o.settledBy || '') === 'wallet' || String(o.settledBy || '') === 'credits') && o.dueAt && Date.parse(o.dueAt) > Date.now();
   const pending = orders.filter(o => o.status === 'pending_onsite');
   const others = orders.filter(o => o.status !== 'pending_onsite');
 

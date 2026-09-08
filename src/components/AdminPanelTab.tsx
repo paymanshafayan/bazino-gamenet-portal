@@ -193,6 +193,11 @@ export default function AdminPanelTab({
   // Customization & Settings states
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [isResettingDb, setIsResettingDb] = useState(false);
+  // فرم شارژ دستی کردیت بازینو (تا نهایی شدن روش‌های کسب کردیت)
+  const [grantUsername, setGrantUsername] = useState('');
+  const [grantDelta, setGrantDelta] = useState('');
+  const [grantNote, setGrantNote] = useState('');
+  const [grantBusy, setGrantBusy] = useState(false);
 
   // Data source state (sample ⇄ database)
   const [dataSource, setDataSource] = useState<'sample' | 'database'>('sample');
@@ -507,6 +512,33 @@ export default function AdminPanelTab({
     }
   };
 
+  const handleGrantCredits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const delta = Math.trunc(Number(grantDelta));
+    if (!grantUsername.trim() || !Number.isSafeInteger(delta) || delta === 0) {
+      addNotification(L(language, { fa: 'نام کاربری و مبلغ معتبر وارد کنید.', en: 'Enter a valid username and amount.', ru: 'Введите имя пользователя и сумму.', tr: 'Geçerli bir kullanıcı adı ve tutar girin.' }), 'error');
+      return;
+    }
+    setGrantBusy(true);
+    try {
+      const res = await fetch('/api/admin/credits/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: grantUsername.trim(), delta, note: grantNote.trim() }),
+      }).then(r => r.json());
+      if (res.success) {
+        addNotification(L(language, { fa: `کردیت ${res.username} به‌روز شد؛ موجودی: ${Number(res.credits).toLocaleString()} BC`, en: `Credits updated for ${res.username}; balance: ${Number(res.credits).toLocaleString()} BC`, ru: `Кредиты ${res.username} обновлены; баланс: ${Number(res.credits).toLocaleString()} BC`, tr: `${res.username} kredileri güncellendi; bakiye: ${Number(res.credits).toLocaleString()} BC` }), 'success');
+        setGrantUsername(''); setGrantDelta(''); setGrantNote('');
+      } else {
+        addNotification(res.error || 'Failed', 'error');
+      }
+    } catch (err) {
+      addNotification(L(language, { fa: 'خطا در شارژ کردیت', en: 'Failed to adjust credits', ru: 'Не удалось изменить кредиты', tr: 'Kredi ayarlanamadı' }), 'error');
+    } finally {
+      setGrantBusy(false);
+    }
+  };
+
   const handleSaveSection = async (
     sectionKey: string, 
     fields: { isEnabled: boolean; titleFa: string; titleEn: string; titleRu?: string; titleTr?: string; descFa: string; descEn: string; descRu?: string; descTr?: string }
@@ -749,7 +781,7 @@ export default function AdminPanelTab({
       }).then(r => r.json());
 
       if (res.success) {
-        setAppSliders(res.appSliders);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'اسلاید جدید با موفقیت اضافه شد', en: 'New slide added successfully', ru: 'Новый слайд успешно добавлен', tr: 'Yeni slayt başarıyla eklendi' }), 'success');
         setNewSlideUrl('');
         setNewSlideMobileUrl('');
@@ -777,7 +809,7 @@ export default function AdminPanelTab({
       }).then(r => r.json());
 
       if (res.success) {
-        setAppSliders(res.appSliders);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'اسلاید حذف شد', en: 'Slide deleted successfully', ru: 'Слайд удалён', tr: 'Slayt silindi' }), 'success');
         if (editingSlideId === id) {
           cancelEditSlide();
@@ -815,7 +847,7 @@ export default function AdminPanelTab({
       }).then(r => r.json());
 
       if (res.success) {
-        setAppSliders(res.appSliders);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'اسلاید با موفقیت ویرایش شد', en: 'Slide updated successfully', ru: 'Слайд успешно обновлён', tr: 'Slayt başarıyla güncellendi' }), 'success');
         setEditingSlideId(null);
         setNewSlideUrl('');
@@ -1275,7 +1307,7 @@ export default function AdminPanelTab({
     try {
       const res = await fetch(`/api/admin/systems/${sysId}`, { method: 'DELETE' }).then(r => r.json());
       if (res.success) {
-        setSystems(res.systems);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'سیستم حذف شد', en: 'System deleted successfully', ru: 'Система удалена', tr: 'Sistem silindi' }), 'success');
       } else {
         addNotification(res.error || 'Failed', 'error');
@@ -1289,7 +1321,7 @@ export default function AdminPanelTab({
     try {
       const res = await fetch(`/api/admin/cafe/${itemId}`, { method: 'DELETE' }).then(r => r.json());
       if (res.success) {
-        setCafeItems(res.cafeItems);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'آیتم منو حذف شد', en: 'Menu item deleted successfully', ru: 'Пункт меню удалён', tr: 'Menü öğesi silindi' }), 'success');
       } else {
         addNotification(res.error || 'Failed', 'error');
@@ -1303,7 +1335,7 @@ export default function AdminPanelTab({
     try {
       const res = await fetch(`/api/admin/tournaments/${tourId}`, { method: 'DELETE' }).then(r => r.json());
       if (res.success) {
-        setTournaments(res.tournaments);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'تورنومنت حذف شد', en: 'Tournament deleted successfully', ru: 'Турнир удалён', tr: 'Turnuva silindi' }), 'success');
       } else {
         addNotification(res.error || 'Failed', 'error');
@@ -1317,7 +1349,7 @@ export default function AdminPanelTab({
     try {
       const res = await fetch(`/api/admin/accessories/${accId}`, { method: 'DELETE' }).then(r => r.json());
       if (res.success) {
-        setAccessories(res.accessories);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'کالا از فروشگاه حذف شد', en: 'Accessory deleted successfully', ru: 'Товар удалён из магазина', tr: 'Ürün mağazadan silindi' }), 'success');
       } else {
         addNotification(res.error || 'Failed', 'error');
@@ -1331,7 +1363,7 @@ export default function AdminPanelTab({
     try {
       const res = await fetch(`/api/admin/articles/${artId}`, { method: 'DELETE' }).then(r => r.json());
       if (res.success) {
-        setArticles(res.articles);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'مقاله حذف شد', en: 'Article deleted successfully', ru: 'Статья удалена', tr: 'Makale silindi' }), 'success');
       } else {
         addNotification(res.error || 'Failed', 'error');
@@ -1351,7 +1383,7 @@ export default function AdminPanelTab({
         body: JSON.stringify({ name: newChatRoomName.trim() })
       }).then(r => r.json());
       if (res.success) {
-        setChatRooms(res.chatRooms);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         setNewChatRoomName('');
         addNotification(L(language, { fa: 'اتاق گفتگو ایجاد شد', en: 'Chat room created successfully', ru: 'Чат-комната создана', tr: 'Sohbet odası oluşturuldu' }), 'success');
       } else {
@@ -1366,7 +1398,7 @@ export default function AdminPanelTab({
     try {
       const res = await fetch(`/api/admin/chat-rooms/${encodeURIComponent(name)}`, { method: 'DELETE' }).then(r => r.json());
       if (res.success) {
-        setChatRooms(res.chatRooms);
+        fetchData(); // بازخوانی از GET ادغام‌شده (فیکس باگ #۴: پاسخ تغییر فقط دیتابیس است)
         addNotification(L(language, { fa: 'اتاق گفتگو حذف شد', en: 'Chat room deleted successfully', ru: 'Чат-комната удалена', tr: 'Sohbet odası silindi' }), 'success');
       } else {
         addNotification(res.error || 'Failed', 'error');
@@ -3988,6 +4020,74 @@ export default function AdminPanelTab({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* SECTION 4a: FEATURE FLAGS + PRICING + CREDITS (درخواست کارفرما) */}
+              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
+                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">
+                  <Settings className="w-4 h-4 text-amber-400" />
+                  <span>{L(language, { fa: 'پرچم‌های قابلیت، قیمت‌گذاری و کردیت بازینو', en: 'Feature Flags, Pricing & Bazino Credits', ru: 'Флаги функций, цены и кредиты Bazino', tr: 'Özellik Bayrakları, Fiyatlandırma ve Bazino Kredileri' })}</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {([
+                    { key: 'chat_enabled', onLabel: { fa: 'گفتگو فعال است', en: 'Chat enabled', ru: 'Чат включён', tr: 'Sohbet açık' }, offLabel: { fa: 'گفتگو غیرفعال (پنهان از منو)', en: 'Chat disabled (hidden from menu)', ru: 'Чат выключен (скрыт из меню)', tr: 'Sohbet kapalı (menüde gizli)' } },
+                    { key: 'food_coming_soon', onLabel: { fa: 'کافه: به‌زودی (سفارش بسته)', en: 'Cafe: coming soon (ordering off)', ru: 'Кафе: скоро (заказ закрыт)', tr: 'Kafe: yakında (sipariş kapalı)' }, offLabel: { fa: 'کافه: فعال (سفارش باز)', en: 'Cafe: live (ordering on)', ru: 'Кафе: активно', tr: 'Kafe: aktif' } },
+                    { key: 'shop_coming_soon', onLabel: { fa: 'فروشگاه: به‌زودی (خرید بسته)', en: 'Shop: coming soon (buying off)', ru: 'Магазин: скоро', tr: 'Mağaza: yakında' }, offLabel: { fa: 'فروشگاه: فعال (خرید باز)', en: 'Shop: live (buying on)', ru: 'Магазин: активен', tr: 'Mağaza: aktif' } },
+                  ] as const).map(f => {
+                    const isOn = f.key === 'chat_enabled' ? siteSettings[f.key] === 'true' : siteSettings[f.key] !== 'false';
+                    return (
+                      <label key={f.key} className="flex items-center gap-3 bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isOn}
+                          onChange={(e) => handleSaveSetting(f.key, f.key === 'chat_enabled' ? String(e.target.checked) : (e.target.checked ? 'true' : 'false'))}
+                          className="w-4 h-4 accent-amber-400"
+                        />
+                        <span className="text-xs text-gray-200 font-bold">{L(language, isOn ? f.onLabel : f.offLabel)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'دستهٔ اضافهٔ کنسول (لیر/ساعت)', en: 'Extra controller (TL/hour)', ru: 'Доп. контроллер (TL/час)', tr: 'Ekstra kol (TL/saat)' })}</label>
+                    <input type="number" dir="ltr" min="0" max="1000000" step="1" placeholder="25"
+                      value={siteSettings['extra_controller_hourly'] ?? '25'}
+                      onChange={(e) => handleSaveSetting('extra_controller_hourly', e.target.value)}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'نرخ کردیت بازی (BC/ساعت) — ۳۰ دقیقه = نصف', en: 'Gaming credit rate (BC/hour) — 30 min = half', ru: 'Тариф кредитов (BC/час)', tr: 'Oyun kredi ücreti (BC/saat)' })}</label>
+                    <input type="number" dir="ltr" min="0" max="1000000" step="1" placeholder="100"
+                      value={siteSettings['gaming_credits_per_hour'] ?? '100'}
+                      onChange={(e) => handleSaveSetting('gaming_credits_per_hour', e.target.value)}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1.5 font-bold">{L(language, { fa: 'کردیت دستهٔ اضافه (BC/ساعت/دسته)', en: 'Extra controller credits (BC/hour/pad)', ru: 'Кредиты за контроллер (BC/час)', tr: 'Ekstra kol kredisi (BC/saat/kol)' })}</label>
+                    <input type="number" dir="ltr" min="0" max="1000000" step="1" placeholder="20"
+                      value={siteSettings['extra_controller_credits_per_hour'] ?? '20'}
+                      onChange={(e) => handleSaveSetting('extra_controller_credits_per_hour', e.target.value)}
+                      className="w-full bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2 font-medium">
+                  {L(language, { fa: 'قیمت پایهٔ رزرو شامل ۲ دسته است؛ هر دستهٔ اضافه جداگانه محاسبه می‌شود. قیمت کردیتی هر محصول از بخش کافه/فروشگاه (کاتالوگ) تنظیم می‌شود.', en: 'The base rate includes 2 controllers; each extra pad is billed separately. Per-product credit prices are set from the cafe/shop catalog.', ru: 'Базовый тариф включает 2 контроллера; каждый дополнительный оплачивается отдельно. Цены в кредитах задаются в каталоге кафе/магазина.', tr: 'Baz ücret 2 kol içerir; her ekstra kol ayrıca ücretlendirilir. Ürün bazında kredi fiyatları kafe/mağaza kataloğundan ayarlanır.' })}
+                </p>
+                <form onSubmit={handleGrantCredits} className="mt-4 border-t border-white/5 pt-4">
+                  <div className="text-xs text-gray-300 font-bold mb-2">{L(language, { fa: 'شارژ دستی کردیت کاربر (تا نهایی شدن روش‌های کسب کردیت)', en: 'Manual user credit top-up (until earn methods are finalized)', ru: 'Ручное начисление кредитов (пока способы заработка не утверждены)', tr: 'Manuel kullanıcı kredisi yükleme (kazanma yöntemleri netleşene kadar)' })}</div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <input type="text" dir="ltr" placeholder="username" aria-label="username" value={grantUsername} onChange={(e) => setGrantUsername(e.target.value)}
+                      className="bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono" />
+                    <input type="number" dir="ltr" step="1" placeholder="+250 / -50" aria-label="delta" value={grantDelta} onChange={(e) => setGrantDelta(e.target.value)}
+                      className="bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono" />
+                    <input type="text" placeholder={L(language, { fa: 'یادداشت (اختیاری)', en: 'Note (optional)', ru: 'Заметка (необязательно)', tr: 'Not (isteğe bağlı)' })} value={grantNote} onChange={(e) => setGrantNote(e.target.value)} maxLength={200}
+                      className="bg-[#0d122b] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400" />
+                    <button type="submit" disabled={grantBusy} className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 disabled:opacity-50 text-black font-bold rounded-lg text-xs transition-all cursor-pointer">
+                      {grantBusy ? '…' : L(language, { fa: 'ثبت شارژ/کسر', en: 'Apply top-up/deduction', ru: 'Применить', tr: 'Uygula' })}
+                    </button>
+                  </div>
+                </form>
               </div>
 
               {/* SECTION 4b: LEGAL / COMPANY / PAYMENTS (feeds the theme-independent pages) */}

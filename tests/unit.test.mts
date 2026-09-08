@@ -945,8 +945,8 @@ suite('13. Wallet & pay-on-site — helpers');
 
 const wallet = await import('../server/wallet/routes.ts');
 
-test('METHODS_BY_KIND: reservation/tournament = wallet+onsite, cafe/shop = onsite only', () => {
-  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.reservation), '["wallet","onsite"]');
+test('METHODS_BY_KIND: reservation = wallet+credits+onsite, tournament = wallet+onsite, cafe/shop = onsite only', () => {
+  assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.reservation), '["wallet","credits","onsite"]');
   assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.tournament), '["wallet","onsite"]');
   assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.cafe), '["onsite"]');
   assert.equal(JSON.stringify(wallet.METHODS_BY_KIND.shop), '["onsite"]');
@@ -1292,6 +1292,137 @@ test('Friend Gate: keyword PR → button DM with unique code → friend comment 
   assert.match(gate.member?.inviteUrl || '', /utm_source=instagram/);
   assert.match(gate.member?.inviteUrl || '', /ref=/);
   assert.equal(gate.member?.followMethod, 'button_event_only');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   16. Employer change list — credits, extra controllers, flags, bug #4
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('16. Employer items — credits, controllers, flags, bug #4');
+
+const serverSrc = read('server.ts');
+const walletSrc = read('server/wallet/routes.ts');
+const ordersSvcSrc = read('server/management/orders.ts');
+const accountSrc = read('server/accountRoutes.ts');
+
+test('feature flags & pricing defaults exist in SAMPLE_SETTINGS', () => {
+  const obj = Object.fromEntries(SAMPLE_SETTINGS.map(s => [s.key, s.value]));
+  assert.equal(obj.chat_enabled, 'false');
+  assert.equal(obj.food_coming_soon, 'true');
+  assert.equal(obj.shop_coming_soon, 'true');
+  assert.equal(obj.extra_controller_hourly, '25');
+  assert.equal(obj.gaming_credits_per_hour, '100');
+  assert.equal(obj.extra_controller_credits_per_hour, '20');
+});
+
+test('sample catalog/reservation rows carry the new fields', () => {
+  for (const c of SAMPLE_CAFE_ITEMS) assert.equal((c as any).creditPrice, 0, `${c.id} lacks creditPrice`);
+  for (const a of SAMPLE_ACCESSORIES) assert.equal((a as any).creditPrice, 0, `${a.id} lacks creditPrice`);
+  for (const r of SAMPLE_RESERVATION_LOGS) assert.equal((r as any).extraControllers, 0, `${r.id} lacks extraControllers`);
+});
+
+test('credits/extraControllers columns exist in SQLite CREATE TABLEs', () => {
+  const users = providersSrc.match(/CREATE TABLE IF NOT EXISTS users \(([^;]*)\);/);
+  assert.ok(users && users[1].includes('credits'), 'users lacks credits');
+  const cafe = providersSrc.match(/CREATE TABLE IF NOT EXISTS cafe_items \(([^;]*)\);/);
+  assert.ok(cafe && cafe[1].includes('creditPrice'), 'cafe_items lacks creditPrice');
+  const acc = providersSrc.match(/CREATE TABLE IF NOT EXISTS accessories \(([^;]*)\);/);
+  assert.ok(acc && acc[1].includes('creditPrice'), 'accessories lacks creditPrice');
+  const logs = providersSrc.match(/CREATE TABLE IF NOT EXISTS reservation_logs \(([^;]*)\);/);
+  assert.ok(logs && logs[1].includes('extraControllers'), 'reservation_logs lacks extraControllers');
+});
+
+test('credits/extraControllers columns exist in SQL Server CREATE TABLEs', () => {
+  assert.match(providersSrc, /CREATE TABLE dbo\.users \([^;]*credits/, 'dbo.users lacks credits');
+  assert.match(providersSrc, /CREATE TABLE dbo\.cafe_items \([^;]*creditPrice/, 'dbo.cafe_items lacks creditPrice');
+  assert.match(providersSrc, /CREATE TABLE dbo\.accessories \([^;]*creditPrice/, 'dbo.accessories lacks creditPrice');
+  assert.match(providersSrc, /CREATE TABLE dbo\.reservation_logs \([^;]*extraControllers/, 'dbo.reservation_logs lacks extraControllers');
+});
+
+test('both migrations register the new columns', () => {
+  const block = providersSrc.match(/addMissingColumns\(\): void \{([\s\S]*?)\n  \}/);
+  assert.ok(block, 'addMissingColumns() not found');
+  for (const col of ['credits', 'creditPrice', 'extraControllers']) {
+    assert.ok(block![1].includes(`'${col}'`) || block![1].includes(`column: '${col}'`), `SQLite migration lacks ${col}`);
+  }
+  assert.match(providersSrc, /IF COL_LENGTH\('dbo\.users','credits'\) IS NULL ALTER TABLE dbo\.users ADD credits/, 'missing MSSQL migration for users.credits');
+  assert.match(providersSrc, /IF COL_LENGTH\('dbo\.cafe_items','creditPrice'\) IS NULL ALTER TABLE dbo\.cafe_items ADD creditPrice/, 'missing MSSQL migration for cafe_items.creditPrice');
+  assert.match(providersSrc, /IF COL_LENGTH\('dbo\.accessories','creditPrice'\) IS NULL ALTER TABLE dbo\.accessories ADD creditPrice/, 'missing MSSQL migration for accessories.creditPrice');
+  assert.match(providersSrc, /IF COL_LENGTH\('dbo\.reservation_logs','extraControllers'\) IS NULL ALTER TABLE dbo\.reservation_logs ADD extraControllers/, 'missing MSSQL migration for reservation_logs.extraControllers');
+});
+
+test('addCreditsToUser is declared once and implemented by all three providers', () => {
+  assert.equal((providersSrc.match(/addCreditsToUser\(username: string, delta: number\)/g) || []).length, 4, 'decl + sqlite + mssql + mongo');
+  assert.match(providersSrc, /COALESCE\(credits, 0\)/, 'sqlite should COALESCE null credits');
+  assert.match(providersSrc, /ISNULL\(credits, 0\)/, 'mssql should ISNULL null credits');
+  assert.match(providersSrc, /\$inc: \{ credits: delta \}/, 'mongo should $inc credits');
+});
+
+test('reservation quote prices extra controllers (consoles only) and credits cost', () => {
+  assert.match(serverSrc, /EXTRA_CONTROLLERS_CONSOLE_ONLY/, 'missing console-only guard');
+  assert.match(serverSrc, /INVALID_EXTRA_CONTROLLERS/, 'missing range validation');
+  assert.match(serverSrc, /extra_controller_hourly/, 'missing TL controller rate');
+  assert.match(serverSrc, /gaming_credits_per_hour/, 'missing gaming credit rate');
+  assert.match(serverSrc, /extra_controller_credits_per_hour/, 'missing controller credit rate');
+  assert.match(serverSrc, /creditsCost/, 'quote must return creditsCost');
+  assert.match(serverSrc, /extraControllers: Number\(p\.extraControllers\) \|\| 0/, 'fulfil must persist extraControllers');
+});
+
+test('publicUser and Guest fallbacks expose credits', () => {
+  assert.match(accountSrc, /credits: Number\(row\.credits\) \|\| 0/, 'publicUser lacks credits');
+  assert.equal((serverSrc.match(/credits: 0, role: "gamer"/g) || []).length, 3, 'Guest fallbacks lack credits');
+});
+
+test('credits checkout endpoint + insufficient-credits + cancel refund exist', () => {
+  assert.match(walletSrc, /\/api\/checkout\/credits/, 'missing credits checkout route');
+  assert.match(walletSrc, /INSUFFICIENT_CREDITS/, 'missing INSUFFICIENT_CREDITS');
+  assert.match(walletSrc, /settledBy === 'credits'/, 'cancel must handle credits orders');
+  assert.match(walletSrc, /refundedCredits/, 'cancel must return refundedCredits');
+  assert.match(walletSrc, /type: 'Credits'/, 'credits movements must be journaled');
+});
+
+test('catalog saveProduct validates and persists creditPrice', () => {
+  assert.match(ordersSvcSrc, /INVALID_CREDIT_PRICE/, 'missing credit price validation');
+  assert.match(ordersSvcSrc, /,creditPrice\}/, 'saveProduct must persist creditPrice');
+});
+
+test('legacy cafe/shop admin routes pass creditPrice through', () => {
+  assert.ok(serverSrc.includes('app.post("/api/admin/cafe"') && serverSrc.includes('creditPrice: Math.max(0, Math.floor(Number(creditPrice) || 0))'), 'cafe POST lacks creditPrice');
+  assert.ok(serverSrc.includes('app.put("/api/admin/cafe/:id"') && serverSrc.includes('creditPrice !== undefined ? Math.max(0, Math.floor(Number(creditPrice) || 0)) : (item.creditPrice || 0)'), 'cafe PUT lacks creditPrice');
+  assert.ok(serverSrc.includes('app.put("/api/admin/accessories/:id"') && serverSrc.includes('creditPrice !== undefined ? Math.max(0, Math.floor(Number(creditPrice) || 0)) : (acc.creditPrice || 0)'), 'accessories PUT lacks creditPrice');
+});
+
+test('admin credits adjust endpoint exists with guards', () => {
+  assert.match(serverSrc, /\/api\/admin\/credits\/adjust/, 'missing adjust route');
+  assert.match(serverSrc, /INVALID_DELTA/, 'missing delta validation');
+});
+
+test('bug #4: no admin mutation assigns the DB-only response list', () => {
+  const adminSrc = read('src/components/AdminPanelTab.tsx');
+  const hits = adminSrc.match(/set(AppSliders|Systems|CafeItems|Tournaments|Accessories|Articles|ChatRooms)\(res\./g) || [];
+  assert.deepEqual(hits, [], `unsafe assignments remain: ${hits.join(', ')}`);
+  assert.ok(adminSrc.includes('فیکس باگ #۴'), 'fix markers missing');
+});
+
+test('portal gates: chat menu conditional, coming-soon props, credits display', () => {
+  const appSrc = read('src/App.tsx');
+  assert.match(appSrc, /\.\.\.\(chatEnabled \? \[\{ id: 'chat'/, 'chat menu must be conditional');
+  assert.match(appSrc, /comingSoon=\{foodComingSoon\}/, 'CafeTab comingSoon missing');
+  assert.match(appSrc, /comingSoon=\{shopComingSoon\}/, 'ShopTab missing');
+  assert.match(appSrc, /credits: Number\(user\.credits\) \|\| 0/, 'theme user lacks credits');
+  assert.match(read('src/components/profile/ProfileOverview.tsx'), /Bazino Credits:/, 'profile must show Bazino Credits');
+  assert.match(read('src/legal/CheckoutModal.tsx'), /\/api\/checkout\/credits/, 'modal must call credits checkout');
+  assert.match(read('src/legal/CheckoutModal.tsx'), /estimateCreditsFromParams/, 'modal must estimate credits');
+  assert.match(read('src/components/ReservationsTab.tsx'), /extraControllers/, 'booking must support extra controllers');
+});
+
+test('hub theme: chat out of nav, disabled guard, pads stepper, real credits', () => {
+  const themeSrc = read('theme-packages/bazino-hub/theme.js');
+  assert.ok(!themeSrc.includes("{ id: 'chat', href: '/chat', key: 'chat' }"), 'chat still in hub NAV');
+  assert.ok(!themeSrc.includes("{ href: '/chat', title: 'CHAT'"), 'chat tile still present');
+  assert.match(themeSrc, /CHAT DISABLED/, 'ChatPage disabled guard missing');
+  assert.match(themeSrc, /EXTRA PADS/, 'pads stepper missing');
+  assert.match(themeSrc, /extraControllers = effPads|extraControllers: effPads|bayParams\.extraControllers/, 'hub must pass extraControllers');
+  assert.match(themeSrc, /user\.credits \|\| 0/, 'ClubPage must show real credits');
 });
 
 await run({ title: 'Bazino — Unit & integrity tests', jsonOut: 'tests/reports/unit.json' });

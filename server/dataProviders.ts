@@ -79,6 +79,8 @@ export interface UserRow {
   email: string;
   phone: string;
   loyaltyPoints: number;
+  /** موجودی کردیت بازینو (BC) — قابل خرج برای رزرو؛ پیش‌فرض ۰ */
+  credits?: number;
   role: string;
   /** پروفایل (تسک ۱۲) — همه اختیاری؛ ردیف‌های قدیمی خالی‌اند */
   displayName?: string;
@@ -145,10 +147,10 @@ export interface TransactionRow { id: string; points: number; description: strin
  *  که فقط خودِ آن کاربر باید ببیند و خرج کند. */
 export interface CouponRow { code: string; type: string; value: number; minOrder: number; expiry: string; expiryDate: string; maxUsageCount: number; usageCount: number; isActive: boolean; ownerUsername?: string; scopes?: string; }
 export interface SystemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; type: string; hourlyRate: number; isActive: boolean; isReserved: boolean; audience?: string; }
-export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; requestedGame?: string; }
-export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; }
+export interface ReservationLogRow { id: string; systemId: string; username: string; systemName: string; startTime: string; endTime: string; totalPrice: number; date: string; checkedIn: boolean; timestamp: string; requestedGame?: string; /** تعداد دسته‌های اضافه (کنسول) */ extraControllers?: number; }
+export interface CafeItemRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; category: string; price: number; imageUrl: string; mobileImageUrl?: string; inventory: number; isAvailable: boolean; /** قیمت کردیتی (BC) — ۰ یعنی بدون قیمت کردیتی */ creditPrice?: number; }
 export interface CafeOrderRow { id: string; items: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; tableNumber: string; date: string; status: string; username?: string; }
-export interface AccessoryRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; description: string; descriptionFa?: string; descriptionEn?: string; descriptionRu?: string; descriptionTr?: string; price: number; imageUrl: string; mobileImageUrl?: string; stock: number; category: string; }
+export interface AccessoryRow { id: string; name: string; nameFa?: string; nameEn?: string; nameRu?: string; nameTr?: string; description: string; descriptionFa?: string; descriptionEn?: string; descriptionRu?: string; descriptionTr?: string; price: number; imageUrl: string; mobileImageUrl?: string; stock: number; category: string; /** قیمت کردیتی (BC) — ۰ یعنی بدون قیمت کردیتی */ creditPrice?: number; }
 export interface ShopOrderRow { id: string; cart: string; totalPrice: number; discountApplied: number; finalAmount: number; couponCode: string; date: string; status: string; username?: string; }
 export interface TournamentRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; game: string; registrationFee: number; startDate: string; maxTeams: number; status: string; registeredTeamsCount: number; teams: string; bracket: string; }
 export interface ArticleRow { id: string; title: string; titleFa?: string; titleEn?: string; titleRu?: string; titleTr?: string; content: string; contentFa?: string; contentEn?: string; contentRu?: string; contentTr?: string; category: string; imageUrl: string; mobileImageUrl?: string; author: string; authorFa?: string; authorEn?: string; authorRu?: string; authorTr?: string; date: string; comments: string; }
@@ -206,6 +208,8 @@ export interface IDataStore {
   createUser(user: { username: string; password: string; email: string; phone: string }): Promise<void>;
   verifyLogin(username: string, password: string): Promise<UserRow | undefined>;
   addLoyaltyPointsToUser(username: string, delta: number): Promise<void>;
+  /** تغییر موجودی کردیت بازینو (BC) — delta می‌تواند منفی باشد */
+  addCreditsToUser(username: string, delta: number): Promise<void>;
   listUsers(): Promise<UserRow[]>;
   countUsers(): Promise<number>;
 
@@ -473,17 +477,17 @@ export class SqliteStore implements IDataStore {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS ops_records (kind TEXT NOT NULL, id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, uniqueKey TEXT UNIQUE, updatedAt TEXT NOT NULL, PRIMARY KEY(kind,id));
       CREATE INDEX IF NOT EXISTS idx_ops_kind_updated ON ops_records(kind,updatedAt);
-      CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, passwordHash TEXT NOT NULL, email TEXT, phone TEXT, loyaltyPoints INTEGER DEFAULT 0, role TEXT DEFAULT 'gamer');
+      CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, passwordHash TEXT NOT NULL, email TEXT, phone TEXT, loyaltyPoints INTEGER DEFAULT 0, role TEXT DEFAULT 'gamer', credits INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
       CREATE TABLE IF NOT EXISTS chat_rooms (name TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, room TEXT, username TEXT, message TEXT, timestamp TEXT);
       CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, points INTEGER, description TEXT, type TEXT, date TEXT);
       CREATE TABLE IF NOT EXISTS active_coupons (code TEXT PRIMARY KEY, type TEXT, value REAL, minOrder REAL, expiry TEXT, expiryDate TEXT, maxUsageCount INTEGER DEFAULT 1, usageCount INTEGER DEFAULT 0, isActive INTEGER DEFAULT 1);
       CREATE TABLE IF NOT EXISTS systems (id TEXT PRIMARY KEY, name TEXT, type TEXT, hourlyRate REAL, isActive INTEGER DEFAULT 1, isReserved INTEGER DEFAULT 0, audience TEXT DEFAULT '');
-      CREATE TABLE IF NOT EXISTS reservation_logs (id TEXT PRIMARY KEY, systemId TEXT, username TEXT, systemName TEXT, startTime TEXT, endTime TEXT, totalPrice REAL, date TEXT, checkedIn INTEGER DEFAULT 0, timestamp TEXT, requestedGame TEXT DEFAULT '');
-      CREATE TABLE IF NOT EXISTS cafe_items (id TEXT PRIMARY KEY, name TEXT, category TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, inventory INTEGER, isAvailable INTEGER DEFAULT 1);
+      CREATE TABLE IF NOT EXISTS reservation_logs (id TEXT PRIMARY KEY, systemId TEXT, username TEXT, systemName TEXT, startTime TEXT, endTime TEXT, totalPrice REAL, date TEXT, checkedIn INTEGER DEFAULT 0, timestamp TEXT, requestedGame TEXT DEFAULT '', extraControllers INTEGER DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS cafe_items (id TEXT PRIMARY KEY, name TEXT, category TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, inventory INTEGER, isAvailable INTEGER DEFAULT 1, creditPrice INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS cafe_orders (id TEXT PRIMARY KEY, items TEXT, totalPrice REAL, discountApplied REAL, finalAmount REAL, couponCode TEXT, tableNumber TEXT, date TEXT, status TEXT);
-      CREATE TABLE IF NOT EXISTS accessories (id TEXT PRIMARY KEY, name TEXT, description TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, stock INTEGER, category TEXT);
+      CREATE TABLE IF NOT EXISTS accessories (id TEXT PRIMARY KEY, name TEXT, description TEXT, price REAL, imageUrl TEXT, mobileImageUrl TEXT, stock INTEGER, category TEXT, creditPrice INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS shop_orders (id TEXT PRIMARY KEY, cart TEXT, totalPrice REAL, discountApplied REAL, finalAmount REAL, couponCode TEXT, date TEXT, status TEXT);
       CREATE TABLE IF NOT EXISTS tournaments (id TEXT PRIMARY KEY, title TEXT, game TEXT, registrationFee REAL, startDate TEXT, maxTeams INTEGER, status TEXT, registeredTeamsCount INTEGER, teams TEXT, bracket TEXT);
       CREATE TABLE IF NOT EXISTS articles (id TEXT PRIMARY KEY, title TEXT, content TEXT, category TEXT, imageUrl TEXT, mobileImageUrl TEXT, author TEXT, date TEXT, comments TEXT);
@@ -564,6 +568,11 @@ export class SqliteStore implements IDataStore {
       // صفحهٔ Games: دستهٔ مخاطب سیستم + بازی درخواستی رزرو
       { table: 'systems', column: 'audience', type: "TEXT DEFAULT ''" },
       { table: 'reservation_logs', column: 'requestedGame', type: "TEXT DEFAULT ''" },
+      // کردیت بازینو + دستهٔ اضافهٔ کنسول (درخواست کارفرما)
+      { table: 'users', column: 'credits', type: "INTEGER DEFAULT 0" },
+      { table: 'cafe_items', column: 'creditPrice', type: "INTEGER DEFAULT 0" },
+      { table: 'accessories', column: 'creditPrice', type: "INTEGER DEFAULT 0" },
+      { table: 'reservation_logs', column: 'extraControllers', type: "INTEGER DEFAULT 0" },
     ];
     for (const { table, column, type } of wanted) {
       try {
@@ -595,6 +604,9 @@ export class SqliteStore implements IDataStore {
   }
   async addLoyaltyPointsToUser(username: string, delta: number) {
     this.db.prepare(`UPDATE users SET loyaltyPoints = loyaltyPoints + ? WHERE username = ?`).run(delta, username);
+  }
+  async addCreditsToUser(username: string, delta: number) {
+    this.db.prepare(`UPDATE users SET credits = COALESCE(credits, 0) + ? WHERE username = ?`).run(delta, username);
   }
   async listUsers() { return this.db.prepare(`SELECT * FROM users`).all() as UserRow[]; }
   async countUsers() { return (this.db.prepare(`SELECT COUNT(*) as c FROM users`).get() as any).c; }
@@ -694,8 +706,8 @@ export class SqliteStore implements IDataStore {
     return row ? { ...row, checkedIn: !!row.checkedIn } : undefined;
   }
   async addReservationLog(l: ReservationLogRow) {
-    this.db.prepare(`INSERT INTO reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp, requestedGame) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(l.id, l.systemId, l.username || '', l.systemName, l.startTime, l.endTime, l.totalPrice, l.date, l.checkedIn ? 1 : 0, l.timestamp, l.requestedGame || '');
+    this.db.prepare(`INSERT INTO reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp, requestedGame, extraControllers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(l.id, l.systemId, l.username || '', l.systemName, l.startTime, l.endTime, l.totalPrice, l.date, l.checkedIn ? 1 : 0, l.timestamp, l.requestedGame || '', l.extraControllers || 0);
   }
   async setReservationCheckedIn(id: string) { this.db.prepare(`UPDATE reservation_logs SET checkedIn = 1 WHERE id = ?`).run(id); }
   async deleteReservationLog(id: string) { this.db.prepare(`DELETE FROM reservation_logs WHERE id = ?`).run(id); }
@@ -719,15 +731,15 @@ export class SqliteStore implements IDataStore {
     return row ? { ...row, isAvailable: !!row.isAvailable } : undefined;
   }
   async createCafeItem(i: CafeItemRow) {
-    this.db.prepare(`INSERT INTO cafe_items (id, name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(i.id, i.name, i.category, i.price, i.imageUrl, i.mobileImageUrl ?? null, i.inventory, i.isAvailable ? 1 : 0);
+    this.db.prepare(`INSERT INTO cafe_items (id, name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable, creditPrice) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(i.id, i.name, i.category, i.price, i.imageUrl, i.mobileImageUrl ?? null, i.inventory, i.isAvailable ? 1 : 0, i.creditPrice || 0);
   }
   async updateCafeItem(id: string, f: Partial<CafeItemRow>) {
     const current = await this.getCafeItemById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    this.db.prepare(`UPDATE cafe_items SET name=?, category=?, price=?, imageUrl=?, mobileImageUrl=?, inventory=?, isAvailable=? WHERE id=?`)
-      .run(m.name, m.category, m.price, m.imageUrl, m.mobileImageUrl ?? null, m.inventory, m.isAvailable ? 1 : 0, id);
+    this.db.prepare(`UPDATE cafe_items SET name=?, category=?, price=?, imageUrl=?, mobileImageUrl=?, inventory=?, isAvailable=?, creditPrice=? WHERE id=?`)
+      .run(m.name, m.category, m.price, m.imageUrl, m.mobileImageUrl ?? null, m.inventory, m.isAvailable ? 1 : 0, m.creditPrice || 0, id);
   }
   async decrementCafeInventory(id: string, qty: number) {
     this.db.prepare(`UPDATE cafe_items SET inventory = MAX(0, inventory - ?) WHERE id = ?`).run(qty, id);
@@ -931,15 +943,15 @@ export class SqliteStore implements IDataStore {
   async listAccessories() { return this.db.prepare(`SELECT * FROM accessories`).all() as AccessoryRow[]; }
   async getAccessoryById(id: string) { return this.db.prepare(`SELECT * FROM accessories WHERE id = ?`).get(id) as AccessoryRow | undefined; }
   async createAccessory(a: AccessoryRow) {
-    this.db.prepare(`INSERT INTO accessories (id, name, description, price, imageUrl, mobileImageUrl, stock, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(a.id, a.name, a.description, a.price, a.imageUrl, a.mobileImageUrl ?? null, a.stock, a.category);
+    this.db.prepare(`INSERT INTO accessories (id, name, description, price, imageUrl, mobileImageUrl, stock, category, creditPrice) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(a.id, a.name, a.description, a.price, a.imageUrl, a.mobileImageUrl ?? null, a.stock, a.category, a.creditPrice || 0);
   }
   async updateAccessory(id: string, f: Partial<AccessoryRow>) {
     const current = await this.getAccessoryById(id);
     if (!current) return;
     const m = { ...current, ...f };
-    this.db.prepare(`UPDATE accessories SET name=?, description=?, price=?, imageUrl=?, mobileImageUrl=?, stock=?, category=? WHERE id=?`)
-      .run(m.name, m.description, m.price, m.imageUrl, m.mobileImageUrl ?? null, m.stock, m.category, id);
+    this.db.prepare(`UPDATE accessories SET name=?, description=?, price=?, imageUrl=?, mobileImageUrl=?, stock=?, category=?, creditPrice=? WHERE id=?`)
+      .run(m.name, m.description, m.price, m.imageUrl, m.mobileImageUrl ?? null, m.stock, m.category, m.creditPrice || 0, id);
   }
   async decrementAccessoryStock(id: string, qty: number) {
     this.db.prepare(`UPDATE accessories SET stock = MAX(0, stock - ?) WHERE id = ?`).run(qty, id);
@@ -1133,17 +1145,17 @@ export class SqlServerStore implements IDataStore {
         CREATE TABLE dbo.ops_records (kind NVARCHAR(50) NOT NULL, id NVARCHAR(100) NOT NULL, version INT NOT NULL, data NVARCHAR(MAX) NOT NULL, uniqueKey NVARCHAR(200) NULL, updatedAt NVARCHAR(50) NOT NULL, PRIMARY KEY(kind,id));
         CREATE UNIQUE INDEX idx_ops_unique ON dbo.ops_records(uniqueKey) WHERE uniqueKey IS NOT NULL;
       END;
-      IF OBJECT_ID('dbo.users','U') IS NULL CREATE TABLE dbo.users (username NVARCHAR(100) PRIMARY KEY, passwordHash NVARCHAR(200) NOT NULL, email NVARCHAR(200), phone NVARCHAR(50), loyaltyPoints INT DEFAULT 0, role NVARCHAR(50) DEFAULT 'gamer');
+      IF OBJECT_ID('dbo.users','U') IS NULL CREATE TABLE dbo.users (username NVARCHAR(100) PRIMARY KEY, passwordHash NVARCHAR(200) NOT NULL, email NVARCHAR(200), phone NVARCHAR(50), loyaltyPoints INT DEFAULT 0, role NVARCHAR(50) DEFAULT 'gamer', credits INT DEFAULT 0);
       IF OBJECT_ID('dbo.settings','U') IS NULL CREATE TABLE dbo.settings ([key] NVARCHAR(100) PRIMARY KEY, value NVARCHAR(MAX));
       IF OBJECT_ID('dbo.chat_rooms','U') IS NULL CREATE TABLE dbo.chat_rooms ([name] NVARCHAR(200) PRIMARY KEY);
       IF OBJECT_ID('dbo.chat_messages','U') IS NULL CREATE TABLE dbo.chat_messages (id NVARCHAR(50) PRIMARY KEY, room NVARCHAR(200), username NVARCHAR(100), message NVARCHAR(MAX), timestamp NVARCHAR(50));
       IF OBJECT_ID('dbo.transactions','U') IS NULL CREATE TABLE dbo.transactions (id NVARCHAR(50) PRIMARY KEY, points INT, description NVARCHAR(MAX), type NVARCHAR(50), date NVARCHAR(50));
       IF OBJECT_ID('dbo.active_coupons','U') IS NULL CREATE TABLE dbo.active_coupons (code NVARCHAR(50) PRIMARY KEY, type NVARCHAR(20), value FLOAT, minOrder FLOAT, expiry NVARCHAR(50), expiryDate NVARCHAR(50), maxUsageCount INT DEFAULT 1, usageCount INT DEFAULT 0, isActive BIT DEFAULT 1);
       IF OBJECT_ID('dbo.systems','U') IS NULL CREATE TABLE dbo.systems (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), type NVARCHAR(50), hourlyRate FLOAT, isActive BIT DEFAULT 1, isReserved BIT DEFAULT 0, audience NVARCHAR(20) DEFAULT '');
-      IF OBJECT_ID('dbo.reservation_logs','U') IS NULL CREATE TABLE dbo.reservation_logs (id NVARCHAR(50) PRIMARY KEY, systemId NVARCHAR(50), username NVARCHAR(100), systemName NVARCHAR(200), startTime NVARCHAR(20), endTime NVARCHAR(20), totalPrice FLOAT, date NVARCHAR(50), checkedIn BIT DEFAULT 0, timestamp NVARCHAR(50), requestedGame NVARCHAR(200) DEFAULT '');
-      IF OBJECT_ID('dbo.cafe_items','U') IS NULL CREATE TABLE dbo.cafe_items (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), category NVARCHAR(50), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), inventory INT, isAvailable BIT DEFAULT 1);
+      IF OBJECT_ID('dbo.reservation_logs','U') IS NULL CREATE TABLE dbo.reservation_logs (id NVARCHAR(50) PRIMARY KEY, systemId NVARCHAR(50), username NVARCHAR(100), systemName NVARCHAR(200), startTime NVARCHAR(20), endTime NVARCHAR(20), totalPrice FLOAT, date NVARCHAR(50), checkedIn BIT DEFAULT 0, timestamp NVARCHAR(50), requestedGame NVARCHAR(200) DEFAULT '', extraControllers INT DEFAULT 0);
+      IF OBJECT_ID('dbo.cafe_items','U') IS NULL CREATE TABLE dbo.cafe_items (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), category NVARCHAR(50), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), inventory INT, isAvailable BIT DEFAULT 1, creditPrice INT DEFAULT 0);
       IF OBJECT_ID('dbo.cafe_orders','U') IS NULL CREATE TABLE dbo.cafe_orders (id NVARCHAR(50) PRIMARY KEY, items NVARCHAR(MAX), totalPrice FLOAT, discountApplied FLOAT, finalAmount FLOAT, couponCode NVARCHAR(50), tableNumber NVARCHAR(50), date NVARCHAR(50), status NVARCHAR(50));
-      IF OBJECT_ID('dbo.accessories','U') IS NULL CREATE TABLE dbo.accessories (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), description NVARCHAR(MAX), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), stock INT, category NVARCHAR(50));
+      IF OBJECT_ID('dbo.accessories','U') IS NULL CREATE TABLE dbo.accessories (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(200), description NVARCHAR(MAX), price FLOAT, imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), stock INT, category NVARCHAR(50), creditPrice INT DEFAULT 0);
       IF OBJECT_ID('dbo.shop_orders','U') IS NULL CREATE TABLE dbo.shop_orders (id NVARCHAR(50) PRIMARY KEY, cart NVARCHAR(MAX), totalPrice FLOAT, discountApplied FLOAT, finalAmount FLOAT, couponCode NVARCHAR(50), date NVARCHAR(50), status NVARCHAR(50));
       IF OBJECT_ID('dbo.tournaments','U') IS NULL CREATE TABLE dbo.tournaments (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(200), game NVARCHAR(100), registrationFee FLOAT, startDate NVARCHAR(50), maxTeams INT, status NVARCHAR(50), registeredTeamsCount INT, teams NVARCHAR(MAX), bracket NVARCHAR(MAX));
       IF OBJECT_ID('dbo.articles','U') IS NULL CREATE TABLE dbo.articles (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(300), content NVARCHAR(MAX), category NVARCHAR(50), imageUrl NVARCHAR(500), mobileImageUrl NVARCHAR(500), author NVARCHAR(100), date NVARCHAR(50), comments NVARCHAR(MAX));
@@ -1176,6 +1188,10 @@ export class SqlServerStore implements IDataStore {
       IF COL_LENGTH('dbo.users','hasPassword') IS NULL ALTER TABLE dbo.users ADD hasPassword INT DEFAULT 1;
       IF COL_LENGTH('dbo.users','createdAt') IS NULL ALTER TABLE dbo.users ADD createdAt NVARCHAR(50) NULL;
       IF COL_LENGTH('dbo.users','walletBalance') IS NULL ALTER TABLE dbo.users ADD walletBalance FLOAT DEFAULT 0;
+      IF COL_LENGTH('dbo.users','credits') IS NULL ALTER TABLE dbo.users ADD credits INT DEFAULT 0;
+      IF COL_LENGTH('dbo.cafe_items','creditPrice') IS NULL ALTER TABLE dbo.cafe_items ADD creditPrice INT DEFAULT 0;
+      IF COL_LENGTH('dbo.accessories','creditPrice') IS NULL ALTER TABLE dbo.accessories ADD creditPrice INT DEFAULT 0;
+      IF COL_LENGTH('dbo.reservation_logs','extraControllers') IS NULL ALTER TABLE dbo.reservation_logs ADD extraControllers INT DEFAULT 0;
       IF OBJECT_ID('dbo.wallet_transactions','U') IS NULL CREATE TABLE dbo.wallet_transactions (id NVARCHAR(40) PRIMARY KEY, username NVARCHAR(100), amount FLOAT, type NVARCHAR(20), ref NVARCHAR(100) DEFAULT '', operator NVARCHAR(100) DEFAULT '', note NVARCHAR(500) DEFAULT '', idempotencyKey NVARCHAR(100) DEFAULT '', balanceAfter FLOAT, createdAt NVARCHAR(50));
       IF OBJECT_ID('dbo.onsite_orders','U') IS NULL CREATE TABLE dbo.onsite_orders (id NVARCHAR(40) PRIMARY KEY, kind NVARCHAR(20), username NVARCHAR(100), amount FLOAT, status NVARCHAR(30), dueAt NVARCHAR(50) DEFAULT '', payload NVARCHAR(MAX), description NVARCHAR(500), result NVARCHAR(MAX), createdAt NVARCHAR(50), updatedAt NVARCHAR(50), settledAt NVARCHAR(50) DEFAULT '', settledBy NVARCHAR(100) DEFAULT '');
       IF COL_LENGTH('dbo.cafe_orders','username') IS NULL ALTER TABLE dbo.cafe_orders ADD username NVARCHAR(100) NULL;
@@ -1221,6 +1237,10 @@ export class SqlServerStore implements IDataStore {
   async addLoyaltyPointsToUser(username: string, delta: number) {
     await this.r().input('d', this.sql.Int, delta).input('u', this.sql.NVarChar, username)
       .query(`UPDATE dbo.users SET loyaltyPoints = loyaltyPoints + @d WHERE username = @u`);
+  }
+  async addCreditsToUser(username: string, delta: number) {
+    await this.r().input('d', this.sql.Int, delta).input('u', this.sql.NVarChar, username)
+      .query(`UPDATE dbo.users SET credits = ISNULL(credits, 0) + @d WHERE username = @u`);
   }
   async listUsers() { return (await this.r().query(`SELECT * FROM dbo.users`)).recordset as UserRow[]; }
   async countUsers() { return (await this.r().query(`SELECT COUNT(*) as c FROM dbo.users`)).recordset[0].c; }
@@ -1341,8 +1361,8 @@ export class SqlServerStore implements IDataStore {
       .input('un', this.sql.NVarChar, l.username || '')
       .input('sn', this.sql.NVarChar, l.systemName).input('st', this.sql.NVarChar, l.startTime).input('et', this.sql.NVarChar, l.endTime)
       .input('tp', this.sql.Float, l.totalPrice).input('d', this.sql.NVarChar, l.date).input('ci', this.sql.Bit, l.checkedIn).input('ts', this.sql.NVarChar, l.timestamp)
-      .input('rg', this.sql.NVarChar, l.requestedGame || '')
-      .query(`INSERT INTO dbo.reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp, requestedGame) VALUES (@id, @sid, @un, @sn, @st, @et, @tp, @d, @ci, @ts, @rg)`);
+      .input('rg', this.sql.NVarChar, l.requestedGame || '').input('ec', this.sql.Int, l.extraControllers || 0)
+      .query(`INSERT INTO dbo.reservation_logs (id, systemId, username, systemName, startTime, endTime, totalPrice, date, checkedIn, timestamp, requestedGame, extraControllers) VALUES (@id, @sid, @un, @sn, @st, @et, @tp, @d, @ci, @ts, @rg, @ec)`);
   }
   async setReservationCheckedIn(id: string) { await this.r().input('id', this.sql.NVarChar, id).query(`UPDATE dbo.reservation_logs SET checkedIn = 1 WHERE id = @id`); }
   async deleteReservationLog(id: string) { await this.r().input('id', this.sql.NVarChar, id).query(`DELETE FROM dbo.reservation_logs WHERE id = @id`); }
@@ -1373,16 +1393,16 @@ export class SqlServerStore implements IDataStore {
   }
   async createCafeItem(i: CafeItemRow) {
     await this.r().input('id', this.sql.NVarChar, i.id).input('n', this.sql.NVarChar, i.name).input('c', this.sql.NVarChar, i.category)
-      .input('p', this.sql.Float, i.price).input('img', this.sql.NVarChar, i.imageUrl).input('mimg', this.sql.NVarChar, i.mobileImageUrl ?? null).input('inv', this.sql.Int, i.inventory).input('a', this.sql.Bit, i.isAvailable)
-      .query(`INSERT INTO dbo.cafe_items (id, name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable) VALUES (@id, @n, @c, @p, @img, @mimg, @inv, @a)`);
+      .input('p', this.sql.Float, i.price).input('img', this.sql.NVarChar, i.imageUrl).input('mimg', this.sql.NVarChar, i.mobileImageUrl ?? null).input('inv', this.sql.Int, i.inventory).input('a', this.sql.Bit, i.isAvailable).input('cp', this.sql.Int, i.creditPrice || 0)
+      .query(`INSERT INTO dbo.cafe_items (id, name, category, price, imageUrl, mobileImageUrl, inventory, isAvailable, creditPrice) VALUES (@id, @n, @c, @p, @img, @mimg, @inv, @a, @cp)`);
   }
   async updateCafeItem(id: string, f: Partial<CafeItemRow>) {
     const current = await this.getCafeItemById(id);
     if (!current) return;
     const m = { ...current, ...f };
     await this.r().input('id', this.sql.NVarChar, id).input('n', this.sql.NVarChar, m.name).input('c', this.sql.NVarChar, m.category)
-      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('inv', this.sql.Int, m.inventory).input('a', this.sql.Bit, m.isAvailable)
-      .query(`UPDATE dbo.cafe_items SET name=@n, category=@c, price=@p, imageUrl=@img, mobileImageUrl=@mimg, inventory=@inv, isAvailable=@a WHERE id=@id`);
+      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('inv', this.sql.Int, m.inventory).input('a', this.sql.Bit, m.isAvailable).input('cp', this.sql.Int, m.creditPrice || 0)
+      .query(`UPDATE dbo.cafe_items SET name=@n, category=@c, price=@p, imageUrl=@img, mobileImageUrl=@mimg, inventory=@inv, isAvailable=@a, creditPrice=@cp WHERE id=@id`);
   }
   async decrementCafeInventory(id: string, qty: number) {
     await this.r().input('q', this.sql.Int, qty).input('id', this.sql.NVarChar, id)
@@ -1619,16 +1639,16 @@ export class SqlServerStore implements IDataStore {
   async getAccessoryById(id: string) { return (await this.r().input('id', this.sql.NVarChar, id).query(`SELECT * FROM dbo.accessories WHERE id = @id`)).recordset[0]; }
   async createAccessory(a: AccessoryRow) {
     await this.r().input('id', this.sql.NVarChar, a.id).input('n', this.sql.NVarChar, a.name).input('desc', this.sql.NVarChar, a.description)
-      .input('p', this.sql.Float, a.price).input('img', this.sql.NVarChar, a.imageUrl).input('mimg', this.sql.NVarChar, a.mobileImageUrl ?? null).input('s', this.sql.Int, a.stock).input('c', this.sql.NVarChar, a.category)
-      .query(`INSERT INTO dbo.accessories (id, name, description, price, imageUrl, mobileImageUrl, stock, category) VALUES (@id, @n, @desc, @p, @img, @mimg, @s, @c)`);
+      .input('p', this.sql.Float, a.price).input('img', this.sql.NVarChar, a.imageUrl).input('mimg', this.sql.NVarChar, a.mobileImageUrl ?? null).input('s', this.sql.Int, a.stock).input('c', this.sql.NVarChar, a.category).input('cp', this.sql.Int, a.creditPrice || 0)
+      .query(`INSERT INTO dbo.accessories (id, name, description, price, imageUrl, mobileImageUrl, stock, category, creditPrice) VALUES (@id, @n, @desc, @p, @img, @mimg, @s, @c, @cp)`);
   }
   async updateAccessory(id: string, f: Partial<AccessoryRow>) {
     const current = await this.getAccessoryById(id);
     if (!current) return;
     const m = { ...current, ...f };
     await this.r().input('id', this.sql.NVarChar, id).input('n', this.sql.NVarChar, m.name).input('desc', this.sql.NVarChar, m.description)
-      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('s', this.sql.Int, m.stock).input('c', this.sql.NVarChar, m.category)
-      .query(`UPDATE dbo.accessories SET name=@n, description=@desc, price=@p, imageUrl=@img, mobileImageUrl=@mimg, stock=@s, category=@c WHERE id=@id`);
+      .input('p', this.sql.Float, m.price).input('img', this.sql.NVarChar, m.imageUrl).input('mimg', this.sql.NVarChar, m.mobileImageUrl ?? null).input('s', this.sql.Int, m.stock).input('c', this.sql.NVarChar, m.category).input('cp', this.sql.Int, m.creditPrice || 0)
+      .query(`UPDATE dbo.accessories SET name=@n, description=@desc, price=@p, imageUrl=@img, mobileImageUrl=@mimg, stock=@s, category=@c, creditPrice=@cp WHERE id=@id`);
   }
   async decrementAccessoryStock(id: string, qty: number) {
     await this.r().input('q', this.sql.Int, qty).input('id', this.sql.NVarChar, id)
@@ -1884,6 +1904,9 @@ export class MongoStore implements IDataStore {
   }
   async addLoyaltyPointsToUser(username: string, delta: number) {
     await this.col('users').updateOne({ username }, { $inc: { loyaltyPoints: delta } });
+  }
+  async addCreditsToUser(username: string, delta: number) {
+    await this.col('users').updateOne({ username }, { $inc: { credits: delta } });
   }
   async listUsers() { return (await this.col('users').find({}).toArray()).map((r: any) => this.strip(r)); }
   async countUsers() { return this.col('users').countDocuments({}); }

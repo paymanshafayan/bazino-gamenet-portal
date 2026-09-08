@@ -5,6 +5,7 @@
  *   GET  /api/me/wallet                           → موجودی + گردش کاربر
  *   GET  /api/me/onsite-orders                    → سفارش‌های در انتظار پرداخت حضوری کاربر
  *   POST /api/checkout/wallet   {kind, params}    → کسر از کیف پول + تکمیل فوری سفارش (fulfil)
+ *   POST /api/checkout/credits  {kind, params}    → کسر از کردیت بازینو (BC) + تکمیل فوری سفارش (فعلاً فقط رزرو)
  *   POST /api/checkout/onsite   {kind, params}    → ثبت سفارش «پرداخت در محل» با مهلت
  *   POST /api/checkout/onsite/:id/cancel          → لغو توسط کاربر (قبل از تسویه)
  *   POST /api/sync/wallet/topup  {phone, amount, operator, note, idempotencyKey}   ← نرم‌افزار مدیریت
@@ -29,7 +30,7 @@ import { normalizePhone } from '../accountRoutes';
 import { onOrderPaid, onOrderReversed, approveDueCommissions } from '../affiliate/engine';
 
 export type OrderKind = 'reservation' | 'cafe' | 'shop' | 'tournament';
-export type PayMethod = 'wallet' | 'onsite' | 'online';
+export type PayMethod = 'wallet' | 'onsite' | 'online' | 'credits';
 
 /** مهلت‌های پرداخت حضوری */
 export const ONSITE_RESERVATION_LEAD_MS = 10 * 60 * 1000;          // ۱۰ دقیقه قبل از سانس
@@ -37,7 +38,7 @@ export const ONSITE_TOURNAMENT_LEAD_MS = 48 * 60 * 60 * 1000;      // ۴۸ سا�
 
 /** روش‌های پرداخت مجاز هر نوع سفارش (بدون احتساب «آنلاین» که با فلگ اضافه می‌شود) */
 export const METHODS_BY_KIND: Record<OrderKind, PayMethod[]> = {
-  reservation: ['wallet', 'onsite'],
+  reservation: ['wallet', 'credits', 'onsite'],
   tournament: ['wallet', 'onsite'],
   cafe: ['onsite'],
   shop: ['onsite'],
@@ -237,6 +238,41 @@ export function registerWalletRoutes(d: WalletDeps) {
     } catch (e) { httpError(res, e); }
   }));
 
+  /** پرداخت با کردیت بازینو (BC): کسر فوری از موجودی کردیت + تکمیل سفارش — فعلاً فقط رزرو. */
+  app.post('/api/checkout/credits', requireAuth, transactional(d.getStore, async (req, res) => {
+    try {
+      const { kind, params } = req.body || {};
+      if (!methodsFor(kind).includes('credits')) return res.status(400).json({ error: 'Credits payment is not allowed for this order kind', code: 'METHOD_NOT_ALLOWED' });
+      const username = d.authUsername(req)!;
+      const q = await d.quote(kind, params || {}, username) as { amount: number; payload: any; description: string; creditsCost?: number };
+      const creditsCost = Math.max(0, Math.ceil(Number(q.creditsCost) || 0));
+      const user = await store().getUserByUsername(username);
+      const balanceBefore = Number(user?.credits) || 0;
+      if (creditsCost > balanceBefore) return res.status(400).json({ error: 'Insufficient Bazino credits', code: 'INSUFFICIENT_CREDITS', creditsCost, creditsBalance: balanceBefore });
+      const orderId = newId('BC');
+      if (creditsCost > 0) await store().addCreditsToUser(username, -creditsCost);
+      let result: any;
+      try {
+        result = await d.fulfil(kind, q.payload, username, { merchantOid: orderId, kind, username });
+      } catch (e) {
+        // برگشت کردیت اگر تکمیل سفارش شکست خورد
+        if (creditsCost > 0) await store().addCreditsToUser(username, creditsCost);
+        throw e;
+      }
+      if (creditsCost > 0) {
+        await store().addTransaction({ id: Math.random().toString(36).substring(2, 9), points: -creditsCost, description: `پرداخت ${creditsCost} کردیت (BC) بابت ${q.description}`, type: 'Credits', date: 'امروز', username });
+      }
+      const dueAt = computeOnsiteDueAt(kind, q.payload).dueAt;
+      await store().createOnsiteOrder({ id: orderId, kind, username, amount: q.amount, status: 'settled', dueAt, payload: JSON.stringify(q.payload), description: q.description, result: JSON.stringify({ method: 'credits', creditsCost, ...result }), createdAt: iso(), updatedAt: iso(), settledAt: iso(), settledBy: 'credits' });
+      try {
+        const u = await store().getUserByUsername(username);
+        await onOrderPaid(store(), { username, orderId, kind, amount: q.amount, dueAt, payload: q.payload, userRole: u?.role });
+      } catch { /* commission must never fail checkout */ }
+      log(`Credits checkout ${orderId} (${kind}) by ${username}: ${creditsCost} BC`);
+      res.json({ success: true, orderId, amount: q.amount, creditsCost, creditsBalance: balanceBefore - creditsCost, result });
+    } catch (e) { httpError(res, e); }
+  }));
+
   /** پرداخت در محل: فقط ثبت سفارش با مهلت؛ رزرو ایستگاه/ظرفیت تورنمنت همین حالا گرفته می‌شود. */
   app.post('/api/checkout/onsite', requireAuth, transactional(d.getStore, async (req, res) => {
     try {
@@ -274,10 +310,20 @@ export function registerWalletRoutes(d: WalletDeps) {
         try { await onOrderReversed(store(), o.id, username); } catch { /* ignore */ }
         return res.json({ success: true, status: 'cancelled_user', refunded: 0 });
       }
-      if (o.status === 'settled' && o.settledBy === 'wallet') {
+      if (o.status === 'settled' && (o.settledBy === 'wallet' || o.settledBy === 'credits')) {
         if (o.dueAt && Date.parse(o.dueAt) <= Date.now()) return res.status(400).json({ error: 'Cancellation window has passed', code: 'TOO_LATE', dueAt: o.dueAt });
         await store().updateOnsiteOrder(o.id, { status: 'cancelled_user', updatedAt: iso() });
         await d.unfulfil(o.kind as OrderKind, payload, username, result);
+        if (o.settledBy === 'credits') {
+          const creditsCost = Math.max(0, Math.ceil(Number((result as any)?.creditsCost) || 0));
+          if (creditsCost > 0) {
+            await store().addCreditsToUser(username, creditsCost);
+            await store().addTransaction({ id: Math.random().toString(36).substring(2, 9), points: creditsCost, description: `بازگشت ${creditsCost} کردیت (BC) بابت لغو ${o.description}`, type: 'Credits', date: 'امروز', username });
+          }
+          const u = await store().getUserByUsername(username);
+          try { await onOrderReversed(store(), o.id, username); } catch { /* ignore */ }
+          return res.json({ success: true, status: 'cancelled_user', refunded: 0, refundedCredits: creditsCost, creditsBalance: Number(u?.credits) || 0 });
+        }
         const tx = o.amount > 0 ? await store().appendWalletTx({ id: newId('TX'), username, amount: round2(o.amount), type: 'refund', ref: o.id, operator: username, note: 'cancelled by user', idempotencyKey: '', createdAt: iso() }) : null;
         try { await onOrderReversed(store(), o.id, username); } catch { /* ignore */ }
         return res.json({ success: true, status: 'cancelled_user', refunded: o.amount, balance: tx?.balanceAfter });

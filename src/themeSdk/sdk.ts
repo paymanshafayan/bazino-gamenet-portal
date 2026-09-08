@@ -88,7 +88,7 @@ export interface ThemeComponentProps {
   slides: ThemeSlide[];
   onNavigate: (tab: ThemeTab | string) => void;
   activeTab?: string;
-  user?: { username: string; points?: number; role?: string; displayName?: string } | null;
+  user?: { username: string; points?: number; credits?: number; role?: string; displayName?: string } | null;
   featuredGames: any[];
   gameGenres?: any[];
   matchHistory?: any[];

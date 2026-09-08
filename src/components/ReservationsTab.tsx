@@ -31,6 +31,10 @@ export default function ReservationsTab({
   const { t, dir, language } = useLanguage();
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
   const [hours, setHours] = useState<number>(2);
+  // دستهٔ اضافه فقط برای کنسول‌ها؛ قیمت پایه شامل ۲ دسته است
+  const [extraControllers, setExtraControllers] = useState<number>(0);
+  // نرخ‌ها از تنظیمات سرور (پیش‌فرض‌ها = پیش‌فرض سرور)
+  const [rates, setRates] = useState({ controllerHourly: 25, creditsPerHour: 100, controllerCreditsPerHour: 20 });
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<DiscountCode | null>(null);
   const [referralCode, setReferralCode] = useState(() => storedRef());
@@ -45,7 +49,7 @@ export default function ReservationsTab({
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [showScannerSim, setShowScannerSim] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
-  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number; title: string } | null>(null);
+  const [checkout, setCheckout] = useState<{ params: Record<string, unknown>; amount: number; credits: number; title: string } | null>(null);
 
   const fetchReservations = async () => {
     try {
@@ -63,6 +67,19 @@ export default function ReservationsTab({
 
   React.useEffect(() => {
     fetchReservations();
+    // نرخ دستهٔ اضافه و کردیت از تنظیمات عمومی (ادمین قابل ویرایش است)
+    fetch('/api/settings').then(r => (r.ok ? r.json() : null)).then((j: Record<string, string> | null) => {
+      if (!j || typeof j !== 'object') return;
+      const num = (k: string, fb: number) => {
+        const n = Number(j[k]);
+        return Number.isFinite(n) && n >= 0 ? n : fb;
+      };
+      setRates({
+        controllerHourly: num('extra_controller_hourly', 25),
+        creditsPerHour: num('gaming_credits_per_hour', 100),
+        controllerCreditsPerHour: num('extra_controller_credits_per_hour', 20),
+      });
+    }).catch(() => {});
   }, []);
 
   // کارت GAME REQUESTS: فوکوس خودکار فیلد «بازی مورد درخواست» — هم هنگام ورود
@@ -105,10 +122,23 @@ export default function ReservationsTab({
   };
 
   const selectedSystem = systems.find(s => s.id === selectedSystemId);
+  const isConsole = selectedSystem?.type === 'PS5' || selectedSystem?.type === 'Xbox';
+  const effectiveExtras = isConsole ? extraControllers : 0;
+
+  const getControllerFee = () => {
+    if (!selectedSystem || !isConsole) return 0;
+    return effectiveExtras * rates.controllerHourly * hours;
+  };
+
+  // برآورد هزینهٔ کردیتی (BC) — مبنای نهایی سرور است
+  const getCreditsEstimate = () => {
+    if (!selectedSystem) return 0;
+    return Math.ceil(hours * rates.creditsPerHour) + effectiveExtras * Math.ceil(hours * rates.controllerCreditsPerHour);
+  };
 
   const getSubtotal = () => {
     if (!selectedSystem) return 0;
-    return selectedSystem.hourlyRate * hours;
+    return selectedSystem.hourlyRate * hours + getControllerFee();
   };
 
   const getDiscountAmount = () => {
@@ -200,13 +230,15 @@ export default function ReservationsTab({
     const isTomorrow = startDay !== `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
     const dateLabel = isTomorrow ? 'فردا' : 'امروز';
     const trimmedRequestedGame = sanitizeRequestedGame(requestedGame);
-    setCheckout({ params: { systemId: selectedSystem.id, startTime: `${startHour}:00`, endTime: `${endHour}:00`, date: dateLabel, couponCode: appliedCoupon?.code || '', referralCode: referralCode.trim(), ...(trimmedRequestedGame ? { requestedGame: trimmedRequestedGame } : {}) }, amount: finalAmount, title: descMsg });
+    setCheckout({ params: { systemId: selectedSystem.id, startTime: `${startHour}:00`, endTime: `${endHour}:00`, date: dateLabel, couponCode: appliedCoupon?.code || '', referralCode: referralCode.trim(), ...(trimmedRequestedGame ? { requestedGame: trimmedRequestedGame } : {}), ...(effectiveExtras > 0 ? { extraControllers: effectiveExtras } : {}) }, amount: finalAmount, credits: getCreditsEstimate(), title: descMsg });
   };
 
   const onCheckoutDone = (r: CheckoutResult) => {
     setCheckout(null);
     if (r.method === 'wallet') {
       addNotification(L(language, { fa: `رزرو ${selectedSystem?.name ?? ''} با کیف پول انجام شد. ${r.result?.points ?? 0} امتیاز گرفتید؛ موجودی: ${(r.balance ?? 0).toLocaleString()} TL`, en: `${selectedSystem?.name ?? 'System'} booked with your wallet. You earned ${r.result?.points ?? 0} points; balance: ${(r.balance ?? 0).toLocaleString()} TL`, ru: `${selectedSystem?.name ?? 'Система'} забронирована из кошелька. Начислено ${r.result?.points ?? 0} баллов; баланс: ${(r.balance ?? 0).toLocaleString()} TL`, tr: `${selectedSystem?.name ?? 'Sistem'} cüzdanla rezerve edildi. ${r.result?.points ?? 0} puan kazandınız; bakiye: ${(r.balance ?? 0).toLocaleString()} TL` }), 'success');
+    } else if (r.method === 'credits') {
+      addNotification(L(language, { fa: `رزرو ${selectedSystem?.name ?? ''} با کردیت انجام شد (${(r.creditsCost ?? 0).toLocaleString()} BC). ${r.result?.points ?? 0} امتیاز گرفتید؛ باقیمانده کردیت: ${(r.creditsBalance ?? 0).toLocaleString()} BC`, en: `${selectedSystem?.name ?? 'System'} booked with credits (${(r.creditsCost ?? 0).toLocaleString()} BC). You earned ${r.result?.points ?? 0} points; remaining credits: ${(r.creditsBalance ?? 0).toLocaleString()} BC`, ru: `${selectedSystem?.name ?? 'Система'} забронирована за кредиты (${(r.creditsCost ?? 0).toLocaleString()} BC). Начислено ${r.result?.points ?? 0} баллов; остаток: ${(r.creditsBalance ?? 0).toLocaleString()} BC`, tr: `${selectedSystem?.name ?? 'Sistem'} krediyle rezerve edildi (${(r.creditsCost ?? 0).toLocaleString()} BC). ${r.result?.points ?? 0} puan kazandınız; kalan kredi: ${(r.creditsBalance ?? 0).toLocaleString()} BC` }), 'success');
     } else {
       const due = formatDue(r.dueAt, language);
       addNotification(L(language, { fa: `رزرو ثبت شد. لطفاً حداکثر تا ${due} (۱۰ دقیقه قبل از سانس) در کلاب حاضر شده و حضوری پرداخت کنید؛ در غیر این صورت رزرو باطل می‌شود.`, en: `Booking registered. Please arrive and pay at the club by ${due} (10 minutes before the session); otherwise it will be cancelled.`, ru: `Бронь оформлена. Придите и оплатите в клубе до ${due} (за 10 минут до сеанса); иначе она будет аннулирована.`, tr: `Rezervasyon kaydedildi. Lütfen en geç ${due} (seanstan 10 dakika önce) kulübe gelip ödeme yapın; aksi hâlde iptal edilir.` }), 'info');
@@ -214,6 +246,7 @@ export default function ReservationsTab({
     fetchReservations();
     setSelectedSystemId(null);
     setHours(2);
+    setExtraControllers(0);
     setAppliedCoupon(null);
     setCouponCode('');
     setRequestedGame('');
@@ -264,7 +297,7 @@ export default function ReservationsTab({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in font-sans" dir={dir}>
-      {checkout && <CheckoutModal kind="reservation" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onDone={onCheckoutDone} onClose={() => { setCheckout(null); fetchReservations(); }} />}
+      {checkout && <CheckoutModal kind="reservation" params={checkout.params} estimatedAmount={checkout.amount} estimatedCredits={checkout.credits} title={checkout.title} onDone={onCheckoutDone} onClose={() => { setCheckout(null); fetchReservations(); }} />}
       
       {/* Grid of systems & Interactive Map */}
       <div className="lg:col-span-3 flex flex-col gap-6">
@@ -349,6 +382,7 @@ export default function ReservationsTab({
                   disabled={sys.isReserved}
                   onClick={() => {
                     setSelectedSystemId(sys.id);
+                    setExtraControllers(0);
                     setAppliedCoupon(null);
                     setCouponCode('');
                   }}
@@ -792,6 +826,31 @@ export default function ReservationsTab({
                 </div>
               </div>
 
+              {/* دستهٔ اضافه (فقط کنسول): قیمت پایه شامل ۲ دسته است */}
+              {isConsole && (
+                <div className="border-t border-white/5 pt-4 space-y-2">
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span className="font-bold">{L(language, { fa: '🎮 دستهٔ اضافه (نرخ پایه ۲ دسته دارد)', en: '🎮 Extra controllers (base rate includes 2)', ru: '🎮 Доп. контроллеры (база включает 2)', tr: '🎮 Ekstra kol (baz ücret 2 kol içerir)' })}</span>
+                    <span className="font-bold text-primary font-mono" dir="ltr">+{rates.controllerHourly.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}/h</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5 font-mono">
+                    {[0, 1, 2, 3, 4].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setExtraControllers(n)}
+                        className={`py-2 rounded-lg text-xs font-black border transition-all cursor-pointer ${
+                          extraControllers === n
+                            ? 'border-primary bg-primary/15 text-primary shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                            : 'border-white/10 bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        {n === 0 ? L(language, { fa: '۰', en: '0', ru: '0', tr: '0' }) : `+${n}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-white/5 pt-4">
                 <label className="text-[10px] text-gray-500 font-bold block mb-1">{L(language, { fa: 'کد معرفی همکار (اختیاری، جدا از تخفیف)', en: 'Affiliate code (optional, not a coupon)', ru: 'Код партнёра (не промокод)', tr: 'Satış ortağı kodu (kupon değil)' })}</label>
                 <input type="text" data-referral-code value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="e.g. ALI12" className="w-full px-3.5 py-2.5 bg-card-2 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-mono" />
@@ -860,6 +919,17 @@ export default function ReservationsTab({
                   </span>
                   <span className="text-gray-200">{subtotal.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
                 </div>
+                {effectiveExtras > 0 && (
+                  <div className="flex justify-between font-medium">
+                    <span>
+                      {language === 'fa' && `دستهٔ اضافه (${effectiveExtras} × ${hours} ساعت):`}
+                      {language === 'en' && `Extra controllers (${effectiveExtras} × ${hours}h):`}
+                      {language === 'ru' && `Доп. контроллеры (${effectiveExtras} × ${hours} ч):`}
+                      {language === 'tr' && `Ekstra kol (${effectiveExtras} × ${hours} sa):`}
+                    </span>
+                    <span className="text-gray-200">{getControllerFee().toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
+                  </div>
+                )}
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-400 font-bold">
                     <span>
@@ -874,6 +944,15 @@ export default function ReservationsTab({
                 <div className="flex justify-between border-t border-white/5 pt-2.5 text-sm font-black text-white font-sans">
                   <span>{t('booking.totalPrice', 'مبلغ کل فاکتور:')}</span>
                   <span className="text-primary text-base font-mono font-bold">{total.toLocaleString(localeOf(language))} {t('common.currency', 'لیر')}</span>
+                </div>
+                <div className="flex justify-between font-medium text-amber-300/90">
+                  <span>
+                    {language === 'fa' && 'یا پرداخت با کردیت:'}
+                    {language === 'en' && 'Or pay with credits:'}
+                    {language === 'ru' && 'Или оплата кредитами:'}
+                    {language === 'tr' && 'veya krediyle öde:'}
+                  </span>
+                  <span dir="ltr" className="font-bold">{getCreditsEstimate().toLocaleString(localeOf(language))} BC</span>
                 </div>
 
                 {/* Loyalty points display */}

@@ -93,8 +93,8 @@
     { id: 'shop', href: '/shop', key: 'shop' },
     { id: 'food', href: '/food', key: 'food' },
     { id: 'club', href: '/club', key: 'club' },
-    { id: 'blog', href: '/blog', key: 'blog' },
-    { id: 'chat', href: '/chat', key: 'chat' }
+    { id: 'blog', href: '/blog', key: 'blog' }
+    /* chat: disabled by employer request — ChatPage code + admin rooms stay for re-enable */
   ];
 
   function navOn(props, id) {
@@ -306,8 +306,8 @@
       { href: '/shop', title: 'SHOP', sub: 'Merch desk — coming soon', tone: 'gold', ic: ICO.star },
       { href: '/food', title: 'FOOD & DRINKS', sub: 'Cafe coming soon', tone: 'gold', ic: ICO.crown },
       { href: '/club', title: 'CLUB', sub: 'Credits & member card', tone: 'green', ic: ICO.users },
-      { href: '/blog', title: 'BLOG', sub: 'Club news', tone: 'purple', ic: ICO.cal },
-      { href: '/chat', title: 'CHAT', sub: 'Lobby and staff', tone: 'cyan', ic: ICO.chat }
+      { href: '/blog', title: 'BLOG', sub: 'Club news', tone: 'purple', ic: ICO.cal }
+      /* chat tile removed — disabled by employer request */
     ];
     var tileNodes = [];
     for (n = 0; n < tiles.length; n++) {
@@ -367,6 +367,8 @@
     var hours = hrSt[0], setHours = hrSt[1];
     var gameSt = useState('');
     var game = gameSt[0], setGame = gameSt[1];
+    var padSt = useState(0);
+    var pads = padSt[0], setPads = padSt[1];
     var systems = props.systems || [];
     var list = filterSys(systems, view === 'kids' ? 'kids' : view === 'adults' ? 'adults' : '');
     var selected = null;
@@ -374,7 +376,12 @@
     for (i = 0; i < list.length; i++) if (list[i].id === sysId) selected = list[i];
     if (!selected && list.length) selected = list[0];
     var rate = selected ? (selected.hourlyRate || selected.rate || 0) : 0;
-    var total = rate * hours;
+    /* extra pads: consoles only — base rate includes 2 pads */
+    var isConsole = !!selected && (selected.type === 'PS5' || selected.type === 'Xbox');
+    var ctrlRate = Number((props.settings || {}).extra_controller_hourly);
+    if (!isFinite(ctrlRate) || ctrlRate < 0) ctrlRate = 25;
+    var effPads = isConsole ? pads : 0;
+    var total = rate * hours + effPads * ctrlRate * hours;
     var cards = [
       { id: 'kids', title: 'KIDS', body: 'Fun & safe games for younger players.', img: asset(props, 'games-kids.jpg'), tone: 'green', cta: 'RESERVE →' },
       { id: 'adults', title: 'ADULTS', body: 'Action, sports, racing. 85" and 65" bays.', img: asset(props, 'games-adults.jpg'), tone: 'magenta', cta: 'RESERVE →' },
@@ -391,6 +398,7 @@
           onClick: function () {
             setView(c.id === 'systems' ? 'adults' : c.id);
             setSysId('');
+            setPads(0);
           }
         },
           h('h2', null, c.title),
@@ -408,7 +416,7 @@
         sysBtns.push(h('button', {
           key: s.id, type: 'button',
           className: 'hub-neon-box' + (selected && selected.id === s.id ? ' is-on hub-neon-box--cyan' : ''),
-          onClick: function () { setSysId(s.id); }
+          onClick: function () { setSysId(s.id); setPads(0); }
         },
           h('span', null,
             h('b', null, s.name),
@@ -424,17 +432,25 @@
         hourBtns.push(h('button', { key: hr, type: 'button', className: hours === hr ? 'is-on' : '', onClick: function () { setHours(hr); } }, hr + 'h'));
       })(i);
     }
+    var padBtns = [];
+    for (i = 0; i <= 4; i++) {
+      (function (n) {
+        padBtns.push(h('button', { key: 'pad' + n, type: 'button', className: pads === n ? 'is-on' : '', onClick: function () { setPads(n); } }, n === 0 ? '0' : '+' + n));
+      })(i);
+    }
     function holdBay() {
       if (!props.user) { login(props); return; }
       if (!selected) return;
       var slot = nextSlot(hours);
-      checkout(props, 'reservation', {
+      var bayParams = {
         systemId: selected.id,
         startTime: slot.startTime,
         endTime: slot.endTime,
         date: slot.date,
         requestedGame: game
-      }, total);
+      };
+      if (effPads > 0) bayParams.extraControllers = effPads;
+      checkout(props, 'reservation', bayParams, total);
     }
     return h('div', { className: 'hub-main' },
       h(Hero, {
@@ -451,6 +467,10 @@
           h('h3', null, view === 'kids' ? 'KIDS BAY' : 'ADULT BAY'),
           h('p', { style: { color: '#7f8fc0', marginTop: 0 } }, selected ? selected.name : '—'),
           h('div', { className: 'hub-hours' }, hourBtns),
+          isConsole ? h('div', null,
+            h('p', { style: { color: '#7f8fc0', fontSize: 12, margin: '8px 0 4px' } }, 'EXTRA PADS · base includes 2 · +' + ctrlRate + ' ₺/h'),
+            h('div', { className: 'hub-hours' }, padBtns)
+          ) : null,
           h('div', { className: 'hub-pay-total' }, total + ' ₺'),
           h('p', { style: { color: '#7f8fc0', fontSize: 12 } }, 'Cash or card at the desk — or pay from your Bazino wallet. No third-party checkout in Hub.'),
           h('button', { className: 'hub-pay-go', type: 'button', onClick: holdBay }, ts(props, 'holdBay', 'HOLD MY BAY')),
@@ -699,8 +719,8 @@
       ) : h('section', { className: 'hub-club' },
         h('div', { className: 'hub-box hub-neon-box hub-neon-box--gold' },
           h('h3', null, 'BAZINO CREDITS'),
-          h('p', { style: { fontSize: 42, margin: '8px 0', fontFamily: 'Orbitron, sans-serif' } }, String(user.points || 0)),
-          h('p', { style: { color: '#7f8fc0' } }, 'Season points rank the champion. Wallet cash lives in your profile.')
+          h('p', { style: { fontSize: 42, margin: '8px 0', fontFamily: 'Orbitron, sans-serif' } }, String(user.credits || 0) + ' BC'),
+          h('p', { style: { color: '#7f8fc0' } }, 'Season points: ' + String(user.points || 0) + '. Wallet cash lives in your profile.')
         ),
         h('button', { className: 'hub-cta', type: 'button', onClick: function () { go(props, '/profile'); } }, 'OPEN FULL PROFILE')
       )
@@ -729,6 +749,7 @@
   }
 
   function ChatPage(props) {
+    var chatOff = String((props.settings || {}).chat_enabled) !== 'true';
     var roomsSt = useState([]);
     var rooms = roomsSt[0], setRooms = roomsSt[1];
     var idSt = useState('');
@@ -738,6 +759,7 @@
     var textSt = useState('');
     var text = textSt[0], setText = textSt[1];
     useEffect(function () {
+      if (chatOff) return;
       var cancelled = false;
       fetch('/api/chat/rooms').then(function (r) { return r.ok ? r.json() : []; }).then(function (d) {
         if (cancelled || !d) return;
@@ -748,7 +770,7 @@
       return function () { cancelled = true; };
     }, []);
     useEffect(function () {
-      if (!id) return;
+      if (chatOff || !id) return;
       var cancelled = false;
       fetch('/api/chat/messages/' + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : []; }).then(function (d) {
         if (!cancelled && Array.isArray(d)) setMsgs(d);
@@ -774,6 +796,7 @@
     }
     return h('div', { className: 'hub-main' },
       h(Hero, { img: asset(props, 'hero-player.jpg'), title: 'LIVE', em: 'CHAT', line: 'LOBBY · TABLES · STAFF' }),
+      chatOff ? h(Empty, { title: 'CHAT DISABLED', body: 'Lobby chat is paused by the club. It will be back soon.' }) :
       rooms.length ? h('section', { className: 'hub-chat' },
         h('div', { className: 'hub-chat-list' }, roomBtns),
         h('div', { className: 'hub-chat-pane hub-neon-box' },

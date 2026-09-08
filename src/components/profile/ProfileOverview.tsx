@@ -57,6 +57,7 @@ export function ProfileOverview({ user, onUserChange, addNotification, onLogout 
           <div style={{ fontWeight: 900, fontSize: 18 }}>{user.displayName || user.username}</div>
           <div style={{ color: LEGAL_PALETTE.muted, fontSize: 13 }} dir="ltr">@{user.username}{user.phone ? ` · ${user.phone}` : ''}</div>
           <div style={{ color: LEGAL_PALETTE.warn, fontWeight: 800, fontSize: 14, marginTop: 4 }}>{user.loyaltyPoints.toLocaleString()} {L(language, { fa: 'امتیاز', en: 'points', ru: 'баллов', tr: 'puan' })}</div>
+          <div style={{ color: LEGAL_PALETTE.accent, fontWeight: 800, fontSize: 14, marginTop: 2 }} dir="ltr" data-credits-balance>Bazino Credits: {(Number(user.credits) || 0).toLocaleString()} BC</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={e => e.target.files?.[0] && upload(e.target.files[0])} data-avatar-input />

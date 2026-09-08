@@ -41,7 +41,7 @@ export function ProfilePoints() {
       {loading ? <Loading /> : data.transactions.length === 0 ? <Empty text={L(language, { fa: 'هنوز تراکنشی ثبت نشده.', en: 'No transactions yet.', ru: 'Операций пока нет.', tr: 'Henüz işlem yok.' })} /> : (
         <table><thead><tr><th>{L(language, { fa: 'شرح', en: 'Description', ru: 'Описание', tr: 'Açıklama' })}</th><th>{L(language, { fa: 'نوع', en: 'Type', ru: 'Тип', tr: 'Tür' })}</th><th>{L(language, { fa: 'امتیاز', en: 'Points', ru: 'Баллы', tr: 'Puan' })}</th><th>{L(language, { fa: 'تاریخ', en: 'Date', ru: 'Дата', tr: 'Tarih' })}</th></tr></thead>
           <tbody>{data.transactions.map((t: any) => (
-            <tr key={t.id}><td>{t.description}</td><td>{t.type}</td><td style={{ color: t.type === 'Redeemed' ? LEGAL_PALETTE.danger : LEGAL_PALETTE.success, fontWeight: 800 }} dir="ltr">{t.type === 'Redeemed' ? '-' : '+'}{Math.abs(t.points)}</td><td>{t.date}</td></tr>
+            <tr key={t.id}><td>{t.description}</td><td>{t.type === 'Credits' ? 'BC' : t.type}</td><td style={{ color: t.type === 'Redeemed' || (t.type === 'Credits' && Number(t.points) < 0) ? LEGAL_PALETTE.danger : LEGAL_PALETTE.success, fontWeight: 800 }} dir="ltr">{t.type === 'Redeemed' || (t.type === 'Credits' && Number(t.points) < 0) ? '-' : '+'}{Math.abs(t.points)}{t.type === 'Credits' ? ' BC' : ''}</td><td>{t.date}</td></tr>
           ))}</tbody></table>
       )}
     </Card>

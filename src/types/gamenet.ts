@@ -3,6 +3,8 @@ export interface UserState {
   email: string;
   phone: string;
   loyaltyPoints: number;
+  /** موجودی کردیت بازینو (BC) */
+  credits?: number;
   role?: string;
   /** پروفایل (تسک ۱۲) — از /api/auth/me و /api/me/profile */
   displayName?: string;
@@ -22,7 +24,8 @@ export interface LoyaltyTx {
   description: string;
   // 'Bonus' هم یک نوع واقعی است (هدیه‌ی خوش‌آمدگویی در server/sampleData.ts) اما
   // در این تایپ نیامده بود، برای همین UI آن را به شاخه‌ی «خرج امتیاز» می‌فرستاد.
-  type: 'Earned' | 'Redeemed' | 'Bonus';
+  // 'Credits' = حرکت کردیت بازینو (BC)؛ علامت points جهت را مشخص می‌کند (مثبت=شارژ/بازگشت، منفی=خرج)
+  type: 'Earned' | 'Redeemed' | 'Bonus' | 'Credits';
   date: string;
   /** صاحب تراکنش. سرور تضمین می‌کند فقط تراکنش‌های خودِ کاربر برگردانده شوند. */
   username?: string;
@@ -63,6 +66,8 @@ export interface CafeItem {
   imageUrl: string;
   inventory: number;
   isAvailable: boolean;
+  /** قیمت کردیتی (BC) — ۰/خالی یعنی بدون قیمت کردیتی */
+  creditPrice?: number;
 }
 
 export interface CafeOrderItem {
@@ -78,6 +83,8 @@ export interface Accessory {
   imageUrl: string;
   stock: number;
   category: 'Keyboard' | 'Mouse' | 'Headset' | 'Controller';
+  /** قیمت کردیتی (BC) — ۰/خالی یعنی بدون قیمت کردیتی */
+  creditPrice?: number;
 }
 
 export interface Tournament {

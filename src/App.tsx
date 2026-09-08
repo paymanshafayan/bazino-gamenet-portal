@@ -24,6 +24,7 @@ import { LanguageMenu, LanguageRow } from './components/LanguageMenu';
 import { postJson, errorMessage } from './services/postJson';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
+import ComingSoonPanel from './components/ComingSoonPanel';
 const HomeTab = lazy(() => import('./components/HomeTab'));
 const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const GamesTab = lazy(() => import('./components/GamesTab'));
@@ -703,11 +704,11 @@ export default function App() {
       const regionName = hubPage === 'home' ? 'home' : ('hub.' + hubPage);
       const hubFallback =
         hubPage === 'games' ? <GamesTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/> :
-        hubPage === 'shop' ? <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/> :
-        hubPage === 'food' ? <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/> :
+        hubPage === 'shop' ? <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={shopComingSoon}/> :
+        hubPage === 'food' ? <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={foodComingSoon}/> :
         hubPage === 'club' ? <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/> :
         hubPage === 'blog' ? <BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/> :
-        hubPage === 'chat' ? <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} /> :
+        hubPage === 'chat' ? (chatEnabled ? <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} /> : <ComingSoonPanel kind="chat" />) :
         hubPage === 'contact' ? <ContactPage onBack={() => navigateStandalone('home')} /> :
         hubPage === 'rules' ? <LegalPage slug="rules" onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} /> :
         hubPage === 'privacy' ? <LegalPage slug="privacy" onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} /> :
@@ -792,8 +793,8 @@ export default function App() {
       )}
       {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
       {activeTab === 'games' && <GamesTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
-      {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
-      {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification}/>}
+      {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={foodComingSoon}/>}
+      {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={shopComingSoon}/>}
       {activeTab === 'tournaments' && <TournamentsTab />}
       {activeTab === 'blog' && <BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/>}
       {activeTab === 'admin' && (
@@ -809,7 +810,7 @@ export default function App() {
         />
       )}
 
-      {activeTab === 'chat' && <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} />}
+      {activeTab === 'chat' && (chatEnabled ? <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} /> : <ComingSoonPanel kind="chat" />)}
     </div>
     </Suspense>
     );
@@ -901,6 +902,10 @@ export default function App() {
     );
   }
 
+  // پرچم‌های قابلیت (از /api/settings): چت فقط وقتی در منو هست که ادمین فعالش کرده باشد
+  const chatEnabled = siteSettings.chat_enabled === 'true';
+  const foodComingSoon = siteSettings.food_coming_soon !== 'false';
+  const shopComingSoon = siteSettings.shop_coming_soon !== 'false';
   // یک منبع واحد برای ناوبری، تا هدر دسکتاپ و نوار پایین موبایل هرگز از هم جدا نیفتند.
   // «بلاگ» و «چت» تا امروز هیچ ورودی‌ای در رابط کاربری نداشتند: صفحه‌شان ساخته شده
   // بود و ادمین می‌توانست مقاله منتشر کند و اتاق گفتگو بسازد، ولی هیچ بازدیدکننده‌ای
@@ -913,7 +918,8 @@ export default function App() {
     { id: 'tournaments',  label: L(language, { fa: 'مسابقات', en: 'Arena', ru: 'АРЕНА', tr: 'ARENA' }),     icon: Trophy },
     { id: 'loyalty',      label: L(language, { fa: 'باشگاه', en: 'Club', ru: 'КЛУБ', tr: 'KULÜP' }),      icon: Award },
     { id: 'blog',         label: L(language, { fa: 'بلاگ', en: 'Blog', ru: 'БЛОГ', tr: 'BLOG' }),      icon: Newspaper },
-    { id: 'chat',         label: L(language, { fa: 'گفتگو', en: 'Chat', ru: 'ЧАТ', tr: 'SOHBET' }),      icon: MessageSquare },
+    // چت غیرفعال است (فقط از منو حذف شده؛ کد و مدیریت ادمین دست‌نخورده)
+    ...(chatEnabled ? [{ id: 'chat', label: L(language, { fa: 'گفتگو', en: 'Chat', ru: 'ЧАТ', tr: 'SOHBET' }), icon: MessageSquare }] : []),
   ];
   // روی موبایل هشت آیکون در ۳۹۰ پیکسل جا نمی‌شود (هر کدام کمتر از ۵۰px می‌شد و
   // هدف لمس بسیار کوچک). پنج تای اول در نوار می‌مانند و بقیه پشت دکمه‌ی «بیشتر».
@@ -947,7 +953,7 @@ export default function App() {
     slides: themeSlides,
     onNavigate: navigateTheme,
     activeTab,
-    user: user ? { username: user.username, points: user.loyaltyPoints, role: user.role, displayName: user.displayName || user.gamerTag || user.username } : null,
+    user: user ? { username: user.username, points: user.loyaltyPoints, credits: Number(user.credits) || 0, role: user.role, displayName: user.displayName || user.gamerTag || user.username } : null,
     settings: siteSettings,
     logoUrl: siteSettings.logo_url || siteSettings.club_logo || '/logo.png',
     assetsBase: activeTheme.assetsBase || '',

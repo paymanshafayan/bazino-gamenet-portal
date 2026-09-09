@@ -1266,5 +1266,17 @@ curl -sS -m 15 -X POST https://bazino.pro/api/webhooks/zernio \
   -H "x-zernio-signature: sha256=$SIG" \
   -d "$BODY"
 # انتظار: پاسخ بی‌اثر با outboundSent:false و بدون ساخت پیام/کوپن/کد
+
+معادل PowerShell (ویندوز — بدون نیاز به openssl، خروجی‌اش را در چت بفرستید، نه خود سکرت):
+
+```powershell
+$Secret = '<ZERNIO_WEBHOOK_SECRET از هاست>'
+$Body = '{"event":"webhook.test","ping":1}'
+$hmac = New-Object System.Security.Cryptography.HMACSHA256
+$hmac.Key = [Text.Encoding]::UTF8.GetBytes($Secret)
+$sig = ($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($Body)) | ForEach-Object { $_.ToString('x2') }) -join ''
+Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -ContentType 'application/json' -Headers @{ 'x-zernio-signature' = "sha256=$sig" } -Body $Body
+# انتظار: ok=True, outboundSent=False, test=True
+```
 ```
 

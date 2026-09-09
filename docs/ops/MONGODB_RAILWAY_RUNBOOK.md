@@ -15,6 +15,12 @@
 openssl rand -base64 512
 ```
 
+روی ویندوز (PowerShell، بدون نیاز به openssl — مستقیم می‌رود در clipboard):
+
+```powershell
+$b = New-Object byte[] 512; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b) | Set-Clipboard
+```
+
 خروجی (~۶۸۰ کاراکتر تک‌خطی، بدون فاصله/newline) را کپی کن. این **secret** است؛ در چت/CI نگذار.
 
 ## قدم ۲ — متغیر Railway

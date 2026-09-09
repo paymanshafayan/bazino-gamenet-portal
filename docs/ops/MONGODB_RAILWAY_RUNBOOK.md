@@ -31,12 +31,14 @@ $b = New-Object byte[] 512; [Security.Cryptography.RandomNumberGenerator]::Creat
 MONGO_KEYFILE=<خروجی قدم ۱>
 ```
 
-## قدم ۳ — Start Command
+## قدم ۳ — Start Command (نسخهٔ v2 — آرگومان‌های شبکهٔ قالب حفظ شده)
+
+> **چرا v2؟ (حادثهٔ ۲۰۲۶-۰۹-۰۹):** دستور v1 فقط `mongod --replSet rs0 --keyFile …` را اجرا می‌کرد، ولی دستور پیش‌فرض قالب Railway یعنی `mongod --ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false` را دور می‌انداخت. شبکهٔ داخلی Railway IPv6 است؛ بدون `--ipv6` نه پورتال می‌تواند وصل شود نه گره به PRIMARY می‌رسد. v2 هر دو را ترکیب می‌کند. (از `getCmdLineOpts` کانتینر سبز اثبات شد که دستور در حال اجرا مال قالب بود، نه ما.)
 
 در سرویس Mongo → تب **Settings** → **Start Command** (جایگزین کامل دستور فعلی):
 
 ```sh
-sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --keyFile /tmp/mongo-keyfile'
+sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile && echo "TG-START wrapper ok, keyfile bytes: $(wc -c < /tmp/mongo-keyfile)"; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --keyFile /tmp/mongo-keyfile --ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false'
 ```
 
 > ⚠️ **کپی تمیز، مهم:** حتماً با دکمهٔ copy بالای بلاک کد کپی کن و کل فیلد Railway را select-all + delete کن بعد paste. اگر از متن رندرشده (چت/مرورگر) کپی کنی ممکن است خراب شود: `&gt;` به‌جای `>`، `&amp;&amp;` به‌جای `&&`، یا لینک‌شدن `docker-entrypoint.sh`. بعد از paste چک کن هیچ‌کدام از این‌ها نباشند: `&gt;` `&amp;` `[` `]` `(http`. (حادثهٔ واقعی ۲۰۲۶-۰۹-۰۹: همین خرابی کپی باعث ماندن `BadValue` شد.)
@@ -51,6 +53,8 @@ sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo
 | `chown mongodb:mongodb` | entrypoint با gosu به کاربر `mongodb` دانگرید می‌کند؛ فایل باید برایش خوانا باشد |
 | صدا زدن صریح `docker-entrypoint.sh` | خودش `--auth` (چون root vars ست‌اند) و `--bind_ip_all` را اضافه می‌کند — **پس ما `--auth` نمی‌نویسیم** (آرگومان تکراری برای mongod خطاست) |
 | `--replSet rs0` | نام ست؛ قدم ۵ باید همین باشد |
+| `--ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false` | **حفظ عین آرگومان‌های شبکهٔ قالب Railway** — حذفشان = قطع اتصال داخلی (IPv6) و نرسیدن به PRIMARY |
+| `echo "TG-START …"` | خودتشخیصی دائمی: فقط **طول** فایل کلید را چاپ می‌کند (نه secret). اگر این خط در لاگ دیپلوی نباشد یعنی wrapper اصلاً اجرا نشده |
 
 ## قدم ۴ — دیپلوی مجدد
 
@@ -99,6 +103,7 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 ```
 
 باید `--replSet`, `rs0`, `--keyFile`, `/tmp/mongo-keyfile` را در خروجی ببینی. اگر نبود → قدم ۳ ذخیره/اعمال نشده؛ برگرد به عیب‌یابی.
+> ⚠️ **سبز بودن سرویس ≠ اجرای دستور جدید:** اگر دیپلوی جدید کرش کند، Railway دیپلوی سالم قبلی را زنده نگه می‌دارد و سرویس «سبز» می‌ماند. پس بعد از هر تغییر، حتماً (۱) لاگ **دیپلوی جدید** را از خط اول بخوان (باید خط `TG-START` را داشته باشد)، (۲) با همین دستور `getCmdLineOpts` چک کن کانتینرِ فعلی واقعاً با `--replSet` بالاست. اگر argv دستور قالب (`--ipv6 …` بدون `--replSet`) را نشان داد یعنی هنوز روی دیپلوی قدیمی هستی و دیپلوی جدید کرش کرده — لاگ کامل دیپلوی جدید را از خط اول بررسی کن.
 
 ## عیب‌یابی سریع
 

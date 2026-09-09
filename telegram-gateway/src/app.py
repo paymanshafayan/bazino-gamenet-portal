@@ -66,6 +66,12 @@ def create_app(cfg: GatewayConfig | None = None, adapter: Any = None,
         if adapter is not None:
             await adapter.connect()
 
+    @app.get('/healthz')
+    async def healthz():
+        # Unauthenticated liveness probe for the platform healthcheck.
+        # Deliberately minimal: no session/fake flags (those stay behind the bearer on /internal/health).
+        return {'ok': True, 'service': 'tg-gateway', 'timestamp': _now()}
+
     @app.get('/internal/health')
     async def health(authorization: str = Header(default='')):
         if not _bearer_ok(authorization):

@@ -45,7 +45,7 @@ python3 -m unittest discover -s tests
 
 ## Railway deploy
 
-1. New service from this repo, **root directory = `telegram-gateway/`** (Dockerfile).
+1. New service from this repo, **root directory = `telegram-gateway/`** (Dockerfile; build/deploy defaults in `railway.toml`, platform healthcheck on `GET /healthz`).
 2. Mount a volume at `/data` (sqlite: idempotency + rate-limit + flood state).
 3. Set env from `.env.example` (**same** `GATEWAY_BEARER`/`GATEWAY_HMAC_SECRET` as the portal's
    `TG_GATEWAY_BEARER`/`TG_GATEWAY_HMAC_SECRET`).

@@ -65,6 +65,15 @@ class AppTests(unittest.TestCase):
         r = client.get('/internal/health')
         self.assertEqual(r.status_code, 401)
 
+    def test_healthz_public_probe_is_minimal(self):
+        client, _ = make_client()
+        r = client.get('/healthz')  # no auth: platform healthcheck probe
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(sorted(body.keys()), ['ok', 'service', 'timestamp'])
+        self.assertTrue(body['ok'])
+        self.assertEqual(body['service'], 'tg-gateway')
+
     def test_dialogs_permissions_search_shapes(self):
         client, _ = make_client()
         h = {'Authorization': f'Bearer {BEARER}'}

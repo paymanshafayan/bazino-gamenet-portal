@@ -1,0 +1,15 @@
+# Bazino Telegram Gateway — Railway service config.
+# Service root = telegram-gateway/ (Dockerfile build). After deploy:
+#   1. Attach a Volume mounted at /data (sqlite idempotency/rate-limit store).
+#   2. Set the env vars from the root .env.example "Telegram gateway" section.
+#   3. Generate a Railway domain OR keep it private and set TG_GATEWAY_URL on the portal.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

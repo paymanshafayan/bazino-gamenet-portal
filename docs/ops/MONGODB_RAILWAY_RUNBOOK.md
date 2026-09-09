@@ -39,6 +39,8 @@ MONGO_KEYFILE=<خروجی قدم ۱>
 sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --keyFile /tmp/mongo-keyfile'
 ```
 
+> ⚠️ **کپی تمیز، مهم:** حتماً با دکمهٔ copy بالای بلاک کد کپی کن و کل فیلد Railway را select-all + delete کن بعد paste. اگر از متن رندرشده (چت/مرورگر) کپی کنی ممکن است خراب شود: `&gt;` به‌جای `>`، `&amp;&amp;` به‌جای `&&`، یا لینک‌شدن `docker-entrypoint.sh`. بعد از paste چک کن هیچ‌کدام از این‌ها نباشند: `&gt;` `&amp;` `[` `]` `(http`. (حادثهٔ واقعی ۲۰۲۶-۰۹-۰۹: همین خرابی کپی باعث ماندن `BadValue` شد.)
+
 چرا این شکلی است:
 
 | جزء | دلیل |

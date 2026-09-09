@@ -93,6 +93,46 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 
 ✅ موفق = `{ myState: 1, setName: "rs0" }` (یعنی PRIMARY). بعد از این، تست تراکنش استودیو + `webhook.test` را اجرا کن.
 
+## قدم ۵٫۵ — smoke test تراکنش (اثبات `TRANSACTIONS_REQUIRED`)
+
+قبل از وصل کردن اپ، در همان Console ثابت کن تراکنش چندسندی کار می‌کند (روی standalone با خطای `Transaction numbers are only allowed on a replica set member` می‌میرد):
+
+```sh
+mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --host 127.0.0.1 --eval '
+const s = db.getMongo().startSession();
+s.startTransaction();
+s.getDatabase("bazino_probe").tx_probe.insertOne({ probe: "tx-smoke", at: new Date() });
+s.commitTransaction();
+const n = s.getDatabase("bazino_probe").tx_probe.countDocuments({ probe: "tx-smoke" });
+s.getDatabase("bazino_probe").tx_probe.deleteMany({ probe: "tx-smoke" });
+s.endSession();
+print("TX-SMOKE count was: " + n);'
+```
+
+✅ موفق = چاپ `TX-SMOKE count was: 1` بدون خطا (دیتای probe پاک می‌شود؛ چیزی باقی نمی‌ماند).
+
+## قدم ۵٫۶ — rotate پسورد root (اگر لو رفته یا دوره‌ای)
+
+> ⚠️ عوض کردن variable به‌تنهایی کافی نیست: entrypoint فقط در init اول یوزر را می‌سازد. باید هم پسورد داخل دیتابیس عوض شود (`changeUserPassword`) هم variableها.
+
+1. **ساخت پسورد جدید (PowerShell ویندوز، ۲۴ کاراکتر URL-safe تا در MONGO_URL به encode نیاز نداشته باشد):**
+   ```powershell
+   -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
+   ```
+   خروجی را نگه دار (secret است).
+2. **عوض کردن پسورد داخل دیتابیس** (Console سرویس Mongo — هنوز با پسورد قدیمی لاگین می‌کند چون env قدیمی است؛ به‌جای `ROOT_USER` مقدار `MONGO_INITDB_ROOT_USERNAME` از تب Variables، معمولاً `mongo`):
+   ```sh
+   mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --host 127.0.0.1 --eval 'db.getSiblingDB("admin").changeUserPassword("ROOT_USER", "NEW_PASS")'
+   ```
+   ✅ موفق = `{ ok: 1 }`.
+3. **به‌روزرسانی variableها:** در تب Variables مقدار `MONGO_INITDB_ROOT_PASSWORD` را به پسورد جدید بده. بعد `MONGO_URL` را چک کن: اگر پسورد قدیمی را به‌صورت literal داخلش می‌بینی، آن را هم دستی به‌روز کن؛ اگر از reference (`${{…}}`) استفاده می‌کند خودش به‌روز می‌شود (راستی‌آزمایی کن).
+4. ذخیره variable دیپلوی جدید می‌سازد (pre-deploy خالی است، تمیز بوت می‌شود؛ entrypoint چون دیتا هست init را رد می‌کند و پسورد جدید دست‌نخورده می‌ماند).
+5. **راستی‌آزمایی:** یک دستور سادهٔ Console (مثلاً قدم ۶) — کنسول حالا با env جدید لاگین می‌کند.
+
+## قدم ۵٫۷ — وصل کردن پورتال (فاز بعد)
+
+سرویس پورتال در `server/dataProviders.ts:2239` به ترتیب `MONGO_URL` بعد `MONGODB_URI` را می‌خواند. برای اتصال: همان مقدار `MONGO_URL` داخلی سرویس Mongo (هاست `mongodb.railway.internal`) را به‌عنوان `MONGO_URL` روی سرویس پورتال ست کن و پورتال را redeploy کن. بعد از آن: تست اکشن تراکنشی استودیو + `webhook.test` (دستور PowerShell در HANDOFF بخش ۲۵٫۷؛ نیازمند `ZERNIO_WEBHOOK_SECRET` از هاست — تسک ۸).
+
 ## قدم ۶ — راستی‌آزمایی آرگومان‌های mongod (اختیاری ولی مفید)
 
 اگر خواستی مطمئن شوی کانتینرِ در حال اجرا واقعاً با `--replSet` و `--keyFile` بالاست (نه start command قدیمی):

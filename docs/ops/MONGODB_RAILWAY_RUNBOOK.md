@@ -113,3 +113,5 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 | `host` اشتباه در `rs.initiate` (کل MONGO_URL) | باید فقط `host:port` باشد | مثلاً `mongodb.railway.internal:27017` بدون `mongodb://` و یوزر/پسورد |
 | `init process complete` در **هر** دیپلوی تکرار می‌شود | احتمالاً Volume روی `/data/db` وصل نیست → دیتا و کانفیگ RS با هر ری‌استارت می‌پرد | Settings → Volumes: یک Volume به `/data/db` وصل کن و Redeploy |
 | دیپلوی جدید هم همان `BadValue` را می‌دهد | Start Command جدید ذخیره/اعمال نشده (متن Settings را عیناً با قدم ۳ مقایسه کن) | اصلاح + Redeploy؛ مطمئن شو روی **همان سرویس Mongo** تغییر دادی |
+| paste دستور جدید «فرقی ندارد» و تیک save روشن نمی‌شود | یعنی فیلد **از قبل** عین همین متن را دارد — چیز خرابی نیست | فقط **Redeploy** بزن تا دیپلوی تازه با همین کانفیگ بوت شود |
+| در چت `&gt;` و `&amp;` و لینک `http://docker-entrypoint.sh` دیده می‌شود | آرتیفکت نمایشی چت است (escape شدن `>` و `&` + autolink پسوند `.sh`)؛ متن واقعی کپی‌شده تمیز است | نادیده بگیر؛ ملاک فقط متن داخل فیلد Railway است |

@@ -115,3 +115,74 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 | دیپلوی جدید هم همان `BadValue` را می‌دهد | Start Command جدید ذخیره/اعمال نشده (متن Settings را عیناً با قدم ۳ مقایسه کن) | اصلاح + Redeploy؛ مطمئن شو روی **همان سرویس Mongo** تغییر دادی |
 | paste دستور جدید «فرقی ندارد» و تیک save روشن نمی‌شود | یعنی فیلد **از قبل** عین همین متن را دارد — چیز خرابی نیست | فقط **Redeploy** بزن تا دیپلوی تازه با همین کانفیگ بوت شود |
 | در چت `&gt;` و `&amp;` و لینک `http://docker-entrypoint.sh` دیده می‌شود | آرتیفکت نمایشی چت است (escape شدن `>` و `&` + autolink پسوند `.sh`)؛ متن واقعی کپی‌شده تمیز است | نادیده بگیر؛ ملاک فقط متن داخل فیلد Railway است |
+
+## قدم ۷ — عیب‌یابی تشخیصی: وقتی با کانفیگ صحیح هم `BadValue` می‌ماند
+
+اگر Start Command عین قدم ۳، `MONGO_KEYFILE` ست، و Volume وصل است ولی دیپلوی تازه هم `BadValue` می‌دهد، یعنی یکی از این سه حالت است و باید تفکیک شود:
+
+1. start command اصلاً اجرا نمی‌شود (دیپلوی با snapshot قدیمی/سرویس اشتباه بوت می‌شود)،
+2. اجرا می‌شود ولی `MONGO_KEYFILE` در runtime خالی است (typo در نام variable یا مقدار خالی)،
+3. اجرا می‌شود و کلید هم هست ولی خطا می‌ماند (پارادوکس → اسکالیشن به پشتیبانی Railway).
+
+**تست تفکیک (موقت):** Start Command را با این نسخهٔ تشخیصی جایگزین کن (فقط **طول** کلید را چاپ می‌کند، نه خود secret):
+
+```sh
+sh -c 'echo "TG-DIAG wrapper running, MONGO_KEYFILE bytes: $(printf "%s" "$MONGO_KEYFILE" | wc -c)"; printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile; echo "TG-DIAG keyfile bytes: $(wc -c < /tmp/mongo-keyfile)"; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --keyFile /tmp/mongo-keyfile'
+```
+
+بعد برای اینکه Railway حتماً یک دیپلوی **کاملاً تازه** با snapshot فعلی تنظیمات بسازد (نه restart دیپلوی قبلی)، در Variables یک متغیر اضافه کن:
+
+```
+REDEPLOY_TRIGGER=1
+```
+
+(مقدارش مهم نیست؛ عوض شدن Variables دیپلوی جدید می‌سازد. بعداً می‌توانی پاکش کنی.)
+
+**خوانش لاگ دیپلوی جدید:**
+
+| آنچه در لاگ می‌بینی | نتیجه |
+|---|---|
+| هیچ خط `TG-DIAG` نیست | حالت ۱: start command اجرا نمی‌شود → پرامپ اسکالیشن (قدم ۸) |
+| `MONGO_KEYFILE bytes: 0` | حالت ۲: variable خالی/اشتباه است → املای نام و مقدار را اصلاح کن، بعد به قدم ۳ برگرد |
+| `bytes: ~684` ولی باز `BadValue` | حالت ۳: پارادوکس → لاگ کامل را نگه دار و پرامپ اسکالیشن (قدم ۸) |
+
+بعد از رفع مشکل، Start Command تشخیصی را با نسخهٔ تمیز قدم ۳ جایگزین کن (خط‌های `TG-DIAG` دیگر لازم نیستند).
+
+## قدم ۸ — پرامپ اسکالیشن به پشتیبانی Railway (انگلیسی، آمادهٔ paste)
+
+اگر به حالت ۱ یا ۳ رسیدی، متن زیر را (با پر کردن `[…]`) در کانال پشتیبانی Railway (Help widget داشبورد / Discord `#support` / `station.railway.com`) paste کن:
+
+```text
+Subject: Custom Start Command seemingly not applied — mongo:8.0 crash-loops with
+"BadValue: security.keyFile is required when authorization is enabled with replica sets"
+
+Setup:
+- Railway service from Docker image `mongo:8.0` (service name: [MongoDB]),
+  project: […], environment: [production], region: […].
+- Volume attached at `/data/db`. `MONGO_INITDB_ROOT_USERNAME/PASSWORD` are set
+  (so the official image entrypoint auto-adds `--auth`).
+- Custom Start Command (saved in Settings, verified — re-pasting shows no diff):
+  sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600
+  /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile;
+  exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0
+  --keyFile /tmp/mongo-keyfile'
+- `MONGO_KEYFILE` variable is set (~684-char base64, single line).
+
+Expected: mongod boots with `--replSet rs0 --keyFile /tmp/mongo-keyfile --auth`.
+
+Actual: EVERY deployment (including brand-new ones, e.g. [0b638f53…]) crashes
+within seconds with:
+  BadValue: security.keyFile is required when authorization is enabled with replica sets
+The container restart-loops, the deployment stays in "Initializing/Deploying"
+for hours, and queued deployments block behind it ("Waiting for previous deployment").
+
+Diagnostic: I temporarily used a Start Command that echoes a marker line
+(`TG-DIAG …`) before exec. The marker lines [DO / DO NOT] appear in the fresh
+deployment's logs (full log attached: […]).
+
+Question: is the Custom Start Command actually executed for these deployments?
+If yes, why would mongod see `--replSet`+`--auth` but not `--keyFile`?
+How can I force a deployment to use the current settings snapshot?
+
+Attachments: full Deploy Logs of deployment […], screenshot of Settings → Start Command.
+```

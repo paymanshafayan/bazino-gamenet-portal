@@ -58,6 +58,7 @@ sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo
 
 ## قدم ۴ — دیپلوی مجدد
 
+- **اول: فیلد `Pre-deploy Command` در Settings باید کاملاً خالی باشد!** (دام واقعی ۲۰۲۶-۰۹-۰۹ — بخش «دام pre-deploy» در عیب‌یابی.) دیتابیس pre-deploy نمی‌خواهد؛ اگر دستوری آنجاست، دیپلوی قبل از استارت کانتینر همان‌جا می‌ماند.
 - اگر دیپلوی قبلی در `DEPLOYING` گیر کرده: منوی **⋮** همان دیپلوی → **Remove** (قفل صف را باز می‌کند).
 - ذخیره Start Command خودش دیپلوی جدید می‌سازد؛ اگر نه: **⋮** → Redeploy.
 - در **Deploy Logs** باید ببینی: بالا آمدن تمیز، `Waiting for connections`، و **بدون** خطای `BadValue`. (قبل از `rs.initiate` گره در حالت STARTUP می‌ماند — طبیعی است.)
@@ -106,6 +107,18 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 > ⚠️ **سبز بودن سرویس ≠ اجرای دستور جدید:** اگر دیپلوی جدید کرش کند، Railway دیپلوی سالم قبلی را زنده نگه می‌دارد و سرویس «سبز» می‌ماند. پس بعد از هر تغییر، حتماً (۱) لاگ **دیپلوی جدید** را از خط اول بخوان (باید خط `TG-START` را داشته باشد)، (۲) با همین دستور `getCmdLineOpts` چک کن کانتینرِ فعلی واقعاً با `--replSet` بالاست. اگر argv دستور قالب (`--ipv6 …` بدون `--replSet`) را نشان داد یعنی هنوز روی دیپلوی قدیمی هستی و دیپلوی جدید کرش کرده — لاگ کامل دیپلوی جدید را از خط اول بررسی کن.
 
 ## عیب‌یابی سریع
+
+### 🪤 دام pre-deploy (علت اصلی حادثهٔ ۲۰۲۶-۰۹-۰۹ — اول این را چک کن!)
+
+اگر دستور replSet قدیمی (یا هر دستور `mongod…`) داخل فیلد **`Pre-deploy Command`** جا مانده باشد، هر دیپلوی قبل از استارت کانتینر اصلی همان‌جا می‌میرد و هیچ تغییری در Start Command اثر نمی‌کند.
+
+**الگوی تشخیص (هر سه با هم):**
+
+1. دیپلوی جدید دقیقه‌ها روی `Deploy › Running pre-deploy command...` می‌ماند؛
+2. در Deploy Logs همان دیپلوی: initdb با دیتای fresh (`createCollection admin.system.users` + `init process complete`) و بعد `BadValue: security.keyFile is required…` — چون کانتینر pre-deploy جدا و بدون Volume و دستور قدیمی keyFile ندارد؛
+3. هیچ خط `TG-START` در لاگ نیست (wrapper اصلاً اجرا نشده) و `getCmdLineOpts` کانتینر سبز argv دستور قالب را نشان می‌دهد (دیپلوی سالم قدیمی زنده مانده).
+
+**درمان:** Settings → `Pre-deploy Command` → select-all + delete (کاملاً خالی) → Save → دیپلوی گیرکرده را Remove کن → دیپلوی تازه بساز. در لاگ دیپلوی جدید باید `TG-START … bytes: ~684` و بعد `Waiting for connections` بیاید.
 
 | علامت | علت | درمان |
 |---|---|---|

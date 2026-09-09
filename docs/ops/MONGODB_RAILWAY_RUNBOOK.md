@@ -125,13 +125,17 @@ print("TX-SMOKE count was: " + n);'
    mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --host 127.0.0.1 --eval 'db.getSiblingDB("admin").changeUserPassword("ROOT_USER", "NEW_PASS")'
    ```
    ✅ موفق = `{ ok: 1 }`.
-3. **به‌روزرسانی variableها:** در تب Variables مقدار `MONGO_INITDB_ROOT_PASSWORD` را به پسورد جدید بده. بعد `MONGO_URL` را چک کن: اگر پسورد قدیمی را به‌صورت literal داخلش می‌بینی، آن را هم دستی به‌روز کن؛ اگر از reference (`${{…}}`) استفاده می‌کند خودش به‌روز می‌شود (راستی‌آزمایی کن).
-4. ذخیره variable دیپلوی جدید می‌سازد (pre-deploy خالی است، تمیز بوت می‌شود؛ entrypoint چون دیتا هست init را رد می‌کند و پسورد جدید دست‌نخورده می‌ماند).
-5. **راستی‌آزمایی:** یک دستور سادهٔ Console (مثلاً قدم ۶) — کنسول حالا با env جدید لاگین می‌کند.
+3. **به‌روزرسانی variableها (دوطرفه — چون پورتال هم با همین credential وصل است!):** در تب Variables سرویس Mongo مقدار `MONGO_INITDB_ROOT_PASSWORD` را به پسورد جدید بده. بعد `MONGO_URL` را چک کن: اگر پسورد قدیمی را به‌صورت literal داخلش می‌بینی، آن را هم دستی به‌روز کن؛ اگر از reference (`${{…}}`) استفاده می‌کند خودش به‌روز می‌شود (راستی‌آزمایی کن). **بعد حتماً `MONGO_URL` روی سرویس پورتال را هم به رشتهٔ جدید (با پسورد جدید) به‌روز کن** — وگرنه پورتال با پسورد قدیمی auth fail می‌شود و سایت می‌خوابد.
+4. ذخیره variableها دیپلوی‌های جدید می‌سازد (pre-deploy خالی است، تمیز بوت می‌شوند؛ entrypoint مونگو چون دیتا هست init را رد می‌کند و پسورد جدید دست‌نخورده می‌ماند). ترتیب: اول Mongo، بعد پورتال.
+5. **راستی‌آزمایی:** یک دستور سادهٔ Console مونگو (کنسول حالا با env جدید لاگین می‌کند) + باز شدن سایت.
 
 ## قدم ۵٫۷ — وصل کردن پورتال (فاز بعد)
 
-سرویس پورتال در `server/dataProviders.ts:2239` به ترتیب `MONGO_URL` بعد `MONGODB_URI` را می‌خواند. برای اتصال: همان مقدار `MONGO_URL` داخلی سرویس Mongo (هاست `mongodb.railway.internal`) را به‌عنوان `MONGO_URL` روی سرویس پورتال ست کن و پورتال را redeploy کن. بعد از آن: تست اکشن تراکنشی استودیو + `webhook.test` (دستور PowerShell در HANDOFF بخش ۲۵٫۷؛ نیازمند `ZERNIO_WEBHOOK_SECRET` از هاست — تسک ۸).
+> ⚠️ **اصلاح بعد از حادثهٔ ۱۹:۰۰:** فرض اولیه («پورتال هنوز وصل نیست») غلط بود — لاگ بوت پورتال (`MONGO_URL detected → using MongoDB` + توپولوژی درایور روی `mongodb.railway.internal:27017`) ثابت کرد **پورتال از قبل به همین Mongo وصل است.** پس قدم ۵٫۷ «وصل کردن» نیست، بلکه «هشدار پنجرهٔ قطعی» است:
+
+**پنجرهٔ قطعی اجتناب‌ناپذیر:** از لحظه‌ای که Mongo با `--replSet` بوت می‌شود (STARTUP) تا `rs.initiate` + PRIMARY شدن، **هیچ read/write کلاینتی جواب نمی‌دهد** (`NotPrimaryNoSecondaryOk`). اگر پورتال در این پنجره ریکوئست بگیرد یا ری‌استارت شود، کرش می‌کند (`MongoServerError: not primary…` و بعد `MongoServerSelectionError: timed out after 30000 ms` در بوت) و سایت می‌خوابد. **درمان:** بلافاصله بعد از سبز شدن دیپلوی replSet، `rs.initiate` را اجرا کن (قدم ۵) و بعد **سرویس پورتال را Redeploy کن** تا با PRIMARY تازه بوت شود. این حادثه دقیقاً ۲۰۲۶-۰۹-۰۹ ساعت ۱۸:۲۲ رخ داد و با Redeploy پورتال بعد از PRIMARY حل شد.
+- نکتهٔ robustness برای بعد: یک read ناموفق نباید کل سرور را کرش کند (unhandled rejection در `FindCursor.next`) — نیازمند هندلینگ خطای دیتابیس در بوت/ریکوئست (بک‌لاگ، نه اضطراری).
+- بعد از پایداری: تست اکشن تراکنشی استودیو + `webhook.test` (دستور PowerShell در HANDOFF بخش ۲۵٫۷؛ نیازمند `ZERNIO_WEBHOOK_SECRET` از هاست — تسک ۸).
 
 ## قدم ۶ — راستی‌آزمایی آرگومان‌های mongod (اختیاری ولی مفید)
 

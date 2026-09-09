@@ -1246,3 +1246,25 @@ done
 2. رگرسیون زندهٔ موارد §۲۵٫۳ روی محیط واقعی (سرور + مرورگر) پیش از اعلام تحویل به کارفرما.
 3. بازها بدون تغییر: استقرار production/receiver (E.110/E.125)، Volume هاست (E.119)، تماس‌های زندهٔ Zernio/Manus/Messaggio، SQL/Mongo واقعی، GTmetrix واقعی.
 
+### ۲۵٫۶ تأیید استقرار production (2026-09-09)
+
+> نشست `arena/01a084c6-bazino-gamenet-portal`. مدیر دیپلوی `main` (مرج PR #22، کامیت `eeccfd8`) را اجرا و سبز اعلام کرد؛ راستی‌آزمایی GET از بیرون سندباکس (curl مستقیم سندباکس به bazino.pro همچنان `SSL_ERROR_SYSCALL` می‌دهد، ولی fetch بیرونی موفق است):
+
+- `GET /api/webhooks/zernio/health` → `{"ok":true,"service":"bazino-zernio-receiver"}` ✅ (گیرندهٔ V4 مستقر است و Secret روی هاست ست شده؛ وگرنه `ok:false` + 503 بود)
+- `GET /api/payments/config` → `{"enabled":false,"onlineDisabled":true,...}` ✅ (کد جدید سروشده و درگاه آنلاین با نبود `PAYMENT_ONLINE_ENABLED` درست خاموش است)
+- `GET /games` → صفحهٔ §۲۴ با سه کارت KIDS/ADULTS/GAME REQUESTS ✅
+- **باز:** `webhook.test` امضاشده (POST، از سندباکس به‌خاطر بلاک شبکه ممکن نیست — مدیر با دستور §۲۵٫۷ از لوکال اجرا کند)؛ رگرسیون تعاملی §۲۵ (پرداخت BC، استپر دسته، شارژ ادمین)؛ تماس‌های زندهٔ Zernio/Manus/Messaggio.
+
+### ۲۵٫۷ دستور `webhook.test` برای اجرای مدیر از لوکال (سکرت را در چت نگذارید)
+
+```bash
+SECRET='<ZERNIO_WEBHOOK_SECRET از هاست>'
+BODY='{"event":"webhook.test","ping":1}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+curl -sS -m 15 -X POST https://bazino.pro/api/webhooks/zernio \
+  -H 'Content-Type: application/json' \
+  -H "x-zernio-signature: sha256=$SIG" \
+  -d "$BODY"
+# انتظار: پاسخ بی‌اثر با outboundSent:false و بدون ساخت پیام/کوپن/کد
+```
+

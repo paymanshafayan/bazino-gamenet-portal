@@ -1278,5 +1278,13 @@ $sig = ($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($Body)) | ForEach-Objec
 Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -ContentType 'application/json' -Headers @{ 'x-zernio-signature' = "sha256=$sig" } -Body $Body
 # انتظار: ok=True, outboundSent=False, test=True
 ```
-```
+## ۲۶. پرامپت کمپین تلگرام Manus — پلن نوشته شد، اجرا نشده (2026-09-09)
+
+> نشست `arena/01a084c6-bazino-gamenet-portal`. پرامپت «ایجنت پورتال بازینو» از Manus برای کمپین تبلیغاتی تلگرام به‌صورت **متن در چت** دریافت شد (فایل attach به فضای کاری نرسید). به دستور مالک خوانده و تحلیل شد ولی **اجرا نشد**. پلن تطبیق‌یافته در **`docs/manus/TELEGRAM_CAMPAIGN_PLAN.md`** نوشته شد؛ اجرا فقط با «شروع کن».
+
+- تصمیم‌های مالک (قطعی): (۱) تأیید انسانی هر ارسال لازم نیست — تأیید یک‌بار کمپین کافی است؛ (۲) Manus فقط از این درگاه پورتال استفاده کند؛ (۳) اختیار کامل فیلتر ارسال‌ها با ایجنت.
+- انحراف‌های تطبیق از پرامپت Manus: پورتال Express (نه FastAPI)؛ تأیید یک‌بار کمپین (text-hash + حصار + سقف + انقضا) به‌جای تأیید هر draft؛ endpoint ارسال روی Gateway؛ هر سه باید به Manus هم اعلام شود.
+- نقاط reuse تأییدشده در کد: توکن `baz_` (`server/affiliate/igRoutes.ts`)، `verifyHmac` (`server/publishing/webhooks.ts`)، `requireAdmin` (`server.ts:828`)، `core.command`/`core.audit`، `AffiliateService.report` (`server/management/affiliates.ts`)، `SecretVault`. هیچ `/api/manus/*` از قبل نیست؛ اتوماسیون تلگرام از قبل نیست (فقط لینک‌های شبکه اجتماعی در محتوا).
+- ریسک اصلی: spam-ban اکانت تلگرام (متوسط با حصار §۵ پلن) — پذیرش با مالک. پیش‌فرض: readonly و بدون ارسال واقعی.
+- موازی: دیپلوی Mongo با `--replSet rs0` در صف Railway بود (boot همچنان ۳ سپتامبر)؛ قدم بعدی آن پس از سبز شدن: `setName` → `rs.initiate` با هاست داخلی → تست اکشن استودیو + webhook.test.
 

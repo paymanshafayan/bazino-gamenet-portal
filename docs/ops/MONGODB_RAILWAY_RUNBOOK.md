@@ -58,7 +58,17 @@ sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo
 
 ## قدم ۵ — `rs.initiate` (تب Console سرویس Mongo)
 
-هاست داخلی را از مقدار `MONGO_URL` بخوان (قسمت بعد از `@` تا `:`، مثلاً `mongodb.railway.internal`) و به‌جای `INTERNAL_HOST` بگذار:
+⚠️ **فقط وقتی این قدم را اجرا کن که دیپلوی سبز و لاگ بدون `BadValue` باشد** (قدم ۴). اجرای زودهنگام خطای `This node was not started with replication enabled` می‌دهد چون کانتینرِ در حال اجرا هنوز با start command قدیمی بالاست.
+
+هاست داخلی را از مقدار `MONGO_URL` بخوان — **فقط قسمت `host:port`** (بعد از `@`)، نه کل URL:
+
+```
+MONGO_URL = mongodb://mongo:PASSWORD@mongodb.railway.internal:27017
+                                        ╰─────────┬─────────╯
+                                              همین تکه
+```
+
+به‌جای `INTERNAL_HOST` بگذار:
 
 ```sh
 mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
@@ -76,6 +86,18 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 
 ✅ موفق = `{ myState: 1, setName: "rs0" }` (یعنی PRIMARY). بعد از این، تست تراکنش استودیو + `webhook.test` را اجرا کن.
 
+## قدم ۶ — راستی‌آزمایی آرگومان‌های mongod (اختیاری ولی مفید)
+
+اگر خواستی مطمئن شوی کانتینرِ در حال اجرا واقعاً با `--replSet` و `--keyFile` بالاست (نه start command قدیمی):
+
+```sh
+mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
+  --authenticationDatabase admin --host 127.0.0.1 \
+  --eval 'JSON.stringify(db.adminCommand("getCmdLineOpts").argv)'
+```
+
+باید `--replSet`, `rs0`, `--keyFile`, `/tmp/mongo-keyfile` را در خروجی ببینی. اگر نبود → قدم ۳ ذخیره/اعمال نشده؛ برگرد به عیب‌یابی.
+
 ## عیب‌یابی سریع
 
 | علامت | علت | درمان |
@@ -85,3 +107,7 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 | `keyFile must not be empty` / `too short` | `MONGO_KEYFILE` خالی یا چندخطی شده | Variable را تک‌خطی و کامل paste کن |
 | دیپلوی جدید در `QUEUED` می‌ماند | دیپلوی قبلی هنوز «فعال» است | Remove دیپلوی گیرکرده (قدم ۴) |
 | `MongoServerError: ... not primary` در اپ | قدم ۵ انجام نشده | `rs.initiate` + راستی‌آزمایی |
+| `This node was not started with replication enabled` | `rs.initiate` زود اجرا شده؛ کانتینر فعلی بدون `--replSet` بالاست | اول قدم ۴ را سبز کن (Start Command جدید + Redeploy)، بعد قدم ۵ |
+| `host` اشتباه در `rs.initiate` (کل MONGO_URL) | باید فقط `host:port` باشد | مثلاً `mongodb.railway.internal:27017` بدون `mongodb://` و یوزر/پسورد |
+| `init process complete` در **هر** دیپلوی تکرار می‌شود | احتمالاً Volume روی `/data/db` وصل نیست → دیتا و کانفیگ RS با هر ری‌استارت می‌پرد | Settings → Volumes: یک Volume به `/data/db` وصل کن و Redeploy |
+| دیپلوی جدید هم همان `BadValue` را می‌دهد | Start Command جدید ذخیره/اعمال نشده (متن Settings را عیناً با قدم ۳ مقایسه کن) | اصلاح + Redeploy؛ مطمئن شو روی **همان سرویس Mongo** تغییر دادی |

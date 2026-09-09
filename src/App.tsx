@@ -247,14 +247,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [themeStoreVersion]);
 
-  // ریست چیدمان به کلاسیک فقط وقتی قالب واقعاً عوض می‌شود — نه در بارگذاری اول صفحه
-  // (وگرنه بعد از هر رفرش، انتخاب ذخیره‌شده «هاب» کاربر پاک می‌شد)
-  const skipLayoutResetOnMount = useRef(true);
   useEffect(() => {
     localStorage.setItem('themeId', themeId);
     document.body.setAttribute('data-theme', themeId);
-    if (skipLayoutResetOnMount.current) { skipLayoutResetOnMount.current = false; return; }
-    setLayoutMode('classic');
+    // NOTE: عمداً هیچ setLayoutMode اینجا نیست — انتخاب هاب/کلاسیک مستقل ذخیره می‌شود و
+    // همگام‌سازی قالب با سرور (که بعد از هر بارگذاری صفحه themeId را عوض می‌کند) نباید آن را پاک کند.
   }, [themeId]);
 
   // بارگذاری فایل CSS مجزای قالب فعال — با تغییر قالب، استایل قبلی

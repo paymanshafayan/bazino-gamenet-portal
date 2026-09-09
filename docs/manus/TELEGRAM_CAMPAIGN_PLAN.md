@@ -60,6 +60,7 @@ Telegram User Account (Bazino)
 | `POST /api/manus/campaigns` | **ادمین** | ساخت کمپین (پیش‌نویس تأیید) |
 | `POST /api/manus/campaigns/{id}/approve` | **ادمین** | تأیید یک‌بار کمپین (actor + timestamp + hash در audit) |
 | `POST /api/manus/campaigns/{id}/pause\|revoke` | **ادمین** | توقف/ابطال |
+| `POST /api/manus/telegram/send-direct` | **ادمین** | ارسال مستقیم مدیر (dialog از فهرست واقعی + متن)؛ مستقل از کمپین ولی با چک‌های §۵٫۱ |
 | `GET /api/manus/reports/affiliate/daily?date=` | Bearer | روی `AffiliateService.report` موجود؛ بدون داده → `data_unavailable`؛ هیچ عدد ساختگی؛ بدون PII |
 
 ### ۴٫۲ Gateway (روی سرویس Gateway، فقط پورتال صدا می‌زند)
@@ -88,6 +89,16 @@ Telegram User Account (Bazino)
 - همه تصمیم‌ها در `policy_decisions` با actor=`policy-engine`، reason، timestamp و hash متن.
 - Gateway هم لایه دفاع دوم است: expiry، idempotency، rate-limit، FloodWait کامل (توقف بقیه صف)، بدون retry تهاجمی.
 
+### ۵٫۱ مسیر ارسال مستقیم مدیر (`send-direct` — بدون حصار کمپین، با ایمنی پایه)
+
+مدیر خودش approval انسانی است، پس text-hash و حصار کمپین لازم نیست؛ ولی این چک‌ها **اجباری** است (fail-closed):
+1. kill-switch سراسری خاموش + کمپین/سیستم pause اضطراری نباشد.
+2. `DEST_FRESH_CHECK` — استعلام تازه permission همان لحظه: `is_member && can_send`.
+3. `DEST_TYPE_OK` — فقط `channel|group|supergroup`؛ **DM حتی برای مدیر در v1 بسته** (قابل بازبینی بعدی).
+4. `NOT_DUPLICATE` — `idempotency_key` اجباری؛ کلید تکراری → همان نتیجه قبلی (replay-safe، ضد دابل‌کلیک).
+5. `CLAIMS_FLAG` — ادعای تأییدنشده (جایزه/تخفیف/قیمت/ظرفیت) **بلاک نمی‌کند** ولی در UI دیالوگ تأیید می‌خواهد و در لاگ flag می‌خورد.
+6. ثبت کامل با actor=نام‌کاربری مدیر + متن-hash + نتیجه در همان جدول‌های §۶.
+
 ## ۶. مدل داده و migration (هر سه پرووایدر)
 
 جداول جدید (روی همان abstraction موجود `server/dataProviders.ts` — SQLite/SQL Server/**Mongo**، چون پروداکشن مالک Mongo است):
@@ -109,9 +120,15 @@ Telegram User Account (Bazino)
 | گزارش افیلیت | `AffiliateService.report` در `server/management/affiliates.ts` | پایه endpoint روزانه Manus |
 | Vault سکرت | `SecretVault` در `server/publishing/settings.ts` | نگهداری session/کلید Gateway (env اولویت) |
 
-## ۸. پنل ادمین (UI)
+## ۸. پنل مدیریت — تب تلگرام داخل استودیوی انتشار (UI)
 
-بخش جدید «کمپین تلگرام» (کنار استودیوی انتشار): فهرست کمپین‌ها (approve/pause/revoke)، صف `pending_approval`، لاگ ارسال‌ها و decisionها، **kill-switch سراسری ارسال**، مشاهده گزارش روزانه. خواندن/نوشتن فقط با JWT ادمین.
+نقطه اتصال دقیق (تأییدشده در کد): تب جدید `telegram` در **`shared/publishing/Studio.tsx`** + کامپوننت جدید **`shared/publishing/Telegram.tsx`** با همان الگو/استایل (`ui.tsx`) و چهارزبانه. چون کنسول مدیریت از همین استودیو استفاده می‌کند (`shared/management/Content.tsx` → `ContentConsole`)، تب خودکار هم در **پنل مدیریت** و هم در ادمین سایت دیده می‌شود.
+
+امکانات تب (فقط ادمین، JWT):
+1. **مشاهده و چک:** فهرست کمپین‌ها + وضعیت، صف `pending_approval`، لاگ ارسال‌ها و decisionها با reason_code، گزارش روزانه افیلیت.
+2. **تغییر و تأیید:** ساخت/ویرایش کمپین (متن، حصار، سقف، انقضا) + approve/pause/revoke؛ هر ویرایش روی فیلدهای قفل (متن/CTA/افیلیت) وضعیت را به `needs-approval` برمی‌گرداند (hash-lock).
+3. **ارسال مستقیم مدیر:** composer دستی — انتخاب dialog از فهرست واقعی وریفای‌شده + متن + دکمه ارسال با دیالوگ تأیید (پست به کانال/گروه)؛ مسیر `send-direct` با چک‌های §۵٫۱.
+4. **kill-switch سراسری ارسال** + نمایش منبع سکرت‌ها (host/panel) مثل تب settings موجود.
 
 ## ۹. امنیت (مطابق پرامپت Manus + قراردادهای ریپو)
 
@@ -128,9 +145,9 @@ Telegram User Account (Bazino)
 
 ## ۱۱. تحویل و بچ‌های اجرا (پس از «شروع کن»)
 
-- **B1 — پورتال هسته:** endpointهای §۴٫۱ + موتور سیاست §۵ + migration هر سه پرووایدر + تست‌های ۱-۱۶ با Gateway mock.
+- **B1 — پورتال هسته:** endpointهای §۴٫۱ (شامل `send-direct` + مسیر §۵٫۱) + موتور سیاست §۵ + ذخیره روی ops-records هر سه پرووایدر (بدون migration جدا) + تست‌های ۱-۱۶ با Gateway mock (+ تست‌های مسیر دستی).
 - **B2 — Gateway:** سرویس Python/Telethon + `/internal/*` + idempotency/rate-limit/FloodWait + Dockerfile + تست واحد.
-- **B3 — ادمین و گزارش:** UI §۸ + endpoint گزارش روزانه + kill-switch + تست UI.
+- **B3 — تب تلگرام استودیو:** `Telegram.tsx` + تب در `Studio.tsx` (مدیریت + ادمین سایت) + composer دستی + kill-switch + تست UI.
 - **B4 — داک و استقرار:** README سه‌طرفه (Manus/Portal/Gateway)، `.env.example`، ران‌بوک approval/توقف اضطراری، کانفیگ Railway، خلاصه فایل‌ها.
 - **B5 — راستی‌آزمایی زنده (با مالک):** ceremony ساخت session، health واقعی، dialogs واقعی (readonly)، سپس **حداقل یک ارسال نظارتی اول** (پیش‌فرض؛ مالک می‌تواند waive کند)، بعد تحویل اتوماسیون.
 
@@ -148,3 +165,4 @@ Telegram User Account (Bazino)
 - **Session = کلید اکانت:** فقط Vault سروری؛ هرگز در چت/Git.
 - **انحراف‌های تطبیق از پرامپت Manus:** (الف) پورتال Express نه FastAPI؛ (ب) تأیید یک‌بار کمپین به‌جای هر draft (به دستور مالک)؛ (ج) endpoint ارسال روی Gateway. این سه باید به Manus هم اعلام شود چون قراردادش را مصرف می‌کند.
 - **حجم کار:** ~۴ بچ + راستی‌آزمایی زنده؛ تست زنده فقط با تلگرام واقعی.
+- **ارسال دستی مدیر:** مسئولیت محتوا با مدیر است ولی چک‌های §۵٫۱ (عضویت/مجوز تازه، ممنوعیت DM، idempotency) در v1 اجباری‌اند و قابل دورزدن از UI نیستند.

@@ -120,6 +120,10 @@ mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
 
 **درمان:** Settings → `Pre-deploy Command` → select-all + delete (کاملاً خالی) → Save → دیپلوی گیرکرده را Remove کن → دیپلوی تازه بساز. در لاگ دیپلوی جدید باید `TG-START … bytes: ~684` و بعد `Waiting for connections` بیاید.
 
+> نمونهٔ واقعی متن تله (۲۰۲۶-۰۹-۰۹، عیناً از پنل): `docker-entrypoint.sh mongod --ipv6 --bind_ip ::,0.0.0.0 --replSet rs0 --setParameter diagnosticDataCollectionEnabled=false` — دستور قدیمی بدون keyFile. نکتهٔ تشدیدکننده: `Pre-deploy Timeout` روی `No timeout` بود، پس دیپلوی به‌جای fail سریع، ۱۲+ دقیقه روی `Running pre-deploy command...` می‌ماند. بعد از خالی کردن فیلد، تنظیم timeout دیگر مهم نیست.
+>
+> **پیدا کردن Mount Path ولوم:** در سایدبار Railway روی اسم ولوم (مثلاً `mongodb-volume`) کلیک کن → جزئیات mount path را نشان می‌دهد؛ باید `/data/db` باشد. (کانتینر pre-deploy به ولوم دسترسی ندارد؛ لاگ fresh-data در دیپلوی‌لاگ از همین است.)
+
 | علامت | علت | درمان |
 |---|---|---|
 | `BadValue: security.keyFile is required…` + ری‌استارت مکرر | قدم ۲/۳ انجام نشده یا Start Command قدیمی است | قدم ۲ و ۳ را بازبینی کن؛ دیپلوی گیرکرده را Remove کن |

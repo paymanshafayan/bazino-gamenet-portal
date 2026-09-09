@@ -85,7 +85,7 @@ export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; 
   presentation:      { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum', keywords: 'slides معرفی pitch' },
   tickets:           { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения в поддержку', tr: 'Destek Talepleri', keywords: 'support help ticket پشتیبانی تیکت destek' },
   wallet:            { fa: 'کیف پول و پرداخت حضوری', en: 'Wallet & On-site Payments', ru: 'Кошелёк и оплата на месте', tr: 'Cüzdan ve Mekânda Ödeme', keywords: 'wallet onsite cash pos payment کیف پول پرداخت حضوری cüzdan ödeme' },
-  affiliates:        { fa: 'همکاری در فروش', en: 'Affiliate Marketing', ru: 'Партнёрский маркетинг', tr: 'Satış Ortaklığı', keywords: 'affiliate referral commission همکار معرفی کمیسیون ref' },
+  affiliates:        { fa: 'همکاری در فروش', en: 'Affiliate Marketing', ru: 'Партнёрский маркетинг', tr: 'Satış Ortaklığı', keywords: 'affiliate referral commission همکار معرفی کمیسیون ref کمپین کمپین‌ها campaign squad دعوت اینستاگرام instagram پورسانت کد معرف لینک همکاری' },
 };
 
 const PresentationTab = React.lazy(() => import('./PresentationTab'));

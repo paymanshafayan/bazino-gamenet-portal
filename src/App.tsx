@@ -151,7 +151,10 @@ export default function App() {
   // بازنویسی می‌کند و بعد از هر رفرش قالب به پیش‌فرض برمی‌گردد. اعتبارسنجی
   // نهایی بعد از دریافت لیست سرور انجام می‌شود.
   const [themeId, setThemeId] = useState(() => __initialThemeId || 'dark-gold');
-  const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
+  // انتخاب نمای هاب/کلاسیک در localStorage ذخیره می‌شود و بعد از رفرش بازیابی می‌گردد
+  const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>(() => {
+    try { return localStorage.getItem('layoutMode') === 'hub' ? 'hub' : 'classic'; } catch { return 'classic'; }
+  });
   const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
     ...BUILT_IN_THEMES,
     ...loadCustomThemes(),
@@ -244,9 +247,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [themeStoreVersion]);
 
+  // ریست چیدمان به کلاسیک فقط وقتی قالب واقعاً عوض می‌شود — نه در بارگذاری اول صفحه
+  // (وگرنه بعد از هر رفرش، انتخاب ذخیره‌شده «هاب» کاربر پاک می‌شد)
+  const skipLayoutResetOnMount = useRef(true);
   useEffect(() => {
     localStorage.setItem('themeId', themeId);
     document.body.setAttribute('data-theme', themeId);
+    if (skipLayoutResetOnMount.current) { skipLayoutResetOnMount.current = false; return; }
     setLayoutMode('classic');
   }, [themeId]);
 

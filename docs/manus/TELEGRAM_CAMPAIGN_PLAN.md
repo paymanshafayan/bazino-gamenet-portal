@@ -74,6 +74,8 @@ Telegram User Account (Bazino)
 
 > شفاف‌سازی انحراف از پرامپت: `POST /api/railway/telegram/send` پرامپت روی **Gateway** پیاده می‌شود (پورتال امضا و ارسال می‌کند)، نه روی پورتال.
 
+> آینه مدیریتی (B3): همه روت‌های بالا به‌جز `POST drafts` (فقط Manus) روی **`/api/management/telegram/*` هم mount می‌شوند** تا تب استودیو با همان `api()` مدیریتی کار کند؛ خواندنی‌ها Manus-یا-ادمین، نوشتنی‌ها فقط ادمین. دو endpoint اضافه برای UI: `GET /campaign/drafts?status=&campaign_id=&limit=` و `GET /campaign/decisions?draft_id=&limit=` (فقط ادمین).
+
 ## ۵. زنجیره فیلتر ارسال (اختیار کامل ایجنت — به ترتیب، fail-closed)
 
 هر draft پیش از تولید دستور ارسال از این زنجیره می‌گذرد؛ **اولین مردودی = رد/صف** با `reason_code` در لاگ:

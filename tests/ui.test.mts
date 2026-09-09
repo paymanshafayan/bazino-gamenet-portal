@@ -751,5 +751,134 @@ test('GAME REQUESTS opens the booking flow with the requested-game input', async
   await el.unmount(); restoreFetch();
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   35. TelegramTab — تب تلگرام استودیوی انتشار (مدیر)
+   ═══════════════════════════════════════════════════════════════════════ */
+suite('35. UI — Telegram studio tab');
+
+const TgCtx = await loadModule('/shared/management/context.tsx');
+const TelegramMod = await loadModule('/shared/publishing/Telegram.tsx');
+
+const withOps = (node: any) =>
+  React.createElement(TgCtx.OpsProvider, { language: 'fa' }, node);
+
+const TG_ME = { staff: { username: 'admin', displayName: 'Admin', admin: true, permissions: ['reports'] }, timezone: 'Asia/Famagusta' };
+const TG_HEALTH = { ok: true, service: 'bazino-portal', telegram_gateway: 'reachable', timestamp: '2026-09-09T10:00:00.000Z' };
+const TG_CAMPAIGNS = [{ campaign_id: 'TGC-1', version: 1, name: 'Launch', text: 'hello gamers', status: 'draft', caps: { maxPerDay: 2 }, expiresAt: '2026-10-09T00:00:00.000Z', fence: {} }];
+const TG_QUEUE = [{ draft_id: 'TGD-1', status: 'pending_approval', dialog_id: '-100111', message: 'hello group', reason: 'CLAIMS_REVIEW', created_at: '2026-09-09T09:00:00.000Z' }];
+const TG_LOG = [{ draft_id: 'TGD-0', status: 'sent', source: 'manager-direct', dialog_id: '-100222', telegram_message_id: '67890', error_code: null }];
+const TG_DIALOGS = [{ dialog_id: '-100222', title: 'Bazino Channel', username: 'bazinopro', type: 'channel', is_member: true, is_admin: true, can_send: true, can_send_media: true, language: 'fa', last_checked_at: '2026-09-09T09:00:00.000Z' }];
+const TG_REPORT_EMPTY = { date: '2026-09-09', status: 'data_unavailable', message: 'داده‌ای ثبت نشده/دسترسی موجود نیست' };
+
+function tgHandler(overrides: Record<string, (url: string, init?: any) => any> = {}) {
+  return (url: string, init?: any) => {
+    for (const [key, fn] of Object.entries(overrides)) if (url.includes(key)) return fn(url, init);
+    if (url.endsWith('/api/management/me')) return { status: 200, body: TG_ME };
+    if (url.includes('/telegram/health')) return { status: 200, body: TG_HEALTH };
+    if (url.includes('/telegram/admin/kill-switch')) {
+      if ((init?.method || 'GET') === 'POST') {
+        const b = JSON.parse(init.body || '{}');
+        return { status: 200, body: { stopped: !!b.stopped } };
+      }
+      return { status: 200, body: { stopped: false } };
+    }
+    if (/\/telegram\/campaigns\/[^/]+\/(approve|pause|revoke)$/.test(url)) return { status: 200, body: { campaign_id: 'TGC-1', status: 'live' } };
+    if (url.includes('/telegram/campaigns')) return { status: 200, body: { items: TG_CAMPAIGNS } };
+    if (url.includes('/telegram/campaign/drafts/') && url.endsWith('/resolve')) return { status: 200, body: { draft_id: 'TGD-1', status: 'sent' } };
+    if (url.includes('/telegram/campaign/drafts') && url.includes('status=')) return { status: 200, body: { items: TG_QUEUE, total: 1 } };
+    if (url.includes('/telegram/campaign/drafts')) return { status: 200, body: { items: TG_LOG, total: 1 } };
+    if (url.includes('/telegram/dialogs')) return { status: 200, body: { items: TG_DIALOGS } };
+    if (url.includes('/telegram/send-direct')) return { status: 200, body: { draft_id: 'TGD-9', status: 'sent', telegram_message_id: '999' } };
+    if (url.includes('/telegram/reports/affiliate/daily')) return { status: 200, body: TG_REPORT_EMPTY };
+    return { status: 404, body: { error: 'nf' } };
+  };
+}
+
+async function mountTelegram(overrides: Record<string, (url: string, init?: any) => any> = {}) {
+  const calls = stubFetch((url: string, init?: any) => tgHandler(overrides)(url, init));
+  const Wrapper = () => withOps(React.createElement(TelegramMod.TelegramTab, {}));
+  const el = await mount(Wrapper, {});
+  await act(async () => { await new Promise(r => setTimeout(r, 80)); });
+  const done = async () => { await el.unmount(); getDocument().querySelectorAll('.pub-modal-backdrop').forEach((n: any) => n.remove()); restoreFetch(); };
+  return { el, calls, done };
+}
+
+const setSelect = async (sel: any, value: string) => act(async () => {
+  const setter = Object.getOwnPropertyDescriptor(getDocument().defaultView.HTMLSelectElement.prototype, 'value')!.set!;
+  setter.call(sel, value);
+  sel.dispatchEvent(new (Ev())('change', { bubbles: true }));
+});
+const setText = async (ta: any, value: string) => act(async () => {
+  const setter = Object.getOwnPropertyDescriptor(getDocument().defaultView.HTMLTextAreaElement.prototype, 'value')!.set!;
+  setter.call(ta, value);
+  ta.dispatchEvent(new (Ev())('input', { bubbles: true }));
+});
+
+test('renders status, campaigns, queue, composer, log and report sections from the API', async () => {
+  const { el, done } = await mountTelegram();
+  for (const sec of ['status', 'campaigns', 'queue', 'composer', 'log', 'report']) {
+    assert.ok(el.find(`[data-tg="${sec}"]`), `section ${sec} missing`);
+  }
+  assert.ok(el.text().includes('reachable'), 'gateway status not shown');
+  assert.ok(el.text().includes('Launch'), 'campaign row not shown');
+  assert.ok(el.text().includes('TGD-1') || el.text().includes('-100111'), 'queue row not shown');
+  assert.ok(el.text().includes('داده‌ای ثبت نشده/دسترسی موجود نیست'), 'data_unavailable report message missing');
+  await done();
+});
+
+test('approve button calls the campaign approve endpoint', async () => {
+  const { el, calls, done } = await mountTelegram();
+  const btn = el.find('[data-tg-campaign-approve="TGC-1"]');
+  assert.ok(btn, 'approve button missing for draft campaign');
+  await el.click(btn);
+  await act(async () => { await new Promise(r => setTimeout(r, 60)); });
+  const hit = calls.find(c => c.url.includes('/telegram/campaigns/TGC-1/approve') && (c.init?.method === 'POST'));
+  assert.ok(hit, 'approve endpoint was not called');
+  await done();
+});
+
+test('composer arms on first click and sends dialog+message on second click', async () => {
+  const { el, calls, done } = await mountTelegram();
+  await setSelect(el.find('[data-tg-dialog]'), '-100222|channel');
+  await setText(el.find('[data-tg-message]'), 'test post to channel');
+  await el.click('[data-tg-send]');
+  assert.ok(!calls.some(c => c.url.includes('/telegram/send-direct')), 'must not send before arming confirm');
+  assert.ok(el.text().includes('تأیید نهایی و ارسال'), 'armed confirm label missing');
+  await el.click('[data-tg-send]');
+  await act(async () => { await new Promise(r => setTimeout(r, 60)); });
+  const hit = calls.find(c => c.url.includes('/telegram/send-direct'));
+  assert.ok(hit, 'send-direct was not called');
+  const body = JSON.parse(hit.init.body || '{}');
+  assert.equal(body.dialog_id, '-100222');
+  assert.equal(body.message, 'test post to channel');
+  assert.ok(body.idempotencyKey, 'idempotency key missing on direct send');
+  await done();
+});
+
+test('resolve modal approves a pending draft through the resolve endpoint', async () => {
+  const { el, calls, done } = await mountTelegram();
+  await el.click('[data-tg-resolve="TGD-1"]');
+  await act(async () => { await new Promise(r => setTimeout(r, 30)); });
+  const doc = getDocument();
+  const approve = doc.querySelector('[data-tg-resolve-approve]') as any;
+  assert.ok(approve, 'resolve modal approve button missing (portal?)');
+  await act(async () => { approve.click(); await new Promise(r => setTimeout(r, 60)); });
+  const hit = calls.find(c => c.url.includes('/telegram/campaign/drafts/TGD-1/resolve'));
+  assert.ok(hit, 'resolve endpoint was not called');
+  assert.equal(JSON.parse(hit.init.body || '{}').action, 'approve');
+  await done();
+});
+
+test('kill-switch toggle posts the new stopped state', async () => {
+  const { el, calls, done } = await mountTelegram();
+  const box = el.find('[data-tg="status"] input[type="checkbox"]') as any;
+  assert.ok(box, 'kill-switch checkbox missing');
+  await act(async () => { box.click(); await new Promise(r => setTimeout(r, 60)); });
+  const hits = calls.filter(c => c.url.includes('/telegram/admin/kill-switch') && (c.init?.method === 'POST'));
+  assert.ok(hits.length > 0, 'kill-switch POST was not called');
+  assert.equal(JSON.parse(hits[hits.length - 1].init.body || '{}').stopped, true);
+  await done();
+});
+
 await run({ title: 'Bazino — UI component tests', jsonOut: 'tests/reports/ui.json' });
 await teardownDom();

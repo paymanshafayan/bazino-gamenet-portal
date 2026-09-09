@@ -69,12 +69,24 @@ export function registerManusRoutes(d: ManusRouteDeps) {
     if (!staff?.admin) fail('ADMIN_ONLY', 403);
     return staff.username;
   }
+  /** Manus bearer OR staff admin — for read routes shared by Manus and the management studio. */
+  async function requireManusOrAdmin(req: express.Request): Promise<'manus' | 'admin'> {
+    if (await isValidApiToken(store(), bearer(req), MANUS_TG_SCOPE)) return 'manus';
+    const staff = await core().authorize(req as any);
+    if (!staff?.admin) fail('ADMIN_ONLY', 403);
+    return 'admin';
+  }
+  // Dual mount: Manus uses /api/manus/*, the management studio uses /api/management/telegram/*.
+  const bases = ['/api/manus', '/api/management/telegram'];
+  const R = (method: 'get' | 'post' | 'put', path: string, handler: express.RequestHandler) => {
+    for (const b of bases) (app as any)[method](b + path, handler);
+  };
   async function killOn(): Promise<boolean> {
     return (await store().getSetting(TG_KILL_SWITCH_KEY)) === '1';
   }
 
   // ---- Health (public, no secrets — plan test 9) ----
-  app.get('/api/manus/health', endpoint(async (_req, res) => {
+  R('get','/health', endpoint(async (_req, res) => {
     const g = gateway();
     let status: 'reachable' | 'unreachable' = 'unreachable';
     if (g) {
@@ -84,8 +96,8 @@ export function registerManusRoutes(d: ManusRouteDeps) {
   }));
 
   // ---- Dialogs (Manus) ----
-  app.get('/api/manus/telegram/dialogs', endpoint(async (req, res) => {
-    await requireManus(req as any);
+  R('get','/telegram/dialogs', endpoint(async (req, res) => {
+    await requireManusOrAdmin(req as any);
     const g = gateway();
     if (!g) fail('GATEWAY_UNREACHABLE', 503);
     const q = req.query as Record<string, string>;
@@ -99,8 +111,8 @@ export function registerManusRoutes(d: ManusRouteDeps) {
   }));
 
   // ---- Permissions (Manus) ----
-  app.get('/api/manus/telegram/dialogs/:id/permissions', endpoint(async (req, res) => {
-    await requireManus(req as any);
+  R('get','/telegram/dialogs/:id/permissions', endpoint(async (req, res) => {
+    await requireManusOrAdmin(req as any);
     const g = gateway();
     if (!g) fail('GATEWAY_UNREACHABLE', 503);
     const id = stringValue(req.params.id, 64, true);
@@ -118,8 +130,8 @@ export function registerManusRoutes(d: ManusRouteDeps) {
   }));
 
   // ---- Message search (Manus, minimal public data) ----
-  app.get('/api/manus/telegram/dialogs/:id/messages/search', endpoint(async (req, res) => {
-    await requireManus(req as any);
+  R('get','/telegram/dialogs/:id/messages/search', endpoint(async (req, res) => {
+    await requireManusOrAdmin(req as any);
     const g = gateway();
     if (!g) fail('GATEWAY_UNREACHABLE', 503);
     const id = stringValue(req.params.id, 64, true);
@@ -239,8 +251,8 @@ export function registerManusRoutes(d: ManusRouteDeps) {
   }));
 
   // ---- Draft status (Manus) ----
-  app.get('/api/manus/campaign/drafts/:id', endpoint(async (req, res) => {
-    await requireManus(req as any);
+  R('get','/campaign/drafts/:id', endpoint(async (req, res) => {
+    await requireManusOrAdmin(req as any);
     const r = await core().read(TG_KINDS.draft, stringValue(req.params.id, 80, true));
     if (!r) fail('NOT_FOUND', 404);
     const d = r.data;
@@ -251,8 +263,44 @@ export function registerManusRoutes(d: ManusRouteDeps) {
     });
   }));
 
+  // ---- Draft + decision lists (ADMIN ONLY — management studio queues) ----
+  R('get','/campaign/drafts', endpoint(async (req, res) => {
+    await requireAdmin(req as any);
+    const q = req.query as Record<string, string>;
+    const statuses = String(q.status || '').split(',').map(s => s.trim()).filter(Boolean);
+    const rows = await core().list(TG_KINDS.draft);
+    let items = rows.map(r => ({
+      draft_id: r.id, status: r.data.status, source: r.data.source || 'manus',
+      campaign_id: r.data.campaignId || '', dialog_id: r.data.dialogId || '',
+      message: String(r.data.message || '').slice(0, 280),
+      reason: r.data.reason || null, created_at: r.data.createdAt || '',
+      sent_at: r.data.sentAt || null, telegram_message_id: r.data.telegramMessageId || null,
+      error_code: r.data.errorCode || null,
+    }));
+    if (q.campaign_id) items = items.filter(x => x.campaign_id === q.campaign_id);
+    if (statuses.length) items = items.filter(x => statuses.includes(x.status));
+    items.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
+    res.json({ items: items.slice(0, limit), total: items.length });
+  }));
+  R('get','/campaign/decisions', endpoint(async (req, res) => {
+    await requireAdmin(req as any);
+    const q = req.query as Record<string, string>;
+    const rows = await core().list(TG_KINDS.decision);
+    let items = rows.map(r => ({
+      draft_id: r.data.draftId || '', campaign_id: r.data.campaignId || '',
+      actor: r.data.actor || '', outcome: r.data.outcome || '', reason: r.data.reason || '',
+      text_hash: r.data.textHash || '', created_at: r.data.createdAt || '',
+    }));
+    if (q.draft_id) items = items.filter(x => x.draft_id === q.draft_id);
+    if (q.campaign_id) items = items.filter(x => x.campaign_id === q.campaign_id);
+    items.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
+    res.json({ items: items.slice(0, limit), total: items.length });
+  }));
+
   // ---- Campaigns (ADMIN ONLY) ----
-  app.post('/api/manus/campaigns', endpoint(async (req, res) => {
+  R('post','/campaigns', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const b = req.body || {};
     const c = core();
@@ -276,13 +324,13 @@ export function registerManusRoutes(d: ManusRouteDeps) {
     res.json({ campaign_id: id, status: 'draft', version: rec.version });
   }));
 
-  app.get('/api/manus/campaigns', endpoint(async (req, res) => {
+  R('get','/campaigns', endpoint(async (req, res) => {
     await requireAdmin(req as any);
     const rows = await core().list(TG_KINDS.campaign);
     res.json({ items: rows.map(r => ({ campaign_id: r.id, version: r.version, ...r.data })) });
   }));
 
-  app.put('/api/manus/campaigns/:id', endpoint(async (req, res) => {
+  R('put','/campaigns/:id', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const c = core();
     const id = stringValue(req.params.id, 80, true);
@@ -308,7 +356,7 @@ export function registerManusRoutes(d: ManusRouteDeps) {
     res.json({ campaign_id: id, status: rec.data.status, version: rec.version });
   }));
 
-  app.post('/api/manus/campaigns/:id/approve', endpoint(async (req, res) => {
+  R('post','/campaigns/:id/approve', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const c = core();
     const id = stringValue(req.params.id, 80, true);
@@ -322,7 +370,7 @@ export function registerManusRoutes(d: ManusRouteDeps) {
     res.json({ campaign_id: id, status: 'live', approved_by: actor, approved_at: rec.data.approvedAt });
   }));
 
-  app.post('/api/manus/campaigns/:id/pause', endpoint(async (req, res) => {
+  R('post','/campaigns/:id/pause', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const c = core();
     const id = stringValue(req.params.id, 80, true);
@@ -333,7 +381,7 @@ export function registerManusRoutes(d: ManusRouteDeps) {
     res.json({ campaign_id: id, status: 'paused' });
   }));
 
-  app.post('/api/manus/campaigns/:id/revoke', endpoint(async (req, res) => {
+  R('post','/campaigns/:id/revoke', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const c = core();
     const id = stringValue(req.params.id, 80, true);
@@ -345,7 +393,7 @@ export function registerManusRoutes(d: ManusRouteDeps) {
   }));
 
   // ---- Resolve a pending/deferred draft (ADMIN ONLY — one-time human override) ----
-  app.post('/api/manus/campaign/drafts/:id/resolve', endpoint(async (req, res) => {
+  R('post','/campaign/drafts/:id/resolve', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const c = core();
     const id = stringValue(req.params.id, 80, true);
@@ -370,7 +418,7 @@ export function registerManusRoutes(d: ManusRouteDeps) {
   }));
 
   // ---- Manager direct send (ADMIN ONLY, §5.1) ----
-  app.post('/api/manus/telegram/send-direct', endpoint(async (req, res) => {
+  R('post','/telegram/send-direct', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const b = req.body || {};
     const input = {
@@ -409,21 +457,21 @@ export function registerManusRoutes(d: ManusRouteDeps) {
   }));
 
   // ---- Kill switch (ADMIN ONLY) ----
-  app.post('/api/manus/admin/kill-switch', endpoint(async (req, res) => {
+  R('post','/admin/kill-switch', endpoint(async (req, res) => {
     const actor = await requireAdmin(req as any);
     const stopped = !!(req.body || {}).stopped;
     await store().setSetting(TG_KILL_SWITCH_KEY, stopped ? '1' : '0');
     await core().audit(actor, stopped ? 'tg-kill.on' : 'tg-kill.off', 'global', {});
     res.json({ stopped });
   }));
-  app.get('/api/manus/admin/kill-switch', endpoint(async (req, res) => {
+  R('get','/admin/kill-switch', endpoint(async (req, res) => {
     await requireAdmin(req as any);
     res.json({ stopped: await killOn() });
   }));
 
   // ---- Affiliate daily report (Manus) — aggregates only, never PII ----
-  app.get('/api/manus/reports/affiliate/daily', endpoint(async (req, res) => {
-    await requireManus(req as any);
+  R('get','/reports/affiliate/daily', endpoint(async (req, res) => {
+    await requireManusOrAdmin(req as any);
     const date = stringValue((req.query as any).date, 16) || nowISO().slice(0, 10);
     const svc = new AffiliateService(core());
     const report = await svc.report(`${date}T00:00:00.000Z`);

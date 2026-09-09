@@ -61,6 +61,8 @@ Telegram User Account (Bazino)
 | `POST /api/manus/campaigns/{id}/approve` | **ادمین** | تأیید یک‌بار کمپین (actor + timestamp + hash در audit) |
 | `POST /api/manus/campaigns/{id}/pause\|revoke` | **ادمین** | توقف/ابطال |
 | `POST /api/manus/telegram/send-direct` | **ادمین** | ارسال مستقیم مدیر (dialog از فهرست واقعی + متن)؛ مستقل از کمپین ولی با چک‌های §۵٫۱ |
+| `POST /api/manus/campaign/drafts/{id}/resolve` | **ادمین** | تعیین‌تکلیف draft معلق (approve یک‌باره/override + ارسال، یا reject) |
+| `GET/POST /api/manus/admin/kill-switch` | **ادمین** | خواندن/تنظیم سوییچ توقف اضطراری سراسری |
 | `GET /api/manus/reports/affiliate/daily?date=` | Bearer | روی `AffiliateService.report` موجود؛ بدون داده → `data_unavailable`؛ هیچ عدد ساختگی؛ بدون PII |
 
 ### ۴٫۲ Gateway (روی سرویس Gateway، فقط پورتال صدا می‌زند)

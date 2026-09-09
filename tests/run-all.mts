@@ -43,6 +43,7 @@ const LAYERS: Layer[] = [
   { id: 'database', file: 'database.test.mts', report: 'database.json', title: 'دیتابیس — SQLite واقعی' },
   { id: 'providers', file: 'providers.test.mts', report: 'providers.json', title: 'پرووایدرها — SQLServer/Mongo' },
   { id: 'ui', file: 'ui.test.mts', report: 'ui.json', title: 'رابط کاربری — کامپوننت‌ها (jsdom)' },
+  { id: 'manus', file: 'manus.test.mts', report: 'manus.json', title: 'منوس/تلگرام — سیاست، HMAC و Gateway mock' },
   { id: 'api', file: 'api.test.mts', report: 'api.json', title: 'API — سرور واقعی (end-to-end)', needsBuild: true },
 ];
 

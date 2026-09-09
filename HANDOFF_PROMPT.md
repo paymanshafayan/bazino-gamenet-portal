@@ -1287,4 +1287,5 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - نقاط reuse تأییدشده در کد: توکن `baz_` (`server/affiliate/igRoutes.ts`)، `verifyHmac` (`server/publishing/webhooks.ts`)، `requireAdmin` (`server.ts:828`)، `core.command`/`core.audit`، `AffiliateService.report` (`server/management/affiliates.ts`)، `SecretVault`. هیچ `/api/manus/*` از قبل نیست؛ اتوماسیون تلگرام از قبل نیست (فقط لینک‌های شبکه اجتماعی در محتوا).
 - ریسک اصلی: spam-ban اکانت تلگرام (متوسط با حصار §۵ پلن) — پذیرش با مالک. پیش‌فرض: readonly و بدون ارسال واقعی.
 - موازی: دیپلوی Mongo با `--replSet rs0` در صف Railway بود (boot همچنان ۳ سپتامبر)؛ قدم بعدی آن پس از سبز شدن: `setName` → `rs.initiate` با هاست داخلی → تست اکشن استودیو + webhook.test.
+- **B1 اجرا شد (2026-09-09):** `server/manus/{policy,gateway,routes}.ts` + scope در `createApiToken` + ثبت روت در `server.ts` + `tests/manus.test.mts` (۳۶/۳۶ ✅) + ثبت در run-all. tsc صفر خطا؛ unit ۱۱۶/۱۱۶ و providers ۲۷/۲۷ سبز ماندند. تست API سطح سرور برای endpointهای جدید به better-sqlite3 نیاز دارد (سندباکس‌بلاک) — روی محیط واقعی/CI. بعدی: B2 (سرویس Python/Telethon) و B3 (تب تلگرام استودیو + composer دستی).
 

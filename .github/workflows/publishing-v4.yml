@@ -1,0 +1,54 @@
+name: Publishing and affiliate regression
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, arena/01a07a2f-bazino-gamenet-portal]
+    paths:
+      - 'server/**'
+      - 'shared/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'Management App/**'
+      - 'package*.json'
+      - '.github/workflows/publishing-v4.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: publishing-v4-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      V4_SHOT_DIR: tests/e2e-browser/shots/v4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Ensure Cyrillic fallback font for Chromium
+        run: |
+          if [ ! -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf ]; then
+            sudo apt-get update
+            sudo apt-get install -y fonts-dejavu-core
+          fi
+      - run: npm ci
+      - run: npm ci --prefix "Management App/Bazino"
+      - run: npm ci --prefix tests/e2e-browser
+      - run: npm run lint && npm --prefix "Management App/Bazino" run lint
+      - run: npm run build
+      - run: npm test
+      - run: node scripts/run-publishing-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: publishing-v4-test-evidence
+          path: |
+            tests/reports/*.json
+            tests/e2e-browser/shots/v4/

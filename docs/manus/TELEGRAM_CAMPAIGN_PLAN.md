@@ -1,6 +1,9 @@
 # پلن درگاه کمپین تلگرام (Manus → Portal → Gateway)
 
-> وضعیت: **پلن — تأییدنشده برای اجرا.** پرامپت Manus در تاریخ 2026-09-09 به‌صورت متن در چت دریافت شد (فایل attach نرسید). **هیچ کدی اجرا/تغییر نشده.** اجرا فقط با دستور صریح مالک («شروع کن»).
+> وضعیت: **کد جلوتر از این سند بود — به‌روز شد ۱۴۰۵/۰۶/۱۹ (2026-09-10).**  
+> B1–B4 اجرا و روی برنچ `arena/01a084c6-…` پوش شده‌اند؛ این نشست آن کار را روی `arena/01a08992-bazino-gamenet-portal` بازیابی کرد.  
+> **باقی‌مانده: B5 راستی‌آزمایی زنده** (سرویس Railway Gateway + Volume `/data` + سشن Telethon + توکن `baz_` با scope `manus:telegram` + حداقل یک ارسال نظارتی).  
+> متن زیر قرارداد طراحی است؛ اگر با کد تعارض داشت، **کد** (`server/manus/*` + `telegram-gateway/`) مرجع است.
 >
 > تصمیم‌های مالک (قطعی، 2026-09-09):
 > 1. تأیید انسانی **تک‌تک ارسال‌ها لازم نیست**؛ تأیید یک‌بارِ متن/کمپین کافی است.
@@ -149,11 +152,11 @@ Telegram User Account (Bazino)
 
 ## ۱۱. تحویل و بچ‌های اجرا (پس از «شروع کن»)
 
-- **B1 — پورتال هسته:** endpointهای §۴٫۱ (شامل `send-direct` + مسیر §۵٫۱) + موتور سیاست §۵ + ذخیره روی ops-records هر سه پرووایدر (بدون migration جدا) + تست‌های ۱-۱۶ با Gateway mock (+ تست‌های مسیر دستی).
-- **B2 — Gateway:** سرویس Python/Telethon + `/internal/*` + idempotency/rate-limit/FloodWait + Dockerfile + تست واحد.
-- **B3 — تب تلگرام استودیو:** `Telegram.tsx` + تب در `Studio.tsx` (مدیریت + ادمین سایت) + composer دستی + kill-switch + تست UI.
-- **B4 — داک و استقرار:** README سه‌طرفه (Manus/Portal/Gateway)، `.env.example`، ران‌بوک approval/توقف اضطراری، کانفیگ Railway، خلاصه فایل‌ها.
-- **B5 — راستی‌آزمایی زنده (با مالک):** ceremony ساخت session، health واقعی، dialogs واقعی (readonly)، سپس **حداقل یک ارسال نظارتی اول** (پیش‌فرض؛ مالک می‌تواند waive کند)، بعد تحویل اتوماسیون.
+- **B1 — پورتال هسته:** ✅ اجرا — `server/manus/{policy,gateway,routes}.ts` + تست `tests/manus.test.mts`.
+- **B2 — Gateway:** ✅ اجرا — `telegram-gateway/` (FastAPI + Telethon/FakeAdapter + تست پایتون).
+- **B3 — تب تلگرام استودیو:** ✅ اجرا — `shared/publishing/Telegram.tsx` + تب در `Studio.tsx`.
+- **B4 — داک و استقرار:** ✅ اجرا — `TELEGRAM_OPERATIONS.md` + `.env.example` + `railway.toml` + `/healthz`.
+- **B5 — راستی‌آزمایی زنده (با مالک):** ❌ باز — ceremony سشن، سرویس Railway جدا، health واقعی، dialogs واقعی، ارسال نظارتی اول.
 
 ## ۱۲. اقدام‌های دستی مالک (در اجرا لازم می‌شود)
 

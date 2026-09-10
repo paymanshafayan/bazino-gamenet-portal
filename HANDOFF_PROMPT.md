@@ -5,7 +5,7 @@
 > سوابق اجرا و تست هر بخش مربوط به همان نشست‌اند؛ نتیجهٔ تحقیق، موارد اجراشده و موارد هنوز آزمایش‌نشده باید از هم تفکیک شوند. وضعیت فعلی پس از مرج **PR #19** در **بخش ۱۶** است: قابلیت‌های batchهای ۱–۱۳ کد و رابط کاربری دارند و در `main` ادغام شده‌اند؛ کار باقی‌مانده **تکمیل شکاف‌ها و راستی‌آزمایی زنده** است، نه ساخت دوبارهٔ بخش‌ها. پروندهٔ سخت‌افزار POS همچنان متوقف است.
 >
 > تاریخ تنظیم: ۱۴۰۵/۰۶/۱۰ (2026-09-01) · آخرین به‌روزرسانی: **۱۴۰۵/۰۶/۱۷ (2026-09-08)**، فهرست ۷موردی کارفرما (کردیت/دستهٔ اضافه/چت/کافه/فروشگاه/باگ ادمین) در **بخش ۲۵**؛ صفحهٔ «بازی‌ها» در **بخش ۲۴** (PR #21 مرج شد)؛ گزارش قطعی دورهٔ قبل در **بخش ۲۳** و `docs/publishing/V4_DELIVERY.md` · ریپو: `paymanshafayan/bazino-gamenet-portal`
-> برنچ نشست جاری: **`arena/01a0800f-bazino-gamenet-portal`**، از پایهٔ merge PR #21 (`37dde76`)؛ تحویل §۲۵ در همین برنچ کامیت/پوش و با PR در `main` ادغام می‌شود. نشست قبلی `arena/01a07cd8-bazino-gamenet-portal` (صفحهٔ Games) با PR #21 در `main` ادغام شده؛ نشست‌های `arena/01a07a2f` (PR #20) و قبل‌تر سابقه‌اند.
+> برنچ نشست جاری: **`arena/01a08992-bazino-gamenet-portal`** (بازیابی کار `arena/01a084c6-…` پس از قطع جلسه). کار و push فقط روی همین برنچ. نشست قبلی عملیاتی: `arena/01a084c6-bazino-gamenet-portal`.
 > **هشدار:** دستورهای fetch/reset/clean و نام شاخهٔ ابتدای بخش ۰، دستورالعمل تاریخی نشست قبل‌اند؛ در این نشست اجرا نشوند. تغییر شاخه یا reset مخرب لازم نیست؛ کار فقط روی شاخهٔ فعلی انجام شود.
 >
 > **وضعیت جاری: بخش ۲۳ — هشت بچ توسعه و تست محلی تکمیل شده‌اند.** 506/506 تست، TypeScript/build و Chromium چهارزبانه با مشاهدهٔ ۲۰ تصویر و restart واقعی دوباره موفق شدند. **استقرار دامنه هنوز تأیید نشده؛ dispatch آخرین بار 403 و health وب HTML است.** این پیگیری فقط اسناد/تحویل را به‌روز می‌کند؛ کار ساخته‌شده از صفر تکرار نشود.
@@ -1329,4 +1329,17 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **B2 اجرا شد (2026-09-09):** سرویس `telegram-gateway/` (FastAPI + Telethon adapter + FakeAdapter + sqlite idempotency/rate-limit/flood + Dockerfile + README با ران‌بوک ceremony). تست پایتون **۲۳/۲۳** ✅ (unittest: security/store/errors/config + TestClient کامل API). **سازگاری HMAC دوطرفه Node↔Python با اجرای واقعی اثبات شد** (امضاهای یکسان + verify متقابل True). بعدی: B3 (تب تلگرام استودیو + composer دستی + kill-switch).
 - **B3 اجرا شد (2026-09-09):** آینه مدیریتی روت‌ها (`/api/management/telegram/*` + دو endpoint فهرست drafts/decisions) + تب `telegram` در `Studio.tsx` + کامپوننت `Telegram.tsx` (وضعیت/kill-switch، کمپین‌ها با approve/pause/revoke، صف pending با resolve، composer دستی دومرحله‌ای، لاگ، گزارش روزانه؛ فقط ادمین؛ چهارزبانه). UI **۵۰/۵۰** ✅ (۵ تست جدید jsdom)، tsc ریشه و مدیریت صفر خطا، رگرسیون manus ۳۶/۳۶ + unit ۱۱۶/۱۱۶ + providers ۲۷/۲۷. بعدی: B4 (داک نهایی + env + کانفیگ استقرار).
 - **B4 اجرا شد (2026-09-09):** `docs/manus/TELEGRAM_OPERATIONS.md` (README سه‌طرفه Manus/Portal/Gateway + ران‌بوک تأیید/توقف/چرخش secret/سشن + نقشه فایل‌ها)، بخش تلگرام در `.env.example` ریشه (۳ env پورتال + ۹ env گیت‌وی)، `telegram-gateway/railway.toml` (Dockerfile + هلث‌چک `/healthz`)، endpoint عمومی حداقلی `GET /healthz` در گیت‌وی. تست پایتون **۲۴/۲۴** ✅. هر ۴ batch تلگرام کامل و پوش شد؛ باقی‌مانده بیرون کد: استقرار Railway (سرویس Gateway + Volume ‎/data + سشن واقعی)، صدور توکن `baz_`، و deploy مونگو (QUEUED).
+
+ بیرون کد: استقرار Railway (سرویس Gateway + Volume ‎/data + سشن واقعی)، صدور توکن `baz_`، و deploy مونگو (QUEUED).
+
+---
+
+## ۲۷. بازیابی نشست قطع‌شده (2026-09-10)
+
+> نشست `arena/01a08992-bazino-gamenet-portal`. کارفرما لینک برنچ `arena/01a084c6-bazino-gamenet-portal` داد چون جلسهٔ قبل قطع شده بود.
+
+- درخت کد آن برنچ با `git merge --allow-unrelated-histories` روی برنچ این نشست آمد (تفاوت باقی‌مانده با مبدأ: فقط `.github/workflows/publishing-v4.yml` روی این نشست).
+- **کد جلوتر از پلن تلگرام بود:** B1–B4 در ریپو موجودند (`server/manus/*`, `telegram-gateway/`, تب استودیو، تست‌ها). `TELEGRAM_CAMPAIGN_PLAN.md` هنوز می‌گفت «هیچ کدی اجرا نشده» → به وضعیت واقعی به‌روز شد. `TELEGRAM_OPERATIONS.md` ارجاع اشتباه به `store.ts` داشت (ذخیره روی ops-records است) → اصلاح شد.
+- **مطابقت کلی:** هندآف §۲۶ با فایل‌های موجود هم‌خوان است. شکاف عمدی: B5 زنده، سرویس Gateway روی Railway ساخته نشده، CDP/تانل مرورگر کاربر معلق (منتظر URL)، POS/SMTP متوقف.
+- کار و push فقط روی **`arena/01a08992-bazino-gamenet-portal`**.
 

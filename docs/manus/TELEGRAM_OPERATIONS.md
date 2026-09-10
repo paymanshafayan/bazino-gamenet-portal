@@ -105,7 +105,7 @@
 
 | فایل/پوشه | batch | نقش |
 |---|---|---|
-| `server/manus/routes.ts` (+ `policy.ts`, `store.ts`, `gateway.ts` کنارش) | B1/B3 | endpointهای Manus + آینه مدیریتی + موتور سیاست + امضای HMAC |
+| `server/manus/routes.ts` (+ `policy.ts`, `gateway.ts`؛ ذخیره روی ops-records، فایل `store.ts` جدا نیست) | B1/B3 | endpointهای Manus + آینه مدیریتی + موتور سیاست + امضای HMAC |
 | `tests/manus.test.mts` | B1 | تست قراردادها با Gateway mock |
 | `telegram-gateway/` (`src/`, `tests/`, `Dockerfile`, `railway.toml`, `README.md`) | B2/B4 | سرویس اجراکننده + تست پایتون + کانفیگ استقرار |
 | `shared/publishing/Telegram.tsx` + تب در `Studio.tsx` + کلید `telegram` در `ui.tsx` | B3 | تب تلگرام استودیو (فقط ادمین، چهارزبانه) |

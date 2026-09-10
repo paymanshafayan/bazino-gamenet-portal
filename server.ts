@@ -74,6 +74,7 @@ import { registerPublishing } from './server/publishing/routes';
 import { protectedIntegrationSetting } from './server/publishing/settings';
 import { registerIgRoutes } from "./server/affiliate/igRoutes";
 import { registerManusRoutes } from "./server/manus/routes";
+import { registerManusBlogRoutes } from "./server/manus/blog";
 import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
 import { onReservationAttended } from "./server/affiliate/engine";
 import { isOnlinePaymentEnabled } from "./server/payments/paytr";
@@ -2596,6 +2597,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     authUsername: (req) => (req as any).authUsername || undefined,
   });
   registerManusRoutes({
+    app,
+    getStore: getActiveDataProvider,
+  });
+  registerManusBlogRoutes({
     app,
     getStore: getActiveDataProvider,
   });

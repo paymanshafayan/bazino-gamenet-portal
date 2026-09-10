@@ -35,6 +35,10 @@ export function normalizeZernio(b:any):InboxEvent {
     e.authorId=identity(message.sender?.id,d.sender?.id,d.reaction?.sender?.id);e.conversationId=identity(conversation.id,message.conversationId);
     e.participantId=str(conversation.participantId);e.direction=str(message.direction);e.messageId=str(message.platformMessageId||message.id);
     e.button=identity(metadata.postbackPayload,metadata.quickReplyPayload,d.button?.payload,d.postback?.payload,message.payload);
+    /* DM body — the away auto-reply and the inbox log need the message text,
+     * not just the button payload. Zernio may put it under message.text/content. */
+    e.text=str(message.text??message.content??d.text).slice(0,3000);
+    e.username=str(message.sender?.username||d.sender?.username).slice(0,100);
   }else if(type==='analytics.synced'){e.cursor=str(d.sync?.cursor);}
   return e;
 }

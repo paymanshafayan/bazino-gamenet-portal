@@ -1382,3 +1382,35 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - قواعد: کد جفت‌سازی تازه در هر جلسه و هرگز در ریپو/چت؛ تمرین mock قبل از هر پل زنده؛ VPN کارفرما حین پل روشن؛ بعد از کار رله stop شود.
 - **درس ۲۰۲۶-۰۹-۱۰ (قطع برق کارفرما):** بعد از ری‌بیلد سندباکس، **URL عمومی پیش‌نمایش عوض می‌شود** (`sbx-….arena.site` قبلی → پروکسی `502 Bad Gateway` می‌دهد؛ URL جدید ≠ `E2B_SANDBOX_ID`، حدس نزن). بازیابی: کارفرما پنل Live Preview را باز می‌کند → صفحهٔ دیاگ bridge.html همان لحظه `href` تازه را به `/report` می‌فرستد → فقط خط `$Base` اسکریپت پل عوض می‌شود؛ کد جفت‌سازی و بقیه اسکریپت ثابت می‌ماند.
 
+---
+
+## ۳۰. دو فیچر جدید: جانشین Away متا + ایمپورت بلاگ مانوس (2026-09-11)
+
+> نشست `arena/01a089a9-bazino-gamenet-portal`. هر دو فیچر کامل، تست‌شده (واحد ۱۶/۱۶ + دود سرتاسری ۱۶/۱۶ روی سرور واقعی) و push‌شده.
+
+### الف) جانشین Away message (پاسخ خودکار ساعات غیبت) — «سیستم خودش جواب می‌دهد»
+
+- **زمینه:** Auto reply و Away متا هر دو Off شدند (§۲۹/آپدیت شب) → اینستاگرام سمت متا کاملاً ساکت. این فیچر همان نقش Away را درون پورتال بازی می‌کند، با تشخیص زبان و قابل‌مشاهده برای ادمین.
+- **فایل‌ها:** `server/affiliate/awayPolicy.ts` (منطق خالص: پیام‌های پیش‌فرض چهارزبانه با همان مضمون قبلی متا — بی‌جوابی ۰۱–۱۰ قبرس + رزرو؛ تشخیص زبان: خط پارسی/عربی→fa، سیریلیک→ru، حروف خاص ترکی (ş/ğ/ı/ç/ö/ü/İ…)=tr چون تنها زبان لاتین دیگرِ سایت انگلیسی است، بقیه→en؛ پنجره با `Intl` به وقت `Asia/Nicosia` با fallback UTC+3؛ گاردها: فقط incoming، فقط instagram، متن خالی رد، campaignHandled رد، سقف روزانه، فاصلهٔ هر گفتگو) + `server/affiliate/awayReply.ts` (موتور: ذخیرهٔ هر پیام ورودی به‌عنوان رکورد `ig-inbox` با sender/text/lang/status + تصمیم + enqueue پاسخ در pub-outbox با **stage=`away_reply` و memberId=`away:<fingerprint>`** — هیچ تماس مستقیم Provider ندارد).
+- **ادغام:** `publishing/routes.ts` بعد از `campaigns.dispatch` برای message.received صدا می‌شود (فقط وقتی کمپین جواب نداد: `!r?.ok`؛ خطای آن هرگز حلقهٔ inbox را نمی‌شکند). `campaignV4.beforeSend` ردیف‌های `away:*` را از شرط member/eligible مستثنا می‌کند (فقط چک اکانت زرنیو)؛ `afterSend` هم آن‌ها را رد می‌کند (رکورد ig-inbox خودش وضعیت را دارد). ارسال واقعی همچنان پشت `outboundEnabled` است.
+- **فیکس لازم در `webhooks.ts`:** `normalizeZernio` برای پیام‌ها `text` و `username` را نگاشت نمی‌کرد (فقط کامنت‌ها) → اضافه شد (`message.text/content`، `message.sender.username`). بدون این، فیچر هیچ متنی نمی‌دید.
+- **پنل ادمین:** تب جدید **Instagram Inbox** در استودیو (`shared/publishing/IgInbox.tsx`): سوییچ فعال/غیرفعال + ساعت شروع/پایان + سقف روزانه + فاصلهٔ گفتگو + چهار متن پاسخ + جدول آخرین پیام‌های دریافتی (زمان/کاربر/زبان/متن/وضعیت پاسخ). endpointها: `GET/PUT /api/management/publishing/ig-away` + `GET /api/management/publishing/ig-inbox` (هر دو فقط ادمین). تنظیمات در setting کلید `ig_away_settings`؛ sanitize فقط فیلدهای شناخته‌شده را ذخیره می‌کند (idempotencyKey کلاینت ops هرگز لو نمی‌رود).
+- **پیش‌فرض‌ها:** enabled=**false** (باید از پنل روشن شود)، پنجره ۱–۱۰، سقف ۱۰۰/روز، ۱۲ ساعت بین دو پاسخ هر گفتگو.
+
+### ب) endpoint مانوس برای ثبت پست‌های منتشرشده به‌صورت پیش‌نویس بلاگ
+
+- `POST /api/manus/blog/imports` در `server/manus/blog.ts` + اعتبارسنجی خالص `server/manus/blogPolicy.ts`. Bearer توکن `baz_` با اسکوپ جدید **`manus:blog`**.
+- بدنه: `{media_id, media_type: post|reel|story, caption (الزامی، ≤5000), image_url?, permalink?, published_at? (ISO), language? (fa|en|tr|ru; حذف→تشخیص از متن کپشن)}`. خطاها: `401 unauthorized`، `MEDIA_ID_REQUIRED/INVALID_MEDIA_ID/INVALID_MEDIA_TYPE/CAPTION_REQUIRED/CAPTION_TOO_LONG/INVALID_IMAGE_URL/INVALID_PERMALINK/INVALID_PUBLISHED_AT` (۴۰۰).
+- همیشه **پیش‌نویس** ContentService می‌سازد (`status=draft`, destination=blog، عنوان از اولین خط معنادار کپشن)؛ انتشار فقط با تأیید ادمین از Content & Publish Queue (قاعدهٔ «عامل پیشنهاد می‌دهد، انسان تأیید می‌کند»). Idempotent: هر `media_id` یک‌بار (ارسال مجدد → `status:"duplicate"`؛ یا `Idempotency-Key` صریح). رکورد ممیزی در kind `blog-import`.
+- **توکن‌ها:** `POST /api/admin/api-tokens` حالا آرایهٔ `scopes` می‌پذیرد (فیلترشده با allowlist `instagram:ingest|manus:telegram|manus:blog`)؛ GET هم `scopes` مجاز را برمی‌گرداند. UI پنل توکن‌ها (AdminAffiliatesSection) چک‌باکس اسکوپ + نمایش بج اسکوپ‌ها روی هر توکن دارد. **نکتهٔ مهم:** توکن‌های قدیمی فقط `instagram:ingest` دارند — برای بلاگ باید توکن تازه با اسکوپ `manus:blog` (یا هر دو) ساخته شود. پرامپت داخل پنل هم به‌روز شد (هر دو endpoint).
+- mount در `server.ts` بعد از registerManusRoutes.
+
+### تست و اثبات
+
+- `tests/integrations.test.mts` (لایهٔ `integrations` در run-all): ۱۶/۱۶ — تشخیص زبان (فارسی/عربی، ترکی با ı، سیریلیک، انگلیسی)، پنجره (شامل wrap شبانه)، همهٔ گاردها (خاموش/کمپین/outgoing/پلتفرم دیگر/متن خالی/سقف/فاصله)، sanitize (clamp + پیش‌فرض‌کردن متن خالی + حذف فیلد مزاحم)، اعتبارسنجی کامل بلاگ.
+- تست دود سرتاسری (خارج از ریپو، سرور واقعی بیلدشده): ۱۶/۱۶ — از جمله: وب‌هوک امضاشدهٔ message.received → رکورد ig-inbox با زبان fa → رکورد outbox با stage `away_reply` (queued چون outboundEnabled خاموش) → پیام دوم همان گفتگو throttled با reason مشخص؛ ایمپورت بلاگ: 401 بدون توکن / 401 اسکوپ غلط / 400 کدهای اعتبارسنجی / draft + duplicate / تشخیص زبان کپشن.
+- کل مجموعه بعد از تغییر webhooks: publishing 54✓، integrations 16✓، manus 36✓، ui 50✓، management 41✓، unit 116✓، database 38✓، providers 27✓. خطاهای باقیمانده pre-existing و اثبات‌شده با stash در همین سندباکس: ۵ مورد publishing-media (نبود باینری ffprobe در سندباکس تازه) + ۲ مورد api (payment methods/dueAt — بی‌ربط به این تغییرات).
+- **درس TS:** tsconfig غیر-strict است (strictNullChecks خاموش) → narrow شدن union روی `!result.ok` در برخی حالت‌ها کار نمی‌کند؛ در `blog.ts` با متغیر `any` حل شد (کامنت در کد).
+- **درس تست:** سرورهای تست بازمانده پورت می‌گیرند و تست بعدی به باندل کهنه وصل می‌شود (نشانه: داده‌های stale در GET) — قبل از هر boot تست، پورت آزاد باشد.
+
+

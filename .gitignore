@@ -51,3 +51,8 @@ tmp-shots/
 
 # Reproducible browser-test artifacts
 /tests/e2e-browser/shots/
+
+# Python (telegram-gateway)
+__pycache__/
+*.pyc
+.venv/

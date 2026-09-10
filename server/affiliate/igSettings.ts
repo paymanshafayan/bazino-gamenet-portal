@@ -143,11 +143,12 @@ async function writeTokens(store: { setSetting(k: string, v: string): Promise<vo
 export async function listApiTokens(store: any): Promise<ApiTokenRow[]> {
   return readTokens(store);
 }
-export async function createApiToken(store: any, name: string): Promise<ApiTokenRow> {
+export async function createApiToken(store: any, name: string, scopes: string[] = ['instagram:ingest']): Promise<ApiTokenRow> {
   const tokens = await readTokens(store);
+  const clean = (Array.isArray(scopes) ? scopes : []).map(s => String(s).slice(0, 60)).filter(Boolean);
   const row: ApiTokenRow = {
     id: newTokId(), name: String(name || '').slice(0, 80) || 'API token',
-    token: generateApiToken(), scopes: ['instagram:ingest'], createdAt: new Date().toISOString(), lastUsedAt: '',
+    token: generateApiToken(), scopes: clean.length ? clean : ['instagram:ingest'], createdAt: new Date().toISOString(), lastUsedAt: '',
   };
   tokens.push(row); await writeTokens(store, tokens); return row;
 }

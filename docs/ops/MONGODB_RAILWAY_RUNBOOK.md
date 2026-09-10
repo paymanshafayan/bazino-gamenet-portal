@@ -1,0 +1,256 @@
+# MongoDB روی Railway — ران‌بوک رپلیکا-ست تک‌گره‌ای
+
+**چرا رپلیکا-ست؟** تراکنش‌های چندسندی (`TRANSACTIONS_REQUIRED`) و change streamها بدون رپلیکا-ست کار نمی‌کنند. یک گره کافی است (`rs0`)؛ هدف HA نیست.
+
+> **درس ۲۰۲۶-۰۹-۰۹ (حادثه واقعی):** ایمیج رسمی `mongo` وقتی `MONGO_INITDB_ROOT_USERNAME/PASSWORD` ست باشند، خودش `--auth` را به mongod اضافه می‌کند (سورس: `docker-entrypoint.sh` ایمیج 8.0، تابع `_mongod_hack_ensure_arg '--auth'`). و قانون mongod: **authorization + replica set بدون `--keyFile` = خطای `BadValue: security.keyFile is required...` و crash-loop** که دیپلوی را ساعت‌ها در `DEPLOYING` نگه می‌دارد و صف را قفل می‌کند. پس keyFile اجباری است، حتی برای تک‌گره.
+
+## پیش‌نیازها
+
+- سرویس Mongo از ایمیج `mongo:8.0` (قالب Railway) با Volume روی `/data/db`.
+- متغیرهای `MONGO_INITDB_ROOT_USERNAME` و `MONGO_INITDB_ROOT_PASSWORD` ست باشند (قالب Railway خودش می‌سازد).
+
+## قدم ۱ — ساخت محتوای keyFile (لوکال، یک‌بار)
+
+```sh
+openssl rand -base64 512
+```
+
+روی ویندوز (PowerShell، بدون نیاز به openssl — مستقیم می‌رود در clipboard):
+
+```powershell
+$b = New-Object byte[] 512; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b) | Set-Clipboard
+```
+
+خروجی (~۶۸۰ کاراکتر تک‌خطی، بدون فاصله/newline) را کپی کن. این **secret** است؛ در چت/CI نگذار.
+
+## قدم ۲ — متغیر Railway
+
+در سرویس Mongo → تب **Variables** اضافه کن:
+
+```
+MONGO_KEYFILE=<خروجی قدم ۱>
+```
+
+## قدم ۳ — Start Command (نسخهٔ v2 — آرگومان‌های شبکهٔ قالب حفظ شده)
+
+> **چرا v2؟ (حادثهٔ ۲۰۲۶-۰۹-۰۹):** دستور v1 فقط `mongod --replSet rs0 --keyFile …` را اجرا می‌کرد، ولی دستور پیش‌فرض قالب Railway یعنی `mongod --ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false` را دور می‌انداخت. شبکهٔ داخلی Railway IPv6 است؛ بدون `--ipv6` نه پورتال می‌تواند وصل شود نه گره به PRIMARY می‌رسد. v2 هر دو را ترکیب می‌کند. (از `getCmdLineOpts` کانتینر سبز اثبات شد که دستور در حال اجرا مال قالب بود، نه ما.)
+
+در سرویس Mongo → تب **Settings** → **Start Command** (جایگزین کامل دستور فعلی):
+
+```sh
+sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile && echo "TG-START wrapper ok, keyfile bytes: $(wc -c < /tmp/mongo-keyfile)"; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --keyFile /tmp/mongo-keyfile --ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false'
+```
+
+> ⚠️ **کپی تمیز، مهم:** حتماً با دکمهٔ copy بالای بلاک کد کپی کن و کل فیلد Railway را select-all + delete کن بعد paste. اگر از متن رندرشده (چت/مرورگر) کپی کنی ممکن است خراب شود: `&gt;` به‌جای `>`، `&amp;&amp;` به‌جای `&&`، یا لینک‌شدن `docker-entrypoint.sh`. بعد از paste چک کن هیچ‌کدام از این‌ها نباشند: `&gt;` `&amp;` `[` `]` `(http`. (حادثهٔ واقعی ۲۰۲۶-۰۹-۰۹: همین خرابی کپی باعث ماندن `BadValue` شد.)
+
+چرا این شکلی است:
+
+| جزء | دلیل |
+|---|---|
+| `sh -c '…'` | فایل کلید باید **قبل** از بالا آمدن mongod از روی env ساخته شود |
+| `/tmp/mongo-keyfile` | ephemeral؛ هر بوت از نو ساخته می‌شود، پس تنها منبع حقیقت همان Variable است |
+| `chmod 600` | mongod فایل با دسترسی بازتر را رد می‌کند (`permissions too open`) |
+| `chown mongodb:mongodb` | entrypoint با gosu به کاربر `mongodb` دانگرید می‌کند؛ فایل باید برایش خوانا باشد |
+| صدا زدن صریح `docker-entrypoint.sh` | خودش `--auth` (چون root vars ست‌اند) و `--bind_ip_all` را اضافه می‌کند — **پس ما `--auth` نمی‌نویسیم** (آرگومان تکراری برای mongod خطاست) |
+| `--replSet rs0` | نام ست؛ قدم ۵ باید همین باشد |
+| `--ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false` | **حفظ عین آرگومان‌های شبکهٔ قالب Railway** — حذفشان = قطع اتصال داخلی (IPv6) و نرسیدن به PRIMARY |
+| `echo "TG-START …"` | خودتشخیصی دائمی: فقط **طول** فایل کلید را چاپ می‌کند (نه secret). اگر این خط در لاگ دیپلوی نباشد یعنی wrapper اصلاً اجرا نشده |
+
+## قدم ۴ — دیپلوی مجدد
+
+- **اول: فیلد `Pre-deploy Command` در Settings باید کاملاً خالی باشد!** (دام واقعی ۲۰۲۶-۰۹-۰۹ — بخش «دام pre-deploy» در عیب‌یابی.) دیتابیس pre-deploy نمی‌خواهد؛ اگر دستوری آنجاست، دیپلوی قبل از استارت کانتینر همان‌جا می‌ماند.
+- اگر دیپلوی قبلی در `DEPLOYING` گیر کرده: منوی **⋮** همان دیپلوی → **Remove** (قفل صف را باز می‌کند).
+- ذخیره Start Command خودش دیپلوی جدید می‌سازد؛ اگر نه: **⋮** → Redeploy.
+- در **Deploy Logs** باید ببینی: بالا آمدن تمیز، `Waiting for connections`، و **بدون** خطای `BadValue`. (قبل از `rs.initiate` گره در حالت STARTUP می‌ماند — طبیعی است.)
+
+## قدم ۵ — `rs.initiate` (تب Console سرویس Mongo)
+
+⚠️ **فقط وقتی این قدم را اجرا کن که دیپلوی سبز و لاگ بدون `BadValue` باشد** (قدم ۴). اجرای زودهنگام خطای `This node was not started with replication enabled` می‌دهد چون کانتینرِ در حال اجرا هنوز با start command قدیمی بالاست.
+
+هاست داخلی را از مقدار `MONGO_URL` بخوان — **فقط قسمت `host:port`** (بعد از `@`)، نه کل URL:
+
+```
+MONGO_URL = mongodb://mongo:PASSWORD@mongodb.railway.internal:27017
+                                        ╰─────────┬─────────╯
+                                              همین تکه
+```
+
+به‌جای `INTERNAL_HOST` بگذار:
+
+```sh
+mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
+  --authenticationDatabase admin --host 127.0.0.1 \
+  --eval 'rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "INTERNAL_HOST:27017" }] })'
+```
+
+راستی‌آزمایی (همان Console):
+
+```sh
+mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
+  --authenticationDatabase admin --host 127.0.0.1 \
+  --eval 'printjson({ myState: rs.status().myState, setName: rs.conf()._id })'
+```
+
+✅ موفق = `{ myState: 1, setName: "rs0" }` (یعنی PRIMARY). بعد از این، تست تراکنش استودیو + `webhook.test` را اجرا کن.
+
+## قدم ۵٫۵ — smoke test تراکنش (اثبات `TRANSACTIONS_REQUIRED`)
+
+قبل از وصل کردن اپ، در همان Console ثابت کن تراکنش چندسندی کار می‌کند (روی standalone با خطای `Transaction numbers are only allowed on a replica set member` می‌میرد):
+
+```sh
+mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --host 127.0.0.1 --eval '
+const s = db.getMongo().startSession();
+s.startTransaction();
+s.getDatabase("bazino_probe").tx_probe.insertOne({ probe: "tx-smoke", at: new Date() });
+s.commitTransaction();
+const n = s.getDatabase("bazino_probe").tx_probe.countDocuments({ probe: "tx-smoke" });
+s.getDatabase("bazino_probe").tx_probe.deleteMany({ probe: "tx-smoke" });
+s.endSession();
+print("TX-SMOKE count was: " + n);'
+```
+
+✅ موفق = چاپ `TX-SMOKE count was: 1` بدون خطا (دیتای probe پاک می‌شود؛ چیزی باقی نمی‌ماند).
+
+## قدم ۵٫۶ — rotate پسورد root (اگر لو رفته یا دوره‌ای)
+
+> ⚠️ عوض کردن variable به‌تنهایی کافی نیست: entrypoint فقط در init اول یوزر را می‌سازد. باید هم پسورد داخل دیتابیس عوض شود (`changeUserPassword`) هم variableها.
+
+1. **ساخت پسورد جدید (PowerShell ویندوز، ۲۴ کاراکتر URL-safe تا در MONGO_URL به encode نیاز نداشته باشد):**
+   ```powershell
+   -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
+   ```
+   خروجی را نگه دار (secret است).
+2. **عوض کردن پسورد داخل دیتابیس** (Console سرویس Mongo — هنوز با پسورد قدیمی لاگین می‌کند چون env قدیمی است؛ به‌جای `ROOT_USER` مقدار `MONGO_INITDB_ROOT_USERNAME` از تب Variables، معمولاً `mongo`):
+   ```sh
+   mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --host 127.0.0.1 --eval 'db.getSiblingDB("admin").changeUserPassword("ROOT_USER", "NEW_PASS")'
+   ```
+   ✅ موفق = `{ ok: 1 }`.
+3. **به‌روزرسانی variableها (دوطرفه — چون پورتال هم با همین credential وصل است!):** در تب Variables سرویس Mongo مقدار `MONGO_INITDB_ROOT_PASSWORD` را به پسورد جدید بده. بعد `MONGO_URL` را چک کن: اگر پسورد قدیمی را به‌صورت literal داخلش می‌بینی، آن را هم دستی به‌روز کن؛ اگر از reference (`${{…}}`) استفاده می‌کند خودش به‌روز می‌شود (راستی‌آزمایی کن). **بعد حتماً `MONGO_URL` روی سرویس پورتال را هم به رشتهٔ جدید (با پسورد جدید) به‌روز کن** — وگرنه پورتال با پسورد قدیمی auth fail می‌شود و سایت می‌خوابد.
+4. ذخیره variableها دیپلوی‌های جدید می‌سازد (pre-deploy خالی است، تمیز بوت می‌شوند؛ entrypoint مونگو چون دیتا هست init را رد می‌کند و پسورد جدید دست‌نخورده می‌ماند). ترتیب: اول Mongo، بعد پورتال.
+5. **راستی‌آزمایی:** یک دستور سادهٔ Console مونگو (کنسول حالا با env جدید لاگین می‌کند) + باز شدن سایت.
+
+## قدم ۵٫۷ — وصل کردن پورتال (فاز بعد)
+
+> ⚠️ **اصلاح بعد از حادثهٔ ۱۹:۰۰:** فرض اولیه («پورتال هنوز وصل نیست») غلط بود — لاگ بوت پورتال (`MONGO_URL detected → using MongoDB` + توپولوژی درایور روی `mongodb.railway.internal:27017`) ثابت کرد **پورتال از قبل به همین Mongo وصل است.** پس قدم ۵٫۷ «وصل کردن» نیست، بلکه «هشدار پنجرهٔ قطعی» است:
+
+**پنجرهٔ قطعی اجتناب‌ناپذیر:** از لحظه‌ای که Mongo با `--replSet` بوت می‌شود (STARTUP) تا `rs.initiate` + PRIMARY شدن، **هیچ read/write کلاینتی جواب نمی‌دهد** (`NotPrimaryNoSecondaryOk`). اگر پورتال در این پنجره ریکوئست بگیرد یا ری‌استارت شود، کرش می‌کند (`MongoServerError: not primary…` و بعد `MongoServerSelectionError: timed out after 30000 ms` در بوت) و سایت می‌خوابد. **درمان:** بلافاصله بعد از سبز شدن دیپلوی replSet، `rs.initiate` را اجرا کن (قدم ۵) و بعد **سرویس پورتال را Redeploy کن** تا با PRIMARY تازه بوت شود. این حادثه دقیقاً ۲۰۲۶-۰۹-۰۹ ساعت ۱۸:۲۲ رخ داد و با Redeploy پورتال بعد از PRIMARY حل شد.
+- نکتهٔ robustness برای بعد: یک read ناموفق نباید کل سرور را کرش کند (unhandled rejection در `FindCursor.next`) — نیازمند هندلینگ خطای دیتابیس در بوت/ریکوئست (بک‌لاگ، نه اضطراری).
+- بعد از پایداری: تست اکشن تراکنشی استودیو + `webhook.test` (دستور PowerShell در HANDOFF بخش ۲۵٫۷؛ نیازمند `ZERNIO_WEBHOOK_SECRET` از هاست — تسک ۸).
+
+## قدم ۶ — راستی‌آزمایی آرگومان‌های mongod (اختیاری ولی مفید)
+
+اگر خواستی مطمئن شوی کانتینرِ در حال اجرا واقعاً با `--replSet` و `--keyFile` بالاست (نه start command قدیمی):
+
+```sh
+mongosh -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
+  --authenticationDatabase admin --host 127.0.0.1 \
+  --eval 'JSON.stringify(db.adminCommand("getCmdLineOpts").argv)'
+```
+
+باید `--replSet`, `rs0`, `--keyFile`, `/tmp/mongo-keyfile` را در خروجی ببینی. اگر نبود → قدم ۳ ذخیره/اعمال نشده؛ برگرد به عیب‌یابی.
+> ⚠️ **سبز بودن سرویس ≠ اجرای دستور جدید:** اگر دیپلوی جدید کرش کند، Railway دیپلوی سالم قبلی را زنده نگه می‌دارد و سرویس «سبز» می‌ماند. پس بعد از هر تغییر، حتماً (۱) لاگ **دیپلوی جدید** را از خط اول بخوان (باید خط `TG-START` را داشته باشد)، (۲) با همین دستور `getCmdLineOpts` چک کن کانتینرِ فعلی واقعاً با `--replSet` بالاست. اگر argv دستور قالب (`--ipv6 …` بدون `--replSet`) را نشان داد یعنی هنوز روی دیپلوی قدیمی هستی و دیپلوی جدید کرش کرده — لاگ کامل دیپلوی جدید را از خط اول بررسی کن.
+
+## عیب‌یابی سریع
+
+### 🪤 دام pre-deploy (علت اصلی حادثهٔ ۲۰۲۶-۰۹-۰۹ — اول این را چک کن!)
+
+اگر دستور replSet قدیمی (یا هر دستور `mongod…`) داخل فیلد **`Pre-deploy Command`** جا مانده باشد، هر دیپلوی قبل از استارت کانتینر اصلی همان‌جا می‌میرد و هیچ تغییری در Start Command اثر نمی‌کند.
+
+**الگوی تشخیص (هر سه با هم):**
+
+1. دیپلوی جدید دقیقه‌ها روی `Deploy › Running pre-deploy command...` می‌ماند؛
+2. در Deploy Logs همان دیپلوی: initdb با دیتای fresh (`createCollection admin.system.users` + `init process complete`) و بعد `BadValue: security.keyFile is required…` — چون کانتینر pre-deploy جدا و بدون Volume و دستور قدیمی keyFile ندارد؛
+3. هیچ خط `TG-START` در لاگ نیست (wrapper اصلاً اجرا نشده) و `getCmdLineOpts` کانتینر سبز argv دستور قالب را نشان می‌دهد (دیپلوی سالم قدیمی زنده مانده).
+
+**درمان:** Settings → `Pre-deploy Command` → select-all + delete (کاملاً خالی) → Save → دیپلوی گیرکرده را Remove کن → دیپلوی تازه بساز. در لاگ دیپلوی جدید باید `TG-START … bytes: ~684` و بعد `Waiting for connections` بیاید.
+
+> نمونهٔ واقعی متن تله (۲۰۲۶-۰۹-۰۹، عیناً از پنل): `docker-entrypoint.sh mongod --ipv6 --bind_ip ::,0.0.0.0 --replSet rs0 --setParameter diagnosticDataCollectionEnabled=false` — دستور قدیمی بدون keyFile. نکتهٔ تشدیدکننده: `Pre-deploy Timeout` روی `No timeout` بود، پس دیپلوی به‌جای fail سریع، ۱۲+ دقیقه روی `Running pre-deploy command...` می‌ماند. بعد از خالی کردن فیلد، تنظیم timeout دیگر مهم نیست.
+>
+> **پیدا کردن Mount Path ولوم:** در سایدبار Railway روی اسم ولوم (مثلاً `mongodb-volume`) کلیک کن → جزئیات mount path را نشان می‌دهد؛ باید `/data/db` باشد. (کانتینر pre-deploy به ولوم دسترسی ندارد؛ لاگ fresh-data در دیپلوی‌لاگ از همین است.)
+
+| علامت | علت | درمان |
+|---|---|---|
+| `BadValue: security.keyFile is required…` + ری‌استارت مکرر | قدم ۲/۳ انجام نشده یا Start Command قدیمی است | قدم ۲ و ۳ را بازبینی کن؛ دیپلوی گیرکرده را Remove کن |
+| `permissions on keyfile are too open` | `chmod 600` جا افتاده | Start Command را عیناً از قدم ۳ کپی کن |
+| `keyFile must not be empty` / `too short` | `MONGO_KEYFILE` خالی یا چندخطی شده | Variable را تک‌خطی و کامل paste کن |
+| دیپلوی جدید در `QUEUED` می‌ماند | دیپلوی قبلی هنوز «فعال» است | Remove دیپلوی گیرکرده (قدم ۴) |
+| `MongoServerError: ... not primary` در اپ | قدم ۵ انجام نشده | `rs.initiate` + راستی‌آزمایی |
+| `This node was not started with replication enabled` | `rs.initiate` زود اجرا شده؛ کانتینر فعلی بدون `--replSet` بالاست | اول قدم ۴ را سبز کن (Start Command جدید + Redeploy)، بعد قدم ۵ |
+| `host` اشتباه در `rs.initiate` (کل MONGO_URL) | باید فقط `host:port` باشد | مثلاً `mongodb.railway.internal:27017` بدون `mongodb://` و یوزر/پسورد |
+| `init process complete` در **هر** دیپلوی تکرار می‌شود | احتمالاً Volume روی `/data/db` وصل نیست → دیتا و کانفیگ RS با هر ری‌استارت می‌پرد | Settings → Volumes: یک Volume به `/data/db` وصل کن و Redeploy |
+| دیپلوی جدید هم همان `BadValue` را می‌دهد | Start Command جدید ذخیره/اعمال نشده (متن Settings را عیناً با قدم ۳ مقایسه کن) | اصلاح + Redeploy؛ مطمئن شو روی **همان سرویس Mongo** تغییر دادی |
+| paste دستور جدید «فرقی ندارد» و تیک save روشن نمی‌شود | یعنی فیلد **از قبل** عین همین متن را دارد — چیز خرابی نیست | فقط **Redeploy** بزن تا دیپلوی تازه با همین کانفیگ بوت شود |
+| دیپلوی سبز است ولی لاگ هنوز `BadValue` قدیمی را نشان می‌دهد | خط‌های مانده از دیپلوی قبلی (لاگ کهنه) | به ID دیپلوی + timestamp خط‌ها دقت کن؛ ملاک بج سبز + قدم ۶ (`getCmdLineOpts`) است |
+| بعد از هر ریدیپلوی/ری‌استارت مونگو: `rs.status()` می‌گوید `not a member of it` ولی `rs.conf()` سالم و DNS درست است | مسابقه DNS در بوت: کانتینر جدید موقع بوت اسم را کهنه دیده، self-match شکست خورده و گره در STARTUP پارک شده (re-resolve خودکار نمی‌کند) | **سرویس Mongo را Restart کن** (بوت تمیز با DNS همگرا → خودش PRIMARY می‌شود) → `rs.status()` → بعد Redeploy پورتال. قانون کلی: بعد از هر تغییر مونگو، اول PRIMARY را تأیید کن بعد سراغ پورتال برو |
+| در چت `&gt;` و `&amp;` و لینک `http://docker-entrypoint.sh` دیده می‌شود | آرتیفکت نمایشی چت است (escape شدن `>` و `&` + autolink پسوند `.sh`)؛ متن واقعی کپی‌شده تمیز است | نادیده بگیر؛ ملاک فقط متن داخل فیلد Railway است |
+
+## قدم ۷ — عیب‌یابی تشخیصی: وقتی با کانفیگ صحیح هم `BadValue` می‌ماند
+
+اگر Start Command عین قدم ۳، `MONGO_KEYFILE` ست، و Volume وصل است ولی دیپلوی تازه هم `BadValue` می‌دهد، یعنی یکی از این سه حالت است و باید تفکیک شود:
+
+1. start command اصلاً اجرا نمی‌شود (دیپلوی با snapshot قدیمی/سرویس اشتباه بوت می‌شود)،
+2. اجرا می‌شود ولی `MONGO_KEYFILE` در runtime خالی است (typo در نام variable یا مقدار خالی)،
+3. اجرا می‌شود و کلید هم هست ولی خطا می‌ماند (پارادوکس → اسکالیشن به پشتیبانی Railway).
+
+**تست تفکیک (موقت):** Start Command را با این نسخهٔ تشخیصی جایگزین کن (فقط **طول** کلید را چاپ می‌کند، نه خود secret):
+
+```sh
+sh -c 'echo "TG-DIAG wrapper running, MONGO_KEYFILE bytes: $(printf "%s" "$MONGO_KEYFILE" | wc -c)"; printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600 /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile; echo "TG-DIAG keyfile bytes: $(wc -c < /tmp/mongo-keyfile)"; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --keyFile /tmp/mongo-keyfile'
+```
+
+بعد برای اینکه Railway حتماً یک دیپلوی **کاملاً تازه** با snapshot فعلی تنظیمات بسازد (نه restart دیپلوی قبلی)، در Variables یک متغیر اضافه کن:
+
+```
+REDEPLOY_TRIGGER=1
+```
+
+(مقدارش مهم نیست؛ عوض شدن Variables دیپلوی جدید می‌سازد. بعداً می‌توانی پاکش کنی.)
+
+**خوانش لاگ دیپلوی جدید:**
+
+| آنچه در لاگ می‌بینی | نتیجه |
+|---|---|
+| هیچ خط `TG-DIAG` نیست | حالت ۱: start command اجرا نمی‌شود → پرامپ اسکالیشن (قدم ۸) |
+| `MONGO_KEYFILE bytes: 0` | حالت ۲: variable خالی/اشتباه است → املای نام و مقدار را اصلاح کن، بعد به قدم ۳ برگرد |
+| `bytes: ~684` ولی باز `BadValue` | حالت ۳: پارادوکس → لاگ کامل را نگه دار و پرامپ اسکالیشن (قدم ۸) |
+
+بعد از رفع مشکل، Start Command تشخیصی را با نسخهٔ تمیز قدم ۳ جایگزین کن (خط‌های `TG-DIAG` دیگر لازم نیستند).
+
+## قدم ۸ — پرامپ اسکالیشن به پشتیبانی Railway (انگلیسی، آمادهٔ paste)
+
+اگر به حالت ۱ یا ۳ رسیدی، متن زیر را (با پر کردن `[…]`) در کانال پشتیبانی Railway (Help widget داشبورد / Discord `#support` / `station.railway.com`) paste کن:
+
+```text
+Subject: Custom Start Command seemingly not applied — mongo:8.0 crash-loops with
+"BadValue: security.keyFile is required when authorization is enabled with replica sets"
+
+Setup:
+- Railway service from Docker image `mongo:8.0` (service name: [MongoDB]),
+  project: […], environment: [production], region: […].
+- Volume attached at `/data/db`. `MONGO_INITDB_ROOT_USERNAME/PASSWORD` are set
+  (so the official image entrypoint auto-adds `--auth`).
+- Custom Start Command (saved in Settings, verified — re-pasting shows no diff):
+  sh -c 'printf "%s" "$MONGO_KEYFILE" > /tmp/mongo-keyfile && chmod 600
+  /tmp/mongo-keyfile && chown mongodb:mongodb /tmp/mongo-keyfile;
+  exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0
+  --keyFile /tmp/mongo-keyfile'
+- `MONGO_KEYFILE` variable is set (~684-char base64, single line).
+
+Expected: mongod boots with `--replSet rs0 --keyFile /tmp/mongo-keyfile --auth`.
+
+Actual: EVERY deployment (including brand-new ones, e.g. [0b638f53…]) crashes
+within seconds with:
+  BadValue: security.keyFile is required when authorization is enabled with replica sets
+The container restart-loops, the deployment stays in "Initializing/Deploying"
+for hours, and queued deployments block behind it ("Waiting for previous deployment").
+
+Diagnostic: I temporarily used a Start Command that echoes a marker line
+(`TG-DIAG …`) before exec. The marker lines [DO / DO NOT] appear in the fresh
+deployment's logs (full log attached: […]).
+
+Question: is the Custom Start Command actually executed for these deployments?
+If yes, why would mongod see `--replSet`+`--auth` but not `--keyFile`?
+How can I force a deployment to use the current settings snapshot?
+
+Attachments: full Deploy Logs of deployment […], screenshot of Settings → Start Command.
+```

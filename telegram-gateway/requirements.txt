@@ -1,0 +1,6 @@
+# Telegram Gateway (Railway service) — Python deps.
+# Portal side stays Node/Express; only this service is Python (Telethon is Python-only).
+fastapi>=0.115,<0.118
+uvicorn>=0.30,<0.36
+telethon>=1.37,<1.42
+httpx>=0.27,<0.29 # FastAPI TestClient

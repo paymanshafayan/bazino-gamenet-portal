@@ -151,7 +151,10 @@ export default function App() {
   // بازنویسی می‌کند و بعد از هر رفرش قالب به پیش‌فرض برمی‌گردد. اعتبارسنجی
   // نهایی بعد از دریافت لیست سرور انجام می‌شود.
   const [themeId, setThemeId] = useState(() => __initialThemeId || 'dark-gold');
-  const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>('classic');
+  // انتخاب نمای هاب/کلاسیک در localStorage ذخیره می‌شود و بعد از رفرش بازیابی می‌گردد
+  const [layoutMode, setLayoutMode] = useState<'classic' | 'hub'>(() => {
+    try { return localStorage.getItem('layoutMode') === 'hub' ? 'hub' : 'classic'; } catch { return 'classic'; }
+  });
   const [availableThemes, setAvailableThemesState] = useState<ThemeInfo[]>(() => [
     ...BUILT_IN_THEMES,
     ...loadCustomThemes(),
@@ -247,7 +250,8 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('themeId', themeId);
     document.body.setAttribute('data-theme', themeId);
-    setLayoutMode('classic');
+    // NOTE: عمداً هیچ setLayoutMode اینجا نیست — انتخاب هاب/کلاسیک مستقل ذخیره می‌شود و
+    // همگام‌سازی قالب با سرور (که بعد از هر بارگذاری صفحه themeId را عوض می‌کند) نباید آن را پاک کند.
   }, [themeId]);
 
   // بارگذاری فایل CSS مجزای قالب فعال — با تغییر قالب، استایل قبلی

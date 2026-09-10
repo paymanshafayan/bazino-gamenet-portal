@@ -1344,3 +1344,16 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - اسناد تلگرام دوباره از روی `routes.ts`/`app.py` هم‌تراز شد: health بدون احراز روی `/api/manus/health`؛ POST drafts فقط Manus؛ ساخت/approve کمپین فقط ادمین؛ ذخیره ops-records نه جداول SQL؛ scope = `manus:telegram`.
 - کار و push فقط روی **`arena/01a08992-bazino-gamenet-portal`**. مرج به `main` با PR از همین برنچ.
 
+---
+
+## ۲۸. کشف محدودیت خروجی سندباکس — معماری جدید دسترسی به مرورگر کاربر (2026-09-10)
+
+> نشست `arena/01a089a9-bazino-gamenet-portal` (فعلی، برنچ ریل‌وی کاربر). ادامهٔ پروندهٔ CDP/تانل §۲۶/§۲۳.
+
+- **شواهد (curl واقعی از سندباکس):** خروجی HTTPS فقط `github.com` و `registry.npmjs.org` باز است؛ `cloudflare.com`، `ngrok.com`، `pinggy.io`، `localhost.run`، `example.com`، `google.com`، `bazino.pro` همه `exit=35` (SSL بلاک). **نتیجه:** پلن «cloudflared quick tunnel + کلاینت سمت سندباکس» هرگز از سمت ایجنت کار نمی‌کرد (حتی اگر DNS/QUIC کاربر حل می‌شد) — شکاف تست‌نشدهٔ §۲۳:۲۰ که این بار قبل از هدر دادن وقت کاربر، با شواهد بسته شد. صداقت کامل با کاربر اعلام شد.
+- خطای کاربر همان روز روی cloudflared (`Failed to initialize DNS local resolver … argotunnel.com: i/o timeout`) = DNS سیستم او هم موقتاً مشکل داشت (شب قبل resolve می‌شد — لاک ip=198.41.200.33). فیکس‌های مرجع اگر روزی cloudflared دوباره لازم شد: VPN روشن / DNS ویندوز 8.8.8.8 / `--edge <ip>:7844` (بدون DNS). **مسیر cloudflared برای این هدف کنار گذاشته شد.**
+- **معماری جایگزین (پل معکوس — پیاده و اجرا شد):** رلهٔ WebSocket روی خود سندباکس (`/home/user/cdp/relay.py`، venv + websockets 17) روی `0.0.0.0:8787` با کد جفت‌سازی یک‌بارمصرف (هرگز در Git ثبت نشود — ریپو **public** است)؛ آدرس عمومی از مسیر live-preview پلتفرم (`https://8787-<sandboxId>.e2b.app`)؛ سمت کاربر اسکریپت PowerShell خالص (`.NET ClientWebSocket`، بدون هیچ نصب) که `ws://127.0.0.1:9222` کرومِ ایجنت را به `wss://…/bridge?code=…` پمپ می‌کند؛ سمت ایجنت `agent.py` به `ws://localhost:8787/agent?code=…` وصل و CDP صحبت می‌کند. کروم با `--remote-debugging-port=9222 --remote-allow-origins=*` و پروفایل جدا `chrome-agent`.
+- **تمرین کامل داخلی سبز** (relay + mock_cdp + mock_bridge + agent.py در یک اجرا): فهرست targetها، attach، اسکرین‌شات JPEG، خواندن عنوان صفحه — همه از مسیر رله. نقشهٔ فایل‌ها: `/home/user/cdp/{relay.py, agent.py, mock_cdp.py, mock_bridge.py, venv/}` (بیرون ریپو).
+- **حلقه‌های هنوز تست‌نشده:** (۱) عبور WebSocket از پروکسی پیش‌نمایش پلتفرم (انتظار OK — HMR همین مسیر را استفاده می‌کند)، (۲) خود اسکریپت PowerShell روی ویندوز کاربر (API استاندارد .NET؛ اگر خطا داد خروجی قرمز چت خواسته شود)، (۳) دسترسی کاربر به `*.e2b.app` از ایران (فالبک: VPN فقط حین پل).
+- **قواعد امنیتی پل:** کد جفت‌سازی = تنها کلید دسترسی؛ بستن پنجرهٔ PowerShell کاربر = قطع فوری (kill-switch)؛ فقط پروفایل `chrome-agent` در معرض است نه کروم اصلی؛ رله بعد از پایان کار خاموش می‌شود. اسکرین‌شات‌های CDP هرگز در ریپو commit نشوند (public + محتوای پنل ادمین).
+

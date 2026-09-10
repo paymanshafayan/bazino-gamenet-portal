@@ -77,9 +77,17 @@ export function registerManusRoutes(d: ManusRouteDeps) {
     return 'admin';
   }
   // Dual mount: Manus uses /api/manus/*, the management studio uses /api/management/telegram/*.
+  // The management base already ends in /telegram, so a route's own leading /telegram
+  // segment is stripped when mounted there — otherwise the studio's call to
+  // /api/management/telegram/dialogs would need a doubled /telegram/telegram/dialogs
+  // and would fall through to the SPA HTML fallback (null items → studio crash).
+  // The Manus contract (/api/manus/telegram/...) is unchanged.
   const bases = ['/api/manus', '/api/management/telegram'];
   const R = (method: 'get' | 'post' | 'put', path: string, handler: express.RequestHandler) => {
-    for (const b of bases) (app as any)[method](b + path, handler);
+    for (const b of bases) {
+      const p = b === '/api/management/telegram' ? path.replace(/^\/telegram(?=\/|$)/, '') : path;
+      (app as any)[method](b + p, handler);
+    }
   };
   async function killOn(): Promise<boolean> {
     return (await store().getSetting(TG_KILL_SWITCH_KEY)) === '1';

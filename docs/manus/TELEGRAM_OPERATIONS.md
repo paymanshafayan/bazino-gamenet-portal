@@ -7,7 +7,7 @@
 
 | نقش | تصمیم می‌گیرد؟ | اجرا می‌کند؟ | حرف می‌زند با |
 |---|---|---|---|
-| **Manus** (عامل بیرونی) | فقط محتوای کمپین را پیشنهاد می‌دهد | ❌ هیچ ارسالی | فقط Portal (`/api/manus/telegram/*`) |
+| **Manus** (عامل بیرونی) | فقط draft ارسال پیشنهاد می‌دهد | ❌ هیچ ارسالی مستقیم | Portal: `GET /api/manus/health`، `GET /api/manus/telegram/*`، `POST /api/manus/campaign/drafts`، `GET /api/manus/reports/affiliate/daily` |
 | **Portal** (این ریپو) | ✅ مقصد، سیاست، تأیید، امضا | ❌ مستقیم به تلگرام وصل نمی‌شود | Gateway (`/internal/*`, Bearer+HMAC) |
 | **Gateway** (`telegram-gateway/`) | ❌ هیچ تصمیمی | ✅ فقط دستور امضاشده Portal | تلگرام (Telethon) |
 
@@ -17,16 +17,15 @@
 
 ## بخش ۱ — Manus (عامل بیرونی)
 
-- **Base URL:** `https://bazino.pro` (پروداکشن) — همه مسیرها زیر `/api/manus/telegram/…`.
-- **احراز هویت:** `Authorization: Bearer baz_…` — توکن integration با scope دقیق `manus:telegram` که ادمین از پنل مدیریت صادر می‌کند. بدون scope درست → `401`.
-- **چرخه کمپین:**
-  1. `POST /campaigns` — ساخت پیش‌نویس کمپین (متن + caps + fence + انقضا).
-  2. انتظار: **مدیر کمپین را در استودیو تأیید می‌کند** (فقط متن/کمپین یک‌بار تأیید می‌شود، نه هر ارسال).
-  3. `GET /dialogs?sendable_only=true` + `GET /dialogs/{id}/permissions` — کشف مقصدهای مجاز.
-  4. `POST /campaign/drafts` — ثبت draft برای هر ارسال (فقط Manus؛ روی آینه مدیریتی mount نیست).
-  5. Portal تصمیم می‌گیرد: `sent` خودکار (کمپین live + همه گیت‌ها سبز) یا `pending_approval` (صف مدیر).
-  6. `GET /reports/affiliate/daily?date=` — گزارش روزانه (ممکن است `data_unavailable` باشد).
-- **ممنوعه‌ها:** ارسال مستقیم، حدس `telegram_message_id`، صدا زدن Gateway، دور زدن `expires_at`/idempotency.
+- **Base URL:** `https://bazino.pro` — مسیرها طبق `server/manus/routes.ts` (نه حدس از پلن قدیمی).
+- **احراز هویت:** `Authorization: Bearer baz_…` با scope دقیق `manus:telegram`. بدون scope → `401`.
+- **چرخه واقعی در کد:**
+  1. **ادمین** کمپین را می‌سازد (`POST …/campaigns`) و تأیید می‌کند (`…/approve` → `live`). توکن Manus **نمی‌تواند** کمپین بسازد/تأیید کند.
+  2. Manus: `GET /api/manus/health` (بدون احراز) + `GET /api/manus/telegram/dialogs?sendable_only=true` + `…/permissions`.
+  3. Manus: `POST /api/manus/campaign/drafts` — **فقط این مسیر drafts**؛ روی آینه مدیریتی mount نیست.
+  4. موتور سیاست: `auto_approved` → ارسال فوری از طریق Gateway؛ وگرنه `pending_approval` / `deferred` در صف استودیو.
+  5. `GET /api/manus/reports/affiliate/daily?date=` — بدون PII؛ نبود داده = `data_unavailable`.
+- **ممنوعه‌ها:** صدا زدن Gateway، `send-direct`، approve/pause/revoke، حدس `telegram_message_id`.
 
 ## بخش ۲ — Portal (این ریپو)
 
@@ -42,12 +41,17 @@
 
 ### Endpointها
 
-| مسیر | مصرف‌کننده | احراز |
+| مسیر واقعی | مصرف‌کننده | احراز |
 |---|---|---|
-| `/api/manus/telegram/health` + `dialogs…` + `search…` + `reports…` | Manus | `baz_` + scope |
-| `/api/manus/telegram/campaigns…` + `campaign/drafts` (POST) + `send-direct` | Manus | `baz_` + scope |
-| `/api/manus/telegram/admin/*` (kill-switch، تنظیمات) | ادمین | JWT ادمین |
-| `/api/management/telegram/*` (آینه کامل به‌جز POST drafts + دو فهرست drafts/decisions) | تب استودیو | JWT ادمین |
+| `GET /api/manus/health` و `GET /api/management/telegram/health` | عمومی | بدون احراز |
+| `GET /api/manus/telegram/dialogs` (+ permissions / search) | Manus یا ادمین | `baz_`+scope **یا** JWT ادمین |
+| `POST /api/manus/campaign/drafts` | فقط Manus | `baz_` + `manus:telegram` |
+| `GET …/campaign/drafts/:id` | Manus یا ادمین | dual mount |
+| `GET …/campaign/drafts` و `GET …/campaign/decisions` | استودیو | JWT ادمین |
+| `POST/GET/PUT …/campaigns` + approve/pause/revoke | ادمین | JWT ادمین (هر دو base) |
+| `POST …/telegram/send-direct` | ادمین | JWT ادمین |
+| `GET/POST …/admin/kill-switch` | ادمین | JWT ادمین |
+| `GET …/reports/affiliate/daily` | Manus یا ادمین | dual |
 
 ### استقرار و تست
 
@@ -85,8 +89,8 @@
 
 ### تأیید کمپین (مسیر عادی)
 
-1. Manus کمپین `draft` می‌سازد و draftها را ثبت می‌کند.
-2. مدیر در استودیو → تب **تلگرام** → جدول کمپین‌ها: متن/caps/fence را می‌خواند، در صورت نیاز **ویرایش** می‌کند، بعد **تأیید** می‌کند (→ `live`).
+1. مدیر در استودیو کمپین را می‌سازد/ویرایش می‌کند (ویرایش کمپین `live` آن را به `draft` برمی‌گرداند — hash-lock).
+2. مدیر **تأیید** می‌کند (→ `live`). سپس Manus فقط draft ارسال ثبت می‌کند.
 3. از این لحظه ارسال‌های آن کمپین (با گذر از ۹ گیت بخش ۵) خودکار انجام می‌شوند؛ موارد مشکوک در **صف بررسی** می‌مانند تا مدیر resolve کند (تأیید/رد).
 4. **توقف اضطراری:** سوییچ kill-switch بالای تب → همه ارسال‌ها فوراً متوقف می‌شوند؛ برای توقف دائمی یک کمپین از **revoke** استفاده کنید.
 

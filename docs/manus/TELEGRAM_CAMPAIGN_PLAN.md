@@ -42,7 +42,7 @@ Telegram User Account (Bazino)
 | `fence` | حصار مقصد (§۵) — فقط داخل حصار ارسال خودکار مجاز است |
 | `caps` | سقف روزانه (پیش‌فرض ≤۲ مقصد/روز)، حداقل فاصله بین ارسال‌ها، ساعت سکوت |
 | `expires_at` | انقضای تأیید (پیش‌فرض ۳۰ روز) |
-| `status` | `draft → approved → live → paused/completed/revoked` |
+| `status` | در کد: `draft → live` (پس از approve) سپس `paused` / `revoked`؛ ویرایش live دوباره `draft` می‌شود |
 
 - **Draft** (به‌ازای هر ارسال پیشنهادی Manus) کماکان ساخته می‌شود، ولی به‌جای انتظار تأیید دستی، موتور سیاست پورتال آن را ارزیابی می‌کند: داخل حصار → `auto_approved` (با decision log)؛ خارج حصار → `pending_approval` برای بررسی انسانی.
 - **Approve کمپین فقط با JWT ادمین** (`requireAdmin` در `server.ts:828` یا `core.guard`) — توکن Manus به‌هیچ‌وجه حق approve ندارد (تضمین در کد + تست).
@@ -108,12 +108,11 @@ Telegram User Account (Bazino)
 
 ## ۶. مدل داده و migration (هر سه پرووایدر)
 
-جداول جدید (روی همان abstraction موجود `server/dataProviders.ts` — SQLite/SQL Server/**Mongo**، چون پروداکشن مالک Mongo است):
+**در کد migration جدا نیست.** سه kind روی ops-records (`OpsCore.save/list`): `tg-campaign`، `tg-draft`، `tg-decision` (`TG_KINDS` در `policy.ts`). Idempotency با `core.command`. هر سه پروایدر بدون جدول SQL جدا.
 
-- `tg_campaigns` — کمپین + text_hash + fence(JSON) + caps + status + approved_by/at + expires_at
-- `tg_drafts` — draft + campaign_id + dialog + text + decision + telegram_message_id + error
-- `tg_policy_decisions` — audit تصمیم‌ها (actor، draft، reason_code، timestamp، text_hash)
-- `tg_idempotency` — request_id/idempotency_key + نتیجه (replay-safe)
+- کمپین: textHash + fence + caps + status + approvedBy/At + expiresAt
+- draft: campaignId، dialog، message، decision/status، telegramMessageId، error
+- decision: actor، reason، textHash
 
 ## ۷. نقشه استفاده مجدد (ساخت دوباره ممنوع)
 
@@ -133,7 +132,7 @@ Telegram User Account (Bazino)
 
 امکانات تب (فقط ادمین، JWT):
 1. **مشاهده و چک:** فهرست کمپین‌ها + وضعیت، صف `pending_approval`، لاگ ارسال‌ها و decisionها با reason_code، گزارش روزانه افیلیت.
-2. **تغییر و تأیید:** ساخت/ویرایش کمپین (متن، حصار، سقف، انقضا) + approve/pause/revoke؛ هر ویرایش روی فیلدهای قفل (متن/CTA/افیلیت) وضعیت را به `needs-approval` برمی‌گرداند (hash-lock).
+2. **تغییر و تأیید:** ساخت/ویرایش کمپین + approve/pause/revoke؛ ویرایش کمپین `live` وضعیت را به **`draft`** برمی‌گرداند (باید دوباره approve شود).
 3. **ارسال مستقیم مدیر:** composer دستی — انتخاب dialog از فهرست واقعی وریفای‌شده + متن + دکمه ارسال با دیالوگ تأیید (پست به کانال/گروه)؛ مسیر `send-direct` با چک‌های §۵٫۱.
 4. **kill-switch سراسری ارسال** + نمایش منبع سکرت‌ها (host/panel) مثل تب settings موجود.
 

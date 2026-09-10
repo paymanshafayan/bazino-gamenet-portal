@@ -1341,5 +1341,6 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - درخت کد آن برنچ با `git merge --allow-unrelated-histories` روی برنچ این نشست آمد (تفاوت باقی‌مانده با مبدأ: فقط `.github/workflows/publishing-v4.yml` روی این نشست).
 - **کد جلوتر از پلن تلگرام بود:** B1–B4 در ریپو موجودند (`server/manus/*`, `telegram-gateway/`, تب استودیو، تست‌ها). `TELEGRAM_CAMPAIGN_PLAN.md` هنوز می‌گفت «هیچ کدی اجرا نشده» → به وضعیت واقعی به‌روز شد. `TELEGRAM_OPERATIONS.md` ارجاع اشتباه به `store.ts` داشت (ذخیره روی ops-records است) → اصلاح شد.
 - **مطابقت کلی:** هندآف §۲۶ با فایل‌های موجود هم‌خوان است. شکاف عمدی: B5 زنده، سرویس Gateway روی Railway ساخته نشده، CDP/تانل مرورگر کاربر معلق (منتظر URL)، POS/SMTP متوقف.
-- کار و push فقط روی **`arena/01a08992-bazino-gamenet-portal`**.
+- اسناد تلگرام دوباره از روی `routes.ts`/`app.py` هم‌تراز شد: health بدون احراز روی `/api/manus/health`؛ POST drafts فقط Manus؛ ساخت/approve کمپین فقط ادمین؛ ذخیره ops-records نه جداول SQL؛ scope = `manus:telegram`.
+- کار و push فقط روی **`arena/01a08992-bazino-gamenet-portal`**. مرج به `main` با PR از همین برنچ.
 

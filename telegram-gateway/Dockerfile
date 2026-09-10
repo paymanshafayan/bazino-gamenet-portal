@@ -12,7 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 
-# Railway injects $PORT; sqlite lives on the mounted volume (/data).
-VOLUME ["/data"]
+# Railway injects $PORT; sqlite lives on the attached Railway Volume (/data).
+# NOTE: no Docker VOLUME instruction — Railway's builder rejects it
+# ("docker VOLUME is not supported, use Railway Volumes"). Mount the volume
+# at /data in the service settings instead.
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn src.app:app --host 0.0.0.0 --port ${PORT:-8000}"]

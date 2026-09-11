@@ -1522,3 +1522,17 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **سخت‌گیری ریپو (این کامیت):** (۱) `mountComponent` حالا factory را هم داخل try می‌گیرد — theme.js معیوب دیگر هرگز صفحه را نمی‌کشد، فقط همان region خالی/فال‌بک می‌شود + هشدار واضح وقتی factory تعریف `{render}` برنگرداند؛ (۲) `validateThemeComponentJs` نصب theme.js دارای هوک React را با خطای فارسی روشن رد می‌کند (کامنت‌ها قبل از بررسی حذف می‌شوند تا false-positive ندهد)؛ (۳) باگ `listFilesRecursive` رفع شد — مسیر زیرپوشه‌ها حفظ می‌شود (قبلاً تخت می‌شد → assetFiles ناقص و exportThemeZip برای assetهای تو‌در‌تو ENOENT). تست‌های جدید: unit ×۴، ui ×۱.
 - **جامانده:** آپلود `bazino-3d-dimension-v1.0.1.zip` (آماده در /tmp، sha256 70481765eb5dcdf5…) با `cdp/upload-zip.js` — وسط آپلود پاورشلِ پل کارفرما ایستاد (~13:42Z؛ مرورگر کارفرما هنوز وصل بود — فقط پنجرهٔ PS). بعد از برگشت پل: آپلود → فعال‌سازی خودکار → وریفای زندهٔ خانه/اسلایدر/تصاویر/صفحات دیگر.
 - **بازسازی کامل ابزار پل بعد از ریبیلد سندباکس (این نوبت):** سندباکس ریبیلد شد (`/home/user/cdp` پاک شد؛ شناسهٔ جدید) → کل ابزار با Node خالص از نو ساخته شد: `relay.js` v7 (HTTP واحد: `/up` `/down` `/status` `/report` + ایجنت: `/agent/cmd` `/agent/poll` long-poll — دیگر watcher/agent پس‌زمینه لازم نیست)، `lib.js`، `agent.js`، `upload-zip.js`، `fetch-3d-assets.js` (دانلود asset از سرور از طریق صفحه)، `capture-errors.js` (هوک خطا قبل از لود)، `mock_bridge.js` (تمرین داخلی — سبز). URL عمومی جدید خودکار از صفحهٔ دیاگ ثبت شد: `https://sbx-kzswdc7ylr3y7mnn.arena.site` (کد جلسه همان fda16519959164f3). درس: مرورگر کارفرما (صفحهٔ دیاگ) و پاورشل جدا قطع/وصل می‌شوند — reports صفحهٔ دیاگ بهترین سیگنال تشخیصِ «کدام طرف افتاده» است.
+
+### ۳۱-ح. قالب «Bazino 3D Dimension» v1.0.1 — نصب و وریفای زندهٔ کامل ✅ (2026-09-11، بسته شد)
+
+> ادامهٔ §۳۱-ز. کارفرما پل را برگرداند؛ آپلود و تست کامل توسط ایجنت انجام شد.
+
+- **نصب:** آپلودر تکه‌ای پل (۱۴ چانک، SHA-256 دوطرفه ✓) → `POST /api/admin/themes/install?name=…&replace=1` → `success:true, replaced:true, activeThemeId:bazino-3d-dimension` — v1.0.1 با ۱۰ asset (۱.۱۶MB)، performance findings خالی. assetFiles حالا مسیرهای زیرپوشهٔ `tour/` را درست نشان می‌دهد (فیکس listFilesRecursive زنده است).
+- **وریفای زنده (همگی از مرورگر کارفرما):**
+  - خانه: **صفر خطای JS** (هوک ضبط خطا)؛ هدر 3D (لوگو + ۵ لینک + دکمهٔ RESERVE)؛ region خانه با هرو فارسی؛ ۶ دکمهٔ تور + ۴ کارت بازی؛ هر ۵ تصویر درخت لود ✓.
+  - اسلایدر: هر ۶ کلیک → تصویر درست + لودشده + دقیقاً یک دکمهٔ فعال + عنوان درست ✓.
+  - صفحات دیگر با هدر 3D و بدون خطا: /games (GAMES فعال)، /tournaments (ARENA فعال)، /cafe (CAFE فعال)، /reservations (alias رسمی پرتال به games — رفتار عادی).
+  - لینک فعال ناوبری بر اساس pathname کار می‌کند (فیکس v1.0.1).
+  - اسکرین‌شات‌های اثبات (non-git): `/home/user/3d-live-proof.jpg` و `/home/user/3d-live-home-final.jpg`.
+- **وضعیت نهایی:** قالب 3D نصب‌شده + فعال + سالم؛ قالب هاب v1.4.0 هم روی سرور هست (برای بازگشت سریع در صورت نیاز). بستهٔ v1.0.1 در `/home/user/bazino-3d-dimension-v1.0.1-fixed.zip` (non-git).
+- نکتهٔ زبانی: ناوبری 3D الان انگلیسی نشان می‌دهد چون زبان جلسهٔ مرورگر EN است — strings.fa کامل موجود است و در حالت فارسی برچسب‌های فارسی می‌آید.

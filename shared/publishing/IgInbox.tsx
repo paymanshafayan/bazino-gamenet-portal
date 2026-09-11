@@ -5,7 +5,9 @@ import './studio.css';
 /** Instagram inbox + away auto-reply (admin only).
  *  Replaces Meta's "Away message": the portal records every inbound DM and,
  *  inside the away window, replies once per conversation in the sender's own
- *  language (fa/en/tr/ru detected from the message text). */
+ *  language (fa/en/tr/ru detected from the message text).
+ *  Admins can edit each language's text and reset any of them (or all) back
+ *  to the operator-approved defaults via the ↺ buttons. */
 export function IgInboxTab() {
   const { api, tr, language } = useCopy();
   const [items, setItems] = useState<any[]>([]);
@@ -67,12 +69,24 @@ export function IgInboxTab() {
       </div>
       <p className="pub-note">{tr(['پاسخ فقط برای پیام‌های ورودی اینستاگرام ارسال می‌شود؛ هر گفتگو در هر بازه یک بار پاسخ می‌گیرد و پیام‌های جریان کمپین (دکمهٔ دوست/همکار) پاسخ اضافه نمی‌گیرند.', 'Replies go to inbound Instagram DMs only; each conversation gets at most one reply per window, and campaign-flow messages (friend/partner button) never get an extra reply.', 'Yanıtlar yalnızca gelen Instagram mesajlarına gider; her sohbet pencere başına en fazla bir yanıt alır, kampanya akışı mesajları ek yanıt almaz.', 'Ответы отправляются только входящим DM Instagram; каждый диалог получает максимум один ответ за окно, сообщения кампании не получают лишних ответов.'])}</p>
       {(['fa', 'en', 'tr', 'ru'] as const).map(l => (
-        <Field key={l} label={tr([`متن پاسخ (${l.toUpperCase()})`, `Reply text (${l.toUpperCase()})`, `Yanıt metni (${l.toUpperCase()})`, `Текст ответа (${l.toUpperCase()})`])}>
+        <div className="pub-field" key={l}>
+          <span className="pub-away-label">
+            {tr([`متن پاسخ (${l.toUpperCase()})`, `Reply text (${l.toUpperCase()})`, `Yanıt metni (${l.toUpperCase()})`, `Текст ответа (${l.toUpperCase()})`])}
+            <button type="button" className="pub-secondary pub-away-reset" data-away-reset={l}
+              title={tr(['حذف متن سفارشی و بازگردانی پیش‌فرض', 'Delete custom text and restore the default', 'Özel metni sil ve varsayılana dön', 'Удалить свой текст и вернуть стандартный'])}
+              onClick={() => set({ messages: { ...s.messages, [l]: cfg.defaults?.[l] ?? s.messages[l] } })}>
+              ↺ {tr(['پیش‌فرض', 'Default', 'Varsayılan', 'По умолчанию'])}
+            </button>
+          </span>
           <textarea rows={3} value={s.messages[l]} onChange={e => set({ messages: { ...s.messages, [l]: e.target.value } })} dir={l === 'fa' ? 'rtl' : 'ltr'} />
-        </Field>
+        </div>
       ))}
       <div className="pub-actions">
         <button className="pub-primary" disabled={busy} onClick={save}>{tr(['ذخیره تغییرات', 'Save changes', 'Kaydet', 'Сохранить'])}</button>
+        <button type="button" className="pub-secondary" disabled={busy} data-away-reset-all
+          onClick={() => set({ messages: { ...(cfg.defaults || s.messages) } })}>
+          ↺ {tr(['حذف همهٔ متن‌های سفارشی', 'Reset all texts', 'Tümünü sıfırla', 'Сбросить все'])}
+        </button>
       </div>
       {saved && <p className="pub-success">{tr(['تنظیمات ذخیره شد', 'Settings saved', 'Ayarlar kaydedildi', 'Настройки сохранены'])}</p>}
       <ErrorNotice error={error} />

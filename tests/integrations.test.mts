@@ -70,6 +70,14 @@ test('outside window / daily cap / conversation gap fail closed', () => {
 });
 
 suite('4. Away settings sanitization');
+test('default texts are the operator-approved 2026-09-11 wording (registered & under review)', () => {
+  assert.ok(away.DEFAULT_AWAY_MESSAGES.fa.includes('در سامانه ثبت و در حال بررسی'), 'fa default must say the message is registered and under review');
+  assert.ok(away.DEFAULT_AWAY_MESSAGES.fa.includes('بازینو پرو'), 'fa default must carry the Bazino Pro sign-off');
+  for (const l of ['en', 'tr', 'ru'] as const) {
+    assert.ok(away.DEFAULT_AWAY_MESSAGES[l].length > 40, `${l} default must be a full sentence`);
+    assert.ok(!away.DEFAULT_AWAY_MESSAGES[l].includes('away right now'), `${l} default must not use the old away-hours wording`);
+  }
+});
 test('clamps bad numbers, keeps valid texts, defaults missing languages', () => {
   const clean = away.sanitizeAwaySettings({ enabled: 'true', startHour: 99, endHour: -5, dailyCap: '50', perConversationHours: 3, messages: { fa: '  سلام  ' } });
   assert.equal(clean.enabled, true);

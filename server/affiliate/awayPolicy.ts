@@ -4,8 +4,9 @@
  * Replaces Meta's "Away message" automation (disabled 2026-09-10 after the
  * duplicate-DM incident): the portal now owns the reply, language-detected,
  * rate-limited, visible to the admin in the studio and auditable.
- * The reply NEVER invents facts — the default texts mirror the old Meta away
- * message theme (we are away, reservation info, reply in the morning).
+ * The reply NEVER invents facts. Default texts = operator-approved wording
+ * (2026-09-11): the message is registered and under review; the reply will be
+ * sent to the sender's DM after review. Same meaning in all four languages.
  */
 export type AwayLanguage = 'fa' | 'en' | 'tr' | 'ru';
 
@@ -24,10 +25,10 @@ export interface AwaySettings {
 }
 
 export const DEFAULT_AWAY_MESSAGES: Record<AwayLanguage, string> = {
-  fa: 'سلام! الان پاسخ‌گوی آنی نیستیم (ساعات ۱ تا ۱۰ بامداد به وقت قبرس). برای رزرو سیستم بازی یا سؤال دربارهٔ کلوپ، همین‌جا پیام بگذارید؛ صبح اول وقت پاسخ می‌دهیم. بازینو پرو — گیم‌نت و کلوپ گیمینگ.',
-  en: 'Hi! We are away right now (01:00–10:00 Cyprus time). For gaming-rig reservations or club questions, leave a message here and we will reply first thing in the morning. Bazino Pro — gaming arena & club.',
-  tr: 'Merhaba! Şu an uzaktayız (Kıbrıs saatiyle 01:00–10:00). Rezervasyon veya kulüp sorularınız için buraya mesaj bırakın, sabah ilk işte dönelim. Bazino Pro — oyun arenası ve kulüp.',
-  ru: 'Привет! Сейчас нас нет онлайн (01:00–10:00 по Кипру). Оставьте сообщение здесь — про бронь игровой станции или вопросы по клубу, ответим утром. Bazino Pro — игровая арена и клуб.',
+  fa: 'سلام . پیام شما در سامانه ثبت و در حال بررسی هست . پس از بررسی ، پاسخ به دایرکت شما ارسال خواهد شد . باتشکر . ***بازینو پرو — گیم‌نت و کلوپ گیمینگ.',
+  en: 'Hello. Your message has been registered in our system and is being reviewed. After the review, a reply will be sent to your direct message. Thank you. ***Bazino Pro — gaming arena & club.',
+  tr: 'Merhaba. Mesajınız sisteme kaydedildi ve inceleniyor. İncelemeden sonra yanıtınız direkt mesaj olarak gönderilecek. Teşekkürler. ***Bazino Pro — oyun arenası ve kulüp.',
+  ru: 'Здравствуйте. Ваше сообщение зарегистрировано в системе и находится на рассмотрении. После проверки ответ будет отправлен вам в директ. Спасибо. ***Bazino Pro — игровая арена и клуб.',
 };
 
 export const DEFAULT_AWAY_SETTINGS: AwaySettings = {

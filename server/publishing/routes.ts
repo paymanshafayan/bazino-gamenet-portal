@@ -10,7 +10,7 @@ import {registerPublicationRoutes} from './publicationRoutes';
 import { WebhookService, registerZernioReceiver } from './webhooks';
 import { InstagramCampaignService } from '../affiliate/campaignV4';
 import { AwayReplier } from '../affiliate/awayReply';
-import { inAwayWindow } from '../affiliate/awayPolicy';
+import { DEFAULT_AWAY_MESSAGES, inAwayWindow } from '../affiliate/awayPolicy';
 import { FriendGateService,registerFriendGate } from '../affiliate/friendGate';
 export function publishingAdmin(core:OpsCore):express.RequestHandler {
   return async(req,res,next)=>{try{const staff=await core.authorize(req);if(!staff.admin)fail('ADMIN_ONLY',403);(req as any).staff=staff;next();}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}};
@@ -40,7 +40,7 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   app.post(`${base}/outbox/:id/:action`,admin,endpoint(async(req,res)=>res.json(await campaigns.resolveOutbox((req as any).staff.username,String(req.params.id),String(req.params.action),req.body||{}))));
   app.get(`${base}/members`,admin,endpoint(async(_req,res)=>res.json(await campaigns.list())));
   app.get(`${base}/ig-inbox`,admin,endpoint(async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({items:await away.list(100)});}));
-  app.get(`${base}/ig-away`,admin,endpoint(async(_req,res)=>{const s=await away.settings();res.setHeader('Cache-Control','no-store');res.json({settings:s,nowActive:inAwayWindow(s,new Date(),s.timezone)});}));
+  app.get(`${base}/ig-away`,admin,endpoint(async(_req,res)=>{const s=await away.settings();res.setHeader('Cache-Control','no-store');res.json({settings:s,nowActive:inAwayWindow(s,new Date(),s.timezone),defaults:DEFAULT_AWAY_MESSAGES});}));
   app.put(`${base}/ig-away`,admin,endpoint(async(req,res)=>res.json(await away.saveSettings(req.body||{}))));
   app.get(`${base}/events`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await webhooks.queue.report())));
   let inboxBusy=false,analyticsBusy=false;

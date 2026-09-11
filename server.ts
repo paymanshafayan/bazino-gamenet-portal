@@ -4118,6 +4118,50 @@ namespace GameNet.Infrastructure.Migrations
     }
   });
 
+  // ═══ تصاویر سفارشی قالب‌ها (استاتیک/تزئینی) — آپلود ادمین ═══
+  // ادمین از پنل شخصی‌سازی، برای هر «اسلات» تصویر (مثل هرو مرکزی/کارت تورنمنت/
+  // کارت مسابقه زنده) فایل آپلود می‌کند؛ خروجی WebP بهینه در DATA_DIR/uploads/theme
+  // سرو می‌شود و URL آن در تنظیمات `theme_img.<slot>` ذخیره می‌شود تا قالب از
+  // props.settings بخواند و در نبودِ آن به تصویر پیش‌فرضِ خودِ قالب برگردد.
+  // نام فایل = نام اسلات (بازنویسی جایگزین) + پارامتر ?v= برای کش‌باست مرورگر.
+  const themeImgDir = path.join(DATA_DIR, "uploads", "theme");
+  app.use("/uploads/theme", express.static(themeImgDir, { maxAge: "30d" }));
+  const rawThemeImage = express.raw({
+    type: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    limit: "8mb",
+  });
+  app.post("/api/admin/theme-image", rawThemeImage, async (req, res) => {
+    try {
+      const slot = String(req.query.slot || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || "image";
+      const buf: Buffer | undefined = Buffer.isBuffer(req.body) ? req.body : undefined;
+      if (!buf || buf.length < 100) {
+        return res.status(400).json({ error: "Invalid or empty image", code: "INVALID_IMAGE" });
+      }
+      let out: Buffer;
+      try {
+        const sharp = (await import("sharp")).default;
+        out = await sharp(buf)
+          .rotate()
+          .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+      } catch (e) {
+        console.error("[theme-image] sharp failed:", e);
+        return res.status(400).json({ error: "Unsupported image format", code: "INVALID_IMAGE" });
+      }
+      fs.mkdirSync(themeImgDir, { recursive: true });
+      const fileName = `${slot}.webp`;
+      fs.writeFileSync(path.join(themeImgDir, fileName), out);
+      const url = `/uploads/theme/${fileName}?v=${Date.now().toString(36)}`;
+      console.info(`[theme-image] slot «${slot}» updated (${out.length} bytes webp)`);
+      res.json({ success: true, url, slot });
+    } catch (err) {
+      console.error("Error uploading theme image:", err);
+      res.status(500).json({ error: "Failed to store theme image" });
+    }
+  });
+
+
   // شارژ/کسر دستی کردیت بازینو (BC) توسط ادمین — تا وقتی روش‌های کسب کردیت نهایی نشده،
   // این مسیر رسمی شارژ حساب کاربر است. هر حرکت در تراکنش‌ها با نوع Credits ثبت می‌شود.
   app.post("/api/admin/credits/adjust", async (req, res) => {

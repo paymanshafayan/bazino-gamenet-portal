@@ -1,9 +1,9 @@
 {
   "id": "bazino-hub-v3",
   "name": "Bazino Hub v3 (Hasti)",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "layout": "hub",
-  "description": "Bazino Hub v3.0.0 — Hasti reference design: very dark neon gaming, English UI, split hero (FC / GTA VI / LIVE), 7 glowing quick-access cards, contact strip, neon footer. Nav & sections mapped to live portal pages.",
+  "description": "Bazino Hub v3.1.0 — Hasti reference design: dark neon gaming, split hero. Dynamic images read live from the server (admin slider = center promo card; tournaments & live match data from events feed; blog strip from article covers). Static decorative art (hero cards) is admin-replaceable via Admin ▸ Customization uploads (theme_img.* settings).",
   "author": "Bazino",
   "sdkVersion": 2,
   "colors": {
@@ -80,7 +80,10 @@
       "contact.ig": "Follow the club life",
       "footer.tagline": "GOOD GAMES • BETTER PEOPLE",
       "footer.links": "EXPLORE",
-      "footer.contact": "CONTACT"
+      "footer.contact": "CONTACT",
+      "hero.more": "MORE INFO",
+      "hero.live.next": "COMING UP",
+      "articles.title": "LATEST FROM BAZINO"
     },
     "fa": {
       "header.club": "گیمینگ کلاب",
@@ -128,7 +131,10 @@
       "contact.ig": "زندگی کلاب را دنبال کن",
       "footer.tagline": "بازی خوب • آدم‌های بهتر",
       "footer.links": "دسترسی",
-      "footer.contact": "تماس"
+      "footer.contact": "تماس",
+      "hero.more": "اطلاعات بیشتر",
+      "hero.live.next": "به‌زودی",
+      "articles.title": "آخرین‌های بازینو"
     },
     "tr": {
       "header.club": "OYUN KULÜBÜ",
@@ -150,7 +156,10 @@
       "contact.map": "Harita ve yol tarifi",
       "footer.tagline": "İYİ OYUNLAR • DAHA İYİ İNSANLAR",
       "footer.links": "KEŞFET",
-      "footer.contact": "İLETİŞİM"
+      "footer.contact": "İLETİŞİM",
+      "hero.more": "DAHA FAZLA BİLGİ",
+      "hero.live.next": "YAKINDA",
+      "articles.title": "BAZINO'DAN SON HABERLER"
     },
     "ru": {
       "header.club": "ИГРОВОЙ КЛУБ",
@@ -172,7 +181,10 @@
       "contact.map": "Карта и маршрут",
       "footer.tagline": "ХОРОШИЕ ИГРЫ • ЛУЧШИЕ ЛЮДИ",
       "footer.links": "РАЗДЕЛЫ",
-      "footer.contact": "КОНТАКТЫ"
+      "footer.contact": "КОНТАКТЫ",
+      "hero.more": "ПОДРОБНЕЕ",
+      "hero.live.next": "СКОРО",
+      "articles.title": "ПОСЛЕДНЕЕ ОТ BAZINO"
     }
   }
 }

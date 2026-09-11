@@ -102,6 +102,22 @@
   letter-spacing: 4.2px;
   color: var(--hz-pink);
 }
+.hz-logo-btn {
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+.hz-logo-img {
+  height: 40px;
+  max-width: 190px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(255, 46, 136, 0.35));
+}
 .hz-nav { display: flex; align-items: center; gap: 2px; height: 100%; }
 .hz-nav-link {
   position: relative;
@@ -254,10 +270,24 @@
   background: rgba(0, 0, 0, 0.45);
 }
 .hz-t-cyan { color: var(--hz-cyan); border: 1px solid rgba(0, 229, 255, 0.5); text-shadow: 0 0 10px rgba(0, 229, 255, 0.7); }
+.hz-t-gold { color: var(--hz-gold); border: 1px solid rgba(255, 201, 60, 0.5); text-shadow: 0 0 10px rgba(255, 201, 60, 0.7); }
+.hz-hero-meta {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13.5px; font-weight: 700;
+  letter-spacing: 1.6px;
+  color: var(--hz-gold);
+  text-shadow: 0 0 12px rgba(255, 201, 60, 0.45);
+}
+.hz-b-purple { color: #c9a0ff; border-color: rgba(157, 78, 221, 0.6); box-shadow: 0 0 14px rgba(157, 78, 221, 0.35); }
 .hz-hero-title {
   font-family: 'Orbitron', sans-serif; font-weight: 900;
   font-size: clamp(20px, 2.4vw, 30px);
   letter-spacing: 1.5px; color: #fff; line-height: 1.05;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .hz-hero-title-xl { font-size: clamp(30px, 4vw, 52px); text-shadow: 0 0 30px rgba(157, 78, 221, 0.65); }
 .hz-hero-sub { font-size: 14.5px; color: #c7cde6; font-weight: 500; }
@@ -364,6 +394,52 @@
 }
 .hz-quick:hover .hz-quick-arrow { color: var(--tone); }
 .hz-quick:hover .hz-quick-title { text-shadow: 0 0 14px color-mix(in srgb, var(--tone) 65%, transparent); }
+
+/* ───────── articles strip (server article covers) ───────── */
+.hz-article-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.hz-article {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--hz-card), rgba(12, 14, 26, 0.85));
+  border: 1px solid var(--hz-line);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.3s var(--hz-ease), box-shadow 0.3s var(--hz-ease), border-color 0.3s var(--hz-ease);
+}
+.hz-article:hover {
+  transform: translateY(-5px);
+  border-color: rgba(77, 163, 255, 0.55);
+  box-shadow: 0 12px 34px rgba(77, 163, 255, 0.18), 0 0 20px rgba(77, 163, 255, 0.12);
+}
+.hz-article-imgwrap { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; background: #0a0d1c; }
+.hz-article-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hz-article-cat {
+  position: absolute; top: 10px; left: 10px;
+  font-family: 'Orbitron', sans-serif; font-weight: 700;
+  font-size: 9px; letter-spacing: 2px;
+  color: var(--hz-cyan);
+  background: rgba(4, 5, 13, 0.72);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  padding: 3px 8px; border-radius: 6px;
+}
+.hz-article-title {
+  padding: 0 14px;
+  font-size: 15px; font-weight: 700; color: #fff; line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hz-article-date {
+  padding: 0 14px 14px;
+  font-size: 12px; color: var(--hz-dim); font-weight: 500; letter-spacing: 0.6px;
+}
 
 /* ───────── contact strip ───────── */
 .hz-contact-grid {
@@ -490,6 +566,7 @@
   .hz-nav { display: none; }
   .hz-quick-grid { grid-template-columns: repeat(4, 1fr); }
   .hz-contact-grid { grid-template-columns: repeat(2, 1fr); }
+  .hz-article-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 900px) {
   .hz-hero { grid-template-columns: 1fr 1.45fr; }
@@ -502,6 +579,7 @@
   .hz-hero-live { display: flex; }
   .hz-quick-grid { grid-template-columns: repeat(2, 1fr); }
   .hz-contact-grid { grid-template-columns: 1fr; }
+  .hz-article-grid { grid-template-columns: 1fr; }
   .hz-footer-in { grid-template-columns: 1fr; gap: 26px; }
   .hz-foot-bar { justify-content: center; text-align: center; }
   .hz-header-in { height: 60px; padding: 0 12px; }

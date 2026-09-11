@@ -9,6 +9,7 @@ coverage/
 
 # Real database files / local install state — must never be committed
 install-config.json
+/uploads/
 bazino.sqlite3
 bazino.sqlite3-*
 database.json

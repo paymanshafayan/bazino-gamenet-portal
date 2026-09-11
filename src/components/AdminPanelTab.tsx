@@ -41,7 +41,8 @@ import {
   LifeBuoy,
   Wallet,
   Megaphone,
-  Ticket
+  Ticket,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
@@ -195,6 +196,8 @@ export default function AdminPanelTab({
   // Customization & Settings states
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [isResettingDb, setIsResettingDb] = useState(false);
+  // آپلود تصاویر سفارشی قالب هاب (اسلات‌های تزئینی — theme_img.<slot>)
+  const [themeImgBusy, setThemeImgBusy] = useState<string | null>(null);
   // فرم شارژ دستی کردیت بازینو (تا نهایی شدن روش‌های کسب کردیت)
   const [grantUsername, setGrantUsername] = useState('');
   const [grantDelta, setGrantDelta] = useState('');
@@ -511,6 +514,34 @@ export default function AdminPanelTab({
       console.error(err);
       addNotification(L(language, { fa: 'خطا در ذخیره تنظیمات', en: 'Error saving setting', ru: 'Ошибка сохранения настройки', tr: 'Ayar kaydedilirken hata oluştu' }), 'error');
       return false;
+    }
+  };
+
+  // آپلود تصویر سفارشی برای اسلات‌های تزئینی قالب هاب: فایل → WebP سرور → تنظیم theme_img.<slot>
+  const handleThemeImageUpload = async (slot: string, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      addNotification(L(language, { fa: 'فقط فایل تصویری مجاز است', en: 'Only image files are allowed', ru: 'Разрешены только изображения', tr: 'Sadece görsel dosyaları kabul edilir' }), 'error');
+      return;
+    }
+    setThemeImgBusy(slot);
+    try {
+      const res = await fetch(`/api/admin/theme-image?slot=${encodeURIComponent(slot)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+        body: await file.arrayBuffer(),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (res.ok && data.success && data.url) {
+        const saved = await handleSaveSetting(`theme_img.${slot}`, data.url);
+        if (saved) return;
+        throw new Error('save failed');
+      }
+      throw new Error(data.error || `HTTP ${res.status}`);
+    } catch (err) {
+      console.error(err);
+      addNotification(L(language, { fa: 'خطا در بارگذاری تصویر قالب', en: 'Error uploading theme image', ru: 'Ошибка загрузки изображения темы', tr: 'Tema görseli yüklenirken hata oluştu' }), 'error');
+    } finally {
+      setThemeImgBusy(null);
     }
   };
 
@@ -4184,6 +4215,82 @@ export default function AdminPanelTab({
                       <span>{L(language, { fa: 'پاک‌سازی کل اطلاعات دیتابیس', en: 'Completely Purge DB', ru: 'Полностью очистить БД', tr: 'Tüm Veritabanını Temizle' })}</span>
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* SECTION 6: HUB THEME DECORATIVE IMAGES (upload & replace) */}
+              <div className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-5">
+                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">
+                  <ImageIcon className="w-4 h-4 text-fuchsia-400" />
+                  <span>{L(language, { fa: 'تصاویر تزئینی قالب هاب (آپلود و جایگزینی)', en: 'Hub Theme Decorative Images (Upload & Replace)', ru: 'Декоративные изображения темы Hub (загрузка и замена)', tr: 'Hub Tema Dekoratif Görselleri (Yükle ve Değiştir)' })}</span>
+                </h3>
+                <p className="text-[10px] text-gray-400 mb-6">
+                  {L(language, {
+                    fa: 'تصاویر پویا (اسلایدهای هرو، تورنمنت‌ها، اخبار و ...) همیشه از سرور خوانده می‌شوند و از بخش‌های خودشان (مدیریت اسلایدر، تورنمنت‌ها، بلاگ) مدیریت می‌شوند. این‌جا فقط جایگزینی تصاویر استاتیک و تزئینی قالب هاب ممکن است: برای هر کارت، تصویر دلخواه آپلود کنید یا به پیش‌فرض قالب بازگردانید. اگر اسلایدی از مدیریت اسلایدر تنظیم شده باشد، تصویر اسلاید اولویت دارد.',
+                    en: 'Dynamic images (hero slides, tournaments, blog posts…) are always read live from the server and managed in their own sections. Here you only replace the theme\'s static decorative images: upload your own artwork per card or reset to the theme default. A slider image (managed in Slider Management) always takes priority on the hero.',
+                    ru: 'Динамические изображения (слайды, турниры, новости…) всегда читаются с сервера и управляются в своих разделах. Здесь заменяются только статичные декоративные изображения темы: загрузите свой арт для каждой карточки или верните стандартный. Слайд из управления слайдером имеет приоритет.',
+                    tr: 'Dinamik görseller (slaytlar, turnuvalar, yazılar…) her zaman sunucudan okunur ve kendi bölümlerinden yönetilir. Burada yalnızca temanın statik dekoratif görselleri değiştirilir: her kart için kendi görselinizi yükleyin veya varsayılana döndürün. Slayt yönetiminden bir görsel varsa hero üzerinde önceliklidir.' })}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {([
+                    { slot: 'hero_main', fa: 'هرو مرکزی — کارت بزرگ تبلیغاتی', en: 'Center hero — main promo card', ru: 'Центральный герой — главная карточка', tr: 'Merkez hero — ana tanıtım kartı', def: '/api/themes/bazino-hub-v3/assets/slide-city.webp' },
+                    { slot: 'hero_tournament', fa: 'کارت تورنمنت هرو (سمت چپ)', en: 'Hero tournament card (left)', ru: 'Карточка турнира (слева)', tr: 'Hero turnuva kartı (sol)', def: '/api/themes/bazino-hub-v3/assets/slide-fc26.webp' },
+                    { slot: 'hero_live', fa: 'کارت مسابقه زنده (سمت راست)', en: 'Live match card (right)', ru: 'Карточка живого матча (справа)', tr: 'Canlı maç kartı (sağ)', def: '/api/themes/bazino-hub-v3/assets/slide-match.webp' },
+                  ] as const).map(imgSlot => {
+                    const key = `theme_img.${imgSlot.slot}`;
+                    const current = siteSettings[key] || '';
+                    return (
+                      <div key={imgSlot.slot} className="bg-black/30 border border-white/5 rounded-xl p-3.5 flex flex-col gap-3">
+                        <span className="text-[11px] font-bold text-white">{L(language, { fa: imgSlot.fa, en: imgSlot.en, ru: imgSlot.ru, tr: imgSlot.tr })}</span>
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-[#0d122b] border border-white/10">
+                          <img
+                            src={current || imgSlot.def}
+                            alt={imgSlot.slot}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.25'; }}
+                          />
+                          {current && (
+                            <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-fuchsia-500/85 text-black text-[9px] font-black uppercase tracking-wider">
+                              {L(language, { fa: 'سفارشی', en: 'CUSTOM', ru: 'СВОЁ', tr: 'ÖZEL' })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all border ${current ? 'bg-transparent border-white/15 text-white hover:border-fuchsia-400/60' : 'bg-fuchsia-600 hover:bg-fuchsia-500 border-fuchsia-500 text-white'}`}>
+                            {themeImgBusy === imgSlot.slot ? (
+                              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <ImageIcon className="w-3.5 h-3.5" />
+                            )}
+                            <span>{current
+                              ? L(language, { fa: 'جایگزینی تصویر', en: 'Replace image', ru: 'Заменить изображение', tr: 'Görseli Değiştir' })
+                              : L(language, { fa: 'آپلود تصویر دلخواه', en: 'Upload custom image', ru: 'Загрузить своё изображение', tr: 'Özel Görsel Yükle' })}</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              className="hidden"
+                              disabled={themeImgBusy === imgSlot.slot}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                e.target.value = '';
+                                if (f) handleThemeImageUpload(imgSlot.slot, f);
+                              }}
+                            />
+                          </label>
+                          {current && (
+                            <button
+                              type="button"
+                              disabled={themeImgBusy === imgSlot.slot}
+                              onClick={() => handleSaveSetting(key, '')}
+                              className="w-full px-3 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:text-white border border-white/10 hover:border-white/25 transition-all cursor-pointer uppercase tracking-wider"
+                            >
+                              {L(language, { fa: 'بازگشت به پیش‌فرض قالب', en: 'Reset to theme default', ru: 'Вернуть стандартное', tr: 'Varsayılana Dön' })}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

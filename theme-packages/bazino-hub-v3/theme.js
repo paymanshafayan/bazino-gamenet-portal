@@ -1,5 +1,13 @@
-// BAZINO HUB v3.0.0 — Hasti reference design (dark neon gaming, English UI)
+// BAZINO HUB v3.1.0 — Hasti reference design (dark neon gaming, English UI)
 // SDK v2 — no React hooks, no timers. Interactive via props callbacks and DOM events.
+//
+// IMAGE POLICY (employer spec):
+//  • DYNAMIC images always come from the SERVER: hero banner = admin slider
+//    (props.slides[0]), tournament/live card content = live tournament data
+//    (props.eventsFeed), blog strip = article covers (props.articles).
+//  • STATIC/DECORATIVE art (hero tournament card art, live-match art, fallback
+//    promo art) = bundled theme asset, overridable per-slot by the admin via
+//    settings key `theme_img.<slot>` (uploaded in Admin ▸ Customization).
 (function () {
   var SDK = window.BazinoThemeSDK;
   if (!SDK || !SDK.registerComponent) {
@@ -14,6 +22,13 @@
     var base = (props && props.assetsBase) ? props.assetsBase : '';
     if (!base) return name;
     return base + '/' + name;
+  }
+  // Static decorative image: admin override (theme_img.<slot>) → bundled default.
+  function imgSrc(props, slot, defaultFile) {
+    var s = props && props.settings;
+    var override = s && s['theme_img.' + slot];
+    if (override && /^\//.test(String(override))) return String(override);
+    return asset(props, defaultFile);
   }
   function tsx(props, key, fallback) {
     if (props && typeof props.ts === 'function') return props.ts(key, fallback);
@@ -43,6 +58,35 @@
     var cur = firstSeg(props && props.pathname);
     var want = firstSeg(path);
     return cur === want;
+  }
+  function langTitle(obj, lang) {
+    if (!obj) return '';
+    return obj[lang] || obj.en || obj.fa || obj.ru || obj.tr || '';
+  }
+  // مسیر هدف اسلایدر ادمین → مسیر واقعی پرتال
+  function slideTargetPath(target) {
+    var t = String(target || '');
+    if (t === 'reserve' || t === 'reservations' || t === 'games') return '/games';
+    if (t === 'cafe' || t === 'food') return '/food';
+    if (t === 'shop') return '/shop';
+    if (t === 'tournaments' || t === 'events') return '/events';
+    if (t === 'blog') return '/blog';
+    if (t === 'chat') return '/chat';
+    if (t === 'club' || t === 'loyalty') return '/club';
+    if (t === 'home') return '/';
+    return '/events';
+  }
+  // انتخاب تورنمنت بعدی از دادهٔ زندهٔ سرور (اول upcoming، وگرنه اولین)
+  function pickTournament(feed) {
+    if (!feed) return null;
+    var pool = [];
+    if (feed.weekly && feed.weekly.length) pool = pool.concat(feed.weekly);
+    if (feed.special && feed.special.length) pool = pool.concat(feed.special);
+    if (!pool.length) return null;
+    for (var i = 0; i < pool.length; i++) {
+      if (pool[i].liveState === 'upcoming') return pool[i];
+    }
+    return pool[0];
   }
 
   // ---------- data ----------
@@ -100,6 +144,23 @@
     );
   }
 
+  // ---------- logo (admin logo_url override → text logo) ----------
+  function LogoBlock(props) {
+    var s = (props && props.settings) || {};
+    var custom = '';
+    var cand = s.logo_url || s.club_logo || '';
+    if (cand && /^\//.test(String(cand)) && String(cand) !== '/logo.png') custom = String(cand);
+    if (custom) {
+      return h('span', { className: 'hz-logo' },
+        h('img', { className: 'hz-logo-img', src: custom, alt: 'BAZINO' })
+      );
+    }
+    return h('span', { className: 'hz-logo' },
+      h('span', { className: 'hz-logo-main' }, 'BAZINO'),
+      h('span', { className: 'hz-logo-sub' }, tsx(props, 'header.club', 'GAMING CLUB'))
+    );
+  }
+
   // ---------- header ----------
   function Header(props) {
     var user = props && props.user;
@@ -136,22 +197,71 @@
     );
     return h('header', { className: 'hz-header' },
       h('div', { className: 'hz-header-in' },
-        h('button', { className: 'hz-logo', onClick: function () { go(props, '/'); } },
-          h('span', { className: 'hz-logo-main' }, 'BAZINO'),
-          h('span', { className: 'hz-logo-sub' }, tsx(props, 'header.club', 'GAMING CLUB'))
-        ),
+        h('button', { className: 'hz-logo-btn', onClick: function () { go(props, '/'); } }, LogoBlock(props)),
         h('nav', { className: 'hz-nav', 'aria-label': 'Main' }, navLinks),
         right
       )
     );
   }
 
-  // ---------- hero (split 3-card) ----------
+  // ---------- hero (split 3-card: tournament / main promo / live) ----------
+  // CENTER = admin slider (slides[0]) — fully dynamic from the server.
+  // LEFT   = next tournament from the live events feed (dynamic data) over
+  //          admin-replaceable decorative art.
+  // RIGHT  = live/featured tournament (dynamic) over admin-replaceable art.
   function Hero(props) {
     var c = contactInfo(props);
-    return h('section', { className: 'hz-hero' },
-      h('button', { className: 'hz-hero-card hz-hero-fc', onClick: function () { go(props, '/events'); } },
-        h('img', { className: 'hz-hero-img', src: asset(props, 'slide-fc26.jpg'), alt: 'FC Tournament', loading: 'lazy' }),
+    var lang = (props && props.language) || 'en';
+    var slides = (props && props.slides) || [];
+    var feed = props && props.eventsFeed;
+    var mainSlide = slides.length ? slides[0] : null;
+    var tour = pickTournament(feed);
+    var live = feed && feed.live;
+
+    // ── center card ──
+    var center;
+    if (mainSlide && mainSlide.imageUrl) {
+      var sTitle = langTitle(mainSlide.title, lang);
+      var sDesc = langTitle(mainSlide.desc, lang);
+      center = h('button', { className: 'hz-hero-card hz-hero-gta', onClick: function () { go(props, slideTargetPath(mainSlide.target)); } },
+        h('img', { className: 'hz-hero-img', src: mainSlide.imageUrl, alt: sTitle || 'BAZINO', loading: 'lazy' }),
+        h('div', { className: 'hz-hero-veil' }),
+        h('div', { className: 'hz-hero-body' },
+          sTitle ? h('span', { className: 'hz-hero-title hz-hero-title-xl' }, sTitle) : h('span', { className: 'hz-hero-title hz-hero-title-xl' }, tsx(props, 'hero.gta.title', 'GTA VI')),
+          sDesc ? h('span', { className: 'hz-hero-sub' }, sDesc) : h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.gta.sub', 'Next-gen open world - play it first at Bazino')),
+          h('span', { className: 'hz-hero-btn hz-b-purple' }, tsx(props, 'hero.more', 'MORE INFO'))
+        )
+      );
+    } else {
+      center = h('button', { className: 'hz-hero-card hz-hero-gta', onClick: function () { go(props, '/events'); } },
+        h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_main', 'slide-city.jpg'), alt: 'GTA VI', loading: 'lazy' }),
+        h('div', { className: 'hz-hero-veil' }),
+        h('div', { className: 'hz-hero-body' },
+          h('span', { className: 'hz-hero-badge' }, tsx(props, 'hero.gta.badge', 'COMING SOON')),
+          h('span', { className: 'hz-hero-title hz-hero-title-xl' }, tsx(props, 'hero.gta.title', 'GTA VI')),
+          h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.gta.sub', 'Next-gen open world - play it first at Bazino')),
+          h('span', { className: 'hz-hero-btn hz-b-purple' }, tsx(props, 'hero.more', 'MORE INFO'))
+        )
+      );
+    }
+
+    // ── left card: next tournament (live server data) ──
+    var left;
+    if (tour) {
+      var meta = [tour.game, tour.startDate].filter(Boolean).join('  ·  ');
+      left = h('button', { className: 'hz-hero-card hz-hero-fc', onClick: function () { go(props, '/events'); } },
+        h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_tournament', 'slide-fc26.jpg'), alt: tour.title, loading: 'lazy' }),
+        h('div', { className: 'hz-hero-veil' }),
+        h('div', { className: 'hz-hero-body' },
+          h('span', { className: 'hz-hero-tag hz-t-cyan' }, tsx(props, 'hero.fc.tag', 'TOURNAMENT')),
+          h('span', { className: 'hz-hero-title' }, tour.title),
+          meta ? h('span', { className: 'hz-hero-meta' }, meta) : null,
+          h('span', { className: 'hz-hero-btn hz-b-cyan' }, tsx(props, 'hero.fc.btn', 'JOIN NOW'))
+        )
+      );
+    } else {
+      left = h('button', { className: 'hz-hero-card hz-hero-fc', onClick: function () { go(props, '/events'); } },
+        h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_tournament', 'slide-fc26.jpg'), alt: 'FC Tournament', loading: 'lazy' }),
         h('div', { className: 'hz-hero-veil' }),
         h('div', { className: 'hz-hero-body' },
           h('span', { className: 'hz-hero-tag hz-t-cyan' }, tsx(props, 'hero.fc.tag', 'TOURNAMENT')),
@@ -159,18 +269,28 @@
           h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.fc.sub', 'Weekly FIFA cups - prize pool every week')),
           h('span', { className: 'hz-hero-btn hz-b-cyan' }, tsx(props, 'hero.fc.btn', 'JOIN NOW'))
         )
-      ),
-      h('button', { className: 'hz-hero-card hz-hero-gta', onClick: function () { go(props, '/events'); } },
-        h('img', { className: 'hz-hero-img', src: asset(props, 'slide-city.jpg'), alt: 'GTA VI', loading: 'lazy' }),
+      );
+    }
+
+    // ── right card: live / featured match (live server data) ──
+    var right;
+    if (live && live.title) {
+      var isLive = !!(live.bracketTotal && live.bracketTotal > 0);
+      right = h('button', { className: 'hz-hero-card hz-hero-live', onClick: function () { go(props, '/events/brackets'); } },
+        h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_live', 'slide-match.jpg'), alt: live.title, loading: 'lazy' }),
         h('div', { className: 'hz-hero-veil' }),
         h('div', { className: 'hz-hero-body' },
-          h('span', { className: 'hz-hero-badge' }, tsx(props, 'hero.gta.badge', 'COMING SOON')),
-          h('span', { className: 'hz-hero-title hz-hero-title-xl' }, tsx(props, 'hero.gta.title', 'GTA VI')),
-          h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.gta.sub', 'Next-gen open world - play it first at Bazino'))
+          isLive
+            ? h('span', { className: 'hz-hero-livebadge' }, h('i', { className: 'hz-dot' }), 'LIVE')
+            : h('span', { className: 'hz-hero-tag hz-t-gold' }, tsx(props, 'hero.live.next', 'COMING UP')),
+          h('span', { className: 'hz-hero-title' }, live.title),
+          live.game ? h('span', { className: 'hz-hero-sub' }, live.game) : null,
+          h('span', { className: 'hz-hero-btn hz-b-magenta' }, tsx(props, 'hero.live.btn', 'WATCH'))
         )
-      ),
-      h('button', { className: 'hz-hero-card hz-hero-live', onClick: function () { go(props, '/events'); } },
-        h('img', { className: 'hz-hero-img', src: asset(props, 'slide-match.jpg'), alt: 'Live match', loading: 'lazy' }),
+      );
+    } else {
+      right = h('button', { className: 'hz-hero-card hz-hero-live', onClick: function () { go(props, '/events'); } },
+        h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_live', 'slide-match.jpg'), alt: 'Live match', loading: 'lazy' }),
         h('div', { className: 'hz-hero-veil' }),
         h('div', { className: 'hz-hero-body' },
           h('span', { className: 'hz-hero-livebadge' }, h('i', { className: 'hz-dot' }), 'LIVE'),
@@ -178,7 +298,13 @@
           h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.live.sub', 'Watch the action on the big wall')),
           h('span', { className: 'hz-hero-btn hz-b-magenta' }, tsx(props, 'hero.live.btn', 'WATCH'))
         )
-      ),
+      );
+    }
+
+    return h('section', { className: 'hz-hero' },
+      left,
+      center,
+      right,
       h('div', { className: 'hz-hero-strip' },
         h('span', { className: 'hz-strip-item' }, icon('clock', 'hz-ico hz-ico-sm'), tsx(props, 'contact.open', 'OPEN EVERYDAY'), h('b', null, c.hours)),
         h('span', { className: 'hz-strip-sep' }),
@@ -218,6 +344,42 @@
         h('h2', { className: 'hz-section-title' }, tsx(props, 'quick.title', 'QUICK ACCESS'))
       ),
       h('div', { className: 'hz-quick-grid' }, cards)
+    );
+  }
+
+  // ---------- latest from bazino (server article covers) ----------
+  function articleTitle(a, lang) {
+    if (!a) return '';
+    var map = { fa: a.titleFa, en: a.titleEn, ru: a.titleRu, tr: a.titleTr };
+    return map[lang] || a.titleEn || a.title || a.titleFa || '';
+  }
+  function ArticlesStrip(props) {
+    var lang = (props && props.language) || 'en';
+    var list = (props && props.articles) || [];
+    if (!list.length) return null;
+    var cards = [];
+    for (var i = 0; i < list.length && i < 4; i++) {
+      var a = list[i];
+      cards.push(h('button', {
+        key: a.id || ('art-' + i),
+        className: 'hz-article',
+        onClick: function () { go(props, '/blog'); }
+      },
+        h('span', { className: 'hz-article-imgwrap' },
+          a.imageUrl ? h('img', { className: 'hz-article-img', src: a.imageUrl, alt: articleTitle(a, lang), loading: 'lazy' }) : null,
+          a.category ? h('span', { className: 'hz-article-cat' }, a.category) : null
+        ),
+        h('span', { className: 'hz-article-title' }, articleTitle(a, lang)),
+        a.date ? h('span', { className: 'hz-article-date' }, a.date) : null
+      ));
+    }
+    if (!cards.length) return null;
+    return h('section', { className: 'hz-section' },
+      h('div', { className: 'hz-section-head' },
+        h('span', { className: 'hz-section-kicker' }, 'BAZINO'),
+        h('h2', { className: 'hz-section-title' }, tsx(props, 'articles.title', 'LATEST FROM BAZINO'))
+      ),
+      h('div', { className: 'hz-article-grid' }, cards)
     );
   }
 
@@ -263,6 +425,7 @@
     return h('div', { className: 'hz-home' },
       Hero(props),
       QuickCards(props),
+      ArticlesStrip(props),
       ContactStrip(props)
     );
   }
@@ -282,10 +445,7 @@
     return h('footer', { className: 'hz-footer' },
       h('div', { className: 'hz-footer-in' },
         h('div', { className: 'hz-foot-brand' },
-          h('span', { className: 'hz-logo' },
-            h('span', { className: 'hz-logo-main' }, 'BAZINO'),
-            h('span', { className: 'hz-logo-sub' }, tsx(props, 'header.club', 'GAMING CLUB'))
-          ),
+          LogoBlock(props),
           h('p', { className: 'hz-foot-tag' }, tsx(props, 'footer.tagline', 'GOOD GAMES - BETTER PEOPLE')),
           h('div', { className: 'hz-foot-social' },
             h('a', { href: c.whatsapp, target: '_blank', rel: 'noreferrer', 'aria-label': 'WhatsApp' }, icon('whatsapp', 'hz-ico')),

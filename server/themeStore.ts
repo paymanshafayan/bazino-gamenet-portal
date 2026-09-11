@@ -158,17 +158,23 @@ export function listInstalledThemes(): InstalledThemeInfo[] {
 function listFilesRecursive(dir: string): string[] {
   const out: string[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listFilesRecursive(full));
-    else out.push(path.relative(dir, full));
+    if (entry.isDirectory()) {
+      // مسیر نسبی از «ریشهٔ» assets حفظ می‌شود. باگ قبلی: path.relative نسبت به
+      // زیرپوشه گرفته می‌شد → نام زیرپوشه‌ها گم می‌شد → assetFiles ناقص و
+      // exportThemeZip برای قالب‌های دارای asset تو در تو با ENOENT می‌بست.
+      for (const sub of listFilesRecursive(path.join(dir, entry.name))) out.push(entry.name + "/" + sub);
+    } else {
+      out.push(entry.name);
+    }
   }
   return out;
 }
+export { listFilesRecursive };
 
 /* ═══════════════════════════════════════════════════════════════
  *  نصب قالب از ZIP — استخراج به پوشه اختصاصی قالب
  * ═══════════════════════════════════════════════════════════════ */
-function validateThemeComponentJs(componentJs: string): string | null {
+export function validateThemeComponentJs(componentJs: string): string | null {
   // theme.js اختیاری است — قالب CSS-only معتبر است
   if (!componentJs || !componentJs.trim()) return null;
   try {
@@ -179,6 +185,16 @@ function validateThemeComponentJs(componentJs: string): string | null {
     new Function(componentJs);
   } catch (e: any) {
     return `theme.js خطای syntax دارد: ${e?.message || String(e)}`;
+  }
+  // هوک‌های React/Preact داخل theme.js ممنوع است — render(props) به‌صورت «تابع ساده»
+  // (نه کامپوننت) اجرا می‌شود؛ فراخوانی useState در آنجا صفحهٔ اصلی را بعد از نصب
+  // کرش می‌کند (حادثهٔ ۲۰۲۶-۰۹-۱۱ قالب «Bazino 3D Dimension»). تعامل باید با
+  // ref + رویدادهای DOM ساخته شود. کامنت‌ها قبل از بررسی حذف می‌شوند.
+  const noComments = componentJs
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:'"\\\w])\/\/[^\n\r]*/g, "$1");
+  if (/\b(?:useState|useEffect|useRef|useMemo|useCallback|useReducer|useContext|useLayoutEffect)\s*\(/.test(noComments)) {
+    return "theme.js نمی‌تواند از هوک‌های React (useState/useEffect/…) استفاده کند — render(props) به‌صورت تابع ساده اجرا می‌شود؛ برای تعامل از ref و رویدادهای DOM استفاده کنید";
   }
   if (!/BazinoThemeSDK/.test(componentJs)) {
     return "theme.js باید بخش‌های قالب را با window.BazinoThemeSDK.registerComponent('<region>', ...) ثبت کند";

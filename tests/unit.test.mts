@@ -26,7 +26,7 @@ const { sanitizeThemeId, stripCssComments, extractIdFromCss, hasNewFormat, extra
   await import('../src/themes/themeCssUtils.ts');
 const { parseThemeZip, buildSampleThemeZip, buildThemeZip, rewriteCssAssetUrls, isZipParseError, normalizeThemeStrings } =
   await import('../src/themes/themeZipCore.ts');
-const { detectRegisteredRegions, KNOWN_REGIONS } = await import('../server/themeStore.ts');
+const { detectRegisteredRegions, KNOWN_REGIONS, validateThemeComponentJs, listFilesRecursive } = await import('../server/themeStore.ts');
 const { makeThemeStrings, THEME_REGIONS } = await import('../src/themeSdk/sdk.ts');
 const { translations } = await import('../src/utils/translations.ts');
 const routes = await import('../src/utils/routes.ts');
@@ -510,6 +510,47 @@ test('rewriteCssAssetUrls leaves absolute and data urls alone', () => {
   const out = rewriteCssAssetUrls(css, '/api/themes/x/assets');
   assert.ok(out.includes('https://cdn/x.png'), 'absolute url was rewritten');
   assert.ok(out.includes('data:image/png'), 'data url was rewritten');
+});
+
+/* ─── سخت‌گیری حادثهٔ «Bazino 3D Dimension» (۲۰۲۶-۰۹-۱۱) ─── */
+
+test('validateThemeComponentJs rejects React hooks (useState etc.) with a clear error', () => {
+  const hookJs = 'window.BazinoThemeSDK.registerComponent("home", function(){ var s = window.BazinoThemeSDK.React.useState(0); });';
+  const err = validateThemeComponentJs(hookJs);
+  assert.ok(err, 'hook usage must be rejected');
+  assert.ok(err!.includes('هوک'), 'error must explain the hook rule in Persian');
+  const bare = 'var x = useState(0); window.BazinoThemeSDK.registerComponent("home", {});';
+  assert.ok(validateThemeComponentJs(bare), 'bare destructured hook call must be rejected too');
+});
+
+test('validateThemeComponentJs ignores hook names inside comments and accepts ref+DOM themes', () => {
+  const commented = '// useState(0) is not allowed here\n/* useEffect(() => {}) */\nwindow.BazinoThemeSDK.registerComponent("home", { render: function(p){ return p; } });';
+  assert.equal(validateThemeComponentJs(commented), null, 'comment mention must not reject');
+  const refTheme = '(function(){var S=window.BazinoThemeSDK,R=S.React;S.registerComponent("home",{render:function(p){return R.createElement("div",{ref:function(el){el&&el.addEventListener("click",function(){})}},"x");}});})();';
+  assert.equal(validateThemeComponentJs(refTheme), null, 'ref+DOM interaction pattern must be accepted');
+});
+
+test('validateThemeComponentJs still rejects syntax errors / missing SDK / unknown regions', () => {
+  assert.ok(validateThemeComponentJs('var (((('), 'syntax error must be rejected');
+  assert.ok(validateThemeComponentJs('console.log("no sdk")'), 'missing BazinoThemeSDK must be rejected');
+  assert.ok(validateThemeComponentJs('window.BazinoThemeSDK.registerComponent("bogus.region", {});'), 'unknown region must be rejected');
+});
+
+test('listFilesRecursive keeps nested asset subfolder paths (3D-theme export bug)', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(path.join(tmpdir(), 'bz-themes-'));
+  try {
+    writeFileSync(path.join(dir, 'a.webp'), 'a');
+    mkdirSync(path.join(dir, 'tour'), { recursive: true });
+    writeFileSync(path.join(dir, 'tour', 'tour-01-grid.webp'), 'b');
+    mkdirSync(path.join(dir, 'tour', 'deep'), { recursive: true });
+    writeFileSync(path.join(dir, 'tour', 'deep', 'c.webp'), 'c');
+    const files = listFilesRecursive(dir).sort();
+    assert.deepEqual(files, ['a.webp', 'tour/deep/c.webp', 'tour/tour-01-grid.webp'], 'nested paths must survive');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 /* ═══════════════════════════════════════════════════════════════════════

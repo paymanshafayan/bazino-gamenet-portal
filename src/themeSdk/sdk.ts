@@ -209,12 +209,21 @@ export function mountComponent(
     mounted.set(name, root);
   }
 
-  const def = reg.factory();
+  // ۲۰۲۶-۰۹-۱۱ (حادثهٔ قالب «Bazino 3D Dimension»): فراخوانی factory بیرون از try بود و
+  // یک theme.js معیوب (فراخوانی useState خارج از رندر) کل صفحهٔ اصلی را با ErrorBoundary
+  // می‌کشت. حالا factory و render هر دو محافظت‌شده‌اند — بدترین حالت: region خالی/افته و
+  // fallback خود سایت رندر می‌شود، نه کرش کل صفحه.
+  let def: ThemeComponentDefinition | null = null;
   let out: unknown = null;
   try {
-    out = def.render ? def.render(props) : (def.create ? def.create(props).render() : null);
+    def = reg.factory();
+    out = def && def.render ? def.render(props) : (def && def.create ? def.create(props).render() : null);
+    if (!def || (!def.render && !def.create)) {
+      console.warn(`[ThemeSDK] region "${name}" factory باید یک تعریف {{ render(props) }} برگرداند — چیزی رندر نشد.`);
+    }
   } catch (e) {
-    console.error(`[ThemeSDK] render() of region "${name}" threw:`, e);
+    console.error(`[ThemeSDK] factory/render of region "${name}" threw:`, e);
+    def = null;
     out = null;
   }
   root.render(React.createElement(React.Fragment, null, normalizeRenderOutput(name, out)));

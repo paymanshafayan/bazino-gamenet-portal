@@ -552,6 +552,22 @@ test('a theme render() that returns { html } is injected; unsupported values ren
   host.remove();
 });
 
+test('a throwing factory (hooks called outside render) must not crash the host — «Bazino 3D Dimension» incident', async () => {
+  const doc = getDocument();
+  const R = (getWindow() as any).BazinoThemeSDK.React;
+  const host = doc.createElement('div'); doc.body.appendChild(host);
+  // دقیقاً الگوی قالب 3D: factory که مستقیم useState صدا می‌زد (خارج از رندر)
+  sdk.registerComponent('home', function () { R.useState(0); return { render: () => 'X' }; });
+  await act(() => { sdk.mountComponent('home', host, { ...baseProps(), region: 'home' }); });
+  assert.equal(host.textContent, '', 'throwing factory must render nothing, not take down the page');
+  // باگ دوم همان قالب: factory که به‌جای تعریف {render} مستقیم المان برمی‌گرداند
+  sdk.registerComponent('home', function () { return R.createElement('b', null, 'BARE'); });
+  await act(() => { sdk.mountComponent('home', host, { ...baseProps(), region: 'home' }); });
+  assert.equal(host.textContent, '', 'a bare element (no {render} definition) renders nothing but must not throw');
+  await act(() => { sdk.unregisterComponent('home'); });
+  host.remove();
+});
+
 test('locationFrom normalises admin settings and falls back to the real club coordinates', () => {
   const loc = locationFrom({ club_address: 'A', club_phone: '+90 1', club_hours: '24/7', club_map_lat: '35.1', club_map_lng: '33.9', club_map_url: 'https://maps.app.goo.gl/x' });
   assert.equal(loc.lat, 35.1); assert.equal(loc.lng, 33.9); assert.equal(loc.mapUrl, 'https://maps.app.goo.gl/x');

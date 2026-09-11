@@ -144,6 +144,25 @@ function notify() {
   listeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
 }
 
+/**
+ * ثبت‌های پشت‌سرهم theme.js (که معمولاً ۶+ تا در یک فایل است) هر کدام sync
+ * notify می‌شدند و hostها را در همان میکروتِیک رندرِ در حالِ اجرا re-render
+ * می‌کردند؛ در dev (preact/compat + useSyncExternalStore) این رندرِ تودرتو
+ * «Hook can only be invoked from render methods» می‌انداخت و مناطقِ تازه‌mount
+ * دوباره خالی می‌شدند. batchNotify همهٔ ثبت‌های یک تیک را در یک通知 ادغام می‌کند.
+ */
+let notifyScheduled = false;
+function batchNotify() {
+  if (notifyScheduled) return;
+  notifyScheduled = true;
+  const flush = () => {
+    notifyScheduled = false;
+    notify();
+  };
+  if (typeof queueMicrotask === 'function') queueMicrotask(flush);
+  else Promise.resolve().then(flush);
+}
+
 /** نسخه‌ی رجیستری — با هر ثبت/حذف زیاد می‌شود (برای re-render هاست‌ها) */
 export function getRegistryVersion(): number { return registryVersion; }
 
@@ -158,13 +177,13 @@ export function registerComponent(name: string, factoryOrDef: Factory | ThemeCom
   if (!name) return;
   const factory: Factory = typeof factoryOrDef === 'function' ? factoryOrDef : () => factoryOrDef;
   registry.set(name, { factory });
-  notify();
+  batchNotify();
 }
 
 /** حذف کامپوننت ثبت‌شده (بعد از حذف قالب یا قبل از بارگذاری نسخه‌ی جدید theme.js) */
 export function unregisterComponent(name: string): void {
   unmountComponent(name);
-  if (registry.delete(name)) notify();
+  if (registry.delete(name)) batchNotify();
 }
 
 /** حذف همه‌ی کامپوننت‌های قالب (هنگام تعویض/آپدیت قالب) */
@@ -172,7 +191,7 @@ export function unregisterAllComponents(): void {
   for (const name of Array.from(registry.keys())) unmountComponent(name);
   const had = registry.size > 0;
   registry.clear();
-  if (had) notify();
+  if (had) batchNotify();
 }
 
 /** آیا قالب برای این بخش کامپوننت دارد؟ */

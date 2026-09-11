@@ -100,7 +100,7 @@ export async function runJarvisChain(deps: ChainDeps, call: ChainCall): Promise<
         await recordIncident(deps.core, {
           type: 'GROQ_UNAVAILABLE', provider: 'groq',
           message: `Groq پاسخ نداد (${primaryError.code}) — در صورت تنظیم، پشتیبان فقط-پشتیبانی فعال می‌شود.`,
-          meta: { code: primaryError.code },
+          meta: { code: primaryError.code, detail: String(primaryError.message || '').slice(0, 300) },
         });
       }
     }
@@ -153,7 +153,7 @@ export async function runJarvisChain(deps: ChainDeps, call: ChainCall): Promise<
       await recordIncident(deps.core, {
         type: 'BACKUP_FAILED', provider: id,
         message: `پشتیبان ${id} هم پاسخ نداد (${code}).`,
-        meta: { code },
+        meta: { code, detail: String(e?.message || '').slice(0, 300), model: bc.model },
       });
     }
   }

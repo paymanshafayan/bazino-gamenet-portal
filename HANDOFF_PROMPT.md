@@ -1462,3 +1462,13 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **تست (`tests/jarvis.test.mts` → ۲۶/۲۶)**: mock سه‌ارائه‌دهنده‌ای route-by-URL؛ سنجه‌ها = sanitize/ماسک/merge پشتیبان‌ها، 402→JARVIS_QUOTA_EXHAUSTED، URLهای پایهٔ درست، fallback کامل (429×2 → OpenRouter؛ 401 → OpenAI)، tools پشتیبان فقط support، یادداشت BACKUP MODE، رد adjust_credits بدون تأثیر، خطای اصلی Groq وقتی پشتیبان نیست، توقف job بازاریابی + اجرای job پشتیبانی روی پشتیبان، روت‌ها (ذخیره/نگهداری کلید ماسک‌شده، models per provider، incidents). کل مجموعه: **۶۰۷ passed / 6 failed** (همان pre-existing).
 - **دود سرور واقعی (بیلد production، پورت ۳۴۷۶)**: ۲۲ چک سبز — ساختار providers در state، ۱۳ مهارت پشتیبانی، ماسک هر سه کلید پس از ذخیره، چت بدون کلید → راهنما، چت با هر سه غیرقابل‌دسترس → خطای تمیز JARVIS_NETWORK_ERROR + سه رویداد (GROQ_UNAVAILABLE + BACKUP_FAILED×2) در log، models → خطای تمیز، بدون توکن → 401، سرور زنده (crash-safe).
 - توجه: egress سندباکس به هر سه ارائه‌دهنده بسته است → تست‌ها mock؛ اولین تست واقعی روی Railway با کلیدهای کارفرما (تنظیمات جارویس → بخش پشتیبان‌ها). اگر Groq کلید ندارد ولی پشتیبان دارد، حالت پشتیبان از همان ابتدا فعال است.
+
+### ۳۱-ب. فیکس‌های سازگاری ارائه‌دهنده‌ها (2026-09-11، پس از گزارش خطای کارفرما)
+
+> کارفرما کلیدهای هر سه سرویس را ثبت کرد و فهرست مدل‌ها را گرفت ولی چت خطا می‌داد. ممیزی کد سه باگ عینی پیدا و رفع کرد (تست زنده با پل مرورگر در جریان):
+
+- **OpenAI — `max_completion_tokens`:** مدل‌های gpt-4.1+/gpt-5/chatgpt-* پارامتر `max_tokens` را با خطای 400 رد می‌کنند → برای این‌ها `max_completion_tokens` فرستاده می‌شود؛ سری o (o1/o3/o4) علاوه بر آن temperature هم نمی‌پذیرد → برایشان temperature حذف می‌شود. gpt-4o/gpt-4o-mini روی max_tokens کلاسیک می‌مانند.
+- **OpenRouter — مدل‌های بدون فراخوانی ابزار:** خیلی از واریانت‌های `:free` ابزار ندارند (404 "No endpoints found that support tool use") → هنگام فراخوانی با tools، آرایهٔ مسیریابی رسمی `models` فرستاده می‌شود (مدل انتخابی ادمین اول + ۴ fallback دارای ابزار: gpt-oss-120b:free، gemini-2.0-flash-exp:free، mistral-small-3.1:free، gpt-oss-20b:free) تا OpenRouter خودش به مدل بعدی برود؛ خطای 404 ابزاری پیام فارسی راهنما می‌گیرد؛ `listProviderModels('openrouter')` حالا `toolModels` (فیلتر `supported_parameters` شامل tools) برمی‌گرداند و پنل هشدار می‌دهد اگر مدل انتخابی ابزار ندارد.
+- **OpenAI models endpoint:** مدل‌های غیر-چت (whisper/dall-e/tts/text-embedding/…) از فهرست فیلتر می‌شوند.
+- **رویدادها:** به meta رویدادهای GROQ_UNAVAILABLE/BACKUP_FAILED جزئیات خطا (detail) و مدل اضافه شد و در جدول رویدادهای پنل نمایش داده می‌شود — برای عیب‌یابی زنده.
+- تست: ۲۷/۲۷ (بدنهٔ درخواست‌ها Assert می‌شود)؛ کل مجموعه ۶۱۳/1 (همان payment قبلی)؛ بیلد سبز.

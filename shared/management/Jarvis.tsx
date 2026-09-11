@@ -236,8 +236,8 @@ function JarvisMonitor({ api, t, language, initial, providers, incidents }: any)
       <tbody>
         {(incidents || []).map((i: any) => <tr key={i.id} data-jarvis-incident={i.id}>
           <td><Badge tone={i.type === 'BACKUP_ACTIVE' ? 'warn' : i.type === 'SUPPORT_ONLY_BLOCKED' ? 'warn' : 'bad'}>{incidentText(i)}</Badge>{(i.count || 1) > 1 ? <span className="ops-muted"> ×{i.count}</span> : ''}</td>
-          <td>{i.provider}</td>
-          <td style={{ maxWidth: 420 }}>{i.message}</td>
+          <td>{i.provider}{i.meta?.model ? <div className="ops-muted" dir="ltr" style={{ fontSize: 10 }}>{i.meta.model}</div> : ''}</td>
+          <td style={{ maxWidth: 420 }}>{i.message}{i.meta?.detail ? <div className="ops-muted" dir="ltr" style={{ fontSize: 10, wordBreak: 'break-all' }}>{String(i.meta.detail).slice(0, 220)}</div> : ''}</td>
           <td className="ops-muted">{String(i.lastAt || i.ts || '').replace('T', ' ').slice(0, 16)}</td>
         </tr>)}
         {!(incidents || []).length && <tr><td colSpan={4} className="ops-muted">{t('رویدادی ثبت نشده — همه‌چیز سالم.', 'No incidents — all healthy.', 'Olay yok.', 'Инцидентов нет.')}</td></tr>}
@@ -249,6 +249,7 @@ function JarvisMonitor({ api, t, language, initial, providers, incidents }: any)
 function JarvisSettings({ api, t, state, onSaved }: any) {
   const [cfg, setCfg] = useState<any>(state?.config || {});
   const [models, setModels] = useState<Record<string, string[]>>({});
+  const [toolModels, setToolModels] = useState<Record<string, string[] | null>>({});
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -260,7 +261,7 @@ function JarvisSettings({ api, t, state, onSaved }: any) {
   };
   const fetchModels = async (provider: string) => {
     setBusy(true); setError('');
-    try { const r = await api('/jarvis/models', 'POST', { provider }); setModels(m => ({ ...m, [provider]: r.models || [] })); }
+    try { const r = await api('/jarvis/models', 'POST', { provider }); setModels(m => ({ ...m, [provider]: r.models || [] })); setToolModels(tm => ({ ...tm, [provider]: r.toolModels || null })); }
     catch (e: any) { setError(e.code || e.message); } finally { setBusy(false); }
   };
   const setBackup = (id: string, patch: any) => setCfg((c: any) => ({
@@ -304,6 +305,10 @@ function JarvisSettings({ api, t, state, onSaved }: any) {
         {models[id]?.length ? <span className="ops-muted">{t(`${models[id].length} مدل`, `${models[id].length} models`, `${models[id].length} model`, `${models[id].length} моделей`)}</span> : ''}
         {(state?.suggestedModels?.[id] || []).map((m: any) => <span key={m.id} className="ops-muted" title={m.note} style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }} onClick={() => setBackup(id, { model: m.id })}>{m.id}</span>)}
       </div>
+      {id === 'openrouter' && toolModels[id] ? (toolModels[id]!.includes(b.model)
+          ? <p className="ops-muted" style={{ color: '#7de8bd', margin: '4px 0 0' }}>✓ {t('مدل انتخابی فراخوانی ابزار دارد.', 'Selected model supports tool calling.', 'Model araç çağrısını destekliyor.', 'Модель поддерживает вызов инструментов.')}</p>
+          : <p className="ops-muted" style={{ color: '#ffd98a', margin: '4px 0 0' }}>⚠ {t('مدل انتخابی در فهرست مدل‌های دارای فراخوانی ابزار نیست — برای چتِ پشتیبان مدل دارای ابزار انتخاب کنید (پیشنهادها بالای همین کادر).', 'Selected model is NOT in the tool-calling list — pick a tool-capable model for backup chat.', 'Seçilen model araç çağrısını desteklemiyor.', 'Выбранная модель не поддерживает вызов инструментов.')}</p>)
+        : ''}
     </div>;
   };
 

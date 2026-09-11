@@ -49,12 +49,17 @@ const modelsResponse = (ids: string[]) => new Response(JSON.stringify({ data: id
 const mockFetcher = (async (url: string, init: any) => {
   const u = String(url);
   if (u.includes('openrouter.ai')) {
-    if (u.endsWith('/models')) return modelsResponse(['meta-llama/llama-3.3-70b-instruct:free', 'openai/gpt-4o-mini']);
+    if (u.endsWith('/models')) return new Response(JSON.stringify({ data: [
+      { id: 'meta-llama/llama-3.3-70b-instruct:free', supported_parameters: ['tools', 'structured_outputs'] },
+      { id: 'openai/gpt-oss-20b:free', supported_parameters: [] },
+    ] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     orCalls.push({ url: u, body: JSON.parse(init.body || '{}') });
     return respondScripted(orScript);
   }
   if (u.includes('api.openai.com')) {
-    if (u.endsWith('/models')) return modelsResponse(['gpt-4o-mini', 'gpt-4.1-nano']);
+    if (u.endsWith('/models')) return new Response(JSON.stringify({ data: [
+      { id: 'gpt-4o-mini' }, { id: 'gpt-4.1-nano' }, { id: 'text-embedding-3-small' }, { id: 'whisper-1' }, { id: 'dall-e-3' },
+    ] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     oaCalls.push({ url: u, body: JSON.parse(init.body || '{}') });
     return respondScripted(oaScript);
   }
@@ -449,6 +454,36 @@ test('marketing job PAUSES when Groq is down (never runs on a backup); support j
   assert.ok(pending.some((p: any) => p.skillId === 'send_ig_reply' && p.requestedBy === 'jarvis:igReplies'));
   assert.ok(orCalls.length >= 1, 'support job must run on the backup');
 });
+test('provider body shaping: openai max_completion_tokens (new models) / no temperature (o-series); openrouter tools routing array', async () => {
+  const seen: any[] = [];
+  const f = (async (_url: string, init: any) => {
+    seen.push(JSON.parse(init.body || '{}'));
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+  }) as unknown as typeof fetch;
+  await jarvisConfig.jarvisChatCompletion({ provider: 'openai', apiKey: 'k', model: 'gpt-4.1-mini', messages: [{ role: 'user', content: 'x' }], fetcher: f });
+  await jarvisConfig.jarvisChatCompletion({ provider: 'openai', apiKey: 'k', model: 'gpt-5-mini', messages: [{ role: 'user', content: 'x' }], fetcher: f });
+  await jarvisConfig.jarvisChatCompletion({ provider: 'openai', apiKey: 'k', model: 'o4-mini', messages: [{ role: 'user', content: 'x' }], fetcher: f });
+  await jarvisConfig.jarvisChatCompletion({ provider: 'openai', apiKey: 'k', model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'x' }], fetcher: f });
+  await jarvisConfig.jarvisChatCompletion({
+    provider: 'openrouter', apiKey: 'k', model: 'meta-llama/llama-3.3-70b-instruct:free',
+    messages: [{ role: 'user', content: 'x' }], tools: [{ type: 'function', function: { name: 't', parameters: { type: 'object', properties: {} } } }], fetcher: f,
+  });
+  const [g41, g5, o4, g4o, or] = seen;
+  assert.equal(g41.max_completion_tokens, 3000, 'gpt-4.1 must use max_completion_tokens');
+  assert.ok(!('max_tokens' in g41));
+  assert.equal(g5.max_completion_tokens, 3000, 'gpt-5 must use max_completion_tokens');
+  assert.ok(!('max_tokens' in g5));
+  assert.ok(!('temperature' in o4), 'o-series must not send temperature');
+  assert.ok(!('max_tokens' in o4));
+  assert.equal(g4o.max_tokens, 3000, 'gpt-4o keeps classic max_tokens');
+  assert.ok(!('max_completion_tokens' in g4o));
+  assert.equal(or.models[0], 'meta-llama/llama-3.3-70b-instruct:free', 'admin model stays first in the routing array');
+  assert.ok(or.models.length >= 2, 'openrouter tool fallbacks present');
+  // The 404 no-tool-support error must carry a Persian, actionable message.
+  const f404 = (async () => new Response('{"error":"No endpoints found that support tool use"}', { status: 404 })) as unknown as typeof fetch;
+  await assert.rejects(() => jarvisConfig.jarvisChatCompletion({ provider: 'openrouter', apiKey: 'k', model: 'x:free', messages: [{ role: 'user', content: 'x' }], tools: [{ type: 'function', function: { name: 't', parameters: {} } }], fetcher: f404 }),
+    (e: any) => /فراخوانی ابزار ندارد/.test(e.message));
+});
 test('routes: backup config save masks keys, keeps old ones; models endpoint per provider', async () => {
   clearScripts();
   await setConfig({ dailyCallCap: 500, backup: { openrouter: orBackup, openai: oaBackup } });
@@ -489,11 +524,13 @@ test('routes: backup config save masks keys, keeps old ones; models endpoint per
     assert.equal(orModels.provider, 'openrouter');
     assert.ok(orModels.models.includes('meta-llama/llama-3.3-70b-instruct:free'));
     assert.ok(orModels.free.every((m: string) => m.endsWith(':free')));
+    assert.deepEqual(orModels.toolModels, ['meta-llama/llama-3.3-70b-instruct:free'], 'toolModels filters on supported_parameters');
 
     const oaModels = await (await fetch(`${base}/api/management/jarvis/models`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'openai' }),
     })).json();
     assert.ok(oaModels.models.includes('gpt-4o-mini'));
+    assert.ok(!oaModels.models.some((m: string) => /whisper|dall-e|text-embedding/.test(m)), 'non-chat OpenAI models filtered out');
 
     // Incidents endpoint (staff).
     const incidents = await (await fetch(`${base}/api/management/jarvis/incidents`)).json();

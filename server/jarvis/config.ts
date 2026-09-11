@@ -99,6 +99,19 @@ export const SUGGESTED_OPENROUTER_MODELS: Array<{ id: string; label: string; not
   { id: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (free)', note: 'رایگان، سریع' },
 ];
 
+/**
+ * OpenRouter routing fallbacks for tool calls — models widely known to keep
+ * native tool calling on the :free variants. Used ONLY as the `models` array
+ * AFTER the admin's configured model; OpenRouter tries them in order when the
+ * primary cannot serve the request (rate limit / no tool support).
+ */
+export const OPENROUTER_TOOL_FALLBACKS = [
+  'openai/gpt-oss-120b:free',
+  'google/gemini-2.0-flash-exp:free',
+  'mistralai/mistral-small-3.1-24b-instruct:free',
+  'openai/gpt-oss-20b:free',
+];
+
 /** OpenAI is paid — cheapest tool-calling models first (2026 pricing). */
 export const SUGGESTED_OPENAI_MODELS: Array<{ id: string; label: string; note: string }> = [
   { id: 'gpt-4o-mini', label: 'GPT-4o mini', note: 'پیشنهادی — ارزان ($0.15/$0.60 per 1M)، فراخوانی ابزار کامل' },
@@ -230,27 +243,53 @@ export async function jarvisChatCompletion(d: {
   const meta = JARVIS_PROVIDERS[d.provider];
   if (!d.apiKey) throw new JarvisProviderError('JARVIS_NOT_CONFIGURED', 409);
   const fetcher = d.fetcher || fetch;
+
+  /* Provider-specific body shaping:
+   *  - OpenAI: gpt-4.1+/gpt-5/chatgpt-* models REQUIRE max_completion_tokens
+   *    (max_tokens → 400 error) and o-series reasoning models reject a custom
+   *    temperature. gpt-4o and gpt-3.5 keep the classic max_tokens.
+   *  - OpenRouter: when tools are used, add the official `models` routing
+   *    array — many :free variants lack tool calling (404 "no endpoints"),
+   *    and the array lets OpenRouter fall through to a sibling model. The
+   *    admin's model stays first. */
+  const body: any = {
+    model: d.model, messages: d.messages,
+    temperature: d.temperature ?? 0.2,
+    max_tokens: d.maxTokens ?? 3000,
+    ...(d.tools?.length ? { tools: d.tools, tool_choice: 'auto' } : {}),
+  };
+  if (d.provider === 'openai') {
+    const m = String(d.model || '');
+    if (/^(gpt-4\.1|gpt-5|chatgpt|o\d)/.test(m)) {
+      delete body.max_tokens;
+      body.max_completion_tokens = d.maxTokens ?? 3000;
+      if (/^o\d/.test(m)) delete body.temperature;
+    }
+  } else if (d.provider === 'openrouter' && d.tools?.length) {
+    body.models = [d.model, ...OPENROUTER_TOOL_FALLBACKS.filter(x => x !== d.model)].slice(0, 4);
+  }
+
   let res: Response;
   try {
     res = await fetcher(`${meta.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${d.apiKey}`, ...(meta.extraHeaders || {}) },
-      body: JSON.stringify({
-        model: d.model, messages: d.messages, temperature: d.temperature ?? 0.2,
-        max_tokens: d.maxTokens ?? 3000,
-        ...(d.tools?.length ? { tools: d.tools, tool_choice: 'auto' } : {}),
-      }),
+      body: JSON.stringify(body),
     });
   } catch (e: any) {
     throw new JarvisProviderError('JARVIS_NETWORK_ERROR', 502, 0, String(e?.message || e));
   }
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
+    const bodyText = await res.text().catch(() => '');
     const retryAfter = Number(res.headers.get('retry-after') || 0);
-    if (res.status === 429) throw new JarvisProviderError('JARVIS_RATE_LIMITED', 429, retryAfter, body);
-    if (res.status === 401 || res.status === 403) throw new JarvisProviderError('JARVIS_BAD_KEY', 401, 0, body);
-    if (res.status === 402) throw new JarvisProviderError('JARVIS_QUOTA_EXHAUSTED', 402, 0, body);
-    throw new JarvisProviderError('JARVIS_PROVIDER_ERROR', 502, 0, `${res.status} ${body}`);
+    if (res.status === 429) throw new JarvisProviderError('JARVIS_RATE_LIMITED', 429, retryAfter, bodyText);
+    if (res.status === 401 || res.status === 403) throw new JarvisProviderError('JARVIS_BAD_KEY', 401, 0, bodyText);
+    if (res.status === 402) throw new JarvisProviderError('JARVIS_QUOTA_EXHAUSTED', 402, 0, bodyText);
+    // OpenRouter "no endpoints support tool use" → make the cause obvious.
+    if (d.provider === 'openrouter' && res.status === 404 && /tool/i.test(bodyText)) {
+      throw new JarvisProviderError('JARVIS_PROVIDER_ERROR', 502, 0, `مدل انتخابی OpenRouter فراخوانی ابزار ندارد (404) — از تنظیمات جارویس مدل دارای ابزار انتخاب کنید. ${bodyText.slice(0, 160)}`);
+    }
+    throw new JarvisProviderError('JARVIS_PROVIDER_ERROR', 502, 0, `${res.status} ${bodyText}`);
   }
   return res.json();
 }
@@ -263,7 +302,7 @@ export async function groqChatCompletion(d: {
   return jarvisChatCompletion({ provider: 'groq', ...d });
 }
 
-export async function listProviderModels(provider: JarvisProviderId, apiKey: string, fetcher?: typeof fetch): Promise<{ models: string[]; free: string[] }> {
+export async function listProviderModels(provider: JarvisProviderId, apiKey: string, fetcher?: typeof fetch): Promise<{ models: string[]; free: string[]; toolModels?: string[] }> {
   const meta = JARVIS_PROVIDERS[provider];
   if (provider !== 'openrouter' && !apiKey) throw new JarvisProviderError('JARVIS_NOT_CONFIGURED', 409);
   const f = fetcher || fetch;
@@ -275,9 +314,23 @@ export async function listProviderModels(provider: JarvisProviderId, apiKey: str
   }
   if (!res.ok) throw new JarvisProviderError('JARVIS_PROVIDER_ERROR', 502, 0, String(res.status));
   const data: any = await res.json();
-  const models = (Array.isArray(data?.data) ? data.data : []).map((m: any) => String(m?.id || '')).filter(Boolean).sort();
+  let models = (Array.isArray(data?.data) ? data.data : []).map((m: any) => String(m?.id || '')).filter(Boolean).sort();
+  if (provider === 'openai') {
+    // Drop non-chat models (embeddings, tts, image, moderation, legacy) so the
+    // admin only picks chat-capable ones.
+    models = models.filter(id => !/^(whisper|dall-e|tts|text-embedding|omni-moderation|babbage|davinci|code-|realtime|gpt-4o-audio)/.test(id));
+  }
   const free = provider === 'openrouter' ? models.filter(id => id.endsWith(':free')) : [];
-  return { models, free };
+  // OpenRouter reports supported parameters per model — surface tool support
+  // so the admin (and the chain) can pick tool-capable models.
+  const toolModels = provider === 'openrouter'
+    ? (Array.isArray(data?.data) ? data.data : [])
+      .filter((m: any) => Array.isArray(m?.supported_parameters) && m.supported_parameters.includes('tools'))
+      .map((m: any) => String(m?.id || ''))
+      .filter(Boolean)
+      .sort()
+    : undefined;
+  return { models, free, toolModels };
 }
 
 /** Backwards-compatible Groq wrapper. */

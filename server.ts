@@ -75,6 +75,7 @@ import { protectedIntegrationSetting } from './server/publishing/settings';
 import { registerIgRoutes } from "./server/affiliate/igRoutes";
 import { registerManusRoutes } from "./server/manus/routes";
 import { registerManusBlogRoutes } from "./server/manus/blog";
+import { registerJarvis } from "./server/jarvis/routes";
 import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
 import { onReservationAttended } from "./server/affiliate/engine";
 import { isOnlinePaymentEnabled } from "./server/payments/paytr";
@@ -873,6 +874,8 @@ async function startServer() {
   registerMessagingRoutes(app,messagingOps);
   const contentOps = new ContentService(management);
   registerContent(app,contentOps);
+  // Jarvis — admin AI assistant (Groq). Management mount + site-admin mount.
+  registerJarvis(app,{core:management,getStore:getActiveDataProvider});
   registerReports(app,management);
   // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
   for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{

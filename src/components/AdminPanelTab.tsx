@@ -64,6 +64,7 @@ import { LegalAdminSection } from '../legal/LegalAdminSection';
 /** نام و کلیدواژه‌های هر بخش پنل — برای عنوان صفحه، هدر بخش و جستجوی سریع */
 export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; ru: string; tr: string; keywords: string }> = {
   dashboard:         { fa: 'داشبورد و آمار زنده', en: 'Dashboard & Live Stats', ru: 'Дашборд и живая статистика', tr: 'Gösterge Paneli ve Canlı İstatistikler', keywords: 'stats آمار statistics dashboard home' },
+  jarvis:            { fa: 'جارویس — دستیار مدیر (AI)', en: 'Jarvis — Admin AI Assistant', ru: 'Джарвис — ИИ-помощник админа', tr: 'Jarvis — Yönetici AI Asistanı', keywords: 'ai جارویس jarvis assistant chatbot groq automation' },
   systems:           { fa: 'مدیریت کلاینت‌ها و سیستم‌ها', en: 'Clients & Systems', ru: 'Клиенты и системы', tr: 'İstemciler ve Sistemler', keywords: 'pc ps5 console کنسول کامپیوتر رزرو reservation station' },
   cafe:              { fa: 'بوفه و کافه', en: 'Cafe Buffet', ru: 'Кафе-буфет', tr: 'Kafe Büfe', keywords: 'menu منو غذا نوشیدنی food drink' },
   shop:              { fa: 'فروشگاه لوازم جانبی', en: 'Accessory Shop', ru: 'Магазин аксессуаров', tr: 'Ekipman Mağazası', keywords: 'products محصول کالا mouse headset' },
@@ -93,6 +94,7 @@ const AdminTicketsSection = React.lazy(() => import('./AdminTicketsSection'));
 const AdminWalletSection = React.lazy(() => import('./AdminWalletSection'));
 const AdminAffiliatesSection = React.lazy(() => import('./AdminAffiliatesSection'));
 const PromotionsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Promotions')).PromotionsConsole as unknown as React.ComponentType }));
+const JarvisConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Jarvis')).JarvisConsole as unknown as React.ComponentType }));
 const TournamentsOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Tournaments')).TournamentsConsole as unknown as React.ComponentType }));
 const AdminTournamentPlanner = React.lazy(() => import('./admin/AdminTournamentPlanner'));
 const AdminMessagingPanel = React.lazy(() => import('./admin/AdminMessagingPanel'));
@@ -1572,6 +1574,18 @@ export default function AdminPanelTab({
           >
             <BarChart3 className="w-4 h-4" />
             <span>{L(language, { fa: 'داشبورد و آمار زنده', en: 'Dashboard & Live Stats', ru: 'Дашборд и живая статистика', tr: 'Gösterge Paneli ve Canlı İstatistikler' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('jarvis')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'jarvis'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{L(language, { fa: 'جارویس — دستیار مدیر (AI)', en: 'Jarvis — Admin AI Assistant', ru: 'Джарвис — ИИ-помощник', tr: 'Jarvis — Yönetici AI Asistanı' })}</span>
           </button>
 
           <button
@@ -4387,6 +4401,12 @@ export default function AdminPanelTab({
           {activeSubTab === 'promotions' && (
             <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
               <OpsProvider language={language}><PromotionsConsole /></OpsProvider>
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'jarvis' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Jarvis...</div>}>
+              <OpsProvider language={language}><JarvisConsole /></OpsProvider>
             </React.Suspense>
           )}
 

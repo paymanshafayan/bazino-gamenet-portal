@@ -1,6 +1,7 @@
 import { WalletConsole } from '../../../shared/management/Wallet';
 import { StartSessionDialog, SessionCheckout } from '../../../shared/management/Stations';
 import { AffiliateConsole } from '../../../shared/management/Affiliates';
+import { JarvisConsole } from '../../../shared/management/Jarvis';
 import { ReportsConsole } from '../../../shared/management/Reports';
 import { OrdersConsole } from '../../../shared/management/Orders';
 import { PromotionsConsole } from '../../../shared/management/Promotions';
@@ -723,6 +724,7 @@ export default function App() {
                   stations: 'ایستگاه‌ها',
                   buffet: 'کافه', shop:'فروشگاه', affiliates:'همکاری در فروش', promotions:'کوپن و ساعات ویژه', content:'محتوا و انتشار', tournaments:'تورنمنت',
                   customers: 'مشتریان',
+                  jarvis: 'جارویس (دستیار مدیر)',
                   accounting: 'حسابداری',
                   operators: 'اپراتورها',
                   settings: 'تنظیمات',
@@ -817,6 +819,7 @@ export default function App() {
         {activeTab === 'buffet' && <OrdersConsole kind="cafe" defaultStationId={orderTarget?.stationId} defaultSessionId={orderTarget?.sessionId}/>}
         {activeTab === 'shop' && <OrdersConsole kind="shop"/>}
         {activeTab === 'affiliates' && <AffiliateConsole/>}
+        {activeTab === 'jarvis' && <JarvisConsole/>}
         {activeTab === 'tournaments' && <TournamentsConsole/>}
         {activeTab === 'promotions' && <PromotionsConsole/>}
         {activeTab === 'content' && <ContentConsole/>}

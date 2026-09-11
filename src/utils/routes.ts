@@ -60,7 +60,7 @@ export function hubPageFromPath(pathname: string): HubPage | null {
 }
 
 export const ADMIN_SECTIONS = [
-  'dashboard', 'systems', 'cafe', 'shop', 'tournaments', 'tournamentOps', 'blog', 'content', 'promotions', 'chat', 'migrations', 'messages',
+  'dashboard', 'jarvis', 'systems', 'cafe', 'shop', 'tournaments', 'tournamentOps', 'blog', 'content', 'promotions', 'chat', 'migrations', 'messages',
   'themes', 'appSlider', 'mobileAppDownload', 'customization', 'dbLogs', 'apiKeys', 'presentation', 'tickets', 'wallet', 'affiliates', 'messaging',
 ] as const;
 

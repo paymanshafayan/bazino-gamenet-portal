@@ -562,8 +562,12 @@
 .hz-mnav-item.is-active { color: var(--hz-cyan); text-shadow: 0 0 12px rgba(0, 229, 255, 0.6); }
 
 /* ───────── responsive ───────── */
-@media (max-width: 1080px) {
+@media (min-width: 880px) {
+  .hz-mnav { display: none; }
+}
+@media (max-width: 880px) {
   .hz-nav { display: none; }
+  .hz-footer { margin-bottom: 76px; }
   .hz-quick-grid { grid-template-columns: repeat(4, 1fr); }
   .hz-contact-grid { grid-template-columns: repeat(2, 1fr); }
   .hz-article-grid { grid-template-columns: repeat(2, 1fr); }

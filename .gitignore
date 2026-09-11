@@ -57,3 +57,4 @@ tmp-shots/
 __pycache__/
 *.pyc
 .venv/
+public/__theme-snapshot.html

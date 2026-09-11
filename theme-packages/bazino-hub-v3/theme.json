@@ -1,7 +1,7 @@
 {
   "id": "bazino-hub-v3",
   "name": "Bazino Hub v3 (Hasti)",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "layout": "hub",
   "description": "Bazino Hub v3.1.0 — Hasti reference design: dark neon gaming, split hero. Dynamic images read live from the server (admin slider = center promo card; tournaments & live match data from events feed; blog strip from article covers). Static decorative art (hero cards) is admin-replaceable via Admin ▸ Customization uploads (theme_img.* settings).",
   "author": "Bazino",

@@ -1,4 +1,4 @@
-// BAZINO HUB v3.1.0 — Hasti reference design (dark neon gaming, English UI)
+// BAZINO HUB v3.1.1 — Hasti reference design (dark neon gaming, English UI)
 // SDK v2 — no React hooks, no timers. Interactive via props callbacks and DOM events.
 //
 // IMAGE POLICY (employer spec):

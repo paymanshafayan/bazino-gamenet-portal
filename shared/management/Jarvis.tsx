@@ -56,7 +56,7 @@ function JarvisChat({ api, t, language, configured, incidents, onApprovals }: an
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   // Backup-mode banner: the latest provider incident is fresh enough to matter.
   const latest: any = incidents?.[0];
   const backupActive = latest && ['BACKUP_ACTIVE', 'GROQ_UNAVAILABLE'].includes(latest.type)
@@ -66,7 +66,9 @@ function JarvisChat({ api, t, language, configured, incidents, onApprovals }: an
     try { const d = await api('/jarvis/sessions'); setSessions(d.sessions || []); } catch { /* */ }
   }, [api]);
   useEffect(() => { void loadSessions(); }, [loadSessions]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  // Internal autoscroll ONLY (container.scrollTop) — scrollIntoView moved the whole
+  // page down on every reply; the page itself must stay where the admin is.
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [messages]);
 
   const open = async (id: string) => {
     setSessionId(id);
@@ -78,6 +80,8 @@ function JarvisChat({ api, t, language, configured, incidents, onApprovals }: an
     if (!message || busy) return;
     setBusy(true); setError(''); setInput('');
     setMessages(m => [...m, { role: 'user', content: message }]);
+    // Employer rule: pressing Send returns the page to the top.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       const r = await api('/jarvis/chat', 'POST', { sessionId: sessionId || undefined, message, language });
       setSessionId(r.sessionId);
@@ -104,14 +108,13 @@ function JarvisChat({ api, t, language, configured, incidents, onApprovals }: an
       {backupActive && <div style={{ padding: '8px 12px', marginBottom: 8, borderRadius: 10, border: '1px solid #8a6d1f', background: '#3a2f14', color: '#ffd98a' }}>
         {t('حالت پشتیبان فعال — Groq در دسترس نیست؛ فقط امور پشتیبانی (تیکت‌ها، پیام‌ها، نظارت پورتال) پاسخ داده می‌شود و سایر امکانات موقتاً غیرفعال و به ادمین گزارش شده‌اند.', 'Backup mode active — Groq unavailable; only support matters (tickets, messages, portal monitoring) are answered. Everything else is paused and reported to the admin.', 'Yedek mod aktif — Groq kullanılamıyor; sadece destek işleri yanıtlanıyor.', 'Активен резервный режим — Groq недоступен; отвечаются только вопросы поддержки.')}
       </div>}
-      <div style={{ flex: 1, overflowY: 'auto', maxHeight: 420 }}>
+      <div style={{ flex: 1, overflowY: 'auto', maxHeight: 420 }} ref={listRef}>
         {messages.map((m: any, i: number) => (
           <div key={i} style={{ margin: '8px 0', textAlign: m.role === 'user' ? 'end' : 'start' }}>
             <div style={{ display: 'inline-block', maxWidth: '85%', padding: '8px 12px', borderRadius: 10, background: m.role === 'user' ? '#173d38' : '#16222f', border: '1px solid #273849', whiteSpace: 'pre-wrap' }}>{m.content}</div>
           </div>
         ))}
         {!messages.length && <p className="ops-muted">{t('مثال: «آمار امروز پورتال را بده» · «برای کاربر ali ده کردیت شارژ کن» · «پیام‌های بی‌پاسخ اینستاگرام؟»', 'e.g. "today\'s stats" · "charge 10 credits for ali"', 'örnek komut', 'пример команды')}</p>}
-        <div ref={endRef} />
       </div>
       <div className="ops-toolbar" style={{ margin: 0 }}>
         <input style={{ flex: 1 }} value={input} onChange={e => setInput(e.target.value)}
@@ -246,6 +249,46 @@ function JarvisMonitor({ api, t, language, initial, providers, incidents }: any)
   </div>;
 }
 
+/** Searchable model picker — a text box with a filtered dropdown (employer rule:
+ *  the model select must be a search box). Free text is allowed (custom models);
+ *  Enter picks the first match, Escape closes. */
+function ModelPicker({ value, options, onChange, t }: { value: string; options: string[]; onChange: (m: string) => void; t?: any }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  const q = query.trim().toLowerCase();
+  const filtered = Array.from(new Set([value, ...options].filter(Boolean)))
+    .filter(m => !q || m.toLowerCase().includes(q)).slice(0, 80);
+  const pick = (m: string) => { onChange(m); setOpen(false); setQuery(''); };
+  return <div ref={wrapRef} style={{ position: 'relative' }}>
+    <input dir="ltr" style={{ width: '100%' }}
+      value={open ? query : (value || '')}
+      placeholder={value || (t ? t('جستجوی مدل…', 'Search model…', 'Model ara…', 'Поиск модели…') : 'search…')}
+      onFocus={() => { setOpen(true); setQuery(''); }}
+      onChange={e => { setQuery(e.target.value); setOpen(true); }}
+      onKeyDown={e => {
+        if (e.key === 'Enter') { e.preventDefault(); if (filtered[0]) pick(filtered[0]); else if (query.trim()) pick(query.trim()); }
+        if (e.key === 'Escape') { setOpen(false); setQuery(''); }
+      }} />
+    {open && <div dir="ltr" style={{ position: 'absolute', top: '100%', insetInlineStart: 0, width: '100%', zIndex: 60, marginTop: 4, background: '#0f1b26', border: '1px solid #2c4254', borderRadius: 8, maxHeight: 230, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.45)' }}>
+      {filtered.map((m: string) => (
+        <div key={m} style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, background: m === value ? '#173d38' : 'transparent', color: m === value ? '#7de8bd' : undefined }}
+          onMouseDown={e => { e.preventDefault(); pick(m); }}
+          onMouseEnter={e => { if (m !== value) e.currentTarget.style.background = '#16222f'; }}
+          onMouseLeave={e => { if (m !== value) e.currentTarget.style.background = 'transparent'; }}>{m}</div>
+      ))}
+      {!filtered.length && <div style={{ padding: '8px 10px', fontSize: 12 }} className="ops-muted">
+        {t ? t('موردی نیست — با Enter مدل تایپ‌شده را ثبت کنید یا فهرست رسمی را بگیرید', 'No match — press Enter to keep the typed model or fetch the official list', 'Eşleşme yok', 'Нет совпадений') : '—'}
+      </div>}
+    </div>}
+  </div>;
+}
+
 function JarvisSettings({ api, t, state, onSaved }: any) {
   const [cfg, setCfg] = useState<any>(state?.config || {});
   const [models, setModels] = useState<Record<string, string[]>>({});
@@ -288,10 +331,8 @@ function JarvisSettings({ api, t, state, onSaved }: any) {
         <label>{t('کلید API', 'API key', 'API anahtarı', 'API-ключ')}
           <input type="password" dir="ltr" placeholder={b.apiKey ? '********' : keyHint} value={b.apiKey === '********' ? '' : (b.apiKey || '')} onChange={e => setBackup(id, { apiKey: e.target.value || '********' })} />
         </label>
-        <label>{t('مدل', 'Model', 'Model', 'Модель')}
-          <select dir="ltr" value={b.model || ''} onChange={e => setBackup(id, { model: e.target.value })}>
-            {modelOptions(id, b.model || '').map((m: string) => <option key={m} value={m}>{m}</option>)}
-          </select>
+        <label>{t('مدل — جستجو کنید', 'Model — searchable', 'Model — ara', 'Модель (поиск)')}
+          <ModelPicker t={t} value={b.model || ''} options={modelOptions(id, b.model || '')} onChange={(m: string) => setBackup(id, { model: m })} />
         </label>
         <label>{t('مدل سفارشی (اگر در فهرست نیست)', 'Custom model', 'Özel model', 'Своя модель')}
           <input dir="ltr" value={cfg.backup?.custom?.[id] || ''} onChange={e => { setCfg((c: any) => ({ ...c, backup: { ...c.backup, custom: { ...(c.backup?.custom || {}), [id]: e.target.value } } })); if (e.target.value) setBackup(id, { model: e.target.value }); }} />
@@ -321,15 +362,11 @@ function JarvisSettings({ api, t, state, onSaved }: any) {
         <label>{t('کلید API سرویس Groq (رایگان: console.groq.com)', 'Groq API key (free: console.groq.com)', 'Groq API anahtarı', 'API-ключ Groq')}
           <input type="password" dir="ltr" placeholder={cfg.apiKey ? '********' : 'gsk_…'} value={cfg.apiKey === '********' ? '' : (cfg.apiKey || '')} onChange={e => setCfg({ ...cfg, apiKey: e.target.value || '********' })} />
         </label>
-        <label>{t('مدل اصلی (پیشنهادی: llama-3.3-70b-versatile)', 'Main model', 'Ana model', 'Основная модель')}
-          <select dir="ltr" value={cfg.model} onChange={e => setCfg({ ...cfg, model: e.target.value })}>
-            {modelOptions('groq', cfg.model).map((m: string) => <option key={m} value={m}>{m}</option>)}
-          </select>
+        <label>{t('مدل اصلی — جستجو کنید (پیشنهادی: openai/gpt-oss-120b)', 'Main model — searchable', 'Ana model', 'Основная модель (поиск)')}
+          <ModelPicker t={t} value={cfg.model} options={modelOptions('groq', cfg.model)} onChange={(m: string) => setCfg({ ...cfg, model: m })} />
         </label>
-        <label>{t('مدل سبک (پشتیبان هنگام محدودیت نرخ)', 'Light fallback model', 'Hafif model', 'Лёгкая модель')}
-          <select dir="ltr" value={cfg.lightModel} onChange={e => setCfg({ ...cfg, lightModel: e.target.value })}>
-            {modelOptions('groq', cfg.lightModel).map((m: string) => <option key={m} value={m}>{m}</option>)}
-          </select>
+        <label>{t('مدل سبک (پشتیبان هنگام محدودیت نرخ) — جستجو کنید', 'Light fallback model — searchable', 'Hafif model', 'Лёгкая модель (поиск)')}
+          <ModelPicker t={t} value={cfg.lightModel} options={modelOptions('groq', cfg.lightModel)} onChange={(m: string) => setCfg({ ...cfg, lightModel: m })} />
         </label>
         <label>{t('سقف فراخوانی روزانه LLM', 'Daily LLM call cap', 'Günlük limit', 'Дневной лимит')}
           <input type="number" min={10} max={100000} value={cfg.dailyCallCap} onChange={e => setCfg({ ...cfg, dailyCallCap: Number(e.target.value) })} />

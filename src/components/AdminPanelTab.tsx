@@ -1018,7 +1018,24 @@ export default function AdminPanelTab({
         headers: { 'Content-Type': 'application/zip' },
         body: zipFileBytes as unknown as BodyInit,
       });
-      const data = await res.json();
+      // Cloudflare/proxy answers slow installs with an HTML error page (524) —
+      // res.json() would throw a useless SyntaxError. Read text first.
+      const rawText = await res.text();
+      let data: any;
+      try { data = JSON.parse(rawText); } catch { data = null; }
+      if (!data) {
+        const proxyTimeout = res.status === 524 || /524|timeout/i.test(rawText.slice(0, 800));
+        const msg = proxyTimeout
+          ? L(language, {
+              fa: 'پردازش فایل ZIP بیش از حد مجاز شبکه طول کشید (خطای 524). فایل قالب بسیار سنگین است — دارایی‌های تصویری آن را قبل از نصب بهینه/فشرده کنید.',
+              en: 'The ZIP took too long to process (proxy error 524). The theme package is too heavy — optimize/compress its image assets before installing.',
+              ru: 'Обработка ZIP заняла слишком много времени (ошибка прокси 524). Слишком тяжёлый пакет темы — сожмите изображения перед установкой.',
+              tr: 'ZIP işleme çok uzun sürdü (proxy hatası 524). Tema paketi çok ağır — kurulumdan önce görselleri optimize edin.' })
+          : L(language, { fa: `پاسخ نامعتبر سرور (HTTP ${res.status})`, en: `Invalid server response (HTTP ${res.status})`, ru: `Неверный ответ сервера (HTTP ${res.status})`, tr: `Geçersiz sunucu yanıtı (HTTP ${res.status})` });
+        setZipError(msg);
+        addNotification(msg, 'error');
+        return;
+      }
       if (!res.ok || !data.success) {
         setZipError(data.error || L(language, { fa: 'خطا در نصب قالب', en: 'Theme installation failed', ru: 'Не удалось установить тему', tr: 'Tema kurulumu başarısız' }));
         addNotification(L(language, { fa: `خطا در نصب: ${data.error || ''}`, en: `Install error: ${data.error || ''}`, ru: `Ошибка установки: ${data.error || ''}`, tr: `Yükleme hatası: ${data.error || ''}` }), 'error');

@@ -202,19 +202,34 @@ export function optimizeUploadedTheme(theme: ParsedZipTheme): ThemePerformanceRe
  * Re-encodes uploaded JPEG/PNG assets to WebP at a web-appropriate size before install.
  * Assets and references are changed together, so an uploaded theme continues to work
  * without requiring its author to edit CSS or theme.js manually.
+ *
+ * Hardening (2026-09-11, live 524 incident with a 25MB "3D" theme): Cloudflare kills
+ * any request that exceeds ~100s without a response, so a sequential sharp loop over
+ * dozens of heavy assets made every big install die as an opaque 524. Now images are
+ * converted with a small concurrency pool AND under a total time budget; whatever is
+ * left when the budget runs out is kept as-is (the 8MB total gate then decides with a
+ * clear Persian error instead of a proxy timeout).
  */
+const IMAGE_WORKERS = 4;
+const OPTIMIZE_BUDGET_MS = 45_000;
+
 export async function optimizeThemeImages(result: ThemePerformanceResult): Promise<ThemePerformanceResult> {
   const findings = [...result.report.findings];
   const assets: Record<string, Uint8Array> = {};
   let css = result.theme.css;
   let componentJs = result.theme.componentJs;
 
-  for (const [name, data] of Object.entries(result.theme.assets)) {
-    if (!CONVERTIBLE_IMAGE_EXTENSION.test(name)) {
-      assets[name] = data;
-      continue;
-    }
+  const entries = Object.entries(result.theme.assets);
+  const convertible: Array<[string, Uint8Array]> = [];
+  for (const [name, data] of entries) {
+    if (!CONVERTIBLE_IMAGE_EXTENSION.test(name)) assets[name] = data;
+    else convertible.push([name, data]);
+  }
 
+  let stoppedAt = -1;
+  const startedAt = Date.now();
+  let cursor = 0;
+  const convertOne = async (name: string, data: Uint8Array): Promise<void> => {
     try {
       const optimized = await sharp(Buffer.from(data))
         .rotate()
@@ -227,7 +242,7 @@ export async function optimizeThemeImages(result: ThemePerformanceResult): Promi
       // .webp with the same name already exists.
       if (optimized.byteLength >= data.byteLength || result.theme.assets[webpName] || assets[webpName]) {
         assets[name] = data;
-        continue;
+        return;
       }
 
       assets[webpName] = new Uint8Array(optimized);
@@ -249,6 +264,31 @@ export async function optimizeThemeImages(result: ThemePerformanceResult): Promi
         message: `تصویر «${name}» قابل تبدیل خودکار نبود و بدون تغییر نگه داشته شد.`,
       });
     }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(IMAGE_WORKERS, convertible.length) }, async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= convertible.length) break;
+        if (Date.now() - startedAt > OPTIMIZE_BUDGET_MS) { stoppedAt = i; break; }
+        await convertOne(convertible[i][0], convertible[i][1]);
+      }
+    }),
+  );
+  // Budget exhausted: keep the remaining originals so the request still answers fast;
+  // the total-size gate reports a clear, actionable error for genuinely heavy themes.
+  if (stoppedAt >= 0) {
+    for (let i = stoppedAt; i < convertible.length; i++) {
+      const [name, data] = convertible[i];
+      if (!assets[name] && !assets[name.replace(CONVERTIBLE_IMAGE_EXTENSION, '.webp')]) assets[name] = data;
+    }
+    findings.push({
+      id: 'optimization-time-budget',
+      severity: 'warning',
+      message: `بهینه‌سازی تصاویر برای پاسخ‌گویی سریع سرور ناقص ماند (${convertible.length - stoppedAt} فایل بدون تبدیل).`,
+      detail: 'قالب‌های با دارایی بسیار سنگین باید قبل از بارگذاری بهینه شوند.',
+    });
   }
 
   const optimizedAssetBytes = Object.values(assets).reduce((sum, data) => sum + data.byteLength, 0);

@@ -80,36 +80,35 @@ export interface JarvisConfig {
   automation: JarvisAutomationConfig;
 }
 
-/** Free-tier Groq models with native tool calling (docs 2026-09-11). */
+/** Free-tier Groq models with native tool calling — VERIFIED LIVE 2026-09-11
+ *  via GET /models with a real key (the catalog rotated: llama-3.3-70b-versatile,
+ *  llama-3.1-8b-instant and qwen/qwen3-32b are GONE → model_not_found). */
 export const FREE_GROQ_MODELS: Array<{ id: string; label: string; note: string }> = [
-  { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', note: 'پیشنهادی — دقیق‌ترین مدل رایگان با فراخوانی ابزار' },
-  { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant', note: 'سبک و بسیار سریع' },
-  { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B', note: 'رایگان، سریع' },
-  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', note: 'رایگان، قوی‌تر' },
-  { id: 'meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout', note: 'رایگان، چندوجهی' },
-  { id: 'qwen/qwen3-32b', label: 'Qwen3 32B', note: 'رایگان' },
+  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', note: 'پیشنهادی — قوی، رایگان، فراخوانی ابزار (تست‌شده)' },
+  { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B', note: 'سبک و سریع — مناسب مدل جانشین' },
+  { id: 'qwen/qwen3.6-27b', label: 'Qwen3.6 27B', note: 'رایگان، فراخوانی ابزار (تست‌شده)' },
+  { id: 'qwen/qwen3.8-27b', label: 'Qwen3.8 27B', note: 'رایگان — جدیدتر از 3.6' },
 ];
 
-/** OpenRouter :free suggestions (ids rotate — the panel has a live fetch button). */
+/** OpenRouter :free suggestions — from the live free ∩ tool-capable list
+ *  (GET /models, 2026-09-11: 18 models; ids rotate — the panel fetches live). */
 export const SUGGESTED_OPENROUTER_MODELS: Array<{ id: string; label: string; note: string }> = [
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (free)', note: 'پیشنهادی — رایگان با فراخوانی ابزار' },
-  { id: 'openai/gpt-oss-120b:free', label: 'GPT-OSS 120B (free)', note: 'رایگان، قوی' },
-  { id: 'openai/gpt-oss-20b:free', label: 'GPT-OSS 20B (free)', note: 'رایگان، سریع' },
-  { id: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek Chat v3 (free)', note: 'رایگان' },
-  { id: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (free)', note: 'رایگان، سریع' },
+  { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B (free)', note: 'پیشنهادی — عمومی، رایگان، فراخوانی ابزار (تست‌شده)' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 3 Super 120B (free)', note: 'رایگان، قوی' },
+  { id: 'google/gemma-4-26b-a4b-it:free', label: 'Gemma 4 26B (free)', note: 'رایگان، سبک‌تر' },
+  { id: 'nvidia/nemotron-3.5-lightning:free', label: 'Nemotron 3.5 Lightning (free)', note: 'رایگان، سریع' },
+  { id: 'thinkingmachines/inkling:free', label: 'Inkling (free)', note: 'رایگان' },
 ];
 
 /**
- * OpenRouter routing fallbacks for tool calls — models widely known to keep
- * native tool calling on the :free variants. Used ONLY as the `models` array
- * AFTER the admin's configured model; OpenRouter tries them in order when the
- * primary cannot serve the request (rate limit / no tool support).
+ * OpenRouter routing fallbacks for tool calls — from the live free ∩ tool-capable
+ * list (2026-09-11). Used ONLY as the `models` array AFTER the admin's configured
+ * model; OpenRouter tries them in order when the primary cannot serve the
+ * request. NOTE: the array is hard-limited to 3 items by OpenRouter.
  */
 export const OPENROUTER_TOOL_FALLBACKS = [
-  'openai/gpt-oss-120b:free',
-  'google/gemini-2.0-flash-exp:free',
-  'mistralai/mistral-small-3.1-24b-instruct:free',
-  'openai/gpt-oss-20b:free',
+  'google/gemma-4-31b-it:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
 ];
 
 /** OpenAI is paid — cheapest tool-calling models first (2026 pricing). */
@@ -127,7 +126,7 @@ export function suggestedModels(provider: JarvisProviderId): Array<{ id: string;
 }
 
 export const DEFAULT_BACKUP_OPENROUTER: JarvisBackupConfig = {
-  enabled: false, apiKey: '', model: 'meta-llama/llama-3.3-70b-instruct:free', dailyCallCap: 50,
+  enabled: false, apiKey: '', model: 'google/gemma-4-31b-it:free', dailyCallCap: 50,
 };
 export const DEFAULT_BACKUP_OPENAI: JarvisBackupConfig = {
   enabled: false, apiKey: '', model: 'gpt-4o-mini', dailyCallCap: 200,
@@ -135,8 +134,8 @@ export const DEFAULT_BACKUP_OPENAI: JarvisBackupConfig = {
 
 export const DEFAULT_JARVIS_CONFIG: JarvisConfig = {
   apiKey: '',
-  model: 'llama-3.3-70b-versatile',
-  lightModel: 'llama-3.1-8b-instant',
+  model: 'openai/gpt-oss-120b',
+  lightModel: 'openai/gpt-oss-20b',
   dailyCallCap: 800,
   backup: { openrouter: { ...DEFAULT_BACKUP_OPENROUTER }, openai: { ...DEFAULT_BACKUP_OPENAI } },
   automation: { dailyBrief: true, weeklyDigest: true, igReplies: false, chatFaq: false, faqAutoSend: false },
@@ -266,7 +265,7 @@ export async function jarvisChatCompletion(d: {
       if (/^o\d/.test(m)) delete body.temperature;
     }
   } else if (d.provider === 'openrouter' && d.tools?.length) {
-    body.models = [d.model, ...OPENROUTER_TOOL_FALLBACKS.filter(x => x !== d.model)].slice(0, 4);
+    body.models = [d.model, ...OPENROUTER_TOOL_FALLBACKS.filter(x => x !== d.model)].slice(0, 3); // OpenRouter hard limit: max 3
   }
 
   let res: Response;
@@ -318,7 +317,7 @@ export async function listProviderModels(provider: JarvisProviderId, apiKey: str
   if (provider === 'openai') {
     // Drop non-chat models (embeddings, tts, image, moderation, legacy) so the
     // admin only picks chat-capable ones.
-    models = models.filter(id => !/^(whisper|dall-e|tts|text-embedding|omni-moderation|babbage|davinci|code-|realtime|gpt-4o-audio)/.test(id));
+    models = models.filter(id => !/^(whisper|dall-e|tts|text-embedding|omni-moderation|babbage|davinci|code-|realtime|gpt-4o-audio|chatgpt-image|gpt-3\.5-turbo-instruct)/.test(id));
   }
   const free = provider === 'openrouter' ? models.filter(id => id.endsWith(':free')) : [];
   // OpenRouter reports supported parameters per model — surface tool support

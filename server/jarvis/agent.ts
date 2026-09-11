@@ -66,7 +66,9 @@ export class JarvisEngine {
         store.listUsers(), store.listSystems(), store.listTickets('open').catch(() => []), store.listUserMessages().catch(() => []),
       ]);
       const hour = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Nicosia', hour: 'numeric', minute: '2-digit', hour12: false }).format(new Date());
-      return `زمان محلی قبرس: ${hour} · کاربران: ${users.length} · سیستم‌ها: ${systems.length} (آزاد: ${systems.filter((s: any) => !s.isReserved).length}) · تیکت باز: ${(tickets || []).length} · پیام خوانده‌نشده: ${(msgs || []).filter((m: any) => !m.isRead).length}`;
+      const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Nicosia', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Nicosia', weekday: 'long' }).format(new Date());
+      return `تاریخ محلی قبرس: ${dateStr} (${weekday}) · ساعت: ${hour} · کاربران: ${users.length} · سیستم‌ها: ${systems.length} (آزاد: ${systems.filter((s: any) => !s.isReserved).length}) · تیکت باز: ${(tickets || []).length} · پیام خوانده‌نشده: ${(msgs || []).filter((m: any) => !m.isRead).length}`;
     } catch { return 'زمینهٔ پورتال در دسترس نیست'; }
   }
 

@@ -102,12 +102,38 @@ export function registerJarvis(app: express.Express, d: JarvisDeps) {
     return maskedJarvisConfig(clean);
   };
 
-  const chat = async (req: express.Request, actor: string) =>
-    engine.chat({
-      sessionId: (req.body || {}).sessionId ? String((req.body).sessionId) : undefined,
-      message: String((req.body || {}).message || ''),
-      actor, language: String((req.body || {}).language || 'fa'),
-    });
+  /** Graceful provider failures: a raw 5xx gets eaten by the edge proxy and
+   *  the panel shows an HTML error page — return a readable Persian reply
+   *  with the providerError code instead ( MESSAGE_EMPTY / SESSION_NOT_FOUND
+   *  and other 4xx keep their normal error path ). */
+  const providerHelp: Record<string, string> = {
+    JARVIS_RATE_LIMITED: 'محدودیت نرخ موقت سرویس هوش مصنوعی — چند لحظه بعد دوباره امتحان کنید.',
+    JARVIS_DAILY_CAP: 'سقف روزانهٔ فراخوانی‌های هوش مصنوعی پر شده است؛ فردا ریست می‌شود.',
+    JARVIS_BAD_KEY: 'کلید API سرویس نامعتبر است — از تنظیمات جارویس کلید را بررسی کنید.',
+    JARVIS_QUOTA_EXHAUSTED: 'اعتبار سرویس تمام شده است (مثلاً حساب OpenAI شارژ نشده) — از تنظیمات جارویس بررسی کنید.',
+    JARVIS_NETWORK_ERROR: 'اتصال به سرویس هوش مصنوعی برقرار نشد؛ دوباره امتحان کنید.',
+    JARVIS_PRIMARY_UNAVAILABLE: 'موتور اصلی (Groq) در دسترس نیست و این کار روی پشتیبان‌ها مجاز نیست؛ بعداً دوباره امتحان کنید.',
+    JARVIS_PROVIDER_ERROR: 'سرویس هوش مصنوعی پاسخ نداد — احتمالاً مدل انتخابی نامعتبر یا موقتاً قطع است؛ از تنظیمات جارویس مدل دیگری (مثلاً openai/gpt-oss-120b) انتخاب کنید.',
+  };
+
+  const chat = async (req: express.Request, actor: string) => {
+    try {
+      return await engine.chat({
+        sessionId: (req.body || {}).sessionId ? String((req.body).sessionId) : undefined,
+        message: String((req.body || {}).message || ''),
+        actor, language: String((req.body || {}).language || 'fa'),
+      });
+    } catch (e: any) {
+      const code = String(e?.code || '');
+      if (code.startsWith('JARVIS_')) {
+        return {
+          sessionId: '', reply: providerHelp[code] || 'سرویس هوش مصنوعی موقتاً در دسترس نیست؛ دوباره امتحان کنید.',
+          approvalsCreated: [], toolsUsed: [], providerError: code, usageToday: await todayUsage(core, 'groq'),
+        };
+      }
+      throw e;
+    }
+  };
 
   const decide = async (req: express.Request, decidedBy: string) =>
     decideApproval(core, {

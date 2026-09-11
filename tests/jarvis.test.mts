@@ -85,7 +85,7 @@ async function bootEngine() {
 
 async function setConfig(over: any = {}) {
   await store.setSetting(jarvisConfig.JARVIS_CONFIG_KEY, JSON.stringify({
-    apiKey: 'gsk-test-key-1234567890', model: 'llama-3.3-70b-versatile', lightModel: 'llama-3.1-8b-instant', dailyCallCap: 50,
+    apiKey: 'gsk-test-key-1234567890', model: 'openai/gpt-oss-120b', lightModel: 'openai/gpt-oss-20b', dailyCallCap: 50,
     automation: { dailyBrief: false, weeklyDigest: false, igReplies: false, chatFaq: false, faqAutoSend: false },
     backup: {
       openrouter: { enabled: false, apiKey: '', model: 'meta-llama/llama-3.3-70b-instruct:free', dailyCallCap: 50 },
@@ -111,9 +111,15 @@ test('sanitize clamps, masks and keeps the old key on placeholder', async () => 
   const masked: any = jarvisConfig.maskedJarvisConfig({ ...clean, apiKey: 'secret' });
   assert.equal(masked.apiKey, '********');
 });
-test('groq tool-use model catalog excludes groq/compound (no local tool use)', () => {
-  assert.ok(jarvisConfig.FREE_GROQ_MODELS.some((m: any) => m.id === 'llama-3.3-70b-versatile'));
-  assert.ok(!jarvisConfig.FREE_GROQ_MODELS.some((m: any) => m.id.includes('compound')));
+test('groq tool-use model catalog matches the LIVE catalog (2026-09-11)', () => {
+  assert.ok(jarvisConfig.FREE_GROQ_MODELS.some((m: any) => m.id === 'openai/gpt-oss-120b'), 'verified primary');
+  assert.ok(jarvisConfig.FREE_GROQ_MODELS.some((m: any) => m.id === 'qwen/qwen3.6-27b'), 'verified qwen3.6');
+  assert.ok(!jarvisConfig.FREE_GROQ_MODELS.some((m: any) => m.id.includes('compound')), 'compound has no local tool use');
+  assert.ok(!jarvisConfig.FREE_GROQ_MODELS.some((m: any) => m.id === 'qwen/qwen3-32b'), 'qwen3-32b was REMOVED by Groq (live 404)');
+  assert.ok(!jarvisConfig.FREE_GROQ_MODELS.some((m: any) => m.id.startsWith('llama-3')), 'llama-3.x models were removed by Groq (live 404)');
+  assert.ok(jarvisConfig.DEFAULT_JARVIS_CONFIG.model === 'openai/gpt-oss-120b');
+  assert.ok(jarvisConfig.DEFAULT_BACKUP_OPENROUTER.model === 'google/gemma-4-31b-it:free');
+  assert.ok(jarvisConfig.OPENROUTER_TOOL_FALLBACKS.length + 1 <= 3, 'OpenRouter models array is hard-limited to 3 items');
 });
 test('provider errors map to stable codes', async () => {
   const badFetcher = (async () => new Response('{"error":"quota"}', { status: 429, headers: { 'retry-after': '5' } })) as unknown as typeof fetch;
@@ -294,7 +300,7 @@ test('state/chat/approvals/monitor over express with staff auth', async () => {
     assert.equal(state.configured, true);
     assert.equal(state.config.apiKey, '********', 'masked key only');
     assert.ok(state.skills.length >= 20);
-    assert.ok(state.freeModels.some((m: any) => m.id === 'llama-3.3-70b-versatile'));
+    assert.ok(state.freeModels.some((m: any) => m.id === 'openai/gpt-oss-120b'));
     assert.ok(state.providers && state.providers.groq.configured === true, 'state must expose provider statuses');
     assert.ok(Array.isArray(state.incidents), 'state must expose the incident log');
     assert.ok(state.suggestedModels.openrouter.some((m: any) => m.id.endsWith(':free')));
@@ -326,6 +332,29 @@ test('unauthenticated caller is rejected by the staff guard', async () => {
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/management/jarvis/state`);
     assert.equal(res.status, 401);
+  } finally { server.close(); }
+});
+test('provider failure → graceful 200 with a readable Persian reply (never a raw 5xx the edge proxy eats)', async () => {
+  clearScripts();
+  await setConfig({ dailyCallCap: 500 }); // no backup configured
+  const app = express();
+  app.use(express.json());
+  app.use((req: any, _res: any, next: any) => { req.authUsername = 'admin'; next(); });
+  registerJarvis(app, { core, getStore, fetcher: mockFetcher, startAutomation: false });
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    // Groq model_not_found (exactly the live failure of the removed qwen3-32b).
+    script = [{ status: 404, body: '{"error":{"message":"The model `x` does not exist","code":"model_not_found"}}' }];
+    const res = await fetch(`http://127.0.0.1:${port}/api/management/jarvis/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'سلام' }),
+    });
+    assert.equal(res.status, 200, 'must be 200 — a 502 gets replaced by the proxy HTML page');
+    const body: any = await res.json();
+    assert.equal(body.providerError, 'JARVIS_PROVIDER_ERROR');
+    assert.ok(String(body.reply).includes('مدل'), 'reply must point at the likely model problem');
+    assert.ok(String(body.reply).includes('gpt-oss-120b'), 'reply must suggest a working model');
   } finally { server.close(); }
 });
 
@@ -465,7 +494,7 @@ test('provider body shaping: openai max_completion_tokens (new models) / no temp
   await jarvisConfig.jarvisChatCompletion({ provider: 'openai', apiKey: 'k', model: 'o4-mini', messages: [{ role: 'user', content: 'x' }], fetcher: f });
   await jarvisConfig.jarvisChatCompletion({ provider: 'openai', apiKey: 'k', model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'x' }], fetcher: f });
   await jarvisConfig.jarvisChatCompletion({
-    provider: 'openrouter', apiKey: 'k', model: 'meta-llama/llama-3.3-70b-instruct:free',
+    provider: 'openrouter', apiKey: 'k', model: 'google/gemma-4-31b-it:free',
     messages: [{ role: 'user', content: 'x' }], tools: [{ type: 'function', function: { name: 't', parameters: { type: 'object', properties: {} } } }], fetcher: f,
   });
   const [g41, g5, o4, g4o, or] = seen;
@@ -477,8 +506,8 @@ test('provider body shaping: openai max_completion_tokens (new models) / no temp
   assert.ok(!('max_tokens' in o4));
   assert.equal(g4o.max_tokens, 3000, 'gpt-4o keeps classic max_tokens');
   assert.ok(!('max_completion_tokens' in g4o));
-  assert.equal(or.models[0], 'meta-llama/llama-3.3-70b-instruct:free', 'admin model stays first in the routing array');
-  assert.ok(or.models.length >= 2, 'openrouter tool fallbacks present');
+  assert.equal(or.models[0], 'google/gemma-4-31b-it:free', 'admin model stays first in the routing array');
+  assert.ok(or.models.length >= 2 && or.models.length <= 3, 'openrouter routing array: 2-3 items (hard limit 3)');
   // The 404 no-tool-support error must carry a Persian, actionable message.
   const f404 = (async () => new Response('{"error":"No endpoints found that support tool use"}', { status: 404 })) as unknown as typeof fetch;
   await assert.rejects(() => jarvisConfig.jarvisChatCompletion({ provider: 'openrouter', apiKey: 'k', model: 'x:free', messages: [{ role: 'user', content: 'x' }], tools: [{ type: 'function', function: { name: 't', parameters: {} } }], fetcher: f404 }),

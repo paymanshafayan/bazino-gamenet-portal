@@ -1472,3 +1472,15 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **OpenAI models endpoint:** مدل‌های غیر-چت (whisper/dall-e/tts/text-embedding/…) از فهرست فیلتر می‌شوند.
 - **رویدادها:** به meta رویدادهای GROQ_UNAVAILABLE/BACKUP_FAILED جزئیات خطا (detail) و مدل اضافه شد و در جدول رویدادهای پنل نمایش داده می‌شود — برای عیب‌یابی زنده.
 - تست: ۲۷/۲۷ (بدنهٔ درخواست‌ها Assert می‌شود)؛ کل مجموعه ۶۱۳/1 (همان payment قبلی)؛ بیلد سبز.
+
+### ۳۱-ج. تست زنده با کلیدهای واقعی کارفرما از طریق پل مرورگر (2026-09-11)
+
+> پل v6 بعد از ریست سندباکس بازسازی شد (relay.js بازنویسی‌شده با endpointهای سمت ایجنت /agent/next و /agent/send به‌جای WS لوکال + agent.py؛ PowerShell کارفرما بدون تغییر همان سند §۵ کار کرد). تمرین داخلی mock سبز → جلسهٔ زنده برقرار → تست واقعی روی bazino.pro با کلیدهای کارفرما. یافته‌ها و فیکس‌ها:
+
+- **ریشهٔ خطای اصلی:** Groq کل کاتالوگ را چرخانده — `llama-3.3-70b-versatile`، `llama-3.1-8b-instant` و `qwen/qwen3-32b` حذف شده‌اند (404 model_not_found؛ خروجی زندهٔ /models فقط ۱۴ مدل دارد). فهرست FREE_GROQ_MODELS با کاتالوگ زنده بازنویسی شد: **openai/gpt-oss-120b** (پیش‌فرض جدید؛ تست‌شده با tool-call واقعی)، openai/gpt-oss-20b (سبک)، qwen/qwen3.6-27b و qwen/qwen3.8-27b (3.6 تست‌شده). تنظیمات کارفرما به 120b/20b اصلاح شد.
+- **باگ OpenRouter (مال من):** آرایهٔ routing `models` حداکثر **۳ عضو** می‌پذیرد (۴ می‌فرستادم → 400). → slice(0,3) + بازنویسی fallbackها از فهرست زندهٔ free∩tools (gemma-4-31b-it:free، nemotron-3-super-120b:free) + SUGGESTED_OPENROUTER_MODELS از همان فهرست (۱۸ مدل free دارای tools؛ متد /models فیلد toolModels برمی‌گرداند).
+- **حساب OpenAI کارفرما اعتبار ندارد:** پاسخ زنده «You have no credits remaining» (429) — کلید سالم است (لیست مدل‌ها ۱۲تایی برگشت) ولی chat پولی است؛ کارفرما باید به platform.openai.com اعتبار اضافه کند تا پشتیبان ۲ کار کند.
+- **502 پروکسی:** پاسخ 5xx سرور توسط edge proxy به HTML تبدیل می‌شد → چت حالا خطای ارائه‌دهنده را **200 + providerError + پیام فارسی راهنما** برمی‌گرداند (routes.ts، تست دارد). تاریخ به زمینهٔ پورتال اضافه شد (مدل تاریخ را هالوسینه می‌کرد).
+- **اثبات زنده:** چت Groq (gpt-oss-120b) با tool-call واقعی portal_stats → پاسخ درست فارسی (۱.۶s)؛ qwen3.6-27b هم tool-call OK؛ زنجیرهٔ رویدادها (GROQ_UNAVAILABLE→BACKUP_FAILED×2) با detail واقعی در پنل ثبت شد.
+- **غیبت فعال شد (تعهد قبلی):** PUT ig-away enabled:true → GET وریفای: enabled ✓، پیام fa دقیقاً متن تأییدشده، پنجرهٔ ۱–۱۰ قبرس، outboundEnabled روشن ماند، زرنیو SET.
+- تست: ۲۸/۲۸؛ کل ۶۱۴/1 (payment قبلی). مسیر پشتیبان OpenRouter بعد از دیپلوی این کامیت باید زنده re-test شود (مدل gemma-4-31b-it:free).

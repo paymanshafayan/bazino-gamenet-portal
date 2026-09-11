@@ -1521,7 +1521,7 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **وریفای محلی:** audit `canInstall:true` بی‌finding؛ هارنس اختصاصی mock-SDK (۲۱ اثبات: هیچ هوک، مسیرهای asset درست/زیرپوشه، کلیک دکمه‌ها → تصویر درست، idempotent-wire، رندر دوم)؛ کل سوئیت ۶۱۹p/1f (فقط payment قبلی).
 - **سخت‌گیری ریپو (این کامیت):** (۱) `mountComponent` حالا factory را هم داخل try می‌گیرد — theme.js معیوب دیگر هرگز صفحه را نمی‌کشد، فقط همان region خالی/فال‌بک می‌شود + هشدار واضح وقتی factory تعریف `{render}` برنگرداند؛ (۲) `validateThemeComponentJs` نصب theme.js دارای هوک React را با خطای فارسی روشن رد می‌کند (کامنت‌ها قبل از بررسی حذف می‌شوند تا false-positive ندهد)؛ (۳) باگ `listFilesRecursive` رفع شد — مسیر زیرپوشه‌ها حفظ می‌شود (قبلاً تخت می‌شد → assetFiles ناقص و exportThemeZip برای assetهای تو‌در‌تو ENOENT). تست‌های جدید: unit ×۴، ui ×۱.
 - **جامانده:** آپلود `bazino-3d-dimension-v1.0.1.zip` (آماده در /tmp، sha256 70481765eb5dcdf5…) با `cdp/upload-zip.js` — وسط آپلود پاورشلِ پل کارفرما ایستاد (~13:42Z؛ مرورگر کارفرما هنوز وصل بود — فقط پنجرهٔ PS). بعد از برگشت پل: آپلود → فعال‌سازی خودکار → وریفای زندهٔ خانه/اسلایدر/تصاویر/صفحات دیگر.
-- **بازسازی کامل ابزار پل بعد از ریبیلد سندباکس (این نوبت):** سندباکس ریبیلد شد (`/home/user/cdp` پاک شد؛ شناسهٔ جدید) → کل ابزار با Node خالص از نو ساخته شد: `relay.js` v7 (HTTP واحد: `/up` `/down` `/status` `/report` + ایجنت: `/agent/cmd` `/agent/poll` long-poll — دیگر watcher/agent پس‌زمینه لازم نیست)، `lib.js`، `agent.js`، `upload-zip.js`، `fetch-3d-assets.js` (دانلود asset از سرور از طریق صفحه)، `capture-errors.js` (هوک خطا قبل از لود)، `mock_bridge.js` (تمرین داخلی — سبز). URL عمومی جدید خودکار از صفحهٔ دیاگ ثبت شد: `https://sbx-kzswdc7ylr3y7mnn.arena.site` (کد جلسه همان fda16519959164f3). درس: مرورگر کارفرما (صفحهٔ دیاگ) و پاورشل جدا قطع/وصل می‌شوند — reports صفحهٔ دیاگ بهترین سیگنال تشخیصِ «کدام طرف افتاده» است.
+- **بازسازی کامل ابزار پل بعد از ریبیلد سندباکس (این نوبت):** سندباکس ریبیلد شد (`/home/user/cdp` پاک شد؛ شناسهٔ جدید) → کل ابزار با Node خالص از نو ساخته شد: `relay.js` v7 (HTTP واحد: `/up` `/down` `/status` `/report` + ایجنت: `/agent/cmd` `/agent/poll` long-poll — دیگر watcher/agent پس‌زمینه لازم نیست)، `lib.js`، `agent.js`، `upload-zip.js`، `fetch-3d-assets.js` (دانلود asset از سرور از طریق صفحه)، `capture-errors.js` (هوک خطا قبل از لود)، `mock_bridge.js` (تمرین داخلی — سبز). URL عمومی جدید خودکار از صفحهٔ دیاگ ثبت شد: `https://sbx-kzswdc7ylr3y7mnn.arena.site` (کد جلسه در آن نوبت در چت داده شد — سکرت‌ها هرگز در ریپو نمی‌مانند). درس: مرورگر کارفرما (صفحهٔ دیاگ) و پاورشل جدا قطع/وصل می‌شوند — reports صفحهٔ دیاگ بهترین سیگنال تشخیصِ «کدام طرف افتاده» است.
 
 ### ۳۱-ح. قالب «Bazino 3D Dimension» v1.0.1 — نصب و وریفای زندهٔ کامل ✅ (2026-09-11، بسته شد)
 
@@ -1545,3 +1545,44 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **وریفای زنده (همگی از مرورگر کارفرما):** نصب replace=1 → فعال شد؛ خانه صفر خطای JS؛ موتور اسکراب با رویدادهای واقعی PointerEvent تست شد: ۷۵% عرض → استیشن ۵ (dock) + تیلت rotateX(2)rotateY(3) + امبیلایت سرخابی؛ ۱۰٪ → استیشن ۱ + آبی؛ ۴۵٪ → استیشن ۳ + طلایی؛ خروج ماوس → تیلت صفر؛ کلیک سگمنت/دکمه → استیشن درست. CTA و کارت بازی → ناوبری SPA به /games بدون رفرش و بدون خطا. صفحات /tournaments، /cafe، /shop، /games با هدر 3D و منوی فعال درست. اسکرین‌شات: `/home/user/3d-v210-home-final.jpg` و `3d-v210-live-proof.jpg` (non-git).
 - **وضعیت نهایی پروداکشن:** activeThemeId=bazino-3d-dimension v2.1.0؛ قالب هاب v1.4.0 سر جایش برای بازگشت. ZIP در `/home/user/bazino-3d-dimension-v2.1.0.zip` (non-git). نکتهٔ زبانی: برچسب‌ها در جلسهٔ EN انگلیسی‌اند؛ strings.fa کامل موجود است.
 - **درس این پرونده:** (۱) گارد نصب هوک روی پروداکشن اثبات شد — قالب مرجع دارای هوک رد شد و صفحهٔ اصلی نجات یافت؛ (۲) همیشه قبل از ساخت، آخرین کامیت ریپوی مرجع را fetch کن (طراحی مرجع وسط پروژه عوض شد: دک کارت‌ها → موتور اسکراب)؛ (۳) پل PS: خطای `[VoidTaskResult]::ReceiveAsync` = خروجی GetResult به‌جای سوکت (فیکس: نظرسنجی IsCompleted)؛ خطای AggregateException در Wait = کروم مرده (فیکس: reconnect loop)؛ 502 پروکسی = فریز موقت سندباکس (خودش برمی‌گردد).
+
+### ۳۲. سیستم دید بصری ایجنت — چهار لایه + راه‌اندازی (2026-09-11، اثبات‌شده) ✅
+
+> **مسئله:** مدل خدمت‌دهندهٔ ایجنت در برخی جلسات قابلیت vision ندارد — `read_file` روی تصویر پیام
+> «you do not have vision capabilities» می‌دهد. **راه‌حل عملیاتی و اثبات‌شده:** زنجیرهٔ چهارلایه؛
+> سند کامل تحقیق: `cdp-tools/VISION.md` + راهنمای کامل پل مرورگر: `docs/ops/BROWSER_CONNECTION_GUIDE.md`.
+
+**لایهٔ A — زنجیرهٔ اوراکل بینایی (بینایی معنایی واقعی) ⭐**
+ابزار `generate_image` سمت پلتفرم اجرا می‌شود (نه سندباکس) و مدل تصویرش **واقعاً تصویر ورودی را می‌بیند**.
+الگو: تصویر هدف → `generate_image(images:[img], prompt="سند سفید شامل فقط متن مشکی monospace — توصیف بصری دقیق …")`
+→ خروجی = تصویرِ سندِ متنی → خواندن با `python3 cdp-tools/ocr.py <خروجی>`.
+- اثبات متقاطع: توصیف اوراکل از اسکرین‌شات تست (سیبرپانک/نئون/BISON/ماسک‌های صورتی-آبی) با OCR مستقیم و
+  palette.py هم‌داستان بود؛ در صحنهٔ «3D Cyber Desk» جزئیاتی دید (کاتانا، درخت قرمز نورانی، نئون SYSTEM OVERRIDE،
+  پنل Bloom) که در DOM نبود.
+- برای ویدئو: با ffmpeg (پکیج pip `imageio-ffmpeg`) فریم‌بندی (مثلاً fps=0.5) → اوراکل روی فریم‌های کلیدی.
+- محدودیت‌ها: ~۱۰ تصویر در هر نوبت؛ متن بلند داخل تصویر را دقیق رونویسی نمی‌کند (→ لایهٔ B)؛
+  گاهی یک فراخوانی خطا می‌دهد (دوباره تلاش کن یا فریم جایگزین).
+- کاربرد اثبات‌شده: تحلیل ویدئوی ریلز ۳۳ثانیه‌ای بازینو (۹ فریم کلیدی + پالت رنگی همهٔ ۱۷ فریم + تشخیص ۱۶ کات) —
+  DNA بصری بازینو: «سینماییِ تیره + نئون متحرک (طلایی→زرشکی→بنفش→آبی→صورتی) + برندینگ طلایی».
+
+**لایهٔ B — OCR محلی (متن + مختصات، آفلاین):** `python3 cdp-tools/ocr.py <img>` — RapidOCR (onnx) با مدل داخل
+wheel؛ متن + x/y/w/h + confidence → بازسازی چیدمان. نصب (بعد از هر ریبیلد!):
+`pip3 install --break-system-packages rapidocr-onnxruntime opencv-python-headless pillow`
+(⚠️ opencv-python با rapidocr نصب می‌شود و libGL می‌خواهد → حتماً بعدش
+`pip3 install --break-system-packages --force-reinstall --no-deps opencv-python-headless`)
+
+**لایهٔ C — شبه‌بینایی رنگ/چیدمان:** `python3 cdp-tools/palette.py <img> [--k N] [--grid C R]` — پالت غالب + روشنایی
++ حکم dark/light + ماتریس رنگ سلول‌ها. سریع برای وریفای رندر قالب (تیره؟ نئون؟ چیدمان؟).
+
+**لایهٔ D — تحلیل DOM/صحنه از مرورگر کارفرما (پل CDP):** `analyze-current.js` (DOM + صحنهٔ three.js از fiber:
+مش/متریال/نور/مثلث + شنونده‌ها + انیمیشن خودجوش/واکنش ماوس)، `scroll-shots.js`، `capture-errors.js` (⚠️ یک تزریق
+در جلسه)، `capture-anim2.js`/`capture-entrance.js` (شکار انیمیشن ورود؛ درس: انیمیشن‌ها one-shot‌اند — شکار فقط
+حین ورود اولیه/ریلود ممکن است؛ ریلود سشن CDP را می‌کشد → attach مجدد؛ تب پس‌زمینه فریز → Target.activateTarget).
+
+**راه‌اندازی بعد از ریبیلد (چک‌لیست):** بازیابی ریپو (fetch+reset) → pip نصب لایهٔ B/C → رله (پورت 8787 اولین پورت)
+→ npm install --ignore-scripts → Base از page_loaded در relay-events.log → اسکریپت پاورشل v3 با $Base جدید.
+مرجع کامل: `docs/ops/BROWSER_CONNECTION_GUIDE.md`.
+
+**وضعیت مرورگر کارفرما (جلسهٔ 2026-09-۱۱ عصر):** پل v7 با Base `sbx-pv4pjgms75n7r4lz` فعال بود؛ دو تب تحلیل شد
+(3dcyberroom.vercel.app + shopify.design)؛ زبان طراحی مدنظر کارفرما ثبت شد: صحنهٔ سه‌بعدی زنده + واکنش ماوس +
+انیمیشن ورود آیتم‌ها با اسکرول (الگوی Tailwind `translate-y-[18px]→0` با cubic-bezier(0.23,1,0.32,1) + GSAP).

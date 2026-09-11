@@ -1484,3 +1484,9 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **اثبات زنده:** چت Groq (gpt-oss-120b) با tool-call واقعی portal_stats → پاسخ درست فارسی (۱.۶s)؛ qwen3.6-27b هم tool-call OK؛ زنجیرهٔ رویدادها (GROQ_UNAVAILABLE→BACKUP_FAILED×2) با detail واقعی در پنل ثبت شد.
 - **غیبت فعال شد (تعهد قبلی):** PUT ig-away enabled:true → GET وریفای: enabled ✓، پیام fa دقیقاً متن تأییدشده، پنجرهٔ ۱–۱۰ قبرس، outboundEnabled روشن ماند، زرنیو SET.
 - تست: ۲۸/۲۸؛ کل ۶۱۴/1 (payment قبلی). مسیر پشتیبان OpenRouter بعد از دیپلوی این کامیت باید زنده re-test شود (مدل gemma-4-31b-it:free).
+
+### ۳۱-د. اثبات نهایی زنده پس از دیپلوی 760d337 (2026-09-11)
+
+- **مسیر پشتیبان در پروداکشن کار کرد:** مدل Groq موقتاً خراب شد → چت پشتیبانی («تیکت‌های باز») → **OpenRouter/google/gemma-4-31b-it:free** در حالت فقط-پشتیبانی جواب داد (۱۰s، tool-call واقعی list_tickets، دادهٔ واقعی تیکت TK-MTMHITON746F، پانوشت «حالت پشتیبان»، رویدادهای GROQ_UNAVAILABLE + BACKUP_ACTIVE). فیکس آرایهٔ ۳عضوی models تأیید شد. مدل Groq بلافاصله برگردانده شد.
+- **وضعیت نهایی تنظیمات کارفرما (زنده):** Groq = openai/gpt-oss-120b + سبک gpt-oss-20b (۱۰/۸۰۰) · OpenRouter = gemma-4-31b-it:free (۳/۵۰) · OpenAI = gpt-4o-mini (۱/۲۰۰، کلید سالم ولی حساب بدون اعتبار — «You have no credits remaining»؛ تا شارژ حساب، پشتیبان ۲ فعال نمی‌شود).
+- کار باقی‌مانده برای کارفرما: شارژ اعتبار OpenAI (platform.openai.com → Billing) در صورت تمایل به پشتیبان ۲. پل مرورگر بعد از پایان جلسه بسته شود (بستن پنجرهٔ PowerShell).

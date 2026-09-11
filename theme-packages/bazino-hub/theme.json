@@ -1,9 +1,9 @@
 {
   "id": "bazino-hub",
   "name": "Bazino Hub",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "layout": "hub",
-  "description": "Neon Hub layout for Bazino — full chrome and hub.* pages on live portal data.",
+  "description": "Neon Hub layout for Bazino — full chrome and hub.* pages on live portal data. | v1.4.0: portal-source package — chat removed from nav/tile (employer request), CHAT DISABLED guard, EXTRA PADS stepper, club credits. Supersedes the landing-repo v1.3.0 build.",
   "author": "Bazino",
   "sdkVersion": 2,
   "colors": {

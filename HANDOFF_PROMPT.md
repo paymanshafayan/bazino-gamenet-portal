@@ -1490,3 +1490,13 @@ Invoke-RestMethod -Uri 'https://bazino.pro/api/webhooks/zernio' -Method Post -Co
 - **مسیر پشتیبان در پروداکشن کار کرد:** مدل Groq موقتاً خراب شد → چت پشتیبانی («تیکت‌های باز») → **OpenRouter/google/gemma-4-31b-it:free** در حالت فقط-پشتیبانی جواب داد (۱۰s، tool-call واقعی list_tickets، دادهٔ واقعی تیکت TK-MTMHITON746F، پانوشت «حالت پشتیبان»، رویدادهای GROQ_UNAVAILABLE + BACKUP_ACTIVE). فیکس آرایهٔ ۳عضوی models تأیید شد. مدل Groq بلافاصله برگردانده شد.
 - **وضعیت نهایی تنظیمات کارفرما (زنده):** Groq = openai/gpt-oss-120b + سبک gpt-oss-20b (۱۰/۸۰۰) · OpenRouter = gemma-4-31b-it:free (۳/۵۰) · OpenAI = gpt-4o-mini (۱/۲۰۰، کلید سالم ولی حساب بدون اعتبار — «You have no credits remaining»؛ تا شارژ حساب، پشتیبان ۲ فعال نمی‌شود).
 - کار باقی‌مانده برای کارفرما: شارژ اعتبار OpenAI (platform.openai.com → Billing) در صورت تمایل به پشتیبان ۲. پل مرورگر بعد از پایان جلسه بسته شود (بستن پنجرهٔ PowerShell).
+
+### ۳۱-ه. مشکل قالب هاب — تشخیص و رفع زنده (2026-09-11، از طریق پل مرورگر)
+
+> دستور کارفرما: «مشکل قالب هاب را بررسی و حل کن». بررسی محلی کامل سبز بود (بیلد ZIP، ممیزی canInstall، تست فروشگاه/موتور/کارایی، چرخهٔ کامل نصب→فعال‌سازی→سرو روی سرور لوکال). تشخیص زنده از پل:
+
+- **ریشه:** روی bazino.pro قالب «Bazino Hub Neon» **v1.3.0 از ریپوی arena-landing** نصب بود (theme.js فقط ۱۰.۶KB) — نه سورس این ریپو. نتیجه: **چت در منو/تایل هاب زنده نمایش داده می‌شد** (نقض الزام کارفرما: حذف چت + گارد CHAT DISABLED) و فیکس‌های EXTRA PADS و کردیت Club هم غایب بودند. (activeThemeId هم روی dark-gold مانده بود — بازگردانی عمدی نشست قبلی.)
+- **رفع:** سورس پرتال با ارتقای نسخه به **1.4.0** (توضیح جایگزینی در theme.json) → بیلد ZIP → بهینه‌سازی با audit --fix (۲.۳۸MB → ۹۳۵KB) → **آپلود تکه‌ای از طریق پل** (۱۱ تکهٔ base64 به صفحه، وریفای SHA-256 دوطرفه، سپس POST نصب اتمیک `?replace=1&activate=1` از مرورگر کارفرما) → `success:true, replaced:true, activeThemeId:bazino-hub`.
+- **وریفای زنده (پس از نصب):** خانه و /games و /club با هدر هاب رندر شدند؛ **چت از منو حذف شده** (navItems بدون CHAT، هیچ لینک /chat)؛ BAZINO CREDITS در Club ✓؛ بدون صفحهٔ سفید و بدون خطای JS (فقط CSP کلادفلر و preload-warning قبلی). EXTRA PADS مطابق طراحی فقط بعد از انتخاب کنسول ظاهر می‌شود. اسکرین‌شات اثبات: `theme-packages/hub-live-proof.jpg` (non-git، /tmp). layoutMode=hub برای کارفرما فعال ماند.
+- **درس:** نصب قالب = داده است؛ فیکس‌های سورس پرتال فقط با آپلود مجدد ZIP روی پروداکشن اعمال می‌شوند. آپلودر تکه‌ای پل: `cdp/upload-zip.js`.
+- کامیت این نوبت: فقط ارتقای نسخه theme.json به 1.4.0 (ZIP طبق قاعده gitignored و هرگز کامیت نشد).

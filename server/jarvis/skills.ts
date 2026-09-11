@@ -17,9 +17,12 @@ import { ContentService } from '../management/content';
 import { PromotionService } from '../management/promotions';
 import { PublishingSettings } from '../publishing/settings';
 import { sanitizeAwaySettings } from '../affiliate/awayPolicy';
+import { snapshot as monitorSnapshot } from './monitor';
 import { randomUUID } from 'node:crypto';
 
 export type SkillRisk = 'read' | 'write' | 'sensitive';
+/** Skill scope: support skills are the ONLY ones backup providers may use. */
+export type SkillScope = 'all' | 'support';
 
 export interface SkillContext { core: OpsCore; store: any; actor: string }
 
@@ -68,6 +71,21 @@ export function buildSkillRegistry(): Skill[] {
         users: users.length, systems: systems.length, freeSystems: systems.filter((x: any) => !x.isReserved).length,
         openTickets, unreadMessages: unread, todayReservations: todayRes, cafeItems: cafe.length, shopItems: shop.length, tournaments: tournaments.length, articles: articles.length,
       });
+    },
+  });
+
+  skills.push({
+    id: 'portal_health', title: 'سلامت/عملکرد پورتال', risk: 'read',
+    description: 'Live portal health snapshot: publishing/Zernio queue, Telegram gateway reachability, DB latency, memory, uptime and active alerts.',
+    params: obj({}),
+    run: async (ctx) => {
+      const snap = await monitorSnapshot(ctx.core);
+      const parts = [
+        `صف انتشار: ارسال ${snap.publishing.sent} · در صف ${snap.publishing.queued} · نامشخص ${snap.publishing.unknown}`,
+        `گیت‌وی تلگرام: ${snap.telegram.configured ? (snap.telegram.reachable ? 'در دسترس' : `قطع (${snap.telegram.detail || '?'})`) : 'تنظیم نشده'}`,
+        `پرتال: آپ‌تایم ${snap.portal.uptimeHours}h · حافظه ${snap.portal.memoryMB}MB · تاخیر DB ${snap.portal.dbLatencyMs}ms`,
+      ];
+      return OK(`${parts.join(' · ')}${snap.alerts.length ? ` · هشدارها: ${snap.alerts.join('، ')}` : ' · بدون هشدار'}`, { snapshot: snap });
     },
   });
 
@@ -457,8 +475,8 @@ export function buildSkillRegistry(): Skill[] {
 export interface SkillRegistry {
   skills: Skill[];
   byId(id: string): Skill | undefined;
-  catalog(): Array<{ id: string; title: string; description: string; risk: SkillRisk; params: any }>;
-  tools(): any[];
+  catalog(scope?: SkillScope): Array<{ id: string; title: string; description: string; risk: SkillRisk; params: any; support: boolean }>;
+  tools(scope?: SkillScope): any[];
   run(ctx: SkillContext, id: string, input: any): Promise<{ ok: boolean; summary: string; data?: any; approvalRequired?: boolean; approvalId?: string }>;
   /** Direct handler execution — ONLY for the approval executor after an admin said yes. */
   runDirect(ctx: SkillContext, id: string, input: any): Promise<{ ok: boolean; summary: string; data?: any }>;
@@ -467,14 +485,32 @@ export interface SkillRegistry {
 /** Sensitive skills never run directly — callers must route them to approvals. */
 export const SENSITIVE_IDS = ['adjust_credits', 'update_cafe_item', 'create_coupon', 'answer_ticket', 'ig_away_toggle', 'publish_content', 'send_ig_reply'];
 
+/**
+ * SUPPORT scope — the only skills backup providers (OpenRouter/OpenAI) may
+ * use (operator rule): answering tickets & user/DM messages, and monitoring
+ * the portal's correct operation. Everything else (marketing briefs, content,
+ * credits, cafe, coupons, publishing…) pauses while Groq is unavailable.
+ */
+export const SUPPORT_SKILL_IDS = [
+  'portal_stats', 'portal_health',
+  'search_user', 'user_details',
+  'list_tickets', 'ticket_details', 'answer_ticket',
+  'list_user_messages', 'send_user_message',
+  'ig_inbox_summary', 'send_ig_reply',
+  'away_status', 'chat_rooms',
+];
+const SUPPORT_SET = new Set(SUPPORT_SKILL_IDS);
+export const isSupportSkill = (id: string): boolean => SUPPORT_SET.has(id);
+
 export function createSkillRegistry(approvals: { create: (core: OpsCore, a: any) => Promise<any> }): SkillRegistry {
   const skills = buildSkillRegistry();
   const map = new Map(skills.map(s => [s.id, s]));
+  const inScope = (s: Skill, scope?: SkillScope) => !scope || scope === 'all' || SUPPORT_SET.has(s.id);
   return {
     skills,
     byId: id => map.get(String(id)),
-    catalog: () => skills.map(s => ({ id: s.id, title: s.title, description: s.description, risk: s.risk, params: s.params })),
-    tools: () => skills.map(s => ({ type: 'function', function: { name: s.id, description: `[${s.risk}] ${s.title} — ${s.description}`, parameters: s.params } })),
+    catalog: (scope?: SkillScope) => skills.filter(s => inScope(s, scope)).map(s => ({ id: s.id, title: s.title, description: s.description, risk: s.risk, params: s.params, support: SUPPORT_SET.has(s.id) })),
+    tools: (scope?: SkillScope) => skills.filter(s => inScope(s, scope)).map(s => ({ type: 'function', function: { name: s.id, description: `[${s.risk}] ${s.title} — ${s.description}`, parameters: s.params } })),
     runDirect: async (ctx, id, input) => {
       const skill = map.get(String(id));
       if (!skill) return ERR(`مهارت «${id}» وجود ندارد`);

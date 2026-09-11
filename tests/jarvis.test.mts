@@ -1,8 +1,9 @@
 /**
- * Jarvis admin-assistant suite — engine, skills, approvals, config and routes
- * against a real SQLite store. The Groq API is fully mocked (sandbox egress
- * cannot reach api.groq.com): the mock returns scripted OpenAI-compatible
- * responses with native tool_calls, exactly the shape Groq produces.
+ * Jarvis admin-assistant suite — engine, skills, approvals, config, provider
+ * chain and routes against a real SQLite store. ALL providers (Groq, OpenRouter,
+ * OpenAI) are fully mocked (sandbox egress cannot reach them): the mocks return
+ * scripted OpenAI-compatible responses with native tool_calls, exactly the
+ * shape every provider in the chain produces.
  */
 import assert from 'node:assert/strict';
 import { suite, test, run } from './harness.mts';
@@ -12,8 +13,10 @@ const { SqliteStore } = await import('../server/dataProviders.ts');
 const { OpsCore } = await import('../server/management/core.ts');
 const jarvisConfig = await import('../server/jarvis/config.ts');
 const { JarvisEngine } = await import('../server/jarvis/agent.ts');
-const { createSkillRegistry, SENSITIVE_IDS, buildSkillRegistry } = await import('../server/jarvis/skills.ts');
+const { createSkillRegistry, SENSITIVE_IDS, SUPPORT_SKILL_IDS, buildSkillRegistry } = await import('../server/jarvis/skills.ts');
 const { createApproval, listApprovals, decideApproval } = await import('../server/jarvis/approvals.ts');
+const { listIncidents } = await import('../server/jarvis/incidents.ts');
+const { runJarvisJob } = await import('../server/jarvis/automation.ts');
 const { registerJarvis } = await import('../server/jarvis/routes.ts');
 
 const store = new SqliteStore();
@@ -24,21 +27,50 @@ await store.seedMinimal({ username: 'admin', password: 'x', email: '', phone: ''
 const getStore = () => store;
 const core = new OpsCore(getStore);
 
-/* ── scripted Groq mock ─────────────────────────────────────────── */
+/* ── scripted provider mocks (groq → openrouter → openai chain) ──── */
 
-type Scripted = Array<{ tool_calls?: any[]; content?: string }>;
-let script: Scripted = [];
-let calls: any[] = [];
-const mockFetcher = (async (url: string, init: any) => {
-  calls.push({ url, body: JSON.parse(init.body || '{}') });
-  const next = script.shift() || { content: 'باشه.' };
+type Scripted = Array<{ tool_calls?: any[]; content?: string; status?: number; body?: string }>;
+let script: Scripted = [];    // groq queue
+let orScript: Scripted = [];  // openrouter queue
+let oaScript: Scripted = [];  // openai queue
+let calls: any[] = [];        // groq calls
+let orCalls: any[] = [];
+let oaCalls: any[] = [];
+
+const respondScripted = (q: Scripted) => {
+  const next = q.shift() || { content: 'باشه.' };
+  if (next.status) return new Response(next.body || '{}', { status: next.status, headers: { 'Content-Type': 'application/json' } });
   const message: any = next.content !== undefined ? { role: 'assistant', content: next.content } : { role: 'assistant', content: '', tool_calls: next.tool_calls };
   return new Response(JSON.stringify({ choices: [{ message }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+};
+
+const modelsResponse = (ids: string[]) => new Response(JSON.stringify({ data: ids.map(id => ({ id })) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+const mockFetcher = (async (url: string, init: any) => {
+  const u = String(url);
+  if (u.includes('openrouter.ai')) {
+    if (u.endsWith('/models')) return modelsResponse(['meta-llama/llama-3.3-70b-instruct:free', 'openai/gpt-4o-mini']);
+    orCalls.push({ url: u, body: JSON.parse(init.body || '{}') });
+    return respondScripted(orScript);
+  }
+  if (u.includes('api.openai.com')) {
+    if (u.endsWith('/models')) return modelsResponse(['gpt-4o-mini', 'gpt-4.1-nano']);
+    oaCalls.push({ url: u, body: JSON.parse(init.body || '{}') });
+    return respondScripted(oaScript);
+  }
+  if (u.endsWith('/models')) return modelsResponse(['llama-3.3-70b-versatile']);
+  calls.push({ url: u, body: JSON.parse(init.body || '{}') });
+  return respondScripted(script);
 }) as unknown as typeof fetch;
 
 const toolCall = (id: string, name: string, args: any) => ({
   id, type: 'function', function: { name, arguments: JSON.stringify(args) },
 });
+
+/** Groq rate-limited: main model 429 AND light-model retry 429. */
+const groqDown = () => { script = [{ status: 429, body: '{"error":"rate"}' }, { status: 429, body: '{"error":"rate"}' }]; };
+
+const clearScripts = () => { script = []; orScript = []; oaScript = []; calls = []; orCalls = []; oaCalls = []; };
 
 async function bootEngine() {
   const registry = createSkillRegistry({ create: createApproval });
@@ -50,13 +82,20 @@ async function setConfig(over: any = {}) {
   await store.setSetting(jarvisConfig.JARVIS_CONFIG_KEY, JSON.stringify({
     apiKey: 'gsk-test-key-1234567890', model: 'llama-3.3-70b-versatile', lightModel: 'llama-3.1-8b-instant', dailyCallCap: 50,
     automation: { dailyBrief: false, weeklyDigest: false, igReplies: false, chatFaq: false, faqAutoSend: false },
+    backup: {
+      openrouter: { enabled: false, apiKey: '', model: 'meta-llama/llama-3.3-70b-instruct:free', dailyCallCap: 50 },
+      openai: { enabled: false, apiKey: '', model: 'gpt-4o-mini', dailyCallCap: 200 },
+    },
     ...over,
   }));
 }
 
+const orBackup = { enabled: true, apiKey: 'sk-or-test-1234567890', model: 'meta-llama/llama-3.3-70b-instruct:free', dailyCallCap: 50 };
+const oaBackup = { enabled: true, apiKey: 'sk-oa-test-1234567890', model: 'gpt-4o-mini', dailyCallCap: 200 };
+
 /* ── 1. Config ──────────────────────────────────────────────────── */
 
-suite('1. Jarvis config (Groq)');
+suite('1. Jarvis config (Groq + backups)');
 test('sanitize clamps, masks and keeps the old key on placeholder', async () => {
   const clean = jarvisConfig.sanitizeJarvisConfig({ apiKey: 'k', model: 'x'.repeat(300), dailyCallCap: 999999 });
   assert.equal(clean.model.length <= 120, true);
@@ -90,6 +129,13 @@ test('read skill answers from the real store', async () => {
   const r = await registry.run({ core, store, actor: 't' }, 'portal_stats', {});
   assert.equal(r.ok, true);
   assert.ok(r.summary!.includes('کاربران'));
+});
+test('portal_health support skill returns the live monitor snapshot', async () => {
+  const registry = createSkillRegistry({ create: createApproval });
+  const r = await registry.run({ core, store, actor: 't' }, 'portal_health', {});
+  assert.equal(r.ok, true);
+  assert.ok(r.summary!.includes('صف انتشار'));
+  assert.ok(SUPPORT_SKILL_IDS.includes('portal_health'));
 });
 test('write skill executes directly and is audited', async () => {
   const registry = createSkillRegistry({ create: createApproval });
@@ -161,13 +207,15 @@ test('send_ig_reply approval enqueues a jarvis_reply outbox row', async () => {
 
 suite('4. Agent loop');
 test('not configured → friendly reply without any LLM call', async () => {
+  clearScripts();
   await store.setSetting(jarvisConfig.JARVIS_CONFIG_KEY, JSON.stringify(jarvisConfig.sanitizeJarvisConfig({ apiKey: '' })));
   const { engine } = await bootEngine();
   const r = await engine.chat({ message: 'سلام', actor: 'admin' });
   assert.ok(r.reply.includes('تنظیم نشده'));
-  assert.equal(calls.length, 0);
+  assert.equal(calls.length + orCalls.length + oaCalls.length, 0);
 });
 test('tool round-trip: read skill → final answer; session persisted', async () => {
+  clearScripts();
   await setConfig();
   const { engine } = await bootEngine();
   script = [
@@ -177,6 +225,8 @@ test('tool round-trip: read skill → final answer; session persisted', async ()
   const r = await engine.chat({ message: 'آمار پورتال؟', actor: 'admin' });
   assert.equal(r.toolsUsed[0], 'portal_stats');
   assert.equal(r.reply, 'امروز ۱ کاربر داریم.');
+  assert.equal(r.provider, 'groq');
+  assert.equal(r.mode, 'primary');
   assert.ok(r.sessionId.startsWith('js-'));
   const session = await engine.session(r.sessionId);
   assert.ok((session!.messages || []).some((m: any) => m.role === 'user'));
@@ -184,6 +234,7 @@ test('tool round-trip: read skill → final answer; session persisted', async ()
   assert.ok((await jarvisConfig.todayUsage(core)) >= 2, 'each LLM round must count against the daily cap');
 });
 test('sensitive request through chat lands in approvals, reply mentions confirmation', async () => {
+  clearScripts();
   await setConfig({ dailyCallCap: 500 });
   const { engine } = await bootEngine();
   script = [
@@ -197,6 +248,7 @@ test('sensitive request through chat lands in approvals, reply mentions confirma
   assert.ok(r.reply.includes('تأیید'));
 });
 test('unknown tool and malformed arguments fail soft, not crash', async () => {
+  clearScripts();
   await setConfig({ dailyCallCap: 500 });
   const { engine } = await bootEngine();
   script = [
@@ -207,6 +259,7 @@ test('unknown tool and malformed arguments fail soft, not crash', async () => {
   assert.equal(r.reply, 'ابزار ناشناخته بود.');
 });
 test('daily cap blocks the LLM call with JARVIS_DAILY_CAP (min clamp = 10)', async () => {
+  clearScripts();
   await setConfig({ dailyCallCap: 10 });
   const { engine } = await bootEngine();
   // Burn the whole daily budget directly (min clamp forbids caps below 10).
@@ -216,10 +269,11 @@ test('daily cap blocks the LLM call with JARVIS_DAILY_CAP (min clamp = 10)', asy
   await assert.rejects(() => engine.chat({ message: 'سلام', actor: 'admin' }), (e: any) => e.code === 'JARVIS_DAILY_CAP');
 });
 
-/* ── 5. Routes (management mount, real express) ─────────────────── */
+/* ── 5. Routes (management mount, real express) ──────────────────── */
 
 suite('5. Jarvis HTTP routes');
 test('state/chat/approvals/monitor over express with staff auth', async () => {
+  clearScripts();
   await setConfig({ dailyCallCap: 500 });
   const app = express();
   app.use(express.json());
@@ -236,6 +290,9 @@ test('state/chat/approvals/monitor over express with staff auth', async () => {
     assert.equal(state.config.apiKey, '********', 'masked key only');
     assert.ok(state.skills.length >= 20);
     assert.ok(state.freeModels.some((m: any) => m.id === 'llama-3.3-70b-versatile'));
+    assert.ok(state.providers && state.providers.groq.configured === true, 'state must expose provider statuses');
+    assert.ok(Array.isArray(state.incidents), 'state must expose the incident log');
+    assert.ok(state.suggestedModels.openrouter.some((m: any) => m.id.endsWith(':free')));
 
     script = [{ tool_calls: [toolCall('c', 'away_status', {})] }, { content: 'وضعیت غیبت: خاموش.' }];
     const chat = await (await fetch(`${base}/api/management/jarvis/chat`, {
@@ -267,4 +324,181 @@ test('unauthenticated caller is rejected by the staff guard', async () => {
   } finally { server.close(); }
 });
 
-run({ title: 'Bazino — Jarvis admin assistant (mocked Groq)', jsonOut: 'tests/reports/jarvis.json' });
+/* ── 6. Backup providers (support-only fallback chain) ──────────── */
+
+suite('6. Backup providers — OpenRouter & OpenAI (support-only)');
+test('backup config sanitize/mask/defaults; 402 maps to JARVIS_QUOTA_EXHAUSTED', async () => {
+  const clean = jarvisConfig.sanitizeJarvisConfig({
+    apiKey: 'k',
+    backup: { openrouter: { enabled: true, apiKey: 'sk-or-1234567890', model: 'x:free', dailyCallCap: 999999 }, openai: { enabled: 'yes' } },
+  });
+  assert.equal(clean.backup.openrouter.enabled, true);
+  assert.equal(clean.backup.openrouter.dailyCallCap, 100000);
+  assert.equal(clean.backup.openai.enabled, false, 'enabled must be a strict boolean');
+  assert.equal(clean.backup.openai.model, 'gpt-4o-mini', 'openai default model');
+  const masked: any = jarvisConfig.maskedJarvisConfig(clean);
+  assert.equal(masked.backup.openrouter.apiKey, '********');
+  assert.equal(masked.backup.openai.apiKey, '');
+  assert.equal(jarvisConfig.backupConfigured(clean, 'openrouter'), true);
+  assert.equal(jarvisConfig.backupConfigured(clean, 'openai'), false, 'no key → not configured');
+  assert.equal(jarvisConfig.anyBackupConfigured(clean), true);
+
+  const f402 = (async () => new Response('{}', { status: 402 })) as unknown as typeof fetch;
+  await assert.rejects(() => jarvisConfig.jarvisChatCompletion({ provider: 'openrouter', apiKey: 'k', model: 'm', messages: [{ role: 'user', content: 'x' }], fetcher: f402 }), (e: any) => e.code === 'JARVIS_QUOTA_EXHAUSTED');
+
+  let hit = '';
+  const fUrl = (async (url: string) => { hit = String(url); return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 }); }) as unknown as typeof fetch;
+  await jarvisConfig.jarvisChatCompletion({ provider: 'openai', apiKey: 'k', model: 'm', messages: [{ role: 'user', content: 'x' }], fetcher: fUrl });
+  assert.ok(hit.includes('api.openai.com/v1/chat/completions'));
+  await jarvisConfig.jarvisChatCompletion({ provider: 'openrouter', apiKey: 'k', model: 'm', messages: [{ role: 'user', content: 'x' }], fetcher: fUrl });
+  assert.ok(hit.includes('openrouter.ai/api/v1/chat/completions'));
+});
+test('fallback: Groq 429 (main+light) → OpenRouter answers support-only, admin is reported', async () => {
+  clearScripts();
+  await setConfig({ dailyCallCap: 500, backup: { openrouter: orBackup } });
+  const { engine } = await bootEngine();
+  groqDown();
+  orScript = [{ tool_calls: [toolCall('f1', 'list_tickets', { status: 'open' })] }, { content: 'دو تیکت باز دارید.' }];
+  const r = await engine.chat({ message: 'تیکت‌های باز را نشان بده', actor: 'admin' });
+  assert.equal(r.provider, 'openrouter');
+  assert.equal(r.mode, 'backup');
+  assert.ok(r.reply.includes('دو تیکت باز دارید.'));
+  assert.ok(r.reply.includes('حالت پشتیبان'), 'reply must report backup mode to the admin');
+  assert.equal(calls.length, 2, 'groq tried main + light model');
+  assert.equal(orCalls.length, 2, 'openrouter served both rounds');
+  // Backups only ever see SUPPORT tools.
+  for (const c of orCalls) {
+    const names: string[] = (c.body.tools || []).map((t: any) => t.function.name);
+    assert.ok(names.length > 0, 'support tool list must not be empty');
+    for (const n of names) assert.ok((SUPPORT_SKILL_IDS as string[]).includes(n), `non-support tool leaked to backup: ${n}`);
+    assert.ok(!names.includes('create_coupon'));
+    assert.ok(!names.includes('adjust_credits'));
+  }
+  // Support-mode system note injected.
+  assert.ok(orCalls[0].body.messages.some((m: any) => m.role === 'system' && String(m.content).includes('BACKUP MODE')));
+  // Incidents reported to the admin.
+  const incidents = await listIncidents(core);
+  assert.ok(incidents.some((i: any) => i.type === 'GROQ_UNAVAILABLE' && i.provider === 'groq'));
+  assert.ok(incidents.some((i: any) => i.type === 'BACKUP_ACTIVE' && i.provider === 'openrouter'));
+  // Per-provider budgets.
+  assert.ok((await jarvisConfig.todayUsage(core, 'groq')) >= 1, 'failed groq attempts still cost budget');
+  assert.equal(await jarvisConfig.todayUsage(core, 'openrouter'), 2);
+});
+test('non-support tool attempt on a backup is refused and reported (no approval, no change)', async () => {
+  clearScripts();
+  await setConfig({ dailyCallCap: 500, backup: { openrouter: orBackup } });
+  const { engine } = await bootEngine();
+  const before = Number((await store.getUserByUsername('admin'))!.credits || 0);
+  const pendingBefore = (await listApprovals(core, 'pending')).length;
+  groqDown();
+  orScript = [
+    { tool_calls: [toolCall('b1', 'adjust_credits', { username: 'admin', delta: 50 })] },
+    { content: 'در حالت پشتیبان امکان شارژ کردیت نیست.' },
+  ];
+  const r = await engine.chat({ message: 'برای admin پنجاه کردیت شارژ کن', actor: 'admin' });
+  assert.equal(r.mode, 'backup');
+  assert.equal(r.approvalsCreated.length, 0, 'non-support sensitive skill must not even file an approval on backup');
+  assert.equal((await listApprovals(core, 'pending')).length, pendingBefore);
+  assert.equal(Number((await store.getUserByUsername('admin'))!.credits || 0), before, 'credits untouched');
+  const incidents = await listIncidents(core);
+  assert.ok(incidents.some((i: any) => i.type === 'SUPPORT_ONLY_BLOCKED' && i.provider === 'openrouter' && i.meta?.skill === 'adjust_credits'));
+});
+test('second-level fallback: OpenRouter fails → OpenAI serves', async () => {
+  clearScripts();
+  await setConfig({ dailyCallCap: 500, backup: { openrouter: orBackup, openai: oaBackup } });
+  const { engine } = await bootEngine();
+  groqDown();
+  orScript = [{ status: 401, body: '{"error":"bad key"}' }];
+  oaScript = [{ content: 'پاسخ از OpenAI رسید.' }];
+  const r = await engine.chat({ message: 'پیام‌های خوانده‌نشده؟', actor: 'admin' });
+  assert.equal(r.provider, 'openai');
+  assert.equal(r.mode, 'backup');
+  assert.ok(r.reply.includes('پاسخ از OpenAI رسید.'));
+  const incidents = await listIncidents(core);
+  assert.ok(incidents.some((i: any) => i.type === 'BACKUP_FAILED' && i.provider === 'openrouter'));
+  assert.ok(incidents.some((i: any) => i.type === 'BACKUP_ACTIVE' && i.provider === 'openai'));
+  assert.equal(await jarvisConfig.todayUsage(core, 'openai'), 1);
+});
+test('no backup configured → the original Groq error surfaces', async () => {
+  clearScripts();
+  await setConfig({ dailyCallCap: 500 });
+  const { engine } = await bootEngine();
+  groqDown();
+  await assert.rejects(() => engine.chat({ message: 'سلام', actor: 'admin' }), (e: any) => e.code === 'JARVIS_RATE_LIMITED');
+});
+test('marketing job PAUSES when Groq is down (never runs on a backup); support job uses the backup', async () => {
+  clearScripts();
+  await setConfig({ dailyCallCap: 500, backup: { openrouter: orBackup }, automation: { dailyBrief: true, weeklyDigest: false, igReplies: false, chatFaq: false, faqAutoSend: false } });
+  const { engine, registry } = await bootEngine();
+
+  groqDown();
+  orScript = []; oaScript = [];
+  await assert.rejects(() => runJarvisJob(engine, registry, 'dailyBrief'), (e: any) => e.code === 'JARVIS_PRIMARY_UNAVAILABLE');
+  assert.equal(orCalls.length, 0, 'marketing jobs must never touch a backup');
+  assert.ok((await listIncidents(core)).some((i: any) => i.type === 'SUPPORT_ONLY_BLOCKED' && i.provider === 'groq'));
+
+  // Support job (igReplies) — an unanswered inbound DM goes through OpenRouter.
+  const { fingerprint } = await import('../server/management/core.ts');
+  const inboxId = fingerprint({ conversation: 'c-backup-1', message: 'mb1', author: 'ab1', text: 'ساعت کاری؟', ts: 'tb1' });
+  await core.save('ig-inbox', inboxId, { accountId: 'acc-1', conversationId: 'c-backup-1', authorId: 'ab1', username: 'backupuser', text: 'ساعت کاری؟', language: 'fa', receivedAt: new Date().toISOString(), messageId: 'mb1', replied: false, reason: '' }, 0);
+  groqDown();
+  orScript = [{ content: '{"reply":"سلام! هر روز ۱۰ تا ۲۴."}' }];
+  const res = await runJarvisJob(engine, registry, 'igReplies');
+  assert.ok(String(res).includes('1'), `expected one filed DM draft, got: ${res}`);
+  const pending = await listApprovals(core, 'pending');
+  assert.ok(pending.some((p: any) => p.skillId === 'send_ig_reply' && p.requestedBy === 'jarvis:igReplies'));
+  assert.ok(orCalls.length >= 1, 'support job must run on the backup');
+});
+test('routes: backup config save masks keys, keeps old ones; models endpoint per provider', async () => {
+  clearScripts();
+  await setConfig({ dailyCallCap: 500, backup: { openrouter: orBackup, openai: oaBackup } });
+  const app = express();
+  app.use(express.json());
+  app.use((req: any, _res: any, next: any) => { req.authUsername = 'admin'; next(); });
+  registerJarvis(app, { core, getStore, fetcher: mockFetcher, startAutomation: false });
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    // Save: new openrouter key, masked placeholder keeps the stored openai key.
+    const saved = await (await fetch(`${base}/api/management/jarvis/config`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: '********',
+        backup: {
+          openrouter: { enabled: true, apiKey: 'sk-or-brand-new-9999', model: 'deepseek/deepseek-chat-v3-0324:free', dailyCallCap: 60 },
+          openai: { enabled: true, apiKey: '********', model: 'gpt-4.1-nano', dailyCallCap: 100 },
+        },
+      }),
+    })).json();
+    assert.equal(saved.backup.openrouter.apiKey, '********', 'masked after save');
+    assert.equal(saved.backup.openai.apiKey, '********', 'masked after save');
+    assert.equal(saved.backup.openrouter.model, 'deepseek/deepseek-chat-v3-0324:free');
+
+    // Persisted state: keys functional (configured), openai key was kept.
+    const state = await (await fetch(`${base}/api/management/jarvis/state`)).json();
+    assert.equal(state.providers.openrouter.configured, true);
+    assert.equal(state.providers.openai.configured, true, 'masked placeholder must keep the previously stored key');
+    assert.equal(state.providers.openrouter.cap, 60);
+    assert.equal(state.config.backup.openai.model, 'gpt-4.1-nano');
+
+    // Models endpoint per provider (openrouter list is public, works keyless).
+    const orModels = await (await fetch(`${base}/api/management/jarvis/models`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'openrouter' }),
+    })).json();
+    assert.equal(orModels.provider, 'openrouter');
+    assert.ok(orModels.models.includes('meta-llama/llama-3.3-70b-instruct:free'));
+    assert.ok(orModels.free.every((m: string) => m.endsWith(':free')));
+
+    const oaModels = await (await fetch(`${base}/api/management/jarvis/models`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'openai' }),
+    })).json();
+    assert.ok(oaModels.models.includes('gpt-4o-mini'));
+
+    // Incidents endpoint (staff).
+    const incidents = await (await fetch(`${base}/api/management/jarvis/incidents`)).json();
+    assert.ok(Array.isArray(incidents.items));
+  } finally { server.close(); }
+});
+
+run({ title: 'Bazino — Jarvis admin assistant (mocked Groq/OpenRouter/OpenAI chain)', jsonOut: 'tests/reports/jarvis.json' });

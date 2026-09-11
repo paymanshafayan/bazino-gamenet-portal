@@ -22,7 +22,7 @@ export function JarvisConsole() {
   const tr = (fa: string, en: string) => language === 'fa' ? fa : en;
 
   return <Screen title={t('جارویس — دستیار مدیر', 'Jarvis — admin assistant', 'Jarvis — yönetici asistanı', 'Джарвис — помощник администратора')}
-    subtitle={t('چت، اتوماسیون بازاریابی و نظارت ابزارها روی موتور Groq. اقدامات حساس همیشه به تأیید شما می‌رسند.', 'Chat, marketing automation and tool monitoring on Groq. Sensitive actions always wait for your approval.', 'Groq üzerinde sohbet, pazarlama otomasyonu ve izleme. Hassas işlemler her zaman onayınızı bekler.', 'Чат, автоматизация маркетинга и мониторинг на Groq. Чувствительные действия всегда ждут вашего подтверждения.')}>
+    subtitle={t('چت، اتوماسیون و نظارت روی زنجیرهٔ Groq → OpenRouter → OpenAI (پشتیبان‌ها فقط امور پشتیبانی). اقدامات حساس همیشه به تأیید شما می‌رسند.', 'Chat, automation and monitoring on the Groq → OpenRouter → OpenAI chain (backups are support-only). Sensitive actions always wait for your approval.', 'Groq → OpenRouter → OpenAI zinciri üzerinde sohbet ve otomasyon (yedekler sadece destek).', 'Чат и автоматизация на цепочке Groq → OpenRouter → OpenAI (резервы — только поддержка).')}>
     <Notice error={error} />
     <div className="ops-toolbar">
       {(['chat', 'approvals', 'briefs', 'monitor', 'settings'] as const).map(v => (
@@ -32,22 +32,24 @@ export function JarvisConsole() {
         </button>
       ))}
       <span className="ops-muted" style={{ marginInlineStart: 'auto' }}>
-        {state ? t(`مصرف امروز: ${state.usage.today}/${state.usage.cap} · مدل: ${state.config.model}`, `Today: ${state.usage.today}/${state.usage.cap} · model: ${state.config.model}`, `Bugün: ${state.usage.today}/${state.usage.cap}`, `Сегодня: ${state.usage.today}/${state.usage.cap}`) : '…'}
+        {state ? <>{t(`مصرف امروز — Groq: ${state.usage.today}/${state.usage.cap} · مدل: ${state.config.model}`, `Today — Groq: ${state.usage.today}/${state.usage.cap} · model: ${state.config.model}`, `Bugün — Groq: ${state.usage.today}/${state.usage.cap}`, `Сегодня — Groq: ${state.usage.today}/${state.usage.cap}`)}
+          {state.providers?.openrouter?.configured ? ` · OpenRouter: ${state.providers.openrouter.usageToday}/${state.providers.openrouter.cap}` : ''}
+          {state.providers?.openai?.configured ? ` · OpenAI: ${state.providers.openai.usageToday}/${state.providers.openai.cap}` : ''}</> : '…'}
       </span>
     </div>
     {!state ? <p className="ops-muted">{t('در حال دریافت…', 'Loading…', 'Yükleniyor…', 'Загрузка…')}</p> : (
       <>
-        {view === 'chat' && <JarvisChat api={api} t={t} language={language} configured={state.configured} onApprovals={reload} />}
+        {view === 'chat' && <JarvisChat api={api} t={t} language={language} configured={state.configured} incidents={state.incidents} onApprovals={reload} />}
         {view === 'approvals' && <JarvisApprovals api={api} t={t} language={language} onDecided={reload} />}
         {view === 'briefs' && <JarvisBriefs api={api} t={t} language={language} />}
-        {view === 'monitor' && <JarvisMonitor api={api} t={t} language={language} initial={state.monitor} />}
+        {view === 'monitor' && <JarvisMonitor api={api} t={t} language={language} initial={state.monitor} providers={state.providers} incidents={state.incidents} />}
         {view === 'settings' && <JarvisSettings api={api} t={t} language={language} state={state} onSaved={reload} />}
       </>
     )}
   </Screen>;
 }
 
-function JarvisChat({ api, t, language, configured, onApprovals }: any) {
+function JarvisChat({ api, t, language, configured, incidents, onApprovals }: any) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [sessionId, setSessionId] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
@@ -55,6 +57,10 @@ function JarvisChat({ api, t, language, configured, onApprovals }: any) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+  // Backup-mode banner: the latest provider incident is fresh enough to matter.
+  const latest: any = incidents?.[0];
+  const backupActive = latest && ['BACKUP_ACTIVE', 'GROQ_UNAVAILABLE'].includes(latest.type)
+    && Date.now() - Date.parse(String(latest.lastAt || latest.ts)) < 30 * 60000;
 
   const loadSessions = useCallback(async () => {
     try { const d = await api('/jarvis/sessions'); setSessions(d.sessions || []); } catch { /* */ }
@@ -95,6 +101,9 @@ function JarvisChat({ api, t, language, configured, onApprovals }: any) {
     </div>
     <div className="ops-card" style={{ display: 'flex', flexDirection: 'column', minHeight: 380 }}>
       {!configured && <Notice error="JARVIS_NOT_CONFIGURED" />}
+      {backupActive && <div style={{ padding: '8px 12px', marginBottom: 8, borderRadius: 10, border: '1px solid #8a6d1f', background: '#3a2f14', color: '#ffd98a' }}>
+        {t('حالت پشتیبان فعال — Groq در دسترس نیست؛ فقط امور پشتیبانی (تیکت‌ها، پیام‌ها، نظارت پورتال) پاسخ داده می‌شود و سایر امکانات موقتاً غیرفعال و به ادمین گزارش شده‌اند.', 'Backup mode active — Groq unavailable; only support matters (tickets, messages, portal monitoring) are answered. Everything else is paused and reported to the admin.', 'Yedek mod aktif — Groq kullanılamıyor; sadece destek işleri yanıtlanıyor.', 'Активен резервный режим — Groq недоступен; отвечаются только вопросы поддержки.')}
+      </div>}
       <div style={{ flex: 1, overflowY: 'auto', maxHeight: 420 }}>
         {messages.map((m: any, i: number) => (
           <div key={i} style={{ margin: '8px 0', textAlign: m.role === 'user' ? 'end' : 'start' }}>
@@ -185,7 +194,7 @@ function JarvisBriefs({ api, t }: any) {
   </div>;
 }
 
-function JarvisMonitor({ api, t, initial }: any) {
+function JarvisMonitor({ api, t, language, initial, providers, incidents }: any) {
   const [snap, setSnap] = useState<any>(initial || null);
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
@@ -194,6 +203,12 @@ function JarvisMonitor({ api, t, initial }: any) {
   useEffect(() => { if (!snap) void refresh(); }, [refresh, snap]);
   if (!snap) return <p className="ops-muted">…</p>;
   const card = (label: string, value: string, tone?: string) => <div className="ops-card" key={label}><p className="ops-muted">{label}</p><div className="ops-stat" style={{ fontSize: 18 }}>{value}</div></div>;
+  const incidentText = (i: any) => ({
+    GROQ_UNAVAILABLE: t('Groq در دسترس نیست', 'Groq unavailable', 'Groq kullanılamıyor', 'Groq недоступен'),
+    BACKUP_ACTIVE: t('پشتیبان فعال (فقط پشتیبانی)', 'Backup active (support-only)', 'Yedek aktif', 'Резерв активен'),
+    SUPPORT_ONLY_BLOCKED: t('درخواست غیرپشتیبانی رد شد', 'Non-support request refused', 'Destek dışı istek reddedildi', 'Не поддерживаемый запрос отклонён'),
+    BACKUP_FAILED: t('خطای ارائه‌دهنده پشتیبان', 'Backup provider failed', 'Yedek sağlayıcı hatası', 'Сбой резервного провайдера'),
+  } as any)[i.type] || i.type;
   return <div>
     <Notice error={error} />
     <div className="ops-toolbar"><button onClick={() => void refresh()}>{t('به‌روزرسانی', 'Refresh', 'Yenile', 'Обновить')}</button>
@@ -205,12 +220,35 @@ function JarvisMonitor({ api, t, initial }: any) {
       {card(t('گیت‌وی تلگرام', 'Telegram gateway', 'Telegram ağ geçidi', 'Шлюз Telegram'), snap.telegram.configured ? (snap.telegram.reachable ? t('در دسترس', 'Reachable', 'Erişilebilir', 'Доступен') : `${t('قطع', 'Down', 'Kesinti', 'Недоступен')} (${snap.telegram.detail || ''})`) : t('تنظیم نشده', 'Not configured', 'Ayarlanmadı', 'Не настроен'))}
       {card(t('پرتال', 'Portal', 'Portal', 'Портал'), `${t('آپ‌تایم', 'Uptime', 'Çalışma', 'Аптайм')}: ${snap.portal.uptimeHours}h · ${t('حافظه', 'Memory', 'Bellek', 'Память')}: ${snap.portal.memoryMB}MB · DB: ${snap.portal.dbLatencyMs}ms`)}
     </div>
+    <h3 style={{ marginTop: 18 }}>{t('ارائه‌دهنده‌های هوش مصنوعی', 'AI providers', 'AI sağlayıcıları', 'AI-провайдеры')}</h3>
+    <p className="ops-muted">{t('زنجیره: Groq (اصلی) → OpenRouter → OpenAI (پشتیبانِ فقط-پشتیبانی). پشتیبان‌ها تنها هنگام عدم پاسخ Groq فعال می‌شوند.', 'Chain: Groq (primary) → OpenRouter → OpenAI (support-only backups). Backups engage only when Groq cannot answer.', 'Zincir: Groq → OpenRouter → OpenAI (sadece destek).', 'Цепочка: Groq → OpenRouter → OpenAI (только поддержка).')}</p>
+    <div className="ops-grid">
+      {(providers ? Object.values(providers) : []).map((p: any) => card(
+        `${p.label} · ${p.role === 'primary' ? t('اصلی', 'primary', 'ana', 'основной') : t('پشتیبان', 'backup', 'yedek', 'резерв')}`,
+        p.configured
+          ? `${p.model} · ${t('مصرف', 'usage', 'kullanım', 'использовано')}: ${p.usageToday}/${p.cap}${p.role === 'backup' && p.enabled === false ? ' · ' + t('خاموش', 'off', 'kapalı', 'выкл') : ''}`
+          : t('تنظیم نشده', 'Not configured', 'Ayarlanmadı', 'Не настроен'),
+      ))}
+    </div>
+    <h3 style={{ marginTop: 18 }}>{t('رویدادها و گزارش‌ها به ادمین', 'Incidents & admin reports', 'Olaylar', 'Инциденты и отчёты')}</h3>
+    <div className="ops-table-wrap"><table>
+      <thead><tr><th>{t('رویداد', 'Incident', 'Olay', 'Инцидент')}</th><th>{t('ارائه‌دهنده', 'Provider', 'Sağlayıcı', 'Провайдер')}</th><th>{t('شرح', 'Detail', 'Açıklama', 'Описание')}</th><th>{t('زمان', 'Time', 'Zaman', 'Время')}</th></tr></thead>
+      <tbody>
+        {(incidents || []).map((i: any) => <tr key={i.id} data-jarvis-incident={i.id}>
+          <td><Badge tone={i.type === 'BACKUP_ACTIVE' ? 'warn' : i.type === 'SUPPORT_ONLY_BLOCKED' ? 'warn' : 'bad'}>{incidentText(i)}</Badge>{(i.count || 1) > 1 ? <span className="ops-muted"> ×{i.count}</span> : ''}</td>
+          <td>{i.provider}</td>
+          <td style={{ maxWidth: 420 }}>{i.message}</td>
+          <td className="ops-muted">{String(i.lastAt || i.ts || '').replace('T', ' ').slice(0, 16)}</td>
+        </tr>)}
+        {!(incidents || []).length && <tr><td colSpan={4} className="ops-muted">{t('رویدادی ثبت نشده — همه‌چیز سالم.', 'No incidents — all healthy.', 'Olay yok.', 'Инцидентов нет.')}</td></tr>}
+      </tbody>
+    </table></div>
   </div>;
 }
 
 function JarvisSettings({ api, t, state, onSaved }: any) {
   const [cfg, setCfg] = useState<any>(state?.config || {});
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<Record<string, string[]>>({});
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -220,59 +258,112 @@ function JarvisSettings({ api, t, state, onSaved }: any) {
     try { const r = await api('/jarvis/config', 'PUT', cfg); setCfg(r); setSaved(true); onSaved(); }
     catch (e: any) { setError(e.code || e.message); } finally { setBusy(false); }
   };
-  const fetchModels = async () => {
+  const fetchModels = async (provider: string) => {
     setBusy(true); setError('');
-    try { const r = await api('/jarvis/models', 'POST', {}); setModels(r.models || []); }
+    try { const r = await api('/jarvis/models', 'POST', { provider }); setModels(m => ({ ...m, [provider]: r.models || [] })); }
     catch (e: any) { setError(e.code || e.message); } finally { setBusy(false); }
   };
+  const setBackup = (id: string, patch: any) => setCfg((c: any) => ({
+    ...c, backup: { ...(c.backup || {}), [id]: { ...(c.backup?.[id] || {}), ...patch } },
+  }));
 
-  const modelOptions = Array.from(new Set([...(state?.freeModels || []).map((m: any) => m.id), ...models, cfg.model].filter(Boolean))) as string[];
+  const modelOptions = (provider: string, current: string) => {
+    const suggested = (state?.suggestedModels?.[provider] || state?.freeModels || []).map((m: any) => m.id);
+    return Array.from(new Set([...suggested, ...(models[provider] || []), current].filter(Boolean))) as string[];
+  };
 
-  return <div className="ops-card">
-    <Notice error={error} />
-    {saved && <p style={{ color: '#7de8bd' }}>{t('تنظیمات ذخیره شد.', 'Settings saved.', 'Ayarlar kaydedildi.', 'Настройки сохранены.')}</p>}
-    <div className="ops-form-grid">
-      <label>{t('کلید API سرویس Groq (رایگان: console.groq.com)', 'Groq API key (free: console.groq.com)', 'Groq API anahtarı', 'API-ключ Groq')}
-        <input type="password" dir="ltr" placeholder={cfg.apiKey ? '********' : 'gsk_…'} value={cfg.apiKey === '********' ? '' : (cfg.apiKey || '')} onChange={e => setCfg({ ...cfg, apiKey: e.target.value || '********' })} />
-      </label>
-      <label>{t('مدل اصلی (پیشنهادی: llama-3.3-70b-versatile)', 'Main model', 'Ana model', 'Основная модель')}
-        <select dir="ltr" value={cfg.model} onChange={e => setCfg({ ...cfg, model: e.target.value })}>
-          {modelOptions.map((m: string) => <option key={m} value={m}>{m}</option>)}
-        </select>
-      </label>
-      <label>{t('مدل سبک (پشتیبان هنگام محدودیت نرخ)', 'Light fallback model', 'Hafif model', 'Лёгкая модель')}
-        <select dir="ltr" value={cfg.lightModel} onChange={e => setCfg({ ...cfg, lightModel: e.target.value })}>
-          {modelOptions.map((m: string) => <option key={m} value={m}>{m}</option>)}
-        </select>
-      </label>
-      <label>{t('سقف فراخوانی روزانه LLM', 'Daily LLM call cap', 'Günlük limit', 'Дневной лимит')}
-        <input type="number" min={10} max={100000} value={cfg.dailyCallCap} onChange={e => setCfg({ ...cfg, dailyCallCap: Number(e.target.value) })} />
-      </label>
-      <label>{t('مدل سفارشی (پلن پولی — اگر مدل موردنظر در فهرست نیست اینجا بنویسید)', 'Custom model (paid plan)', 'Özel model', 'Своя модель')}
-        <input dir="ltr" placeholder="e.g. llama-3.3-70b-specdec" value={cfg.customModel || ''} onChange={e => setCfg({ ...cfg, model: e.target.value || cfg.model, customModel: e.target.value })} />
-      </label>
+  const backupCard = (id: 'openrouter' | 'openai', title: string, keyHint: string, note: string) => {
+    const b = cfg.backup?.[id] || {};
+    return <div className="ops-card" key={id} style={{ border: b.enabled ? '1px solid #2e6b57' : undefined }}>
+      <div className="ops-row">
+        <h3 style={{ margin: 0 }}>{title}</h3>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginInlineStart: 'auto' }}>
+          <input type="checkbox" checked={b.enabled === true} onChange={e => setBackup(id, { enabled: e.target.checked })} />
+          {t('فعال', 'Enable', 'Etkin', 'Включить')}
+        </label>
+      </div>
+      <p className="ops-muted" style={{ marginTop: 4 }}>{note}</p>
+      <div className="ops-form-grid">
+        <label>{t('کلید API', 'API key', 'API anahtarı', 'API-ключ')}
+          <input type="password" dir="ltr" placeholder={b.apiKey ? '********' : keyHint} value={b.apiKey === '********' ? '' : (b.apiKey || '')} onChange={e => setBackup(id, { apiKey: e.target.value || '********' })} />
+        </label>
+        <label>{t('مدل', 'Model', 'Model', 'Модель')}
+          <select dir="ltr" value={b.model || ''} onChange={e => setBackup(id, { model: e.target.value })}>
+            {modelOptions(id, b.model || '').map((m: string) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+        <label>{t('مدل سفارشی (اگر در فهرست نیست)', 'Custom model', 'Özel model', 'Своя модель')}
+          <input dir="ltr" value={cfg.backup?.custom?.[id] || ''} onChange={e => { setCfg((c: any) => ({ ...c, backup: { ...c.backup, custom: { ...(c.backup?.custom || {}), [id]: e.target.value } } })); if (e.target.value) setBackup(id, { model: e.target.value }); }} />
+        </label>
+        <label>{t('سقف فراخوانی روزانه (بودجهٔ جدا)', 'Daily call cap (separate budget)', 'Günlük limit', 'Дневной лимит')}
+          <input type="number" min={10} max={100000} value={b.dailyCallCap ?? 50} onChange={e => setBackup(id, { dailyCallCap: Number(e.target.value) })} />
+        </label>
+      </div>
+      <div className="ops-toolbar">
+        <button disabled={busy} onClick={() => void fetchModels(id)}>{t(`دریافت فهرست مدل‌ها از ${title}`, `Fetch models from ${title}`, `${title} modelleri`, `Получить модели ${title}`)}</button>
+        {models[id]?.length ? <span className="ops-muted">{t(`${models[id].length} مدل`, `${models[id].length} models`, `${models[id].length} model`, `${models[id].length} моделей`)}</span> : ''}
+        {(state?.suggestedModels?.[id] || []).map((m: any) => <span key={m.id} className="ops-muted" title={m.note} style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }} onClick={() => setBackup(id, { model: m.id })}>{m.id}</span>)}
+      </div>
+    </div>;
+  };
+
+  return <div>
+    <div className="ops-card">
+      <Notice error={error} />
+      {saved && <p style={{ color: '#7de8bd' }}>{t('تنظیمات ذخیره شد.', 'Settings saved.', 'Ayarlar kaydedildi.', 'Настройки сохранены.')}</p>}
+      <h3 style={{ marginTop: 0 }}>{t('موتور اصلی — Groq', 'Primary engine — Groq', 'Ana motor — Groq', 'Основной движок — Groq')}</h3>
+      <div className="ops-form-grid">
+        <label>{t('کلید API سرویس Groq (رایگان: console.groq.com)', 'Groq API key (free: console.groq.com)', 'Groq API anahtarı', 'API-ключ Groq')}
+          <input type="password" dir="ltr" placeholder={cfg.apiKey ? '********' : 'gsk_…'} value={cfg.apiKey === '********' ? '' : (cfg.apiKey || '')} onChange={e => setCfg({ ...cfg, apiKey: e.target.value || '********' })} />
+        </label>
+        <label>{t('مدل اصلی (پیشنهادی: llama-3.3-70b-versatile)', 'Main model', 'Ana model', 'Основная модель')}
+          <select dir="ltr" value={cfg.model} onChange={e => setCfg({ ...cfg, model: e.target.value })}>
+            {modelOptions('groq', cfg.model).map((m: string) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+        <label>{t('مدل سبک (پشتیبان هنگام محدودیت نرخ)', 'Light fallback model', 'Hafif model', 'Лёгкая модель')}
+          <select dir="ltr" value={cfg.lightModel} onChange={e => setCfg({ ...cfg, lightModel: e.target.value })}>
+            {modelOptions('groq', cfg.lightModel).map((m: string) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+        <label>{t('سقف فراخوانی روزانه LLM', 'Daily LLM call cap', 'Günlük limit', 'Дневной лимит')}
+          <input type="number" min={10} max={100000} value={cfg.dailyCallCap} onChange={e => setCfg({ ...cfg, dailyCallCap: Number(e.target.value) })} />
+        </label>
+        <label>{t('مدل سفارشی (پلن پولی — اگر مدل موردنظر در فهرست نیست اینجا بنویسید)', 'Custom model (paid plan)', 'Özel model', 'Своя модель')}
+          <input dir="ltr" placeholder="e.g. llama-3.3-70b-specdec" value={cfg.customModel || ''} onChange={e => setCfg({ ...cfg, model: e.target.value || cfg.model, customModel: e.target.value })} />
+        </label>
+      </div>
+      <div className="ops-toolbar">
+        <button disabled={busy} onClick={() => void fetchModels('groq')}>{t('دریافت فهرست مدل‌ها از Groq', 'Fetch model list from Groq', 'Model listesini al', 'Получить список моделей')}</button>
+        {models.groq?.length ? <span className="ops-muted">{t(`${models.groq.length} مدل`, `${models.groq.length} models`, `${models.groq.length} model`, `${models.groq.length} моделей`)}</span> : ''}
+      </div>
     </div>
-    <div className="ops-toolbar">
-      <button disabled={busy} onClick={() => void fetchModels()}>{t('دریافت فهرست مدل‌ها از Groq', 'Fetch model list from Groq', 'Model listesini al', 'Получить список моделей')}</button>
-      {models.length ? <span className="ops-muted">{t(`${models.length} مدل`, `${models.length} models`, `${models.length} model`, `${models.length} моделей`)}</span> : ''}
+    <h3>{t('ارائه‌دهنده‌های پشتیبان — فقط امور پشتیبانی', 'Backup providers — support-only', 'Yedek sağlayıcılar — sadece destek', 'Резервные провайдеры — только поддержка')}</h3>
+    <p className="ops-muted">{t('پشتیبان‌ها فقط وقتی فعال می‌شوند که Groq پاسخ ندهد (محدودیت نرخ/سقف روزانه/خطا). در حالت پشتیبان فقط تیکت‌ها، پیام‌ها و نظارت پورتال پاسخ داده می‌شود؛ سایر امکانات (بریف بازاریابی، محتوا، کردیت، کوپن و…) متوقف و به ادمین گزارش می‌شوند. هر پشتیبان بودجهٔ روزانهٔ جدا دارد.', 'Backups engage only when Groq cannot answer. In backup mode only tickets, messages and portal monitoring are served; everything else pauses and is reported to the admin. Each backup has its own daily budget.', 'Yedekler yalnızca Groq yanıt veremediğinde devreye girer.', 'Резервы включаются только когда Groq не отвечает.')}</p>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      {backupCard('openrouter', 'OpenRouter', 'sk-or-…', t('پشتیبان ۱ — مدل‌های رایگان با پسوند :free (حدود ۵۰ درخواست/روز؛ با شارژ ۱۰$ تا ۱۰۰۰ درخواست/روز). کلید: openrouter.ai/keys', 'Backup #1 — free models end with :free (≈50 req/day; 1,000/day with $10 credits). Key: openrouter.ai/keys', 'Yedek 1 — ücretsiz modeller :free ile biter.', 'Резерв 1 — бесплатные модели с суффиксом :free (≈50 запросов/день).'))}
+      {backupCard('openai', 'OpenAI', 'sk-…', t('پشتیبان ۲ — پولی (pay-as-you-go)؛ ارزان‌ترین گزینه‌های با فراخوانی ابزار: gpt-4o-mini و gpt-4.1-nano. کلید: platform.openai.com/api-keys', 'Backup #2 — paid pay-as-you-go; cheapest tool-calling models: gpt-4o-mini, gpt-4.1-nano. Key: platform.openai.com/api-keys', 'Yedek 2 — ücretli; en ucuz: gpt-4o-mini.', 'Резерв 2 — платный; самые дешёвые: gpt-4o-mini, gpt-4.1-nano.'))}
     </div>
-    <h3>{t('اتوماسیون', 'Automation', 'Otomasyon', 'Автоматизация')}</h3>
-    <div className="ops-form-grid">
-      {([['dailyBrief', t('بریف روزانه ۹ صبح (قبرس)', 'Daily brief 09:00 Cyprus', 'Günlük brif', 'Дневной бриф 9:00')],
-        ['weeklyDigest', t('دایجست هفتگی (دوشنبه ۱۰)', 'Weekly digest (Mon 10:00)', 'Haftalık özet', 'Недельный дайджест')],
-        ['igReplies', t('پیشنهاد پاسخ دایرکت اینستاگرام', 'Instagram DM reply drafts', 'DM yanıt taslakları', 'Черновики ответов DM')],
-        ['chatFaq', t('پیشنهاد پاسخ تیکت', 'Ticket reply drafts', 'Bilet yanıtları', 'Черновики ответов на тикеты')],
-        ['faqAutoSend', t('ارسال خودکار پاسخ‌های مطمئن (FAQ)', 'Auto-send confident FAQ answers', 'Otomatik FAQ', 'Автоотправка уверенных FAQ')]] as const).map(([key, label]) => (
-        <label key={key} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input type="checkbox" checked={cfg.automation?.[key] === true} onChange={e => setCfg({ ...cfg, automation: { ...cfg.automation, [key]: e.target.checked } })} />
-          {label}
-        </label>))}
+    <div className="ops-card" style={{ marginTop: 16 }}>
+      <h3 style={{ marginTop: 0 }}>{t('اتوماسیون', 'Automation', 'Otomasyon', 'Автоматизация')}</h3>
+      <div className="ops-form-grid">
+        {([['dailyBrief', t('بریف روزانه ۹ صبح (قبرس)', 'Daily brief 09:00 Cyprus', 'Günlük brif', 'Дневной бриф 9:00')],
+          ['weeklyDigest', t('دایجست هفتگی (دوشنبه ۱۰)', 'Weekly digest (Mon 10:00)', 'Haftalık özet', 'Недельный дайджест')],
+          ['igReplies', t('پیشنهاد پاسخ دایرکت اینستاگرام', 'Instagram DM reply drafts', 'DM yanıt taslakları', 'Черновики ответов DM')],
+          ['chatFaq', t('پیشنهاد پاسخ تیکت', 'Ticket reply drafts', 'Bilet yanıtları', 'Черновики ответов на тикеты')],
+          ['faqAutoSend', t('ارسال خودکار پاسخ‌های مطمئن (FAQ)', 'Auto-send confident FAQ answers', 'Otomatik FAQ', 'Автоотправка уверенных FAQ')]] as const).map(([key, label]) => (
+          <label key={key} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" checked={cfg.automation?.[key] === true} onChange={e => setCfg({ ...cfg, automation: { ...cfg.automation, [key]: e.target.checked } })} />
+            {label}
+          </label>))}
+      </div>
+      <p className="ops-muted">{t('توجه: بریف روزانه و دایجست هفتگی «بازاریابی» هستند و در حالت پشتیبان اجرا نمی‌شوند؛ پیشنهاد دایرکت و پاسخ تیکت «پشتیبانی» هستند و روی پشتیبان هم اجرا می‌شوند.', 'Note: the marketing brief/digest never run on backups; DM/ticket drafts are support work and do.', 'Not: pazarlama brifleri yedekte çalışmaz.', 'Примечание: маркетинговые брифы не выполняются на резервах.')}</p>
+      <div className="ops-toolbar">
+        <button className="ops-primary" disabled={busy} onClick={() => void save()}>{t('ذخیره تنظیمات', 'Save settings', 'Kaydet', 'Сохранить')}</button>
+        <button disabled={busy} onClick={() => void api('/jarvis/jobs/igReplies', 'POST', {}).catch(() => {})}>{t('اجرا الان: دایرکت‌ها', 'Run now: DM drafts', 'Şimdi çalıştır', 'Запустить сейчас')}</button>
+        <button disabled={busy} onClick={() => void api('/jarvis/jobs/chatFaq', 'POST', {}).catch(() => {})}>{t('اجرا الان: تیکت‌ها', 'Run now: tickets', 'Şimdi: biletler', 'Сейчас: тикеты')}</button>
+      </div>
+      <p className="ops-muted">{t('کلید هرگز پس از ذخیره نمایش داده نمی‌شود؛ برای تغییر، مقدار تازه بنویسید. دسترسی جارویس به کلیدها/توکن‌ها/مديريت اپراتورها/ريست دیتابیس به‌طور طراحی مسدود است.', 'Keys are never shown after save. Jarvis is designed to never touch keys/tokens/operator management/database resets.', 'Anahtarlar kayıttan sonra gösterilmez.', 'Ключи не показываются после сохранения.')}</p>
     </div>
-    <div className="ops-toolbar">
-      <button className="ops-primary" disabled={busy} onClick={() => void save()}>{t('ذخیره تنظیمات', 'Save settings', 'Kaydet', 'Сохранить')}</button>
-      <button disabled={busy} onClick={() => void api('/jarvis/jobs/igReplies', 'POST', {}).catch(() => {})}>{t('اجرا الان: دایرکت‌ها', 'Run now: DM drafts', 'Şimdi çalıştır', 'Запустить сейчас')}</button>
-      <button disabled={busy} onClick={() => void api('/jarvis/jobs/chatFaq', 'POST', {}).catch(() => {})}>{t('اجرا الان: تیکت‌ها', 'Run now: tickets', 'Şimdi: biletler', 'Сейчас: тикеты')}</button>
-    </div>
-    <p className="ops-muted">{t('کلید هرگز پس از ذخیره نمایش داده نمی‌شود؛ برای تغییر، مقدار تازه بنویسید. دسترسی جارویس به کلیدها/توکن‌ها/مديريت اپراتورها/ريست دیتابیس به‌طور طراحی مسدود است.', 'Keys are never shown after save. Jarvis is designed to never touch keys/tokens/operator management/database resets.', 'Anahtarlar kayıttan sonra gösterilmez.', 'Ключи не показываются после сохранения.')}</p>
   </div>;
 }

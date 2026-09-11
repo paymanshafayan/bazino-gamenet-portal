@@ -10,12 +10,14 @@ import type express from 'express';
 import { OpsCore, endpoint, fail } from '../management/core';
 import {
   getJarvisConfig, sanitizeJarvisConfig, mergeApiKey, maskedJarvisConfig, providerConfigured,
-  listGroqModels, FREE_GROQ_MODELS, todayUsage, JARVIS_CONFIG_KEY,
+  backupConfigured, listProviderModels, suggestedModels, todayUsage, JARVIS_CONFIG_KEY,
+  BACKUP_PROVIDERS, JARVIS_PROVIDERS, type JarvisConfig, type JarvisProviderId,
 } from './config';
 import { JarvisEngine } from './agent';
 import { createSkillRegistry } from './skills';
 import { createApproval, listApprovals, decideApproval } from './approvals';
 import { snapshot, recordSnapshot, monitorHistory } from './monitor';
+import { listIncidents } from './incidents';
 import { startJarvisAutomation, runJarvisJob } from './automation';
 
 export interface JarvisDeps { core: OpsCore; getStore: () => any; fetcher?: typeof fetch; startAutomation?: boolean }
@@ -35,24 +37,67 @@ export function registerJarvis(app: express.Express, d: JarvisDeps) {
 
   /* ── shared handlers (actor resolution differs per mount) ─────── */
 
+  const providerState = async (cfg: JarvisConfig) => {
+    const [groq, openrouter, openai] = await Promise.all([
+      todayUsage(core, 'groq'), todayUsage(core, 'openrouter'), todayUsage(core, 'openai'),
+    ]);
+    return {
+      groq: {
+        id: 'groq' as const, label: JARVIS_PROVIDERS.groq.label, role: 'primary' as const,
+        configured: providerConfigured(cfg), model: cfg.model, usageToday: groq, cap: cfg.dailyCallCap,
+      },
+      openrouter: {
+        id: 'openrouter' as const, label: JARVIS_PROVIDERS.openrouter.label, role: 'backup' as const,
+        configured: backupConfigured(cfg, 'openrouter'), enabled: cfg.backup.openrouter.enabled,
+        model: cfg.backup.openrouter.model, usageToday: openrouter, cap: cfg.backup.openrouter.dailyCallCap,
+      },
+      openai: {
+        id: 'openai' as const, label: JARVIS_PROVIDERS.openai.label, role: 'backup' as const,
+        configured: backupConfigured(cfg, 'openai'), enabled: cfg.backup.openai.enabled,
+        model: cfg.backup.openai.model, usageToday: openai, cap: cfg.backup.openai.dailyCallCap,
+      },
+    };
+  };
+
   const state = async () => {
     const cfg = await getJarvisConfig(getStore());
     const pending = (await listApprovals(core, 'pending')).length;
     const history: any = await monitorHistory(core);
     return {
       configured: providerConfigured(cfg),
-      config: maskedJarvisConfig(cfg), freeModels: FREE_GROQ_MODELS,
-      usage: { today: await todayUsage(core), cap: cfg.dailyCallCap },
+      config: maskedJarvisConfig(cfg), freeModels: suggestedModels('groq'),
+      providers: await providerState(cfg),
+      suggestedModels: {
+        groq: suggestedModels('groq'), openrouter: suggestedModels('openrouter'), openai: suggestedModels('openai'),
+      },
+      usage: { today: await todayUsage(core, 'groq'), cap: cfg.dailyCallCap },
       pendingApprovals: pending,
       skills: registry.catalog(),
+      incidents: await listIncidents(core, 20),
       monitor: history.latest, briefsCount: (await core.list('jarvis-brief')).length,
     };
   };
 
+  /** Merge incoming config; masked key placeholders keep the stored keys. */
+  const mergeConfig = (previous: JarvisConfig, body: any): JarvisConfig => {
+    const b = body || {};
+    const backupIn = b.backup && typeof b.backup === 'object' ? b.backup : {};
+    const backup: JarvisConfig['backup'] = {} as JarvisConfig['backup'];
+    for (const id of BACKUP_PROVIDERS as Array<'openrouter' | 'openai'>) {
+      const inc = backupIn[id] && typeof backupIn[id] === 'object' ? backupIn[id] : {};
+      backup[id] = {
+        enabled: inc.enabled === undefined ? previous.backup[id].enabled : inc.enabled === true,
+        apiKey: mergeApiKey(String(inc.apiKey ?? '********'), previous.backup[id].apiKey),
+        model: String(inc.model || previous.backup[id].model).slice(0, 160),
+        dailyCallCap: Number.isFinite(Number(inc.dailyCallCap)) ? Number(inc.dailyCallCap) : previous.backup[id].dailyCallCap,
+      };
+    }
+    return sanitizeJarvisConfig({ ...previous, ...b, apiKey: mergeApiKey(String(b.apiKey ?? '********'), previous.apiKey), backup });
+  };
+
   const saveConfig = async (req: express.Request) => {
     const previous = await getJarvisConfig(getStore());
-    const incoming = sanitizeJarvisConfig({ ...previous, ...(req.body || {}) });
-    const clean = { ...incoming, apiKey: mergeApiKey(String((req.body || {}).apiKey ?? '********'), previous.apiKey) };
+    const clean = mergeConfig(previous, req.body);
     await getStore().setSetting(JARVIS_CONFIG_KEY, JSON.stringify(clean));
     return maskedJarvisConfig(clean);
   };
@@ -81,16 +126,20 @@ export function registerJarvis(app: express.Express, d: JarvisDeps) {
     .sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)))
     .slice(0, 20);
 
+  const models = async (req: express.Request) => {
+    const provider = String((req.body || {}).provider || 'groq') as JarvisProviderId;
+    if (!BACKUP_PROVIDERS.includes(provider as any) && provider !== 'groq') fail('INVALID_PROVIDER', 400);
+    const cfg = await getJarvisConfig(getStore());
+    const apiKey = provider === 'groq' ? cfg.apiKey : cfg.backup[provider as 'openrouter' | 'openai'].apiKey;
+    return { provider, ...(await listProviderModels(provider, apiKey, d.fetcher)) };
+  };
+
   /* ── Management App mount (OpsCore staff auth) ────────────────── */
 
   const M = '/api/management/jarvis';
   app.get(`${M}/state`, core.guard(), endpoint(async (_req, res) => res.json(await state())));
   app.put(`${M}/config`, endpoint(async (req, res) => { await staffAdmin(req); res.json(await saveConfig(req)); }));
-  app.post(`${M}/models`, endpoint(async (req, res) => {
-    await staffAdmin(req);
-    const cfg = await getJarvisConfig(getStore());
-    res.json({ models: await listGroqModels(cfg.apiKey, d.fetcher) });
-  }));
+  app.post(`${M}/models`, endpoint(async (req, res) => { await staffAdmin(req); res.json(await models(req)); }));
   app.post(`${M}/chat`, core.guard(), endpoint(async (req, res) => res.json(await chat(req, String((req as any).staff.username || 'staff')))));
   app.get(`${M}/sessions`, core.guard(), endpoint(async (_req, res) => res.json({ sessions: await engine.sessions() })));
   app.get(`${M}/sessions/:id`, core.guard(), endpoint(async (req, res) => {
@@ -106,6 +155,8 @@ export function registerJarvis(app: express.Express, d: JarvisDeps) {
   }));
   app.get(`${M}/monitor`, core.guard(), endpoint(async (_req, res) => res.json(await monitorNow())));
   app.get(`${M}/monitor/history`, core.guard(), endpoint(async (_req, res) => res.json(await monitorHistory(core))));
+  app.get(`${M}/incidents`, core.guard(), endpoint(async (req, res) =>
+    res.json({ items: await listIncidents(core, Number(req.query.limit) || 30) })));
   app.get(`${M}/briefs`, core.guard(), endpoint(async (_req, res) => res.json({ items: await briefs() })));
   app.post(`${M}/jobs/:id/run`, endpoint(async (req, res) => {
     await staffAdmin(req);

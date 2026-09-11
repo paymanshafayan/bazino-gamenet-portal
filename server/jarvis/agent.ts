@@ -1,25 +1,32 @@
 /**
- * Jarvis agent loop — native Groq tool-calling over the skill registry.
+ * Jarvis agent loop — native tool-calling over the skill registry, served by
+ * the provider chain (Groq primary → OpenRouter/OpenAI support-only backups).
  *
  * Loop: system prompt (persona + rules + skill list + live portal context)
- * → Groq chat completion with tools → execute read/write skills, route
+ * → chain chat completion with tools → execute read/write skills, route
  * sensitive ones to the approval queue → feed results back → final reply.
- * Max 6 tool rounds per turn; every LLM call counts against the daily cap.
+ * Max 6 tool rounds per turn; every LLM attempt counts against its provider's
+ * daily cap. When a backup serves the turn, only SUPPORT skills are offered
+ * and any other attempt is refused + reported to the admin (incident log).
  */
 import { OpsCore, nowISO } from '../management/core';
 import { randomUUID } from 'node:crypto';
 import {
-  getJarvisConfig, groqChatCompletion, providerConfigured, todayUsage, bumpUsage,
-  JarvisProviderError, type GroqMessage, type JarvisConfig,
+  getJarvisConfig, providerConfigured, anyBackupConfigured, todayUsage,
+  JARVIS_PROVIDERS, type GroqMessage, type JarvisProviderId,
 } from './config';
-import type { SkillRegistry } from './skills';
+import { runJarvisChain, type ChainBreaker } from './chain';
+import { isSupportSkill, SUPPORT_SKILL_IDS, type SkillRegistry } from './skills';
+import { recordIncident } from './incidents';
 
 export interface JarvisChatResult {
   sessionId: string;
   reply: string;
   approvalsCreated: string[];
   toolsUsed: string[];
-  provider?: string;
+  provider?: JarvisProviderId;
+  /** primary = Groq served the turn; backup = support-only fallback. */
+  mode?: 'primary' | 'backup';
   usageToday: number;
 }
 
@@ -27,6 +34,9 @@ const MAX_TOOL_ROUNDS = 6;
 const MAX_SESSION_MESSAGES = 40;
 
 export class JarvisEngine {
+  /** Shared circuit-breaker state for the provider chain (chat + automation). */
+  public chainState: ChainBreaker = { skipUntil: 0, code: '' };
+
   constructor(
     public core: OpsCore,
     public getStore: () => any,
@@ -34,7 +44,7 @@ export class JarvisEngine {
     public fetcher?: typeof fetch,
   ) {}
 
-  async config(): Promise<JarvisConfig> { return getJarvisConfig(this.getStore()); }
+  async config() { return getJarvisConfig(this.getStore()); }
 
   async sessions(limit = 20) {
     return (await this.core.list<any>('jarvis-session'))
@@ -79,20 +89,17 @@ Available skills:
 ${catalog}`;
   }
 
-  private async callLlm(cfg: JarvisConfig, messages: GroqMessage[], tools: any[], usage: number): Promise<any> {
-    if (usage >= cfg.dailyCallCap) throw new JarvisProviderError('JARVIS_DAILY_CAP', 429);
-    try {
-      return await groqChatCompletion({ apiKey: cfg.apiKey, model: cfg.model, messages, tools, fetcher: this.fetcher });
-    } catch (e: any) {
-      if (e instanceof JarvisProviderError && e.code === 'JARVIS_RATE_LIMITED' && cfg.lightModel && cfg.lightModel !== cfg.model) {
-        // Free-tier TPM bump: retry once on the light model.
-        return await groqChatCompletion({ apiKey: cfg.apiKey, model: cfg.lightModel, messages, tools, fetcher: this.fetcher });
-      }
-      throw e;
-    } finally {
-      // Count attempts even on failure — protects the daily budget.
-      await bumpUsage(this.core, 1).catch(() => {});
-    }
+  /** Extra system note injected on BACKUP calls — support-only mode. */
+  private supportNote(language: string): string {
+    const langName = language === 'en' ? 'English' : language === 'ru' ? 'Russian' : language === 'tr' ? 'Turkish' : 'Persian (فارسی)';
+    const supportList = this.registry.catalog('support').map(s => `- ${s.id} [${s.risk}] ${s.title}`).join('\n');
+    return `BACKUP MODE — the primary engine (Groq) is temporarily unavailable and you are a SUPPORT-ONLY backup. Answer in ${langName}.
+Ignore the full skill list above; ONLY these support skills are available to you:
+${supportList}
+Rules for backup mode:
+1. You may help with support matters ONLY: answering tickets, user/Instagram messages, and monitoring the portal's correct operation.
+2. If the admin asks for anything else (marketing briefs, content, credits, cafe, coupons, publishing, statistics beyond support), politely refuse: say the primary engine is temporarily limited, the request has been reported to the admin, and non-support features resume when the primary engine is back.
+3. Never attempt tools that are not in the support list above.`;
   }
 
   async chat(input: { sessionId?: string; message: string; actor: string; language?: string }): Promise<JarvisChatResult> {
@@ -116,24 +123,37 @@ ${catalog}`;
     const approvalsCreated: string[] = [];
     const toolsUsed: string[] = [];
 
-    if (!providerConfigured(cfg)) {
+    if (!providerConfigured(cfg) && !anyBackupConfigured(cfg)) {
       const reply = 'هوش مصنوعی جارویس هنوز تنظیم نشده است. از تنظیمات جارویس، کلید API سرویس Groq را وارد کنید (رایگان: console.groq.com). تا آن موقع فقط ابزارهای بدون LLM در دسترس‌اند.';
       await this.saveSession(sessionId, version, history, { role: 'user', content: message }, { role: 'assistant', content: reply }, input.actor);
       return { sessionId, reply, approvalsCreated, toolsUsed: [], usageToday: await todayUsage(this.core) };
     }
 
-    const usage = await todayUsage(this.core);
+    const language = String(input.language || 'fa');
     const context = await this.portalContext();
     const messages: GroqMessage[] = [
-      { role: 'system', content: this.systemPrompt(String(input.language || 'fa'), context) },
+      { role: 'system', content: this.systemPrompt(language, context) },
       ...history,
       { role: 'user', content: message },
     ];
+    const fullTools = this.registry.tools();
+    const supportTools = this.registry.tools('support');
 
     let reply = '';
+    let provider: JarvisProviderId = 'groq';
+    let mode: 'primary' | 'backup' = 'primary';
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const data: any = await this.callLlm(cfg, messages, this.registry.tools(), usage + round);
-      const choice = data?.choices?.[0];
+      const chain = await runJarvisChain(
+        { core: this.core, getStore: this.getStore, fetcher: this.fetcher, breaker: this.chainState },
+        {
+          messages, tools: fullTools, supportTools,
+          supportNote: this.supportNote(language),
+          allowBackup: true, maxTokens: 3000,
+        },
+      );
+      provider = chain.provider;
+      mode = chain.mode;
+      const choice = chain.data?.choices?.[0];
       const assistant: any = choice?.message || {};
       const toolCalls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
       if (!toolCalls.length) {
@@ -151,6 +171,17 @@ ${catalog}`;
         let resultText: string;
         if (!this.registry.byId(name)) {
           resultText = JSON.stringify({ ok: false, summary: `مهارت «${name}» وجود ندارد` });
+        } else if (chain.mode === 'backup' && !isSupportSkill(name)) {
+          // Backup providers are support-only by operator rule: refuse + report.
+          resultText = JSON.stringify({
+            ok: false,
+            summary: `این اقدام (${name}) خارج از دامنهٔ پشتیبانی است و در حالت پشتیبان غیرفعال می‌ماند. فقط امور پشتیبانی (تیکت، پیام‌ها، نظارت پورتال) با سرویس پشتیبان انجام می‌شود.`,
+          });
+          await recordIncident(this.core, {
+            type: 'SUPPORT_ONLY_BLOCKED', provider: chain.provider,
+            message: `درخواست غیرپشتیبانی «${name}» در حالت پشتیبان رد و به ادمین گزارش شد.`,
+            meta: { skill: name },
+          });
         } else {
           const result = await this.registry.run({ core: this.core, store: this.getStore(), actor: input.actor }, name, parsed);
           if (result.approvalRequired && result.approvalId) approvalsCreated.push(result.approvalId);
@@ -165,8 +196,13 @@ ${catalog}`;
     }
     if (!reply) reply = 'پاسخی دریافت نشد.';
 
+    // Deterministic in-chat report whenever a backup (support-only) served the turn.
+    if (mode === 'backup') {
+      reply += `\n\n— [${JARVIS_PROVIDERS[provider].label} · حالت پشتیبان | فقط امور پشتیبانی فعال است؛ سایر امکانات تا بازگشت Groq متوقف و به ادمین گزارش شد.]`;
+    }
+
     await this.saveSession(sessionId, version, history, { role: 'user', content: message }, { role: 'assistant', content: reply }, input.actor, messages);
-    return { sessionId, reply, approvalsCreated, toolsUsed, provider: 'groq', usageToday: await todayUsage(this.core) };
+    return { sessionId, reply, approvalsCreated, toolsUsed, provider, mode, usageToday: await todayUsage(this.core) };
   }
 
   /** Persist the session with the new user + assistant turns (tool chatter trimmed out). */
@@ -182,3 +218,5 @@ ${catalog}`;
     await this.core.save('jarvis-session', sessionId, data, existing?.version || 0);
   }
 }
+
+export { SUPPORT_SKILL_IDS };

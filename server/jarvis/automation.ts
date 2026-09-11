@@ -7,10 +7,15 @@
  *                                (approval queue; the away message stays separate)
  *   chatFaq      every 10 min  — draft ticket answers; auto-send only for
  *                                high-confidence FAQs when the admin enabled it
- * Every LLM call passes the shared daily cap; failures never crash the timer.
+ * Provider chain: marketing jobs (dailyBrief/weeklyDigest) are PRIMARY-ONLY —
+ * when Groq cannot answer they pause with JARVIS_PRIMARY_UNAVAILABLE and an
+ * incident is reported to the admin. Support jobs (igReplies/chatFaq) may run
+ * on the support-only backups (OpenRouter → OpenAI). Every LLM attempt counts
+ * against its provider's daily cap; failures never crash the timer.
  */
 import { OpsCore, nowISO } from '../management/core';
-import { getJarvisConfig, providerConfigured, todayUsage, groqChatCompletion, cyprusNowKey } from './config';
+import { getJarvisConfig, providerConfigured, anyBackupConfigured, cyprusNowKey } from './config';
+import { runJarvisChain } from './chain';
 import type { JarvisEngine } from './agent';
 import type { SkillRegistry } from './skills';
 import { createApproval } from './approvals';
@@ -57,15 +62,22 @@ function cyprusWeekday(): number {
   } catch { return 0; }
 }
 
-async function llm(engine: JarvisEngine, prompt: string, system: string, maxTokens = 1800): Promise<string> {
-  const cfg = await getJarvisConfig(engine.getStore());
-  if (!providerConfigured(cfg)) throw Object.assign(new Error('JARVIS_NOT_CONFIGURED'), { code: 'JARVIS_NOT_CONFIGURED' });
-  if (await todayUsage(engine.core) >= cfg.dailyCallCap) throw Object.assign(new Error('JARVIS_DAILY_CAP'), { code: 'JARVIS_DAILY_CAP' });
-  const data: any = await groqChatCompletion({
-    apiKey: cfg.apiKey, model: cfg.lightModel || cfg.model, temperature: 0.4, maxTokens, fetcher: (engine as any).fetcher,
-    messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
-  });
-  return String(data?.choices?.[0]?.message?.content || '');
+/**
+ * One LLM call through the provider chain.
+ *  support:false → primary-only; pauses (JARVIS_PRIMARY_UNAVAILABLE) when
+ *                  Groq cannot answer, never degrades to a backup.
+ *  support:true  → may be served by a support-only backup (OpenRouter/OpenAI)
+ *                  when Groq is unavailable.
+ */
+async function llm(engine: JarvisEngine, prompt: string, system: string, maxTokens = 1800, opts: { support: boolean } = { support: false }): Promise<string> {
+  const result = await runJarvisChain(
+    { core: engine.core, getStore: engine.getStore, fetcher: (engine as any).fetcher, breaker: (engine as any).chainState },
+    {
+      messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
+      allowBackup: opts.support, temperature: 0.4, maxTokens,
+    },
+  );
+  return String(result.data?.choices?.[0]?.message?.content || '');
 }
 
 /* ── Jobs ─────────────────────────────────────────────────────────── */
@@ -92,7 +104,7 @@ const MARKETING_SYSTEM_EN = 'You are the marketing assistant of BAZINO Pro gamin
 async function runDailyBrief(engine: JarvisEngine, registry: SkillRegistry): Promise<string> {
   const dateKey = cyprusNowKey();
   const stats = await gatherStats(engine);
-  const raw = await llm(engine, `داده‌های دیروز/امروز پورتال:\n${stats}\n\nیک بریف روزانهٔ بازاریابی بنویس: ۱) خلاصهٔ وضعیت (۳-۴ خط) ۲) سه ایدهٔ محتوا برای امروز (هرکدام عنوان + کپشن اینستاگرام + یک پاراگراف پیش‌نویس بلاگ) ۳) دو نکتهٔ کوتاه SEO/GEO. پاسخ را فقط به صورت JSON بده: {"summary":"...","ideas":[{"title":"","caption":"","blog":""}],"seo":["",""]}`, MARKETING_SYSTEM);
+  const raw = await llm(engine, `داده‌های دیروز/امروز پورتال:\n${stats}\n\nیک بریف روزانهٔ بازاریابی بنویس: ۱) خلاصهٔ وضعیت (۳-۴ خط) ۲) سه ایدهٔ محتوا برای امروز (هرکدام عنوان + کپشن اینستاگرام + یک پاراگراف پیش‌نویس بلاگ) ۳) دو نکتهٔ کوتاه SEO/GEO. پاسخ را فقط به صورت JSON بده: {"summary":"...","ideas":[{"title":"","caption":"","blog":""}],"seo":["",""]}`, MARKETING_SYSTEM, 1800, { support: false });
   let parsed: any = null;
   try { parsed = JSON.parse(String(raw).replace(/```json|```/g, '')); } catch { parsed = null; }
   const brief = {
@@ -125,7 +137,7 @@ async function runWeeklyDigest(engine: JarvisEngine): Promise<string> {
   const ig = (await engine.core.list('ig-inbox')).map((r: any) => r.data);
   const byLang: any = {};
   for (const row of ig) byLang[row.language] = (byLang[row.language] || 0) + 1;
-  const raw = await llm(engine, `داده‌های هفته:\n${stats}\nزبان پیام‌های دریافتی اینستاگرام: ${JSON.stringify(byLang)}\n\nیک دایجست هفتگی بنویس: ۱) عملکرد انتشار و پیام‌ها ۲) سه راهکار مشخص برای ارتقاء بازخورد پست‌ها. JSON: {"summary":"","recommendations":["","",""]}`, MARKETING_SYSTEM);
+  const raw = await llm(engine, `داده‌های هفته:\n${stats}\nزبان پیام‌های دریافتی اینستاگرام: ${JSON.stringify(byLang)}\n\nیک دایجست هفتگی بنویس: ۱) عملکرد انتشار و پیام‌ها ۲) سه راهکار مشخص برای ارتقاء بازخورد پست‌ها. JSON: {"summary":"","recommendations":["","",""]}`, MARKETING_SYSTEM, 1800, { support: false });
   let parsed: any = null;
   try { parsed = JSON.parse(String(raw).replace(/```json|```/g, '')); } catch { parsed = null; }
   const brief = {
@@ -157,7 +169,7 @@ async function runIgReplies(engine: JarvisEngine): Promise<string> {
   for (const row of rows) {
     try {
       const langName: any = { fa: 'فارسی', en: 'English', tr: 'Türkçe', ru: 'Русский' }[row.language] || 'English';
-      const raw = await llm(engine, `پیام کاربر اینستاگرام (زبان ${langName}): «${String(row.text).slice(0, 500)}»\nدانش پورتال: ${knowledge}\nیک پاسخ کوتاه، مؤدبانه و دقیق به همین زبان بنویس. اگر پاسخ قطعی در دانش نیست، بگو مدیریت صبح پاسخ می‌دهد. JSON: {"reply":""}`, MARKETING_SYSTEM_EN, 700);
+      const raw = await llm(engine, `پیام کاربر اینستاگرام (زبان ${langName}): «${String(row.text).slice(0, 500)}»\nدانش پورتال: ${knowledge}\nیک پاسخ کوتاه، مؤدبانه و دقیق به همین زبان بنویس. اگر پاسخ قطعی در دانش نیست، بگو مدیریت صبح پاسخ می‌دهد. JSON: {"reply":""}`, MARKETING_SYSTEM_EN, 700, { support: true });
       let parsed: any = null;
       try { parsed = JSON.parse(String(raw).replace(/```json|```/g, '')); } catch { parsed = null; }
       const text = String(parsed?.reply || '').slice(0, 800).trim();
@@ -197,7 +209,7 @@ async function runChatFaq(engine: JarvisEngine, registry: SkillRegistry): Promis
     try {
       const msgs = await store.listTicketMessages(t.id).catch(() => []);
       const thread = msgs.map((m: any) => `${m.isStaff ? 'پشتیبانی' : m.author}: ${m.body}`).join('\n').slice(0, 1500);
-      const raw = await llm(engine, `تیکت «${t.subject}» از ${t.username}:\n${thread || '(بدون پیام)'}\nدانش پورتال: ${knowledge}\nپاسخ فارسی کوتاه بنویس. اگر و ا только اگر پاسخ از دانش پورتال کاملاً مشخص است (ساعات/قیمت/رزرو) auto=true. JSON: {"auto":true|false,"reply":""}`, MARKETING_SYSTEM, 800);
+      const raw = await llm(engine, `تیکت «${t.subject}» از ${t.username}:\n${thread || '(بدون پیام)'}\nدانش پورتال: ${knowledge}\nپاسخ فارسی کوتاه بنویس. اگر و ا только اگر پاسخ از دانش پورتال کاملاً مشخص است (ساعات/قیمت/رزرو) auto=true. JSON: {"auto":true|false,"reply":""}`, MARKETING_SYSTEM, 800, { support: true });
       let parsed: any = null;
       try { parsed = JSON.parse(String(raw).replace(/```json|```/g, '')); } catch { parsed = null; }
       const reply = String(parsed?.reply || '').slice(0, 1500).trim();
@@ -238,7 +250,7 @@ export function startJarvisAutomation(engine: JarvisEngine, registry: SkillRegis
     busy = true;
     try {
       const cfg = await getJarvisConfig(engine.getStore());
-      if (!providerConfigured(cfg)) return;
+      if (!providerConfigured(cfg) && !anyBackupConfigured(cfg)) return;
       const hour = cyprusHour();
       const dateKey = cyprusNowKey();
       const { state } = await loadState(engine.core);

@@ -86,8 +86,12 @@ const waitForPort = (ms) => new Promise((resolve) => {
   check('ورود ادمین پیش‌فرض (admin/admin) روی دیتابیس محلی', login.status === 200 && !!login.json.token);
   const T = login.json.token || '';
 
-  await api('POST', '/api/admin/reset-database', undefined, T).catch(() => {});
   await api('POST', '/api/admin/sync-settings', { apiKey: 'desktop-local-key-1' }, T).catch(() => {});
+  // دادهٔ نمونه فقط وقتی درج شود که دیتابیس خالی است (اجرای مجدد روی دیتای موجود → خطای UNIQUE)
+  const sys = await api('GET', '/api/systems');
+  if (!Array.isArray(sys.json) || sys.json.length === 0) {
+    await api('POST', '/api/admin/reset-database', undefined, T).catch(() => {});
+  }
 
   // کاربر + تیکت + پیام برای دیدن دیتای واقعی در تب‌ها
   const uname = `chk_${Date.now().toString(36)}`;

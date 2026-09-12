@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `ffdd4f0e7e5904277aed29913e5cfec9b7a70d50`
+- commit: `8f61e882c768ab734dcbb5938c4f9ed4c1853b64`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34703398736
-- date:   2026-09-12 15:50 UTC
+- run:    34704068236
+- date:   2026-09-12 16:03 UTC
 
 ## flutter --version
 ```
@@ -128,12 +128,9 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-
-   info • The local variable '_wrap' starts with an underscore. Try renaming the variable to not start with an underscore • test/widget_test.dart:447:12 • no_leading_underscores_for_local_identifiers
-
-1 issue found. (ran in 9.5s)
+No issues found! (ran in 9.9s)
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter test
 ```
@@ -190,7 +187,7 @@ Consider addressing these issues to enable wasm builds. See docs for more info: 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 19428 bytes (98.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             45.7s
+Compiling lib/main.dart for the Web...                             46.2s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -199,7 +196,7 @@ Compiling lib/main.dart for the Web...                             45.7s
 ```
 flutter --version=0
 flutter pub get=0
-flutter analyze=1
+flutter analyze=0
 flutter test=0
 flutter build web=0
 ```

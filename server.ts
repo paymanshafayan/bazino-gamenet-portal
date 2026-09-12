@@ -5272,11 +5272,37 @@ Example format:
   };
   interface DesktopGhAsset { name: string; url: string; size: number; }
   interface DesktopGhRelease { tag: string; name: string; prerelease: boolean; assets: DesktopGhAsset[]; }
-  let desktopGhCache: { at: number; release: DesktopGhRelease | null } = { at: 0, release: null };
+  let desktopGhCache: { at: number; ok: boolean; release: DesktopGhRelease | null } = { at: 0, ok: false, release: null };
+
+  // فالبک «آخرین ریلیز شناخته‌شده» — اگر GitHub API از دسترس خارج شود (مثل
+  // rate-limit سهمیهٔ ۶۰ درخواست/ساعتهٔ IPهای خروجی اشتراکی Railway، که بعد از هر
+  // ری‌استارت نمونه می‌تواند رخ دهد)، دکمه‌های دانلود پنل مدیریت نباید بمیرند.
+  // آدرس دانلود مستقیم ریلیزِ ریپوی عمومی قطعی است: /releases/download/{tag}/{asset}.
+  // این مقدار فقط هنگام کشِ خالی + شکست API مصرف می‌شود؛ تا وقتی API زنده است
+  // همیشه اطلاعات واقعی لحظه‌ای برمی‌گردد.
+  const DESKTOP_FALLBACK_RELEASE: DesktopGhRelease = {
+    tag: "desktop-dev-9",
+    name: "BAZINO PRO Desktop v1.1.0 (build 9)",
+    prerelease: true,
+    assets: [
+      "BAZINO.PRO.Setup.1.1.0.exe",
+      "BAZINO.PRO.1.1.0.exe",
+      "BAZINO.PRO-1.1.0-arm64.dmg",
+      "BAZINO.PRO.1.1.0.AppImage",
+      "bazino-pro-desktop_1.1.0_amd64.deb",
+    ].map((name) => ({
+      name,
+      url: `https://github.com/${GITHUB_REPO}/releases/download/desktop-dev-9/${encodeURIComponent(name)}`,
+      size: 0,
+    })),
+  };
 
   /** آخرین ریلیز دسکتاپ از GitHub — پایدار (desktop-v*) مقدم بر آزمایشی (desktop-dev-). کش ۶۰ ثانیه. */
   async function latestDesktopGithubRelease(): Promise<DesktopGhRelease | null> {
-    if (Date.now() - desktopGhCache.at < 60_000) return desktopGhCache.release;
+    // موفق: ۱۵ دقیقه کش (اطلاعات ریلیز به‌ندرت تغییر می‌کند و فراخوانی کمتر = خطر
+    // کمترِ خوردن rate-limit). ناموفق: فقط ۶۰ ثانیه صبر و بعد تلاش مجدد.
+    const ttl = desktopGhCache.ok ? 15 * 60_000 : 60_000;
+    if (Date.now() - desktopGhCache.at < ttl) return desktopGhCache.release;
     try {
       const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=50`, {
         headers: { "User-Agent": "bazino-portal-desktop-download", Accept: "application/vnd.github+json" },
@@ -5298,12 +5324,19 @@ Example format:
               .filter((a: DesktopGhAsset) => a.name && a.url),
           }
         : null;
-      desktopGhCache = { at: Date.now(), release };
+      desktopGhCache = { at: Date.now(), ok: true, release };
       return release;
     } catch (e) {
-      // گیت‌هاب در دسترس نبود — آخرین دادهٔ کش‌شده (حتی کهنه) برگردد تا دکمه‌ها نچسبند
+      // گیت‌هاب در دسترس نبود — آخرین دادهٔ کش‌شده (حتی کهنه) برگردد تا دکمه‌ها نچسبند؛
+      // اگر نمونهٔ تازه‌بالا‌آمده هنوز هیچ کشی ندارد، فالبکِ آخرین ریلیز شناخته‌شده
+      // خودش کش می‌شود تا در بازهٔ انتظارِ (۶۰ ثانیه) تلاش مجدد هم دانلود زنده بماند.
       console.warn("[desktop] GitHub release lookup failed:", e);
-      return desktopGhCache.release;
+      if (!desktopGhCache.release) {
+        console.warn("[desktop] Serving last-known desktop release fallback:", DESKTOP_FALLBACK_RELEASE.tag);
+      }
+      const release = desktopGhCache.release ?? DESKTOP_FALLBACK_RELEASE;
+      desktopGhCache = { at: Date.now(), ok: false, release };
+      return release;
     }
   }
 

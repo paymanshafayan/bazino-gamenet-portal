@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `320ff1333ed7cea93425c27b2a51f117f7b9b6c4`
+- commit: `817bb45a99bc63eb5553ffaeb64aa5886c08fd34`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34697949660
-- date:   2026-09-12 13:59 UTC
+- run:    34698083617
+- date:   2026-09-12 14:02 UTC
 
 ## flutter --version
 ```
@@ -128,7 +128,7 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 7.4s)
+No issues found! (ran in 9.3s)
 ```
 **exit 0 — OK**
 
@@ -141,18 +141,8 @@ No issues found! (ran in 7.4s)
 ✅ BazinoApp — رندر کاربر تازه صفحه‌ی intro را می‌بیند
 ✅ BazinoApp — رندر کاربری که intro را دیده، دیگر آن را نمی‌بیند
 ✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
-::endgroup::
-::group::❌ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me (failed)
-type 'Null' is not a subtype of type 'num' in type cast
-package:bazino_app/models.dart 117:65  new UserState.fromJson
-test/widget_test.dart 90:27            main.<fn>.<fn>
-::endgroup::
-::group::❌ parse کردن پاسخ سرور UserState.fromJson — پاسخ ناقص نباید کرش کند (failed)
-type 'Null' is not a subtype of type 'int'
-package:bazino_app/models.dart 115:58  new UserState.fromJson
-test/widget_test.dart 104:27           main.<fn>.<fn>
-::endgroup::
-::group::✅ Passing tests
+✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me
+✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ ناقص نباید کرش کند
 ✅ parse کردن پاسخ سرور GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
 ✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
 ✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
@@ -163,13 +153,7 @@ test/widget_test.dart 104:27           main.<fn>.<fn>
 ✅ جارویس — رابط گفتگومحور نشانگر «در حال تایپ» سه نقطهٔ متحرک دارد
 ✅ جارویس — رابط گفتگومحور پیام جارویس با اکشن، نشان «عملیات انجام شد» می‌گیرد
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور UserState.fromJson — فیلدهای کامل publicUser سرور
-::endgroup::
-::group::❌ حساب کاربری و پرداخت — parse کردن پاسخ سرور UserState.fromJson — پاسخ قدیمی سرور بدون فیلدهای جدید نباید کرش کند (failed)
-type 'Null' is not a subtype of type 'num' in type cast
-package:bazino_app/models.dart 117:65  new UserState.fromJson
-test/widget_test.dart 320:27           main.<fn>.<fn>
-::endgroup::
-::group::✅ Passing tests
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور UserState.fromJson — پاسخ قدیمی سرور بدون فیلدهای جدید نباید کرش کند
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور UserState.toJson ↔ fromJson — رفت‌وبرگشت (لازم برای آپلود آواتار)
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور WalletTx.fromJson — تراکنش کیف پول
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور OnsiteOrder.fromJson — سفارش حضوری با مهلت
@@ -180,9 +164,9 @@ test/widget_test.dart 320:27           main.<fn>.<fn>
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور TicketMessage.fromJson — پیام پشتیبانی
 ::endgroup::
 
-::error::23 tests passed, 3 failed.
+🎉 26 tests passed.
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter build web
 ```
@@ -199,7 +183,7 @@ Consider addressing these issues to enable wasm builds. See docs for more info: 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 19428 bytes (98.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             35.4s
+Compiling lib/main.dart for the Web...                             45.0s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -209,7 +193,7 @@ Compiling lib/main.dart for the Web...                             35.4s
 flutter --version=0
 flutter pub get=0
 flutter analyze=0
-flutter test=1
+flutter test=0
 flutter build web=0
 ```
 

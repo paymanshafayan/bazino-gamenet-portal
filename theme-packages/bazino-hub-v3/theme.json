@@ -1,7 +1,7 @@
 {
   "id": "bazino-hub-v3",
   "name": "Bazino Hub v3 (Hasti)",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "layout": "hub",
   "description": "Bazino Hub v3.1.0 — Hasti reference design: dark neon gaming, split hero. Dynamic images read live from the server (admin slider = center promo card; tournaments & live match data from events feed; blog strip from article covers). Static decorative art (hero cards) is admin-replaceable via Admin ▸ Customization uploads (theme_img.* settings).",
   "author": "Bazino",
@@ -71,19 +71,11 @@
       "quick.blog.sub": "News & stories",
       "quick.contact": "CONTACT",
       "quick.contact.sub": "Map, phone & chat",
-      "contact.title": "FIND US",
       "contact.hours": "OPENING HOURS",
       "contact.open": "OPEN EVERYDAY",
-      "contact.wa": "Chat with us",
-      "contact.location": "LOCATION",
-      "contact.map": "View map & directions",
-      "contact.ig": "Follow the club life",
-      "footer.tagline": "GOOD GAMES • BETTER PEOPLE",
-      "footer.links": "EXPLORE",
-      "footer.contact": "CONTACT",
       "hero.more": "MORE INFO",
       "hero.live.next": "COMING UP",
-      "articles.title": "LATEST FROM BAZINO"
+      "footer.club": "GAMING CLUB"
     },
     "fa": {
       "header.club": "گیمینگ کلاب",
@@ -122,19 +114,11 @@
       "quick.blog.sub": "اخبار و داستان‌ها",
       "quick.contact": "تماس",
       "quick.contact.sub": "نقشه، تلفن و چت",
-      "contact.title": "ما را پیدا کن",
       "contact.hours": "ساعات کاری",
       "contact.open": "هر روز باز",
-      "contact.wa": "با ما چت کن",
-      "contact.location": "آدرس",
-      "contact.map": "نقشه و مسیر",
-      "contact.ig": "زندگی کلاب را دنبال کن",
-      "footer.tagline": "بازی خوب • آدم‌های بهتر",
-      "footer.links": "دسترسی",
-      "footer.contact": "تماس",
       "hero.more": "اطلاعات بیشتر",
       "hero.live.next": "به‌زودی",
-      "articles.title": "آخرین‌های بازینو"
+      "footer.club": "GAMING CLUB"
     },
     "tr": {
       "header.club": "OYUN KULÜBÜ",
@@ -149,17 +133,11 @@
       "nav.blog": "BLOG",
       "nav.contact": "İLETİŞİM",
       "quick.title": "HIZLI ERİŞİM",
-      "contact.title": "BİZİ BUL",
       "contact.hours": "ÇALIŞMA SAATLERİ",
       "contact.open": "HER GÜN AÇIK",
-      "contact.location": "KONUM",
-      "contact.map": "Harita ve yol tarifi",
-      "footer.tagline": "İYİ OYUNLAR • DAHA İYİ İNSANLAR",
-      "footer.links": "KEŞFET",
-      "footer.contact": "İLETİŞİM",
       "hero.more": "DAHA FAZLA BİLGİ",
       "hero.live.next": "YAKINDA",
-      "articles.title": "BAZINO'DAN SON HABERLER"
+      "footer.club": "GAMING CLUB"
     },
     "ru": {
       "header.club": "ИГРОВОЙ КЛУБ",
@@ -174,17 +152,11 @@
       "nav.blog": "БЛОГ",
       "nav.contact": "КОНТАКТЫ",
       "quick.title": "БЫСТРЫЙ ДОСТУП",
-      "contact.title": "НАЙТИ НАС",
       "contact.hours": "ЧАСЫ РАБОТЫ",
       "contact.open": "ОТКРЫТО КАЖДЫЙ ДЕНЬ",
-      "contact.location": "АДРЕС",
-      "contact.map": "Карта и маршрут",
-      "footer.tagline": "ХОРОШИЕ ИГРЫ • ЛУЧШИЕ ЛЮДИ",
-      "footer.links": "РАЗДЕЛЫ",
-      "footer.contact": "КОНТАКТЫ",
       "hero.more": "ПОДРОБНЕЕ",
       "hero.live.next": "СКОРО",
-      "articles.title": "ПОСЛЕДНЕЕ ОТ BAZINO"
+      "footer.club": "GAMING CLUB"
     }
   }
 }

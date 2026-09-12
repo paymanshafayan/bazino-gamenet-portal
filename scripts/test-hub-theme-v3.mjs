@@ -180,14 +180,9 @@ ok(liveBadge.length === 1, 'بج LIVE برای bracket فعال (bracketTotal>0)
 const dynHeroCards = findAll(homeDyn, (n) => /hz-hero-card/.test(n.props.className || ''));
 dynHeroCards[1].props.onClick();
 ok(calls.some((c) => c[0] === 'nav' && c[1] === '/shop'), 'کلیک کارت مرکزی → مسیر هدف اسلاید (target=shop → /shop)');
-// نوار مقالات = تصاویر سرور
-const articleCards = findAll(homeDyn, (n) => /(^|\s)hz-article(\s|$)/.test(n.props.className || ''));
-ok(articleCards.length === 3, `نوار مقالات: ${articleCards.length} کارت از articles سرور`);
-const artImgs = articleCards.map((a) => findAll(a, (n) => n.type === 'img' && /(^|\s)hz-article-img(\s|$)/.test(n.props.className || ''))).flat();
-ok(artImgs.length === 3 && artImgs.every((im) => String(im.props.src).startsWith('/images/')), 'تصاویر مقالات از سرور (imageUrl)');
-ok(/Weekend Tournament Report/.test(textOf(articleCards[0])), 'عنوان مقاله به زبان UI (titleEn)');
-articleCards[0].props.onClick();
-ok(calls.some((c) => c[0] === 'nav' && c[1] === '/blog'), 'کلیک مقاله → /blog');
+// تک‌صفحه (مرجع ۰۱) — حتی با articles سرور، نوار مقالات رندر نمی‌شود
+ok(findAll(homeDyn, (n) => /hz-article/.test(n.props.className || '')).length === 0, 'articles سرور → بدون نوار مقالات (تک‌صفحه)');
+ok(findAll(homeDyn, (n) => /(^|\s)hz-contact(\s|$)/.test(n.props.className || '')).length === 0, 'بدون بخش FIND US (اطلاعات در فوتر)');
 
 // ── override تصاویر ادمین (theme_img.*) ──
 console.log('── override تصاویر ادمین ──');
@@ -202,28 +197,28 @@ const homeSoon = regions.home.render({ ...serverProps, slides: [], eventsFeed: {
 ok(/COMING UP/.test(textOf(homeSoon)), 'live بدون bracket → بج COMING UP (طلایی)');
 ok(!findAll(homeSoon, (n) => /hz-hero-livebadge/.test(n.props.className || '')).length, 'live بدون bracket → بدون بج قرمز LIVE');
 
-// ── تماس ──
-console.log('── تماس ──');
-const contacts = findAll(home, (n) => /(^|\s)hz-contact(\s|$)/.test(n.props.className || ''));
-ok(contacts.length === 4, '۴ باکس تماس (hours/whatsapp/location/instagram)');
-const wa = contacts.find((c) => c.type === 'a' && /wa\.me/.test(String(c.props.href || '')));
-ok(!!wa && /wa\.me\/\d+/.test(String(wa.props.href)), 'لینک WhatsApp از شمارهٔ settings');
-ok(/11:00/.test(textOf(contacts[0])) && /23:50/.test(textOf(contacts[0])), 'ساعات کاری 11:00–23:50 (پیش‌فرض مرجع)');
-const homeS = regions.home.render({ ...baseProps, settings: { club_hours: '10:00 - 01:00', club_phone: '+90 555 000 11 22' } });
-const contactsS = findAll(homeS, (n) => /(^|\s)hz-contact(\s|$)/.test(n.props.className || ''));
-ok(/10:00/.test(textOf(contactsS[0])), 'ساعات از settings.club_hours خوانده می‌شود');
-const waS = contactsS.find((c) => c.type === 'a' && /wa\.me/.test(String(c.props.href || '')));
-ok(/wa\.me\/905550001122/.test(String(waS.props.href)), 'WhatsApp از club_phone ساخته می‌شود');
+// ── تماس → فقط در فوتر (مرجع ۰۱: آدرس | ساعت | واتساپ | اینستاگرام) ──
+console.log('── تماس (فوتر) ──');
 
-// ── فوتر ──
+// ── فوتر: نوار تک‌ردیف مرجع ۰۱ ──
 console.log('── فوتر ──');
 const footer = regions.footer.render(baseProps);
-const footTag = findAll(footer, (n) => /hz-foot-tag/.test(n.props.className || ''));
-ok(footTag.length === 1 && /GOOD GAMES/.test(textOf(footTag[0])), 'تگ‌لاین «GOOD GAMES • BETTER PEOPLE»');
-const footLinks = findAll(footer, (n) => /hz-foot-link/.test(n.props.className || ''));
-ok(footLinks.length === 8, '۸ لینک فوتر = صفحات واقعی');
-const social = findAll(footer, (n) => n.type === 'a' && (String(n.props.href || '').includes('wa.me') || String(n.props.href || '').includes('instagram.com')));
-ok(social.length >= 2, 'آیکون‌های سوشال (WhatsApp + Instagram)');
+const footRow = findAll(footer, (n) => /hz-foot-row/.test(n.props.className || ''));
+ok(footRow.length === 1, 'فوتر = یک نوار تک‌ردیف');
+const footText = textOf(footer);
+ok(/BAZINO/.test(footText) && /GAMING CLUB/.test(footText), 'برند BAZINO GAMING CLUB در نوار');
+ok(/11:00/.test(footText) && /23:50/.test(footText), 'ساعات کاری 11:00–23:50 (پیش‌فرض مرجع)');
+ok(/OPEN EVERYDAY/.test(footText), 'OPEN EVERYDAY در نوار');
+ok(/@bazinopro/.test(footText), 'اینستاگرام @bazinopro در نوار');
+const waF = findAll(footer, (n) => n.type === 'a' && /wa\.me/.test(String(n.props.href || '')));
+ok(waF.length === 1 && /wa\.me\/\d+/.test(String(waF[0].props.href)), 'لینک WhatsApp از شمارهٔ settings');
+const igF = findAll(footer, (n) => n.type === 'a' && /instagram\.com/.test(String(n.props.href || '')));
+ok(igF.length === 1, 'لینک Instagram');
+const footerS = regions.footer.render({ ...baseProps, settings: { club_hours: '10:00 - 01:00', club_phone: '+90 555 000 11 22' } });
+const footTextS = textOf(footerS);
+ok(/10:00/.test(footTextS), 'ساعات از settings.club_hours خوانده می‌شود');
+const waFS = findAll(footerS, (n) => n.type === 'a' && /wa\.me/.test(String(n.props.href || '')));
+ok(waFS.length === 1 && /wa\.me\/905550001122/.test(String(waFS[0].props.href)), 'WhatsApp از club_phone ساخته می‌شود');
 
 // ── موبایل‌ناو ──
 console.log('── موبایل‌ناو ──');

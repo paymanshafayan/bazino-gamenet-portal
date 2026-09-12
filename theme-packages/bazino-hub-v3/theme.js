@@ -1,4 +1,4 @@
-// BAZINO HUB v3.1.1 — Hasti reference design (dark neon gaming, English UI)
+// BAZINO HUB v3.1.2 — Hasti reference design (single-page no-scroll per ref-01: hero + 7 tiles + slim footer bar)
 // SDK v2 — no React hooks, no timers. Interactive via props callbacks and DOM events.
 //
 // IMAGE POLICY (employer spec):
@@ -347,125 +347,27 @@
     );
   }
 
-  // ---------- latest from bazino (server article covers) ----------
-  function articleTitle(a, lang) {
-    if (!a) return '';
-    var map = { fa: a.titleFa, en: a.titleEn, ru: a.titleRu, tr: a.titleTr };
-    return map[lang] || a.titleEn || a.title || a.titleFa || '';
-  }
-  function ArticlesStrip(props) {
-    var lang = (props && props.language) || 'en';
-    var list = (props && props.articles) || [];
-    if (!list.length) return null;
-    var cards = [];
-    for (var i = 0; i < list.length && i < 4; i++) {
-      var a = list[i];
-      cards.push(h('button', {
-        key: a.id || ('art-' + i),
-        className: 'hz-article',
-        onClick: function () { go(props, '/blog'); }
-      },
-        h('span', { className: 'hz-article-imgwrap' },
-          a.imageUrl ? h('img', { className: 'hz-article-img', src: a.imageUrl, alt: articleTitle(a, lang), loading: 'lazy' }) : null,
-          a.category ? h('span', { className: 'hz-article-cat' }, a.category) : null
-        ),
-        h('span', { className: 'hz-article-title' }, articleTitle(a, lang)),
-        a.date ? h('span', { className: 'hz-article-date' }, a.date) : null
-      ));
-    }
-    if (!cards.length) return null;
-    return h('section', { className: 'hz-section' },
-      h('div', { className: 'hz-section-head' },
-        h('span', { className: 'hz-section-kicker' }, 'BAZINO'),
-        h('h2', { className: 'hz-section-title' }, tsx(props, 'articles.title', 'LATEST FROM BAZINO'))
-      ),
-      h('div', { className: 'hz-article-grid' }, cards)
-    );
-  }
-
-  // ---------- contact strip ----------
-  function ContactStrip(props) {
-    var c = contactInfo(props);
-    return h('section', { className: 'hz-section' },
-      h('div', { className: 'hz-section-head' },
-        h('span', { className: 'hz-section-kicker' }, 'BAZINO'),
-        h('h2', { className: 'hz-section-title' }, tsx(props, 'contact.title', 'FIND US'))
-      ),
-      h('div', { className: 'hz-contact-grid' },
-        h('div', { className: 'hz-contact hz-tone-cyan' },
-          h('span', { className: 'hz-contact-ico' }, icon('clock')),
-          h('span', { className: 'hz-contact-label' }, tsx(props, 'contact.hours', 'OPENING HOURS')),
-          h('b', { className: 'hz-contact-val' }, c.hours),
-          h('span', { className: 'hz-contact-sub' }, tsx(props, 'contact.open', 'OPEN EVERYDAY'))
-        ),
-        h('a', { className: 'hz-contact hz-tone-green', href: c.whatsapp, target: '_blank', rel: 'noreferrer' },
-          h('span', { className: 'hz-contact-ico' }, icon('whatsapp')),
-          h('span', { className: 'hz-contact-label' }, 'WHATSAPP'),
-          h('b', { className: 'hz-contact-val' }, c.phone),
-          h('span', { className: 'hz-contact-sub' }, tsx(props, 'contact.wa', 'Chat with us'))
-        ),
-        h('button', { className: 'hz-contact hz-tone-orange', onClick: function () { go(props, '/contact'); } },
-          h('span', { className: 'hz-contact-ico' }, icon('pin')),
-          h('span', { className: 'hz-contact-label' }, tsx(props, 'contact.location', 'LOCATION')),
-          h('b', { className: 'hz-contact-val hz-contact-val-sm' }, c.address),
-          h('span', { className: 'hz-contact-sub' }, tsx(props, 'contact.map', 'View map & directions'))
-        ),
-        h('a', { className: 'hz-contact hz-tone-magenta', href: c.instagram, target: '_blank', rel: 'noreferrer' },
-          h('span', { className: 'hz-contact-ico' }, icon('instagram')),
-          h('span', { className: 'hz-contact-label' }, 'INSTAGRAM'),
-          h('b', { className: 'hz-contact-val hz-contact-val-sm' }, '@bazinopro'),
-          h('span', { className: 'hz-contact-sub' }, tsx(props, 'contact.ig', 'Follow the club life'))
-        )
-      )
-    );
-  }
-
   // ---------- home ----------
   function HomePage(props) {
     return h('div', { className: 'hz-home' },
       Hero(props),
-      QuickCards(props),
-      ArticlesStrip(props),
-      ContactStrip(props)
+      QuickCards(props)
     );
   }
 
-  // ---------- footer ----------
+  // ---------- footer (نوار تک‌ردیف — مرجع ۰۱) ----------
   function Footer(props) {
     var c = contactInfo(props);
-    var links = [];
-    for (var i = 0; i < NAV.length; i++) {
-      var item = NAV[i];
-      links.push(h('button', {
-        key: 'f' + item.path,
-        className: 'hz-foot-link' + (isActive(props, item.path) ? ' is-active' : ''),
-        onClick: (function (p) { return function () { go(props, p); }; })(item.path)
-      }, tsx(props, item.key, item.key)));
-    }
     return h('footer', { className: 'hz-footer' },
-      h('div', { className: 'hz-footer-in' },
-        h('div', { className: 'hz-foot-brand' },
-          LogoBlock(props),
-          h('p', { className: 'hz-foot-tag' }, tsx(props, 'footer.tagline', 'GOOD GAMES - BETTER PEOPLE')),
-          h('div', { className: 'hz-foot-social' },
-            h('a', { href: c.whatsapp, target: '_blank', rel: 'noreferrer', 'aria-label': 'WhatsApp' }, icon('whatsapp', 'hz-ico')),
-            h('a', { href: c.instagram, target: '_blank', rel: 'noreferrer', 'aria-label': 'Instagram' }, icon('instagram', 'hz-ico'))
-          )
-        ),
-        h('div', { className: 'hz-foot-nav' },
-          h('h4', null, tsx(props, 'footer.links', 'EXPLORE')),
-          links
-        ),
-        h('div', { className: 'hz-foot-contact' },
-          h('h4', null, tsx(props, 'footer.contact', 'CONTACT')),
-          h('p', { className: 'hz-foot-line' }, icon('clock', 'hz-ico hz-ico-sm'), c.hours, ' - ', tsx(props, 'contact.open', 'OPEN EVERYDAY')),
-          h('p', { className: 'hz-foot-line' }, icon('whatsapp', 'hz-ico hz-ico-sm'), c.phone),
-          h('p', { className: 'hz-foot-line' }, icon('pin', 'hz-ico hz-ico-sm'), c.address)
-        )
-      ),
-      h('div', { className: 'hz-foot-bar' },
-        h('span', null, '\u00A9 ' + new Date().getFullYear() + ' BAZINO GAMING CLUB'),
-        h('span', { className: 'hz-foot-bar-tag' }, tsx(props, 'footer.tagline', 'GOOD GAMES - BETTER PEOPLE'))
+      h('div', { className: 'hz-foot-row' },
+        h('span', { className: 'hz-foot-item hz-foot-brand-sm' },
+          h('b', null, 'BAZINO'), ' ', tsx(props, 'footer.club', 'GAMING CLUB')),
+        h('span', { className: 'hz-foot-item hz-foot-addr' }, c.address),
+        h('span', { className: 'hz-foot-item' }, c.hours, ' \u00B7 ', tsx(props, 'contact.open', 'OPEN EVERYDAY')),
+        h('a', { className: 'hz-foot-item hz-foot-link', href: c.whatsapp, target: '_blank', rel: 'noreferrer' },
+          icon('whatsapp', 'hz-ico hz-ico-sm'), ' ', c.phone),
+        h('a', { className: 'hz-foot-item hz-foot-link', href: c.instagram, target: '_blank', rel: 'noreferrer' },
+          icon('instagram', 'hz-ico hz-ico-sm'), ' @bazinopro')
       )
     );
   }

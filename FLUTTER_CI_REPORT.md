@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `817bb45a99bc63eb5553ffaeb64aa5886c08fd34`
+- commit: `ffdd4f0e7e5904277aed29913e5cfec9b7a70d50`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34698083617
-- date:   2026-09-12 14:02 UTC
+- run:    34703398736
+- date:   2026-09-12 15:50 UTC
 
 ## flutter --version
 ```
@@ -128,9 +128,12 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 9.3s)
+
+   info • The local variable '_wrap' starts with an underscore. Try renaming the variable to not start with an underscore • test/widget_test.dart:447:12 • no_leading_underscores_for_local_identifiers
+
+1 issue found. (ran in 9.5s)
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## flutter test
 ```
@@ -162,9 +165,13 @@ No issues found! (ran in 9.3s)
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور MyOrder.fromJson + itemsSummary — خلاصهٔ اقلام سفارش
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور SupportTicket.fromJson — تیکت با پاسخ جدید
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور TicketMessage.fromJson — پیام پشتیبانی
+✅ آزمایشگاه UI — ورود OTP، حساب، تورنمنت، زبان صفحهٔ ورود: حالت پیامک OTP فرم شماره و دکمهٔ دریافت کد را نشان می‌دهد
+✅ آزمایشگاه UI — ورود OTP، حساب، تورنمنت، زبان مرکز حساب کاربر مهمان: دعوت به ورود و باز شدن صفحهٔ ورود
+✅ آزمایشگاه UI — ورود OTP، حساب، تورنمنت، زبان دیالوگ ثبت‌نام تورنمنت دارای ورودی: انتخابگر روش پرداخت کیف پول/حضوری
+✅ آزمایشگاه UI — ورود OTP، حساب، تورنمنت، زبان منوی زبان هاب هر چهار زبان را نشان می‌دهد
 ::endgroup::
 
-🎉 26 tests passed.
+🎉 30 tests passed.
 ```
 **exit 0 — OK**
 
@@ -183,7 +190,7 @@ Consider addressing these issues to enable wasm builds. See docs for more info: 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 19428 bytes (98.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             45.0s
+Compiling lib/main.dart for the Web...                             45.7s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -192,7 +199,7 @@ Compiling lib/main.dart for the Web...                             45.0s
 ```
 flutter --version=0
 flutter pub get=0
-flutter analyze=0
+flutter analyze=1
 flutter test=0
 flutter build web=0
 ```

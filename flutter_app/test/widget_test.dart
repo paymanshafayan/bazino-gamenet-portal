@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bazino_app/main.dart';
 import 'package:bazino_app/models.dart';
 import 'package:bazino_app/screens/account_screen.dart';
+import 'package:bazino_app/screens/auth_screen.dart';
 import 'package:bazino_app/screens/hub_screen.dart';
 import 'package:bazino_app/screens/intro_screen.dart';
 import 'package:bazino_app/screens/jarvis_assistant.dart';
@@ -436,6 +437,92 @@ void main() {
         'createdAt': '2026-09-12T11:00:00.000Z',
       });
       expect(m.isStaff, isTrue);
+    });
+  });
+
+  // ============================================================
+  // آزمایشگاه رابط کاربری — صفحات جدید (فاز ۱/۲)
+  // ============================================================
+  group('آزمایشگاه UI — ورود OTP، حساب، تورنمنت، زبان', () {
+    Widget _wrap(Widget child, {AppState? appState}) => MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => appState ?? AppState()),
+      ],
+      child: MaterialApp(home: child),
+    );
+
+    testWidgets('صفحهٔ ورود: حالت پیامک OTP فرم شماره و دکمهٔ دریافت کد را نشان می‌دهد', (tester) async {
+      await tester.pumpWidget(_wrap(const AuthScreen()));
+      await tester.pumpAndSettle();
+
+      // حالت پیش‌فرض رمز است؛ به حالت پیامک سوییچ می‌کنیم
+      await tester.tap(find.text('ورود با پیامک'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('شمارهٔ موبایل'), findsOneWidget);
+      expect(find.textContaining('دریافت کد تأیید'), findsOneWidget);
+      // حالت رمز مخفی شده است
+      expect(find.textContaining('ورود با رمز / ثبت‌نام'), findsOneWidget); // چیپ سوییچ برمی‌گردد
+    });
+
+    testWidgets('مرکز حساب کاربر مهمان: دعوت به ورود و باز شدن صفحهٔ ورود', (tester) async {
+      await tester.pumpWidget(_wrap(const AccountScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ورود / ثبت‌نام'), findsOneWidget);
+
+      await tester.tap(find.text('ورود / ثبت‌نام'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AuthScreen), findsOneWidget);
+    });
+
+    testWidgets('دیالوگ ثبت‌نام تورنمنت دارای ورودی: انتخابگر روش پرداخت کیف پول/حضوری', (tester) async {
+      final appState = AppState();
+      appState.tournaments = [
+        Tournament.fromJson({
+          'id': 'tx',
+          'title': 'CS2 Champions Cup',
+          'game': 'CS2',
+          'status': 'Active',
+          'registrationFee': 500,
+          'startDate': '2026-10-01',
+          'maxTeams': 8,
+          'registeredTeamsCount': 0,
+        }),
+      ];
+
+      await tester.pumpWidget(_wrap(const TournamentScreen(), appState: appState));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('ثبت‌نام سریع تیم در تورنمنت'));
+      await tester.tap(find.text('ثبت‌نام سریع تیم در تورنمنت'));
+      await tester.pumpAndSettle();
+
+      // دیالوگ با انتخابگر روش پرداخت (چون ورودی ۵۰۰ > 0)
+      expect(find.textContaining('ثبت‌نام در CS2'), findsOneWidget);
+      expect(find.textContaining('روش پرداخت'), findsOneWidget);
+      expect(find.textContaining('کیف پول'), findsWidgets);
+      expect(find.textContaining('پرداخت در محل'), findsOneWidget);
+
+      // انتخاب کیف پول نباید دیالوگ را ببندد
+      await tester.tap(find.textContaining('کیف پول').first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('ثبت‌نام در CS2'), findsOneWidget);
+    });
+
+    testWidgets('منوی زبان هاب هر چهار زبان را نشان می‌دهد', (tester) async {
+      SharedPreferences.setMockInitialValues({'bazino_intro_seen_v1': true});
+
+      await tester.pumpWidget(_wrapApp());
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+
+      await tester.tap(find.byIcon(Icons.language_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('فارسی'), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
+      expect(find.text('Русский'), findsOneWidget);
+      expect(find.text('Türkçe'), findsOneWidget);
     });
   });
 }

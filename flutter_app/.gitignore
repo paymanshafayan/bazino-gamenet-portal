@@ -30,7 +30,11 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+# بیلد وبِ اپ فلاتر به‌صورت عمدی track می‌شود تا CI آن را میزبانی/بازگردانی کند
+# (بازینو: build/web خروجی نهایی وب‌اپ است — bazino.pro/app-web آن را سرو می‌کند)
+/build/*
+!/build/web/
+!/build/web/**
 /coverage/
 
 # Symbolication related

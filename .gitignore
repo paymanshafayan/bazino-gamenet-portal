@@ -1,5 +1,6 @@
 node_modules/
-build/
+# فقط build سطح ریشه ignore است؛ build اپ فلاتر (build/web) عمداً track می‌شود
+/build/
 dist/
 coverage/
 .DS_Store

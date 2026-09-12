@@ -203,7 +203,7 @@ class _OverviewTab extends StatelessWidget {
                   children: [
                     Expanded(child: _statChip(isFa ? 'امتیاز' : 'Points', '${user.loyaltyPoints}', Icons.stars_rounded, GamingTheme.goldAccent)),
                     const SizedBox(width: 8),
-                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.tokens_rounded, GamingTheme.secondary)),
+                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.monetization_on_rounded, GamingTheme.secondary)),
                     const SizedBox(width: 8),
                     Expanded(child: _statChip(isFa ? 'کیف پول' : 'Wallet', '${appState.walletBalance.toStringAsFixed(0)} TL', Icons.account_balance_wallet_rounded, GamingTheme.primary)),
                   ],

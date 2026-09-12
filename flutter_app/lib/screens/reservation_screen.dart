@@ -332,7 +332,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
           title = isFa ? 'کردیت بازینو (BC)' : 'Bazino Credits (BC)';
           subtitle = isFa ? 'موجودی: ${appState.user.credits.toStringAsFixed(0)} BC — نرخ زمانی' : 'Balance: ${appState.user.credits.toStringAsFixed(0)} BC';
           color = GamingTheme.secondary;
-          icon = Icons.tokens_rounded;
+          icon = Icons.monetization_on_rounded;
           enabled = appState.user.credits > 0;
         default:
           title = isFa ? 'پرداخت در محل' : 'Pay on-site';

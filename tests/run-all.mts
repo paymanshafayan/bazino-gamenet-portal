@@ -46,6 +46,7 @@ const LAYERS: Layer[] = [
   { id: 'manus', file: 'manus.test.mts', report: 'manus.json', title: 'منوس/تلگرام — سیاست، HMAC و Gateway mock' },
   { id: 'integrations', file: 'integrations.test.mts', report: 'integrations.json', title: 'یکپارچه‌سازی — پاسخ غیبت اینستاگرام و ایمپورت بلاگ مانوس' },
   { id: 'jarvis', file: 'jarvis.test.mts', report: 'jarvis.json', title: 'جارویس — دستیار ادمین (Groq mock)' },
+  { id: 'appetize', file: 'appetize.test.mts', report: 'appetize.json', title: 'آزمایشگاه اپ — امولاتور وب (Appetize ماک)', needsBuild: true },
   { id: 'api', file: 'api.test.mts', report: 'api.json', title: 'API — سرور واقعی (end-to-end)', needsBuild: true },
 ];
 

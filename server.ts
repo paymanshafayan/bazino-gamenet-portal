@@ -4236,6 +4236,309 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   });
 
+  // =========================================================================
+  // APP LAB — امولاتور وب (Appetize.io): نصب APK و تست زندهٔ آن در مرورگر
+  // =========================================================================
+  // جریان: ادمین یک‌بار توکن API Appetize را (از appetize.io) ذخیره می‌کند؛
+  // سپس APK — یا فایل همین سایت یا فایل دلخواه — با «متد URL» به Appetize
+  // سپرده می‌شود: یعنی خودِ Appetize فایل را مستقیم از همین سایت دانلود
+  // می‌کند و بایت‌ها دوباره از سرور ما آپلود نمی‌شوند. کلید عمومی
+  // (publicKey) برگشتی ذخیره می‌شود و صفحهٔ عمومی /app-download امولاتور
+  // را با iframe embed می‌کند — تجربه‌ای شبیه خود appetize.io روی دامنهٔ خودمان.
+  // توکن هرگز به کلاینت برگردانده نمی‌شود (فقط چهار کاراکتر آخرش).
+  const APPETIZE_TOKEN_SETTING = "appetize_api_token";
+  const APPETIZE_APP_SETTING = "appetize_app";
+  const APPETIZE_API_BASE = (process.env.BAZINO_APPETIZE_API_BASE || "https://api.appetize.io/v1").replace(/\/+$/, "");
+  // فایل‌های APK موقتی که Appetize باید از ما دانلود کند: توکن تصادفی → مسیر+انقضا
+  const APPETIZE_UPLOAD_TTL_MS = 30 * 60 * 1000;
+  const appetizeTempFiles = new Map<string, { path: string; expiresAt: number }>();
+
+  const getAppetizeToken = async (): Promise<string> => {
+    const raw = await getActiveDataProvider().getSetting(APPETIZE_TOKEN_SETTING);
+    const stored = typeof raw === "string" ? raw.trim() : "";
+    return stored || (process.env.BAZINO_APPETIZE_TOKEN || "").trim();
+  };
+
+  const getAppetizeApp = async (): Promise<any> => {
+    try {
+      const raw = await getActiveDataProvider().getSetting(APPETIZE_APP_SETTING);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" && typeof parsed.publicKey === "string" && parsed.publicKey ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getAppetizePublicOrigin = (req: express.Request): string => {
+    const envUrl = (process.env.PUBLIC_URL || process.env.BAZINO_PUBLIC_URL || "").replace(/\/+$/, "");
+    if (envUrl) return envUrl;
+    const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+    const proto = forwardedProto || req.protocol || "https";
+    return `${proto}://${req.get("host") || "localhost"}`;
+  };
+
+  const sweepStaleAppetizeFiles = async () => {
+    const now = Date.now();
+    for (const [token, entry] of appetizeTempFiles) {
+      if (entry.expiresAt <= now) {
+        appetizeTempFiles.delete(token);
+        await fs.promises.rm(entry.path, { force: true }).catch(() => {});
+      }
+    }
+  };
+
+  // فراخوانی API Appetize (هدر X-API-KEY + تایم‌اوت). خطاها کد و وضعیت HTTP
+  // شفاف برمی‌گردانند تا پنل ادمین پیام دقیق سرویس بیرونی را نشان بدهد.
+  const appetizeApi = async (apiPath: string, init: RequestInit = {}, timeoutMs = 5 * 60 * 1000): Promise<any> => {
+    const token = await getAppetizeToken();
+    if (!token) {
+      const err: any = new Error("APPETIZE_NOT_CONFIGURED");
+      err.appCode = "APPETIZE_NOT_CONFIGURED";
+      err.appStatus = 503;
+      throw err;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${APPETIZE_API_BASE}${apiPath}`, {
+        ...init,
+        headers: { "X-API-KEY": token, ...init.headers },
+        signal: controller.signal,
+      });
+      const text = await res.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+      if (!res.ok) {
+        const err: any = new Error((data && (data.message || data.error)) || `Appetize API HTTP ${res.status}`);
+        err.appCode = (data && (data.code || data.error)) || "APPETIZE_API_ERROR";
+        err.appStatus = 502;
+        err.appData = data;
+        throw err;
+      }
+      return data;
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        const err: any = new Error("Appetize API timeout");
+        err.appCode = "APPETIZE_TIMEOUT";
+        err.appStatus = 504;
+        throw err;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const sendAppetizeError = (res: express.Response, req: express.Request, error: any) => {
+    const code = String(error?.appCode || "APPETIZE_ERROR");
+    if (code === "APPETIZE_NOT_CONFIGURED") {
+      return res.status(503).json(apiError(req, "APPETIZE_NOT_CONFIGURED"));
+    }
+    console.error("[App Lab] Appetize request failed:", { code, message: error?.message });
+    return res.status(Number(error?.appStatus) || 500).json({
+      error: error?.message || "Appetize request failed",
+      code,
+      status: Number(error?.appStatus) || 500,
+      details: error?.appData ?? undefined,
+    });
+  };
+
+  const appetizeAppSummary = (app: any) => ({
+    publicKey: String(app.publicKey),
+    platform: app.platform || "android",
+    note: app.note || "",
+    source: app.source || "",
+    updatedAt: app.updatedAt || "",
+    embedUrl: `https://appetize.io/embed/${app.publicKey}`,
+  });
+
+  // هستهٔ مشترکِ «ارسال به امولاتور»: ساخت/به‌روزرسانی اپ با متد URL
+  const pushUrlToAppetize = async (req: express.Request, url: string, forceNew: boolean) => {
+    const existing = forceNew ? null : await getAppetizeApp();
+    const apiPath = existing ? `/apps/${encodeURIComponent(String(existing.publicKey))}` : "/apps";
+    const data = await appetizeApi(apiPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        platform: "android",
+        note: "BAZINO PRO — App Lab",
+        // بدون run:public مرورگر بازدیدکننده اجازهٔ اجرای نشست را نمی‌گرفت
+        appPermissions: { run: "public" },
+      }),
+    });
+    const publicKey = String(data?.publicKey || existing?.publicKey || "").trim();
+    if (!publicKey) {
+      const err: any = new Error("Appetize did not return a publicKey");
+      err.appCode = "APPETIZE_NO_PUBLIC_KEY";
+      err.appStatus = 502;
+      throw err;
+    }
+    const app = {
+      publicKey,
+      platform: "android",
+      note: data?.note || "BAZINO PRO — App Lab",
+      source: url,
+      updatedAt: new Date().toISOString(),
+    };
+    await getActiveDataProvider().setSetting(APPETIZE_APP_SETTING, JSON.stringify(app));
+    return { data, app, updatedExisting: !!existing };
+  };
+
+  // ---- عمومی: اپ فعالِ قابل‌تست در مرورگر (فقط publicKey؛ بدون هیچ راز) ----
+  app.get("/api/appetize/active", async (_req, res) => {
+    try {
+      const app = await getAppetizeApp();
+      res.json({
+        active: !!app,
+        app: app ? appetizeAppSummary(app) : null,
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ---- دانلود موقتیِ APK برای Appetize (توکن تصادفی + انقضای ۳۰ دقیقه) ----
+  app.get("/api/appetize/file/:token", async (req, res) => {
+    const token = String(req.params.token || "");
+    const entry = appetizeTempFiles.get(token);
+    if (!entry || entry.expiresAt <= Date.now() || !fs.existsSync(entry.path)) {
+      appetizeTempFiles.delete(token);
+      return res.status(404).json({ error: "APK link expired or not found", code: "APPETIZE_FILE_NOT_FOUND", status: 404 });
+    }
+    res.download(entry.path, "bazino-app-lab.apk", (err) => {
+      if (err) {
+        console.error("[App Lab] temp file download failed:", { code: (err as any)?.code, message: err.message, path: entry.path });
+        if (!res.headersSent) res.status(500).json({ error: "Download failed" });
+      }
+    });
+  });
+
+  // ---- ادمین: وضعیت آزمایشگاه ----
+  app.get("/api/admin/appetize/status", async (req, res) => {
+    try {
+      const token = await getAppetizeToken();
+      const app = await getAppetizeApp();
+      const cfg = await getMobileAppConfig();
+      res.json({
+        configured: !!token,
+        tokenHint: token ? `••••${token.slice(-4)}` : "",
+        app: app ? appetizeAppSummary(app) : null,
+        apkAvailable: !!cfg.apkAvailable,
+        apkSize: cfg.apkSize || 0,
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ---- ادمین: ذخیره/حذف توکن Appetize ----
+  app.put("/api/admin/appetize/token", async (req, res) => {
+    const token = String((req.body as any)?.token ?? "").trim();
+    if (token.length < 8) return res.status(400).json(apiError(req, "APPETIZE_TOKEN_INVALID"));
+    await getActiveDataProvider().setSetting(APPETIZE_TOKEN_SETTING, token);
+    console.info("[App Lab] Appetize API token saved");
+    res.json({ success: true });
+  });
+
+  app.delete("/api/admin/appetize/token", async (_req, res) => {
+    await getActiveDataProvider().setSetting(APPETIZE_TOKEN_SETTING, "");
+    res.json({ success: true });
+  });
+
+  // ---- ادمین: ارسال APK به امولاتور (فایل سایت یا هر URL عمومی دیگر) ----
+  app.post("/api/admin/appetize/push", async (req, res) => {
+    try {
+      // بدون توکن، هیچ منبعی معنا ندارد — این خطای بنیادی اول برگردد
+      if (!(await getAppetizeToken())) {
+        return res.status(503).json(apiError(req, "APPETIZE_NOT_CONFIGURED"));
+      }
+      const source = String((req.body as any)?.source ?? "site-apk");
+      const forceNew = (req.body as any)?.forceNew === true;
+      let url = "";
+      if (source === "site-apk") {
+        const cfg = await getMobileAppConfig();
+        if (!cfg.apkAvailable) return res.status(400).json(apiError(req, "APK_NOT_UPLOADED"));
+        url = `${getAppetizePublicOrigin(req)}/api/mobile-app/download`;
+      } else if (source === "url") {
+        url = String((req.body as any)?.url ?? "").trim();
+        if (!/^https?:\/\//i.test(url)) return res.status(400).json(apiError(req, "APPETIZE_URL_INVALID"));
+      } else {
+        return res.status(400).json(apiError(req, "APPETIZE_SOURCE_INVALID"));
+      }
+      const { data, app, updatedExisting } = await pushUrlToAppetize(req, url, forceNew);
+      console.info("[App Lab] APK pushed to Appetize", { publicKey: app.publicKey, updatedExisting, source });
+      res.json({ success: true, app: appetizeAppSummary(app), updatedExisting, appetize: data ?? null });
+    } catch (e: any) {
+      sendAppetizeError(res, req, e);
+    }
+  });
+
+  // ---- ادمین: آپلود APK دلخواه و ارسال مستقیم همان به امولاتور ----
+  // فایل با formidable روی دیسک موقت می‌نشیند (بدون بافر حافظه)؛ سپس با متد
+  // URL از مسیر موقتِ عمومی به Appetize سپرده می‌شود. بعد از موفقیت، فایل تا
+  // پایان TTL (۳۰ دقیقه) می‌ماند تا اگر Appetize دوباره آن را fetch کرد شکست
+  // نخورد؛ پاک‌سازی نهایی را sweeper انجام می‌دهد. فقط مسیر خطا فوراً پاک می‌شود.
+  app.post("/api/admin/appetize/upload", async (req, res) => {
+    let fileToken: string | null = null;
+    let filePath: string | null = null;
+    let keepFile = false;
+    try {
+      if (!isMultipartApkUpload(req)) {
+        return res.status(400).json({ error: "Expected a multipart/form-data upload", code: "INVALID_APPETIZE_FORM", status: 400 });
+      }
+      await sweepStaleAppetizeFiles();
+      await fs.promises.mkdir(getMobileAppDownloadDir(), { recursive: true });
+      const form = formidable({
+        uploadDir: getMobileAppDownloadDir(),
+        filename: () => `appetize-tmp-${randomUUID()}.apk`,
+        maxFiles: 1,
+        maxFileSize: MAX_APK_BYTES,
+        maxTotalFileSize: MAX_APK_BYTES,
+        minFileSize: 1,
+        allowEmptyFiles: false,
+        multiples: false,
+      });
+      const [, files] = await form.parse(req);
+      const uploaded = (files.file || [])[0];
+      if (!uploaded) return res.status(400).json(apiError(req, "APPETIZE_APK_REQUIRED"));
+      const originalName = String(uploaded.originalFilename || "").trim();
+      if (!originalName.toLowerCase().endsWith(".apk")) {
+        return res.status(400).json({ error: "Only .apk files are allowed", code: "INVALID_APPETIZE_FILE", status: 400 });
+      }
+      filePath = uploaded.filepath;
+      fileToken = randomUUID();
+      appetizeTempFiles.set(fileToken, { path: filePath, expiresAt: Date.now() + APPETIZE_UPLOAD_TTL_MS });
+      const publicUrl = `${getAppetizePublicOrigin(req)}/api/appetize/file/${fileToken}`;
+      const { data, app, updatedExisting } = await pushUrlToAppetize(req, publicUrl, req.query.forceNew === "1" || req.query.forceNew === "true");
+      keepFile = true;
+      console.info("[App Lab] Custom APK uploaded to Appetize", { publicKey: app.publicKey, updatedExisting, originalName, size: uploaded.size });
+      res.json({ success: true, app: appetizeAppSummary(app), updatedExisting, appetize: data ?? null });
+    } catch (e: any) {
+      sendAppetizeError(res, req, e);
+    } finally {
+      if (filePath && !keepFile) {
+        if (fileToken) appetizeTempFiles.delete(fileToken);
+        await fs.promises.rm(filePath, { force: true }).catch(() => {});
+      }
+    }
+  });
+
+  // ---- ادمین: حذف اپ از امولاتور ----
+  app.delete("/api/admin/appetize/app", async (req, res) => {
+    try {
+      const app = await getAppetizeApp();
+      if (app) {
+        await appetizeApi(`/apps/${encodeURIComponent(String(app.publicKey))}`, { method: "DELETE" }, 60_000);
+        console.info("[App Lab] Appetize app deleted", { publicKey: app.publicKey });
+      }
+      await getActiveDataProvider().setSetting(APPETIZE_APP_SETTING, "");
+      res.json({ success: true });
+    } catch (e: any) {
+      sendAppetizeError(res, req, e);
+    }
+  });
+
   const isMultipartApkUpload = (req: express.Request) =>
     /^multipart\/form-data(?:\s*;|$)/i.test(String(req.headers["content-type"] || ""));
 

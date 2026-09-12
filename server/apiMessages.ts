@@ -86,6 +86,11 @@ export const M = {
   TICKET_NOT_FOUND: { fa: 'تیکت پیدا نشد.', en: 'Ticket not found.', ru: 'Тикет не найден.', tr: 'Destek talebi bulunamadı.' },
   TICKET_CLOSED: { fa: 'این تیکت بسته شده است.', en: 'This ticket is closed.', ru: 'Этот тикет закрыт.', tr: 'Bu destek talebi kapatılmış.' },
   MESSAGE_REQUIRED: { fa: 'متن پیام خالی است.', en: 'Message text is empty.', ru: 'Текст сообщения пуст.', tr: 'Mesaj metni boş.' },
+  APPETIZE_NOT_CONFIGURED: { fa: 'توکن API اپتایز (Appetize) هنوز ثبت نشده است. آن را از appetize.io بگیرید و در همین بخش ذخیره کنید.', en: 'The Appetize API token has not been saved yet. Get one from appetize.io and save it here first.', ru: 'API-токен Appetize ещё не сохранён. Получите его на appetize.io и сохраните здесь.', tr: 'Appetize API anahtarı henüz kaydedilmedi. appetize.io\'dan alın ve buraya kaydedin.' },
+  APPETIZE_TOKEN_INVALID: { fa: 'توکن Appetize معتبر نیست (حداقل ۸ کاراکتر).', en: 'Invalid Appetize token (at least 8 characters).', ru: 'Недействительный токен Appetize (минимум 8 символов).', tr: 'Geçersiz Appetize anahtarı (en az 8 karakter).' },
+  APPETIZE_URL_INVALID: { fa: 'آدرس APK معتبر نیست (باید با http/https شروع شود).', en: 'Invalid APK URL (must start with http/https).', ru: 'Неверный URL APK (должен начинаться с http/https).', tr: 'Geçersiz APK adresi (http/https ile başlamalı).' },
+  APPETIZE_SOURCE_INVALID: { fa: 'منبع ارسال نامعتبر است.', en: 'Invalid push source.', ru: 'Недопустимый источник публикации.', tr: 'Geçersiz gönderim kaynağı.' },
+  APPETIZE_APK_REQUIRED: { fa: 'فایل APK ارسال نشده است.', en: 'No APK file was uploaded.', ru: 'APK-файл не загружен.', tr: 'APK dosyası gönderilmedi.' },
 } satisfies Record<string, Msg>;
 
 export type ApiMessageKey = keyof typeof M;

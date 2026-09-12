@@ -250,27 +250,31 @@ class _HubScreenState extends State<HubScreen> {
             ),
         ],
         child: Container(
-          margin: const EdgeInsets.all(8),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          margin: const EdgeInsets.all(4),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           decoration: BoxDecoration(
             color: GamingTheme.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: GamingTheme.primary.withValues(alpha: 0.3)),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.language_rounded, color: GamingTheme.primary, size: 13),
-              const SizedBox(width: 3),
-              Text(
-                appState.language.toUpperCase(),
-                style: const TextStyle(
-                  color: GamingTheme.primary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+          child: FittedBox(
+            // FittedBox تضمین می‌کند برچسب زبان در عرض محدودِ AppBar.leading
+            // هرگز RenderFlex overflow ندهد (باهم‌فشردگی به‌جای کرش در تست/نما).
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.language_rounded, color: GamingTheme.primary, size: 13),
+                const SizedBox(width: 3),
+                Text(
+                  appState.language.toUpperCase(),
+                  style: const TextStyle(
+                    color: GamingTheme.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

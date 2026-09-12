@@ -335,7 +335,7 @@ class _OverviewTab extends StatelessWidget {
                                       style: const TextStyle(fontSize: 11, color: Colors.white70),
                                     ),
                                     Text(
-                                      '${tx.createdAt.isNotEmpty ? tx.createdAt.substring(0, tx.createdAt.length > 16 ? 16 : tx.createdAt.length) : ''}',
+                                      tx.createdAt.isNotEmpty && tx.createdAt.length > 16 ? tx.createdAt.substring(0, 16) : tx.createdAt,
                                       style: const TextStyle(fontSize: 8.5, color: Colors.white30),
                                     ),
                                   ],
@@ -1211,7 +1211,7 @@ class _TicketDetailScreenState extends State<_TicketDetailScreen> {
                             child: Container(
                               width: 44,
                               height: 44,
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: GamingTheme.ctaGradient,
                               ),

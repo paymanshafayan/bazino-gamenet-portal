@@ -5787,6 +5787,29 @@ Example format:
   // کش: بدون maxAge ولی با etag — نام فایل‌های خروجی فلاتر پایدار است
   // (main.dart.js و …) پس کش تهاجمی باعث کهنگی می‌شد؛ 304-revalidate کافی است.
   const flutterWebDist = path.join(staticRoot, "flutter_app", "build", "web");
+  // دیباگ/شفافیت: وضعیت دقیق بیلد وبِ فلاتر روی این دیپلوی (کدام فایل‌ها هستند)
+  app.get("/api/app-web/status", (_req, res) => {
+    try {
+      const exists = (f: string) => fs.existsSync(path.join(flutterWebDist, f));
+      const size = (f: string) => {
+        try { return fs.statSync(path.join(flutterWebDist, f)).size; } catch { return 0; }
+      };
+      const files = fs.existsSync(flutterWebDist) ? fs.readdirSync(flutterWebDist) : [];
+      res.json({
+        dirExists: fs.existsSync(flutterWebDist),
+        served: exists("index.html"),
+        files,
+        indexHtml: exists("index.html"),
+        mainDartJs: exists("main.dart.js"),
+        mainDartJsSize: size("main.dart.js"),
+        flutterJs: exists("flutter.js"),
+        bootstrap: exists("flutter_bootstrap.js"),
+        canvaskit: exists("canvaskit/canvaskit.js"),
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
   // گارد روی index.html نه فقط دایرکتوری — بیلد ناتمامِ فلاتر (main.dart.js بدون
   // index.html) هرگز نباید مسیر را با 500 فعال کند (درس دیپلوی اول).
   if (fs.existsSync(path.join(flutterWebDist, "index.html"))) {

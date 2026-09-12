@@ -5798,7 +5798,13 @@ Example format:
         try { return fs.statSync(path.join(flutterWebDist, f)).size; } catch { return 0; }
       };
       const files = fs.existsSync(flutterWebDist) ? fs.readdirSync(flutterWebDist) : [];
+      // کدام کامیت در حال سرو است؟ (dist/build-meta.json — در زمان build نوشته می‌شود)
+      let buildMeta: unknown = null;
+      try {
+        buildMeta = JSON.parse(fs.readFileSync(path.join(process.cwd(), "dist", "build-meta.json"), "utf8"));
+      } catch { /* لوکال/تست — مهم نیست */ }
       res.json({
+        buildMeta,
         dirExists: fs.existsSync(flutterWebDist),
         served: exists("index.html"),
         files,

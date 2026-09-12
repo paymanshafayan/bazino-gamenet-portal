@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `963045296a33bff69fd8a933b0f5852a3cc9fcf8`
+- commit: `320ff1333ed7cea93425c27b2a51f117f7b9b6c4`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34697820049
-- date:   2026-09-12 13:56 UTC
+- run:    34697949660
+- date:   2026-09-12 13:59 UTC
 
 ## flutter --version
 ```
@@ -128,51 +128,18 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-
-   info • Unnecessary use of string interpolation. Try replacing the string literal with the variable name • lib/screens/account_screen.dart:338:39 • unnecessary_string_interpolations
-   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/screens/account_screen.dart:1214:43 • prefer_const_constructors
-
-2 issues found. (ran in 9.0s)
+No issues found! (ran in 7.4s)
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter test
 ```
-A RenderFlex overflowed by 19 pixels on the right.
 
-The relevant error-causing widget was:
-  Row
-  Row:file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/lib/screens/hub_screen.dart:260:18
-
-The overflowing RenderFlex has an orientation of Axis.horizontal.
-The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
-black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
-Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
-RenderFlex to fit within the available space instead of being sized to their natural size.
-This is considered an error condition because it indicates that there is content that cannot be
-seen. If the content is legitimately bigger than the available space, consider clipping it with a
-ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
-like a ListView.
-The specific RenderFlex in question is: RenderFlex#76f3b OVERFLOWING:
-  creator: Row ← Padding ← DecoratedBox ← Padding ← Container ← Listener ← RawGestureDetector ←
-    GestureDetector ← Semantics ← DefaultSelectionStyle ← Builder ← MouseRegion ← ⋯
-  parentData: offset=Offset(11.0, 7.0) (can use size)
-  constraints: BoxConstraints(w=18.0, h=26.0)
-  size: Size(18.0, 26.0)
-  direction: horizontal
-  mainAxisAlignment: start
-  mainAxisSize: min
-  crossAxisAlignment: center
-  textDirection: ltr
-  verticalDirection: down
-  spacing: 0.0
-◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
-════════════════════════════════════════════════════════════════════════════════════════════════════
-Test failed. See exception logs above.
-The test description was: کاربری که intro را دیده، دیگر آن را نمی‌بیند
-
-::endgroup::
 ::group::✅ Passing tests
+✅ BazinoApp — رندر بدون استثنا بالا می‌آید و MaterialApp با عنوان درست می‌دهد
+✅ BazinoApp — رندر اولین فریم قبل از خواندن SharedPreferences، لودر نشان می‌دهد
+✅ BazinoApp — رندر کاربر تازه صفحه‌ی intro را می‌بیند
+✅ BazinoApp — رندر کاربری که intro را دیده، دیگر آن را نمی‌بیند
 ✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
 ::endgroup::
 ::group::❌ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me (failed)
@@ -189,82 +156,8 @@ test/widget_test.dart 104:27           main.<fn>.<fn>
 ✅ parse کردن پاسخ سرور GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
 ✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
 ✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
-::endgroup::
-::group::❌ هاب خانه — قالب کنسول سایت ارب مرکزی جارویس و پنج دکمهٔ مداری بخش‌ها رندر می‌شوند (failed)
-══╡ EXCEPTION CAUGHT BY RENDERING LIBRARY ╞═════════════════════════════════════════════════════════
-The following assertion was thrown during layout:
-A RenderFlex overflowed by 19 pixels on the right.
-
-The relevant error-causing widget was:
-  Row
-  Row:file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/lib/screens/hub_screen.dart:260:18
-
-The overflowing RenderFlex has an orientation of Axis.horizontal.
-The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
-black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
-Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
-RenderFlex to fit within the available space instead of being sized to their natural size.
-This is considered an error condition because it indicates that there is content that cannot be
-seen. If the content is legitimately bigger than the available space, consider clipping it with a
-ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
-like a ListView.
-The specific RenderFlex in question is: RenderFlex#04c42 OVERFLOWING:
-  creator: Row ← Padding ← DecoratedBox ← Padding ← Container ← Listener ← RawGestureDetector ←
-    GestureDetector ← Semantics ← DefaultSelectionStyle ← Builder ← MouseRegion ← ⋯
-  parentData: offset=Offset(11.0, 7.0) (can use size)
-  constraints: BoxConstraints(w=18.0, h=26.0)
-  size: Size(18.0, 26.0)
-  direction: horizontal
-  mainAxisAlignment: start
-  mainAxisSize: min
-  crossAxisAlignment: center
-  textDirection: ltr
-  verticalDirection: down
-  spacing: 0.0
-◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
-════════════════════════════════════════════════════════════════════════════════════════════════════
-Test failed. See exception logs above.
-The test description was: ارب مرکزی جارویس و پنج دکمهٔ مداری بخش‌ها رندر می‌شوند
-
-::endgroup::
-::group::❌ هاب خانه — قالب کنسول سایت تب پروفایل نوار پایین مرکز حساب کاربری را باز می‌کند نه مسابقات (failed)
-══╡ EXCEPTION CAUGHT BY RENDERING LIBRARY ╞═════════════════════════════════════════════════════════
-The following assertion was thrown during layout:
-A RenderFlex overflowed by 19 pixels on the right.
-
-The relevant error-causing widget was:
-  Row
-  Row:file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/lib/screens/hub_screen.dart:260:18
-
-The overflowing RenderFlex has an orientation of Axis.horizontal.
-The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
-black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
-Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
-RenderFlex to fit within the available space instead of being sized to their natural size.
-This is considered an error condition because it indicates that there is content that cannot be
-seen. If the content is legitimately bigger than the available space, consider clipping it with a
-ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
-like a ListView.
-The specific RenderFlex in question is: RenderFlex#04759 OVERFLOWING:
-  creator: Row ← Padding ← DecoratedBox ← Padding ← Container ← Listener ← RawGestureDetector ←
-    GestureDetector ← Semantics ← DefaultSelectionStyle ← Builder ← MouseRegion ← ⋯
-  parentData: offset=Offset(11.0, 7.0) (can use size)
-  constraints: BoxConstraints(w=18.0, h=26.0)
-  size: Size(18.0, 26.0)
-  direction: horizontal
-  mainAxisAlignment: start
-  mainAxisSize: min
-  crossAxisAlignment: center
-  textDirection: ltr
-  verticalDirection: down
-  spacing: 0.0
-◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
-════════════════════════════════════════════════════════════════════════════════════════════════════
-Test failed. See exception logs above.
-The test description was: تب پروفایل نوار پایین مرکز حساب کاربری را باز می‌کند نه مسابقات
-
-::endgroup::
-::group::✅ Passing tests
+✅ هاب خانه — قالب کنسول سایت ارب مرکزی جارویس و پنج دکمهٔ مداری بخش‌ها رندر می‌شوند
+✅ هاب خانه — قالب کنسول سایت تب پروفایل نوار پایین مرکز حساب کاربری را باز می‌کند نه مسابقات
 ✅ جارویس — رابط گفتگومحور پیام خوش‌آمد، نوار ورودی و پیشنهادهای شروع نمایش داده می‌شوند
 ✅ جارویس — رابط گفتگومحور پس از رشد گفتگو، پیشنهادهای شروع پنهان می‌شوند
 ✅ جارویس — رابط گفتگومحور نشانگر «در حال تایپ» سه نقطهٔ متحرک دارد
@@ -287,7 +180,7 @@ test/widget_test.dart 320:27           main.<fn>.<fn>
 ✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور TicketMessage.fromJson — پیام پشتیبانی
 ::endgroup::
 
-::error::19 tests passed, 7 failed.
+::error::23 tests passed, 3 failed.
 ```
 **exit 1 — FAILED**
 
@@ -306,7 +199,7 @@ Consider addressing these issues to enable wasm builds. See docs for more info: 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 19428 bytes (98.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             44.5s
+Compiling lib/main.dart for the Web...                             35.4s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -315,7 +208,7 @@ Compiling lib/main.dart for the Web...                             44.5s
 ```
 flutter --version=0
 flutter pub get=0
-flutter analyze=1
+flutter analyze=0
 flutter test=1
 flutter build web=0
 ```

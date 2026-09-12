@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import '../models.dart';
-import 'loyalty_screen.dart';
+import 'account_screen.dart';
 import 'reservation_screen.dart';
 import 'cafe_screen.dart';
 import 'shop_screen.dart';
@@ -28,16 +28,50 @@ class _HubScreenState extends State<HubScreen> {
   Timer? _sliderTimer;
   int _sliderCurrentPage = 0;
 
+  // ---- اعلان‌های زندهٔ درون‌برنامه‌ای (فاز ۳) ----
+  int _lastSeenNotifVersion = 0;
+  AppState? _observedAppState;
+
+  void _onAppStateChanged() {
+    final appState = _observedAppState;
+    if (appState == null || !mounted) return;
+    if (appState.inAppNotifVersion > _lastSeenNotifVersion) {
+      _lastSeenNotifVersion = appState.inAppNotifVersion;
+      final latest = appState.unseenInAppNotifications.isNotEmpty ? appState.unseenInAppNotifications.first : '';
+      if (latest.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(latest, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            backgroundColor: GamingTheme.darkCardSolid.withValues(alpha: 0.95),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      appState.markInAppNotificationsSeen();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
     _startSliderTimer();
-    
+
     // Fetch sliders on load
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AppState>(context, listen: false).fetchSliders();
+      final appState = Provider.of<AppState>(context, listen: false);
+      appState.fetchSliders();
+      _observedAppState = appState;
+      _lastSeenNotifVersion = appState.inAppNotifVersion;
+      appState.addListener(_onAppStateChanged);
     });
+  }
+
+  @override
+  void deactivate() {
+    _observedAppState?.removeListener(_onAppStateChanged);
+    super.deactivate();
   }
 
   void _startSliderTimer() {
@@ -101,14 +135,14 @@ class _HubScreenState extends State<HubScreen> {
     // Index 2: Cafe
     // Index 3: Shop
     // Index 4: Tournament/Arena
-    // Index 5: Loyalty/Profile; 6-8 are voice-opened utility sections.
+    // Index 5: Account (profile/wallet/orders/tickets + Loyalty); 6-8 utility.
     final List<Widget> screens = [
       _buildHomeHub(appState),
       const ReservationScreen(),
       const CafeScreen(),
       const ShopScreen(),
       const TournamentScreen(),
-      const LoyaltyScreen(),
+      const AccountScreen(),
       const MessagesScreen(),
       const ChatScreen(),
       const BlogScreen(),
@@ -183,27 +217,60 @@ class _HubScreenState extends State<HubScreen> {
           ),
         ],
       ),
-      leading: Container(
-        margin: const EdgeInsets.all(8),
-        child: TextButton(
-          onPressed: () {
-            appState.setLanguage(appState.language == 'fa' ? 'en' : 'fa');
-          },
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            backgroundColor: GamingTheme.primary.withValues(alpha: 0.1),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: GamingTheme.primary.withValues(alpha: 0.3)),
+      // منوی زبان چهارگانه (فاز ۵.۲ — سایت ۴ زبان دارد؛ جارویس و TTS هم ru/tr را پشتیبانی می‌کنند)
+      leading: PopupMenuButton<String>(
+        tooltip: isFa ? 'زبان' : 'Language',
+        position: PopupMenuPosition.under,
+        color: GamingTheme.darkCardSolid,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: GamingTheme.primary.withValues(alpha: 0.3)),
+        ),
+        onSelected: (lang) => appState.setLanguage(lang),
+        itemBuilder: (_) => [
+          for (final l in [
+            ('fa', 'فارسی'),
+            ('en', 'English'),
+            ('ru', 'Русский'),
+            ('tr', 'Türkçe'),
+          ])
+            PopupMenuItem<String>(
+              value: l.$1,
+              child: Row(
+                children: [
+                  Icon(
+                    appState.language == l.$1 ? Icons.check_circle : Icons.circle_outlined,
+                    color: appState.language == l.$1 ? GamingTheme.primary : Colors.white24,
+                    size: 15,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(l.$2, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
+        ],
+        child: Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: GamingTheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: GamingTheme.primary.withValues(alpha: 0.3)),
           ),
-          child: Text(
-            appState.language == 'fa' ? 'EN' : 'FA',
-            style: const TextStyle(
-              color: GamingTheme.primary,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.language_rounded, color: GamingTheme.primary, size: 13),
+              const SizedBox(width: 3),
+              Text(
+                appState.language.toUpperCase(),
+                style: const TextStyle(
+                  color: GamingTheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
       ),

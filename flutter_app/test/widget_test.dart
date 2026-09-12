@@ -16,10 +16,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:bazino_app/main.dart';
 import 'package:bazino_app/models.dart';
+import 'package:bazino_app/screens/account_screen.dart';
 import 'package:bazino_app/screens/hub_screen.dart';
 import 'package:bazino_app/screens/intro_screen.dart';
 import 'package:bazino_app/screens/jarvis_assistant.dart';
-import 'package:bazino_app/screens/loyalty_screen.dart';
 import 'package:bazino_app/screens/tournament_screen.dart';
 import 'package:bazino_app/theme.dart';
 
@@ -173,7 +173,7 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
 
-    testWidgets('تب پروفایل نوار پایین صفحهٔ باشگاه/پروفایل را باز می‌کند نه مسابقات', (tester) async {
+    testWidgets('تب پروفایل نوار پایین مرکز حساب کاربری را باز می‌کند نه مسابقات', (tester) async {
       SharedPreferences.setMockInitialValues({'bazino_intro_seen_v1': true});
 
       await tester.pumpWidget(_wrapApp());
@@ -183,9 +183,11 @@ void main() {
       await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle(const Duration(seconds: 2));
 
-      // باگ قبلی: این تب اشتباهاً صفحهٔ تورنمنت (اندیس ۴) را باز می‌کرد
-      expect(find.byType(LoyaltyScreen), findsOneWidget);
+      // باگ قبلی: این تب اشتباهاً صفحهٔ تورنمنت (اندیس ۴) را باز می‌شد
+      expect(find.byType(AccountScreen), findsOneWidget);
       expect(find.byType(TournamentScreen), findsNothing);
+      // کاربر مهمان → دعوت به ورود، نه کرش
+      expect(find.textContaining('ورود / ثبت‌نام'), findsOneWidget);
     });
   });
 
@@ -281,6 +283,159 @@ void main() {
 
       expect(find.textContaining('سفارش کافه ثبت شد'), findsOneWidget);
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    });
+  });
+
+  // ============================================================
+  // فاز ۱ و ۲ — اقتصاد جدید و حساب کاربری (قرارداد API سرور)
+  // ============================================================
+  group('حساب کاربری و پرداخت — parse کردن پاسخ سرور', () {
+    test('UserState.fromJson — فیلدهای کامل publicUser سرور', () {
+      final u = UserState.fromJson({
+        'username': 'gamer1',
+        'email': 'g@bazino.test',
+        'phone': '+905390000001',
+        'loyaltyPoints': 90,
+        'role': 'gamer',
+        'credits': 250.5,
+        'displayName': 'گیمر تست',
+        'avatarUrl': '/uploads/avatars/a.webp',
+        'phoneVerified': true,
+        'hasPassword': false,
+        'createdAt': '2026-09-12T10:00:00.000Z',
+      });
+
+      expect(u.credits, 250.5);
+      expect(u.displayName, 'گیمر تست');
+      expect(u.avatarUrl, '/uploads/avatars/a.webp');
+      expect(u.phoneVerified, isTrue);
+      expect(u.hasPassword, isFalse);
+      expect(u.createdAt, startsWith('2026-09-12'));
+      // رفتار قدگی حفظ شود
+      expect(u.username, 'gamer1');
+      expect(u.loyaltyPoints, 90);
+    });
+
+    test('UserState.fromJson — پاسخ قدیمی سرور بدون فیلدهای جدید نباید کرش کند', () {
+      final u = UserState.fromJson({'username': 'x', 'loyaltyPoints': 5});
+      expect(u.credits, 0);
+      expect(u.phoneVerified, isFalse);
+      expect(u.hasPassword, isTrue); // پیش‌فرض: کاربر رمز دارد
+    });
+
+    test('UserState.toJson ↔ fromJson — رفت‌وبرگشت (لازم برای آپلود آواتار)', () {
+      final u = UserState.fromJson({
+        'username': 'gamer1',
+        'loyaltyPoints': 1,
+        'avatarUrl': '/a.webp',
+        'credits': 9,
+      });
+      final copy = UserState.fromJson(u.toJson());
+      expect(copy.username, 'gamer1');
+      expect(copy.avatarUrl, '/a.webp');
+      expect(copy.credits, 9);
+    });
+
+    test('WalletTx.fromJson — تراکنش کیف پول', () {
+      final tx = WalletTx.fromJson({
+        'id': 'TX-1',
+        'amount': -150,
+        'type': 'purchase',
+        'note': 'Rezervasyon',
+        'balanceAfter': 1850,
+        'createdAt': '2026-09-12T12:00:00.000Z',
+      });
+      expect(tx.amount, -150);
+      expect(tx.isTopup, isFalse);
+      expect(tx.balanceAfter, 1850);
+    });
+
+    test('OnsiteOrder.fromJson — سفارش حضوری با مهلت', () {
+      final o = OnsiteOrder.fromJson({
+        'id': 'OS-1',
+        'kind': 'reservation',
+        'amount': 300,
+        'status': 'pending_onsite',
+        'dueAt': '2026-09-12T20:20:00.000Z',
+        'description': 'Rezervasyon: VIP 22:00-23:00',
+        'createdAt': '2026-09-12T12:00:00.000Z',
+      });
+      expect(o.isPending, isTrue);
+      expect(o.kind, 'reservation');
+      expect(o.dueAt, isNotNull);
+    });
+
+    test('PaymentMethods.fromJson — قرارداد /api/payments/methods', () {
+      final m = PaymentMethods.fromJson({
+        'online': false,
+        'currency': 'TL',
+        'methods': {
+          'reservation': ['wallet', 'credits', 'onsite'],
+          'cafe': ['onsite'],
+        },
+        'onsiteLeadMinutes': {'reservation': 10, 'tournament': 2880},
+      });
+      expect(m.online, isFalse);
+      expect(m.currency, 'TL');
+      expect(m.methods['reservation'], containsAll(['wallet', 'credits', 'onsite']));
+      expect(m.methods['cafe'], ['onsite']);
+      expect(m.reservationLeadMinutes, 10);
+    });
+
+    test('MyReservationLog.fromJson — رزروهای من', () {
+      final r = MyReservationLog.fromJson({
+        'id': 'RES-1',
+        'systemName': 'سیستم شماره ۱ (VIP PC)',
+        'startTime': '22:00',
+        'endTime': '23:00',
+        'totalPrice': 150,
+        'date': 'امروز',
+        'checkedIn': false,
+      });
+      expect(r.systemName, contains('VIP'));
+      expect(r.totalPrice, 150);
+      expect(r.checkedIn, isFalse);
+    });
+
+    test('MyOrder.fromJson + itemsSummary — خلاصهٔ اقلام سفارش', () {
+      final o = MyOrder.fromJson({
+        'id': 'CF-1',
+        'finalAmount': 500,
+        'status': 'Pending',
+        'date': 'امروز',
+        'items': [
+          {'item': {'id': 'c1', 'name': 'پیتزا'}, 'quantity': 2},
+        ],
+      }, kind: 'cafe');
+      expect(o.kind, 'cafe');
+      expect(o.finalAmount, 500);
+      expect(o.itemsSummary, 'پیتزا ×2');
+    });
+
+    test('SupportTicket.fromJson — تیکت با پاسخ جدید', () {
+      final t = SupportTicket.fromJson({
+        'id': 'TK-1',
+        'subject': 'تست',
+        'category': 'general',
+        'priority': 'high',
+        'status': 'answered',
+        'createdAt': '2026-09-12T10:00:00.000Z',
+        'updatedAt': '2026-09-12T11:00:00.000Z',
+        'hasNewReply': true,
+      });
+      expect(t.hasNewReply, isTrue);
+      expect(t.status, 'answered');
+      expect(t.priority, 'high');
+    });
+
+    test('TicketMessage.fromJson — پیام پشتیبانی', () {
+      final m = TicketMessage.fromJson({
+        'id': 'm1',
+        'isStaff': 1,
+        'body': 'سلام، بررسی شد.',
+        'createdAt': '2026-09-12T11:00:00.000Z',
+      });
+      expect(m.isStaff, isTrue);
     });
   });
 }

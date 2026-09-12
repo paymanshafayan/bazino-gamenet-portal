@@ -14,17 +14,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
   GameSystem? _selectedSystem;
   double _hours = 2;
   final TextEditingController _promoController = TextEditingController();
-  bool _isPromoApplied = false;
-  double _discountPercent = 0;
+  String? _payMethod; // wallet | credits | onsite
+  bool _isPaying = false;
 
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
     final isFa = appState.language == 'fa';
 
-    num totalRate = _selectedSystem != null ? _selectedSystem!.hourlyRate * _hours.toInt() : 0;
-    int finalPrice = (totalRate * (1 - _discountPercent / 100)).toInt();
-    int loyaltyPtsToEarn = (finalPrice / 10000).round();
+    final estimateTotal = _selectedSystem != null ? _selectedSystem!.hourlyRate * _hours.toInt() : 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -158,10 +156,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Reservation Checkout panel
+          // Reservation Checkout panel — اقتصاد جدید سرور (بیعانه/کیف پول/کردیت/حضوری)
           if (_selectedSystem != null) ...[
             Text(
-              isFa ? '📑 فاکتور و تایید نهایی رزرو' : '📑 Billing & Checkout invoice',
+              isFa ? '📑 فاکتور و انتخاب روش پرداخت' : '📑 Invoice & Payment Method',
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 12),
@@ -169,183 +167,313 @@ class _ReservationScreenState extends State<ReservationScreen> {
               glow: GamingTheme.secondary,
               padding: const EdgeInsets.all(16),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isFa ? 'سیستم انتخاب شده:' : 'Selected Hardware:',
-                          style: const TextStyle(fontSize: 11, color: GamingTheme.textMuted),
-                        ),
-                        Text(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isFa ? 'سیستم انتخاب شده:' : 'Selected Hardware:',
+                        style: const TextStyle(fontSize: 11, color: GamingTheme.textMuted),
+                      ),
+                      Flexible(
+                        child: Text(
                           _selectedSystem!.name,
+                          textAlign: TextAlign.end,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
-                      ],
-                    ),
-                    const Divider(color: Color(0xFF22242D), height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isFa ? 'مدت زمان رزرو:' : 'Duration (Hours):',
-                          style: const TextStyle(fontSize: 11, color: GamingTheme.textMuted),
-                        ),
-                        Text(
-                          '${_hours.toInt()} ${isFa ? 'ساعت' : 'Hours'}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GamingTheme.primary),
-                        ),
-                      ],
-                    ),
-                    Slider(
-                      value: _hours,
-                      min: 1,
-                      max: 8,
-                      divisions: 7,
-                      activeColor: GamingTheme.primary,
-                      onChanged: (val) {
-                        setState(() {
-                          _hours = val;
-                        });
-                      },
-                    ),
-                    const Divider(color: Color(0xFF22242D), height: 16),
-
-                    // Promo Code Input
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _promoController,
-                            decoration: InputDecoration(
-                              hintText: isFa ? 'کد تخفیف (مثال: GAMER2026)' : 'Coupon Code',
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          height: 44,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: GamingTheme.ctaGradient,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  if (_promoController.text.toUpperCase() == 'GAMER2026') {
-                                    setState(() {
-                                      _isPromoApplied = true;
-                                      _discountPercent = 15;
-                                    });
-                                  }
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                                  child: Center(
-                                    child: Text(
-                                      isFa ? 'اعمال' : 'Apply',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_isPromoApplied) ...[
-                      const SizedBox(height: 8),
-                      const Text(
-                        '✓ Code Applied! 15% discount has been applied.',
-                        style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ],
+                  ),
+                  const Divider(color: Color(0xFF22242D), height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isFa ? 'مدت زمان رزرو:' : 'Duration (Hours):',
+                        style: const TextStyle(fontSize: 11, color: GamingTheme.textMuted),
+                      ),
+                      Text(
+                        '${_hours.toInt()} ${isFa ? 'ساعت' : 'Hours'}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GamingTheme.primary),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: _hours,
+                    min: 1,
+                    max: 8,
+                    divisions: 7,
+                    activeColor: GamingTheme.primary,
+                    onChanged: (val) {
+                      setState(() {
+                        _hours = val;
+                      });
+                    },
+                  ),
+                  const Divider(color: Color(0xFF22242D), height: 16),
 
-                    const Divider(color: Color(0xFF22242D), height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isFa ? 'مبلغ کل فاکتور:' : 'Total invoice:',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                  // کد تخفیف واقعی — سمت سرور اعتبارسنجی و اعمال می‌شود (کد جعلی سمت کلاینت حذف شد)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _promoController,
+                          decoration: InputDecoration(
+                            hintText: isFa ? 'کد تخفیف (اگر دارید)' : 'Coupon code (optional)',
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
                         ),
-                        Text(
-                          '${finalPrice.toLocaleString()} ${isFa ? 'تومان' : 'Tomans'}',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GamingTheme.primary),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isFa ? 'امتیاز وفاداری دریافتی:' : 'Loyalty points to gain:',
-                          style: const TextStyle(fontSize: 11, color: GamingTheme.textMuted),
-                        ),
-                        Text(
-                          '+$loyaltyPtsToEarn ${isFa ? 'امتیاز' : 'Points'}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isFa ? 'مبلغ نهایی و تخفیف دقیق هنگام تأیید توسط سرور محاسبه می‌شود.' : 'Final amount & discount are validated server-side at checkout.',
+                    style: const TextStyle(fontSize: 9.5, color: Colors.white38),
+                  ),
 
-                    const SizedBox(height: 20),
+                  const Divider(color: Color(0xFF22242D), height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isFa ? 'برآورد مبلغ (لیر):' : 'Estimated total (TL):',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      Text(
+                        '${(estimateTotal).toInt().toLocaleString()} ${isFa ? 'لیر' : 'TL'}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GamingTheme.primary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ---- انتخاب روش پرداخت (از /api/payments/methods سرور) ----
+                  if (!appState.isLoggedIn) ...[
+                    GlassCard(
+                      glow: GamingTheme.goldAccent,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.lock_outline, color: GamingTheme.goldAccent, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isFa ? 'برای رزرو و پرداخت، وارد حساب کاربری شوید.' : 'Please log in to book & pay.',
+                              style: const TextStyle(fontSize: 11, color: Colors.white70),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      isFa ? '💳 روش پرداخت' : '💳 Payment method',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._buildPaymentOptions(appState, isFa),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: NeonGradientButton(
-                        label: isFa ? 'پرداخت نهایی و تایید رزرو' : 'Pay & Confirm Reservation',
+                        label: _checkoutButtonLabel(isFa),
                         icon: Icons.check_circle_outline,
-                        onPressed: () async {
-                          final now = DateTime.now();
-                          final end = now.add(Duration(minutes: (_hours * 60).round()));
-                          String fmt(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-
-                          final error = await appState.reserveSystem(
-                            _selectedSystem!.id,
-                            fmt(now),
-                            fmt(end),
-                            couponCode: _isPromoApplied ? 'GAMER2026' : null,
-                          );
-                          if (!context.mounted) return;
-                          if (error != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
-                            );
-                            return;
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                isFa
-                                    ? 'رزرو سیستم با موفقیت ثبت و تایید شد!'
-                                    : 'Reservation successfully confirmed!',
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                          setState(() {
-                            _selectedSystem = null;
-                            _hours = 2;
-                            _promoController.clear();
-                            _isPromoApplied = false;
-                            _discountPercent = 0;
-                          });
-                        },
+                        loading: _isPaying,
+                        onPressed: _isPaying || _effectivePayMethod(appState) == null
+                            ? null
+                            : () async {
+                                await _doCheckout(appState, isFa);
+                              },
                       ),
                     ),
                   ],
-                ),
+                ],
+              ),
             ),
           ],
         ],
       ),
     );
+  }
+
+  /// روش پرداختِ انتخاب‌شده فقط وقتی معتبر است که موجودی‌اش هم باشد.
+  String? _effectivePayMethod(AppState appState) {
+    switch (_payMethod) {
+      case 'wallet':
+        return appState.walletBalance > 0 ? 'wallet' : null;
+      case 'credits':
+        return appState.user.credits > 0 ? 'credits' : null;
+      default:
+        return _payMethod;
+    }
+  }
+
+  List<Widget> _buildPaymentOptions(AppState appState, bool isFa) {
+    final methods = appState.paymentMethods?.methods['reservation'] ?? ['wallet', 'credits', 'onsite'];
+    final effective = _effectivePayMethod(appState);
+    final widgets = <Widget>[];
+    for (final m in methods) {
+      if (m == 'online') continue; // درگاه آنلاین در حال حاضر غیرفعال است
+      final selected = effective == m;
+      String title;
+      String subtitle;
+      Color color;
+      IconData icon;
+      bool enabled = true;
+      switch (m) {
+        case 'wallet':
+          title = isFa ? 'کیف پول بازینو' : 'BAZINO Wallet';
+          subtitle = isFa ? 'موجودی: ${appState.walletBalance.toStringAsFixed(0)} لیر — تأیید فوری' : 'Balance: ${appState.walletBalance.toStringAsFixed(0)} TL — instant';
+          color = GamingTheme.primary;
+          icon = Icons.account_balance_wallet_rounded;
+          enabled = appState.walletBalance > 0;
+        case 'credits':
+          title = isFa ? 'کردیت بازینو (BC)' : 'Bazino Credits (BC)';
+          subtitle = isFa ? 'موجودی: ${appState.user.credits.toStringAsFixed(0)} BC — نرخ زمانی' : 'Balance: ${appState.user.credits.toStringAsFixed(0)} BC';
+          color = GamingTheme.secondary;
+          icon = Icons.tokens_rounded;
+          enabled = appState.user.credits > 0;
+        default:
+          title = isFa ? 'پرداخت در محل' : 'Pay on-site';
+          subtitle = isFa ? 'جا همین حالا رزرو می‌شود؛ پرداخت حداکثر ۱۰ دقیقه قبل از شروع' : 'Spot held; pay at desk up to 10 min before start';
+          color = GamingTheme.goldAccent;
+          icon = Icons.storefront_rounded;
+      }
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: enabled
+                ? () {
+                    setState(() => _payMethod = m);
+                  }
+                : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: selected ? color.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: selected ? color : Colors.white12, width: selected ? 1.5 : 1),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: enabled ? color : Colors.white24, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: enabled ? Colors.white : Colors.white38),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(fontSize: 9.5, color: Colors.white54),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (selected) Icon(Icons.check_circle, color: color, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  String _checkoutButtonLabel(bool isFa) {
+    if (_payMethod == 'onsite') return isFa ? 'ثبت رزرو — پرداخت در محل' : 'Book — pay on-site';
+    if (_payMethod == 'credits') return isFa ? 'پرداخت با کردیت و تأیید رزرو' : 'Pay with credits & confirm';
+    return isFa ? 'پرداخت از کیف پول و تأیید رزرو' : 'Pay from wallet & confirm';
+  }
+
+  Future<void> _doCheckout(AppState appState, bool isFa) async {
+    final method = _effectivePayMethod(appState);
+    if (_selectedSystem == null || method == null || _isPaying) return;
+    setState(() => _isPaying = true);
+
+    final now = DateTime.now().add(const Duration(minutes: 5));
+    final roundedStart = DateTime(now.year, now.month, now.day, now.hour, (now.minute / 5).ceil() * 5);
+    final end = roundedStart.add(Duration(hours: _hours.toInt()));
+    String fmt(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+    final error = await appState.checkoutOrder(
+      kind: 'reservation',
+      method: method,
+      params: {
+        'systemId': _selectedSystem!.id,
+        'startTime': fmt(roundedStart),
+        'endTime': fmt(end),
+        'date': 'امروز',
+        if (_promoController.text.trim().isNotEmpty) 'couponCode': _promoController.text.trim(),
+      },
+    );
+
+    if (!mounted) return;
+    setState(() => _isPaying = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    final outcome = appState.lastCheckout;
+    final isOnsite = method == 'onsite';
+    String message;
+    if (isOnsite) {
+      message = isFa
+          ? 'جا برای شما گرفته شد! سفارش ${outcome?.orderId ?? ''} — پرداخت حضوری حداکثر ۱۰ دقیقه قبل از شروع سانس.'
+          : 'Spot held! Order ${outcome?.orderId ?? ''} — pay at the desk up to 10 min before your session.';
+    } else if (method == 'credits') {
+      message = isFa
+          ? 'پرداخت با کردیت انجام شد (${outcome?.creditsCost ?? 0} BC). شناسه: ${outcome?.orderId ?? ''}'
+          : 'Paid with credits (${outcome?.creditsCost ?? 0} BC). ID: ${outcome?.orderId ?? ''}';
+    } else {
+      message = isFa
+          ? 'پرداخت از کیف پول انجام شد (${(outcome?.amount ?? 0).toStringAsFixed(0)} لیر). موجودی جدید: ${(outcome?.balanceAfter ?? appState.walletBalance).toStringAsFixed(0)} لیر'
+          : 'Paid from wallet (${(outcome?.amount ?? 0).toStringAsFixed(0)} TL). New balance: ${(outcome?.balanceAfter ?? appState.walletBalance).toStringAsFixed(0)} TL';
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GamingTheme.darkCardSolid,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: GamingTheme.accentGreen.withValues(alpha: 0.4)),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.verified_rounded, color: GamingTheme.accentGreen, size: 22),
+            const SizedBox(width: 8),
+            Text(isFa ? 'رزرو ثبت شد' : 'Reservation booked', style: const TextStyle(color: Colors.white, fontSize: 15)),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.6)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(isFa ? 'عالیه!' : 'Awesome!', style: const TextStyle(color: GamingTheme.primary)),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _selectedSystem = null;
+      _hours = 2;
+      _promoController.clear();
+      _payMethod = null;
+    });
   }
 }

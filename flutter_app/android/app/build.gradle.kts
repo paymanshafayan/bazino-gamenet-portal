@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.bazino_app"
+    namespace = "pro.bazino.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -16,21 +18,38 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.bazino_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // شناسهٔ رسمی انتشار بازینو (قبلاً com.example.bazino_app بود — فاز ۴)
+        applicationId = "pro.bazino.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            // امضای release از متغیرهای محیطی/رازهای CI می‌آید:
+            //   BAZINO_ANDROID_KEYSTORE_B64  — فایل keystore به base64
+            //   BAZINO_ANDROID_KEY_ALIAS / BAZINO_ANDROID_KEY_PASSWORD / BAZINO_ANDROID_STORE_PASSWORD
+            // اگر ست نشده باشند (بیلد محلی/CI بدون راز)، مثل قبل با کلید debug امضا می‌شود
+            // تا APK قابل نصب بماند — کلید واقعی را فقط GitHub Secrets نگه می‌دارد.
+            val keystoreB64 = System.getenv("BAZINO_ANDROID_KEYSTORE_B64")
+            if (keystoreB64 != null && keystoreB64.isNotEmpty()) {
+                val keystoreFile = File(rootProject.layout.buildDirectory.asFile.get(), "bazino-release.keystore")
+                keystoreFile.parentFile.mkdirs()
+                keystoreFile.writeBytes(Base64.getDecoder().decode(keystoreB64))
+                storeFile = keystoreFile
+                keyAlias = System.getenv("BAZINO_ANDROID_KEY_ALIAS") ?: "bazino"
+                keyPassword = System.getenv("BAZINO_ANDROID_KEY_PASSWORD") ?: ""
+                storePassword = System.getenv("BAZINO_ANDROID_STORE_PASSWORD") ?: ""
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            val hasReleaseKey = System.getenv("BAZINO_ANDROID_KEYSTORE_B64")?.isNotEmpty() == true
+            signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 }

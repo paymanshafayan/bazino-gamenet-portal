@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,12 +77,34 @@ class UserState {
   int loyaltyPoints;
   String role;
 
+  // فیلدهای حساب کامل (تسک حساب کاربری) — از /api/me/profile و publicUser سرور
+  double credits;
+  String displayName;
+  String avatarUrl;
+  String bio;
+  String gamerTag;
+  String city;
+  String birthDate;
+  bool phoneVerified;
+  bool hasPassword;
+  String createdAt;
+
   UserState({
     required this.username,
     required this.email,
     required this.phone,
     required this.loyaltyPoints,
     this.role = 'gamer',
+    this.credits = 0,
+    this.displayName = '',
+    this.avatarUrl = '',
+    this.bio = '',
+    this.gamerTag = '',
+    this.city = '',
+    this.birthDate = '',
+    this.phoneVerified = false,
+    this.hasPassword = true,
+    this.createdAt = '',
   });
 
   factory UserState.fromJson(Map<String, dynamic> json) {
@@ -89,12 +112,250 @@ class UserState {
       username: json['username'] ?? 'Guest',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
-      loyaltyPoints: (json['loyaltyPoints'] ?? 0) as int,
+      loyaltyPoints: (json['loyaltyPoints'] ?? 0) is int ? json['loyaltyPoints'] : int.tryParse('${json['loyaltyPoints']}') ?? 0,
       role: json['role'] ?? 'gamer',
+      credits: (json['credits'] ?? 0) is num ? (json['credits'] as num).toDouble() : double.tryParse('${json['credits']}') ?? 0,
+      displayName: json['displayName'] ?? '',
+      avatarUrl: json['avatarUrl'] ?? '',
+      bio: json['bio'] ?? '',
+      gamerTag: json['gamerTag'] ?? '',
+      city: json['city'] ?? '',
+      birthDate: json['birthDate'] ?? '',
+      phoneVerified: json['phoneVerified'] == true,
+      hasPassword: json['hasPassword'] == null ? true : json['hasPassword'] == true,
+      createdAt: json['createdAt'] ?? '',
     );
   }
 
   static UserState guest() => UserState(username: 'Guest', email: '', phone: '', loyaltyPoints: 0);
+
+  Map<String, dynamic> toJson() => {
+        'username': username,
+        'email': email,
+        'phone': phone,
+        'loyaltyPoints': loyaltyPoints,
+        'role': role,
+        'credits': credits,
+        'displayName': displayName,
+        'avatarUrl': avatarUrl,
+        'bio': bio,
+        'gamerTag': gamerTag,
+        'city': city,
+        'birthDate': birthDate,
+        'phoneVerified': phoneVerified,
+        'hasPassword': hasPassword,
+        'createdAt': createdAt,
+      };
+}
+
+/// تراکنش کیف پول (TL) — GET /api/me/wallet
+class WalletTx {
+  final String id;
+  final double amount;
+  final String type;
+  final String note;
+  final double balanceAfter;
+  final String createdAt;
+
+  WalletTx({required this.id, required this.amount, required this.type, required this.note, required this.balanceAfter, required this.createdAt});
+
+  factory WalletTx.fromJson(Map<String, dynamic> json) {
+    return WalletTx(
+      id: json['id']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      type: json['type']?.toString() ?? '',
+      note: json['note']?.toString() ?? '',
+      balanceAfter: (json['balanceAfter'] as num?)?.toDouble() ?? 0,
+      createdAt: json['createdAt']?.toString() ?? '',
+    );
+  }
+
+  bool get isTopup => amount > 0;
+}
+
+/// سفارش «پرداخت در محل» / سفارش تسویه‌شده — GET /api/me/onsite-orders
+class OnsiteOrder {
+  final String id;
+  final String kind; // reservation | cafe | shop | tournament
+  final double amount;
+  final String status; // pending_onsite | settled | cancelled_*
+  final String? dueAt;
+  final String description;
+  final String createdAt;
+
+  OnsiteOrder({required this.id, required this.kind, required this.amount, required this.status, this.dueAt, required this.description, required this.createdAt});
+
+  factory OnsiteOrder.fromJson(Map<String, dynamic> json) {
+    return OnsiteOrder(
+      id: json['id']?.toString() ?? '',
+      kind: json['kind']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      status: json['status']?.toString() ?? '',
+      dueAt: json['dueAt']?.toString(),
+      description: json['description']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? '',
+    );
+  }
+
+  bool get isPending => status == 'pending_onsite';
+}
+
+/// روش‌های پرداخت مجاز هر نوع سفارش — GET /api/payments/methods
+class PaymentMethods {
+  final bool online;
+  final String currency;
+  final Map<String, List<String>> methods;
+  final int reservationLeadMinutes;
+
+  PaymentMethods({required this.online, required this.currency, required this.methods, required this.reservationLeadMinutes});
+
+  factory PaymentMethods.fromJson(Map<String, dynamic> json) {
+    final m = <String, List<String>>{};
+    final raw = json['methods'];
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        m[k.toString()] = (v as List?)?.map((e) => e.toString()).toList() ?? [];
+      });
+    }
+    return PaymentMethods(
+      online: json['online'] == true,
+      currency: json['currency']?.toString() ?? 'TL',
+      methods: m,
+      reservationLeadMinutes: ((json['onsiteLeadMinutes'] as Map?)?['reservation'] as num?)?.toInt() ?? 10,
+    );
+  }
+}
+
+/// نتیجهٔ یک checkout موفق — POST /api/checkout/{wallet,credits,onsite}
+class CheckoutOutcome {
+  final String orderId;
+  final double amount;
+  final String method; // wallet | credits | onsite
+  final String status; // settled | pending_onsite
+  final String? dueAt;
+  final double? balanceAfter;
+  final int? creditsCost;
+  final double? creditsBalance;
+  final Map<String, dynamic> raw;
+
+  CheckoutOutcome({
+    required this.orderId,
+    required this.amount,
+    required this.method,
+    required this.status,
+    this.dueAt,
+    this.balanceAfter,
+    this.creditsCost,
+    this.creditsBalance,
+    required this.raw,
+  });
+}
+
+/// رزرو کاربر — GET /api/me/reservations
+class MyReservationLog {
+  final String id;
+  final String systemName;
+  final String startTime;
+  final String endTime;
+  final double totalPrice;
+  final String date;
+  final bool checkedIn;
+
+  MyReservationLog({required this.id, required this.systemName, required this.startTime, required this.endTime, required this.totalPrice, required this.date, required this.checkedIn});
+
+  factory MyReservationLog.fromJson(Map<String, dynamic> json) {
+    return MyReservationLog(
+      id: json['id']?.toString() ?? '',
+      systemName: json['systemName']?.toString() ?? '',
+      startTime: json['startTime']?.toString() ?? '',
+      endTime: json['endTime']?.toString() ?? '',
+      totalPrice: (json['totalPrice'] as num?)?.toDouble() ?? 0,
+      date: json['date']?.toString() ?? '',
+      checkedIn: json['checkedIn'] == true,
+    );
+  }
+}
+
+/// سفارش کافه/فروشگاه کاربر — GET /api/me/orders
+class MyOrder {
+  final String id;
+  final String kind; // cafe | shop
+  final double finalAmount;
+  final String status;
+  final String date;
+  final String rawItems;
+
+  MyOrder({required this.id, required this.kind, required this.finalAmount, required this.status, required this.date, required this.rawItems});
+
+  factory MyOrder.fromJson(Map<String, dynamic> json, {required String kind}) {
+    return MyOrder(
+      id: json['id']?.toString() ?? '',
+      kind: kind,
+      finalAmount: (json['finalAmount'] as num?)?.toDouble() ?? 0,
+      status: json['status']?.toString() ?? '',
+      date: json['date']?.toString() ?? '',
+      rawItems: jsonEncode(json['items'] ?? json['cart'] ?? []),
+    );
+  }
+
+  String get itemsSummary {
+    try {
+      final list = jsonDecode(rawItems) as List;
+      return list.map((l) {
+        final name = (l is Map && l['item'] is Map) ? l['item']['name'].toString() : '';
+        final qty = (l is Map ? l['quantity'] : 1) ?? 1;
+        return name.isEmpty ? '' : '$name ×$qty';
+      }).where((s) => s.isNotEmpty).join('، ');
+    } catch (_) {
+      return '';
+    }
+  }
+}
+
+/// تیکت پشتیبانی — GET/POST /api/me/tickets
+class SupportTicket {
+  final String id;
+  final String subject;
+  final String category;
+  final String priority;
+  final String status;
+  final String createdAt;
+  final String updatedAt;
+  final bool hasNewReply;
+
+  SupportTicket({required this.id, required this.subject, required this.category, required this.priority, required this.status, required this.createdAt, required this.updatedAt, required this.hasNewReply});
+
+  factory SupportTicket.fromJson(Map<String, dynamic> json) {
+    return SupportTicket(
+      id: json['id']?.toString() ?? '',
+      subject: json['subject']?.toString() ?? '',
+      category: json['category']?.toString() ?? 'general',
+      priority: json['priority']?.toString() ?? 'normal',
+      status: json['status']?.toString() ?? 'open',
+      createdAt: json['createdAt']?.toString() ?? '',
+      updatedAt: json['updatedAt']?.toString() ?? '',
+      hasNewReply: json['hasNewReply'] == true,
+    );
+  }
+}
+
+/// پیام داخل تیکت
+class TicketMessage {
+  final String id;
+  final bool isStaff;
+  final String body;
+  final String createdAt;
+
+  TicketMessage({required this.id, required this.isStaff, required this.body, required this.createdAt});
+
+  factory TicketMessage.fromJson(Map<String, dynamic> json) {
+    return TicketMessage(
+      id: json['id']?.toString() ?? '',
+      isStaff: json['isStaff'] == 1 || json['isStaff'] == true,
+      body: json['body']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? '',
+    );
+  }
 }
 
 /// A live chat room. The backend only stores room names as plain strings, so
@@ -670,6 +931,30 @@ class AppState extends ChangeNotifier {
   List<Tournament> tournaments = [];
   List<Article> articles = [];
 
+  // ---- حساب کاربری کامل (تسک فاز ۲) ----
+  double walletBalance = 0;
+  List<WalletTx> walletTransactions = [];
+  List<OnsiteOrder> onsiteOrders = [];
+  PaymentMethods? paymentMethods;
+  List<MyReservationLog> myReservations = [];
+  List<MyOrder> myOrders = [];
+  List<SupportTicket> tickets = [];
+  int unreadTickets = 0;
+  bool isLoadingAccount = false;
+
+  /// اعلان‌های درون‌برنامه‌ای که هنوز توسط کاربر دیده نشده‌اند (ورودی اورلی هاب).
+  /// `_inAppNotifVersion` با هر اعلانِ جدید بالا می‌رود تا هاب فقط «تازه‌ها» را اورلی کند.
+  final List<String> unseenInAppNotifications = [];
+  int _inAppNotifVersion = 0;
+  int get inAppNotifVersion => _inAppNotifVersion;
+
+  void markInAppNotificationsSeen() {
+    if (unseenInAppNotifications.isNotEmpty) {
+      unseenInAppNotifications.clear();
+      notifyListeners();
+    }
+  }
+
   AppState() {
     _bootstrap();
   }
@@ -715,6 +1000,7 @@ class AppState extends ChangeNotifier {
       fetchChatRooms(),
       if (isLoggedIn) fetchTransactions(),
       if (isLoggedIn) fetchCoupons(),
+      if (isLoggedIn) fetchAccountData(),
     ]);
 
     _connectRealtime();
@@ -747,6 +1033,8 @@ class AppState extends ChangeNotifier {
             } else if (event == 'notification' && data is Map<String, dynamic>) {
               messages.insert(0, AppMessage.fromJson(data));
               notifications.insert(0, '✉️ ${data['title'] ?? ''}');
+              unseenInAppNotifications.insert(0, '✉️ ${data['title'] ?? ''}');
+              _inAppNotifVersion++;
               notifyListeners();
             }
           } catch (e) {
@@ -961,7 +1249,7 @@ class AppState extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       if (_authToken != null) await prefs.setString(_tokenKey, _authToken!);
 
-      await Future.wait([fetchTransactions(), fetchCoupons()]);
+      await Future.wait([fetchTransactions(), fetchCoupons(), fetchAccountData()]);
       notifyListeners();
       return null;
     } catch (e) {
@@ -984,7 +1272,7 @@ class AppState extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       if (_authToken != null) await prefs.setString(_tokenKey, _authToken!);
 
-      await Future.wait([fetchTransactions(), fetchCoupons()]);
+      await Future.wait([fetchTransactions(), fetchCoupons(), fetchAccountData()]);
       notifyListeners();
       return null;
     } catch (e) {
@@ -1238,6 +1526,360 @@ class AppState extends ChangeNotifier {
       return 'اتصال به سرور برقرار نشد: $e';
     }
   }
+
+  // =========================================================================
+  // حساب کاربری کامل + اقتصاد جدید (checkout کیف پول / کردیت / حضوری)
+  // — همگی روی APIهای واقعی سرور: /api/payments/methods، /api/checkout/*،
+  // /api/me/*، /api/auth/otp/*
+  // =========================================================================
+
+  Future<Map<String, dynamic>> _apiJson(String method, String path, {Object? body, Map<String, String>? extraHeaders}) async {
+    final req = http.Request(method, Uri.parse('$kApiBaseUrl$path'));
+    req.headers.addAll(_authHeaders(json: body != null));
+    if (extraHeaders != null) req.headers.addAll(extraHeaders);
+    if (body != null) req.body = jsonEncode(body);
+    final res = await http.Client().send(req).timeout(const Duration(seconds: 20));
+    final bytes = await res.stream.toBytes();
+    final text = utf8.decode(bytes);
+    try {
+      return jsonDecode(text) as Map<String, dynamic>;
+    } catch (_) {
+      return {'error': text.isNotEmpty ? text : 'HTTP ${res.statusCode}', '_status': res.statusCode};
+    }
+  }
+
+  /// بارگیری یکجاً داده‌های حساب: کیف پول، سفارش‌های حضوری، روش‌های پرداخت،
+  /// رزروها/سفارش‌ها و تیکت‌ها. بعد از هر ورود و هر checkout صدا زده می‌شود.
+  Future<void> fetchAccountData() async {
+    if (!isLoggedIn) return;
+    isLoadingAccount = true;
+    notifyListeners();
+    try {
+      await Future.wait([
+        fetchWallet(),
+        fetchOnsiteOrders(),
+        fetchPaymentMethods(),
+        fetchMyReservations(),
+        fetchMyOrders(),
+        fetchTickets(),
+      ]);
+    } finally {
+      isLoadingAccount = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchWallet() async {
+    try {
+      final data = await _apiJson('GET', '/api/me/wallet');
+      if (data['balance'] is num) {
+        walletBalance = (data['balance'] as num).toDouble();
+        walletTransactions = ((data['transactions'] as List?) ?? []).map((e) => WalletTx.fromJson(e as Map<String, dynamic>)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[AppState] fetchWallet failed: $e');
+    }
+  }
+
+  Future<void> fetchOnsiteOrders() async {
+    try {
+      final res = await http.get(Uri.parse('$kApiBaseUrl/api/me/onsite-orders'), headers: _authHeaders()).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+        if (decoded is List) {
+          onsiteOrders = decoded.map((e) => OnsiteOrder.fromJson(e as Map<String, dynamic>)).toList();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('[AppState] fetchOnsiteOrders failed: $e');
+    }
+  }
+
+  Future<void> fetchPaymentMethods() async {
+    try {
+      final data = await _apiJson('GET', '/api/payments/methods');
+      if (data.containsKey('methods')) {
+        paymentMethods = PaymentMethods.fromJson(data);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[AppState] fetchPaymentMethods failed: $e');
+    }
+  }
+
+  Future<void> fetchMyReservations() async {
+    try {
+      final data = await _apiJson('GET', '/api/me/reservations');
+      myReservations = ((data['reservations'] as List?) ?? []).map((e) => MyReservationLog.fromJson(e as Map<String, dynamic>)).toList();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[AppState] fetchMyReservations failed: $e');
+    }
+  }
+
+  Future<void> fetchMyOrders() async {
+    try {
+      final data = await _apiJson('GET', '/api/me/orders');
+      final cafe = ((data['cafe'] as List?) ?? []).map((e) => MyOrder.fromJson(e as Map<String, dynamic>, kind: 'cafe')).toList();
+      final shop = ((data['shop'] as List?) ?? []).map((e) => MyOrder.fromJson(e as Map<String, dynamic>, kind: 'shop')).toList();
+      myOrders = [...cafe, ...shop];
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[AppState] fetchMyOrders failed: $e');
+    }
+  }
+
+  Future<void> fetchTickets() async {
+    try {
+      final data = await _apiJson('GET', '/api/me/tickets');
+      tickets = ((data['tickets'] as List?) ?? []).map((e) => SupportTicket.fromJson(e as Map<String, dynamic>)).toList();
+      unreadTickets = (data['unread'] as num?)?.toInt() ?? 0;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[AppState] fetchTickets failed: $e');
+    }
+  }
+
+  /// پرداخت واقعی سفارش با یکی از روش‌های جدید سرور.
+  /// [kind]: reservation | cafe | shop | tournament — [method]: wallet | credits | onsite
+  /// خروجی: null + outcome=موفق، یا پیام خطای واقعی سرور.
+  Future<String?> checkoutOrder({
+    required String kind,
+    required String method,
+    required Map<String, dynamic> params,
+  }) async {
+    if (!isLoggedIn) {
+      return 'برای ثبت سفارش ابتدا وارد حساب کاربری شوید.';
+    }
+    try {
+      final data = await _apiJson('POST', '/api/checkout/$method', body: {'kind': kind, 'params': params});
+      if (data['success'] == true) {
+        _lastCheckout = CheckoutOutcome(
+          orderId: data['orderId']?.toString() ?? '',
+          amount: (data['amount'] as num?)?.toDouble() ?? 0,
+          method: method,
+          status: data['status']?.toString() ?? 'settled',
+          dueAt: data['dueAt']?.toString(),
+          balanceAfter: (data['balance'] as num?)?.toDouble(),
+          creditsCost: (data['creditsCost'] as num?)?.toInt(),
+          creditsBalance: (data['creditsBalance'] as num?)?.toDouble(),
+          raw: data,
+        );
+        // به‌روزرسانی هم‌زمان کیف پول/کردیت/رزروها/سفارش‌های حضوری
+        await fetchAccountData();
+        return null;
+      }
+      return _friendlyCheckoutError(data);
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  CheckoutOutcome? _lastCheckout;
+  CheckoutOutcome? get lastCheckout => _lastCheckout;
+
+  String _friendlyCheckoutError(Map<String, dynamic> data) {
+    final code = data['code']?.toString() ?? data['error']?.toString() ?? 'خطای نامشخص';
+    switch (code) {
+      case 'INSUFFICIENT_FUNDS':
+        return 'موجودی کیف پول کافی نیست. موجودی فعلی: ${walletBalance.toStringAsFixed(0)} لیر — از پنل مدیریت شارژ کنید یا «پرداخت در محل» را انتخاب کنید.';
+      case 'INSUFFICIENT_CREDITS':
+        return 'کردیت بازینو (BC) کافی نیست (لازم: ${data['creditsCost'] ?? '?'}, موجودی: ${data['creditsBalance'] ?? 0}).';
+      case 'ONSITE_TOO_LATE':
+        return 'برای «پرداخت در محل» دیر شده است (مهلت: ۱۰ دقیقه قبل از شروع سانس). لطفاً با کیف پول پرداخت کنید.';
+      case 'METHOD_NOT_ALLOWED':
+        return 'این روش پرداخت برای این نوع سفارش مجاز نیست.';
+      case 'OUT_OF_STOCK':
+        return 'موجودی این کالا تمام شده است.';
+      case 'INVALID_RESERVATION_TIME':
+      case 'PAST_RESERVATION':
+        return 'بازهٔ زمانی انتخابی معتبر نیست؛ لطفاً ساعت دیگری انتخاب کنید.';
+      case 'SLOT_TAKEN':
+      case 'STATION_BUSY':
+        return 'این سیستم در بازهٔ انتخابی گرفته شد؛ ساعت یا سیستم دیگری انتخاب کنید.';
+      default:
+        return data['message']?.toString() ?? data['error']?.toString() ?? code;
+    }
+  }
+
+  /// لغو سفارش حضوری/کیف‌پولی توسط خود کاربر (قبل از مهلت).
+  Future<String?> cancelOnsiteOrder(String orderId) async {
+    try {
+      final data = await _apiJson('POST', '/api/checkout/onsite/$orderId/cancel', body: {});
+      if (data['success'] == true) {
+        await fetchAccountData();
+        return null;
+      }
+      return data['error']?.toString() ?? 'لغو ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  // ---- پروفایل ----
+
+  Future<String?> updateProfile(Map<String, String> fields) async {
+    try {
+      final data = await _apiJson('PUT', '/api/me/profile', body: fields);
+      if (data['success'] == true && data['user'] is Map<String, dynamic>) {
+        _user = UserState.fromJson(data['user']);
+        notifyListeners();
+        return null;
+      }
+      return data['error']?.toString() ?? 'ذخیره پروفایل ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  /// آپلود آواتار — بدنهٔ خام تصویر (JPEG/PNG/WebP تا ۵ مگابایت).
+  Future<String?> uploadAvatar(Uint8List bytes, String contentType) async {
+    try {
+      final req = http.Request('POST', Uri.parse('$kApiBaseUrl/api/me/avatar'));
+      req.headers.addAll(_authHeaders());
+      req.headers['Content-Type'] = contentType;
+      req.bodyBytes = bytes;
+      final res = await http.Client().send(req).timeout(const Duration(seconds: 30));
+      final text = utf8.decode(await res.stream.toBytes());
+      final data = jsonDecode(text) as Map<String, dynamic>;
+      if (data['success'] == true) {
+        _user = UserState.fromJson({..._user.toJson(), 'avatarUrl': data['avatarUrl']});
+        notifyListeners();
+        return null;
+      }
+      return data['error']?.toString() ?? 'آپلود آواتار ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  Future<String?> removeAvatar() async {
+    try {
+      final data = await _apiJson('DELETE', '/api/me/avatar');
+      if (data['success'] == true) {
+        _user = UserState.fromJson({..._user.toJson(), 'avatarUrl': ''});
+        notifyListeners();
+        return null;
+      }
+      return data['error']?.toString() ?? 'حذف آواتار ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  /// تغییر/تعیین رمز. کاربر OTP-only (بدون رمز) oldPassword نمی‌خواهد.
+  Future<String?> changePassword({required String newPassword, String? oldPassword}) async {
+    try {
+      final data = await _apiJson('POST', '/api/me/password', body: {
+        'newPassword': newPassword,
+        if (oldPassword != null && oldPassword.isNotEmpty) 'oldPassword': oldPassword,
+      });
+      if (data['success'] == true) return null;
+      final err = data['error']?.toString() ?? '';
+      if (err.contains('OLD_PASSWORD')) return 'رمز فعلی اشتباه است.';
+      if (err.contains('TOO_SHORT')) return 'رمز جدید باید حداقل ۶ کاراکتر باشد.';
+      return err.isNotEmpty ? err : 'تغییر رمز ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  // ---- ورود با پیامک (OTP) ----
+
+  /// درخواست کد پیامکی. خروجی null = ارسال شد.
+  Future<String?> requestOtp(String phone) async {
+    try {
+      final data = await _apiJson('POST', '/api/auth/otp/request', body: {'phone': phone});
+      if (data['success'] == true) return null;
+      final err = data['error']?.toString() ?? '';
+      if (err.contains('TOO_SOON')) return 'کد قبلی هنوز معتبر است؛ کمی صبر کنید و دوباره امتحان کنید.';
+      if (err.contains('RATE_LIMIT')) return 'تعداد درخواست‌ها زیاد است؛ بعداً تلاش کنید.';
+      if (err.contains('PHONE')) return 'شمارهٔ موبایل معتبر نیست.';
+      if (err.contains('SEND')) return 'ارسال پیامک ناموفق بود؛ دوباره تلاش کنید.';
+      return err.isNotEmpty ? err : 'درخواست کد ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  /// تأیید کد و ورود. null = ورود موفق.
+  Future<String?> verifyOtp(String phone, String code) async {
+    try {
+      final data = await _apiJson('POST', '/api/auth/otp/verify', body: {'phone': phone, 'code': code});
+      if (data['success'] == true) {
+        _authToken = data['token'] as String?;
+        _user = UserState.fromJson(data['user'] as Map<String, dynamic>);
+        final prefs = await SharedPreferences.getInstance();
+        if (_authToken != null) await prefs.setString(_tokenKey, _authToken!);
+        await Future.wait([fetchTransactions(), fetchCoupons(), fetchAccountData()]);
+        notifyListeners();
+        return null;
+      }
+      final err = data['error']?.toString() ?? '';
+      if (err.contains('WRONG')) return 'کد واردشده اشتباه است.';
+      if (err.contains('EXPIRED')) return 'کد منقضی شده است؛ کد جدید بگیرید.';
+      if (err.contains('LOCKED')) return 'تعداد تلاش‌های ناموفق زیاد بود؛ کد جدید بگیرید.';
+      if (err.contains('NOT_FOUND')) return 'کدی برای این شماره ثبت نشده است.';
+      return err.isNotEmpty ? err : 'تأیید کد ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  // ---- تیکت پشتیبانی ----
+
+  Future<String?> createTicket({required String subject, required String message, String category = 'general', String priority = 'normal'}) async {
+    try {
+      final data = await _apiJson('POST', '/api/me/tickets', body: {'subject': subject, 'message': message, 'category': category, 'priority': priority});
+      if (data['success'] == true) {
+        await fetchTickets();
+        return null;
+      }
+      return data['error']?.toString() ?? 'ثبت تیکت ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  Future<List<TicketMessage>> fetchTicketMessages(String ticketId) async {
+    try {
+      final data = await _apiJson('GET', '/api/me/tickets/$ticketId');
+      await fetchTickets(); // hasNewReply پاک می‌شود
+      return ((data['messages'] as List?) ?? []).map((e) => TicketMessage.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[AppState] fetchTicketMessages failed: $e');
+      return [];
+    }
+  }
+
+  Future<String?> replyTicket(String ticketId, String message) async {
+    try {
+      final data = await _apiJson('POST', '/api/me/tickets/$ticketId/reply', body: {'message': message});
+      if (data['success'] == true) {
+        await fetchTickets();
+        return null;
+      }
+      return data['error']?.toString() ?? 'ارسال پیام ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
+  Future<String?> closeTicket(String ticketId) async {
+    try {
+      final data = await _apiJson('POST', '/api/me/tickets/$ticketId/close');
+      if (data['success'] == true) {
+        await fetchTickets();
+        return null;
+      }
+      return data['error']?.toString() ?? 'بستن تیکت ناموفق بود.';
+    } catch (e) {
+      return 'اتصال به سرور برقرار نشد: $e';
+    }
+  }
+
 }
 
 extension IntFormatting on num {
@@ -1279,7 +1921,35 @@ class AppLocalizations {
       'nav.chat': 'Chat Rooms',
       'nav.blog': 'News Blog',
       'nav.messages': 'Inbox',
-    }
+    },
+    'ru': {
+      'brand.name': 'BAZINO',
+      'brand.tagline': 'Бронирование, буфет, турниры и клуб лояльности геймнета',
+      'user.pts': 'Очки',
+      'nav.home': 'Главная',
+      'nav.loyalty': 'Клуб лояльности',
+      'nav.reservations': 'Бронирование',
+      'nav.cafe': 'Кафе',
+      'nav.shop': 'Аксессуары',
+      'nav.tournaments': 'Турниры',
+      'nav.chat': 'Чаты',
+      'nav.blog': 'Блог',
+      'nav.messages': 'Входящие',
+    },
+    'tr': {
+      'brand.name': 'BAZINO',
+      'brand.tagline': 'Oyun salonu rezervasyonu, büfe, turnuvalar ve sadakat kulübü',
+      'user.pts': 'Puan',
+      'nav.home': 'Ana Sayfa',
+      'nav.loyalty': 'Sadakat Kulübü',
+      'nav.reservations': 'Rezervasyon',
+      'nav.cafe': 'Kafe',
+      'nav.shop': 'Aksesuarlar',
+      'nav.tournaments': 'Turnuvalar',
+      'nav.chat': 'Sohbet',
+      'nav.blog': 'Blog',
+      'nav.messages': 'Gelen Kutusu',
+    },
   };
 
   static String translate(String key, String lang) {

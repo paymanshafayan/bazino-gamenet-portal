@@ -262,7 +262,11 @@ class _CafeScreenState extends State<CafeScreen> {
                           label: isFa ? 'ثبت نهایی سفارش' : 'Place Order Now',
                           icon: Icons.check_circle_outline,
                           onPressed: () async {
-                            final error = await appState.placeCafeOrder(_cart, null);
+                            // ثبت سفارش روی زنجیرهٔ اقتصادی جدید سرور (پرداخت در محل)
+                            final items = _cart.entries
+                                .map((e) => {'item': {'id': e.key.id}, 'quantity': e.value})
+                                .toList();
+                            final error = await appState.checkoutOrder(kind: 'cafe', method: 'onsite', params: {'items': items});
                             if (!context.mounted) return;
                             if (error != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -270,12 +274,13 @@ class _CafeScreenState extends State<CafeScreen> {
                               );
                               return;
                             }
+                            final oid = appState.lastCheckout?.orderId ?? '';
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
                                   isFa
-                                      ? 'سفارش بوفه شما با موفقیت ثبت شد! در حال آماده‌سازی...'
-                                      : 'Buffet order placed successfully! Deliver in progress...',
+                                      ? 'سفارش بوفه ثبت شد ($oid) — پرداخت حضوری هنگام تحویل.'
+                                      : 'Cafe order placed ($oid) — pay on-site at delivery.',
                                 ),
                                 backgroundColor: Colors.green,
                               ),

@@ -227,6 +227,8 @@ export default function AdminPanelTab({
   const [zipError, setZipError] = useState('');
   const [isParsingZip, setIsParsingZip] = useState(false);
   const [isInstallingZip, setIsInstallingZip] = useState(false);
+  /** job نصب اِسنک (پاسخ 202 سرور): وضعیت/پیشرفت برای پولینگ و نمایش progress */
+  const [installJob, setInstallJob] = useState<{ jobId: string; status: string; filesDone: number; filesTotal: number } | null>(null);
 
   // Messages form and states
   const [recipient, setRecipient] = useState('All');
@@ -1036,43 +1038,16 @@ export default function AdminPanelTab({
     }
   };
 
-  /* ---------- نصب روی سرور (پوشه اختصاصی قالب + assets) ---------- */
+  /* ---------- نصب روی سرور (پوشه اختصاصی قالب + assets) ----------
+   * ۲۰۲۶-۰۹-۱۲: نصب قالب‌های پر-asset دیگر داخل همان درخواست HTTP انجام
+   * نمی‌شود (خطای 524 کلادفلر). سرور 202 + jobId برمی‌گرداند و نصب در
+   * پس‌زمینه ادامه می‌یابد؛ این‌جا تا وضعیت نهایی poll می‌کنیم و فاز/پیشرفت
+   * واقعی را نشان می‌دهیم. پاسخ sync قدیمی (200) هم برای سازگاری هندل می‌شود. */
   const handleInstallZip = async () => {
     if (!zipParsed || !zipFileBytes) return;
     if (!setAvailableThemes) return;
 
-    setIsInstallingZip(true);
-    try {
-      const replace = zipReplacesExisting ? '&replace=1' : '';
-      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}${replace}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/zip' },
-        body: zipFileBytes as unknown as BodyInit,
-      });
-      // Cloudflare/proxy answers slow installs with an HTML error page (524) —
-      // res.json() would throw a useless SyntaxError. Read text first.
-      const rawText = await res.text();
-      let data: any;
-      try { data = JSON.parse(rawText); } catch { data = null; }
-      if (!data) {
-        const proxyTimeout = res.status === 524 || /524|timeout/i.test(rawText.slice(0, 800));
-        const msg = proxyTimeout
-          ? L(language, {
-              fa: 'پردازش فایل ZIP بیش از حد مجاز شبکه طول کشید (خطای 524). فایل قالب بسیار سنگین است — دارایی‌های تصویری آن را قبل از نصب بهینه/فشرده کنید.',
-              en: 'The ZIP took too long to process (proxy error 524). The theme package is too heavy — optimize/compress its image assets before installing.',
-              ru: 'Обработка ZIP заняла слишком много времени (ошибка прокси 524). Слишком тяжёлый пакет темы — сожмите изображения перед установкой.',
-              tr: 'ZIP işleme çok uzun sürdü (proxy hatası 524). Tema paketi çok ağır — kurulumdan önce görselleri optimize edin.' })
-          : L(language, { fa: `پاسخ نامعتبر سرور (HTTP ${res.status})`, en: `Invalid server response (HTTP ${res.status})`, ru: `Неверный ответ сервера (HTTP ${res.status})`, tr: `Geçersiz sunucu yanıtı (HTTP ${res.status})` });
-        setZipError(msg);
-        addNotification(msg, 'error');
-        return;
-      }
-      if (!res.ok || !data.success) {
-        setZipError(data.error || L(language, { fa: 'خطا در نصب قالب', en: 'Theme installation failed', ru: 'Не удалось установить тему', tr: 'Tema kurulumu başarısız' }));
-        addNotification(L(language, { fa: `خطا در نصب: ${data.error || ''}`, en: `Install error: ${data.error || ''}`, ru: `Ошибка установки: ${data.error || ''}`, tr: `Yükleme hatası: ${data.error || ''}` }), 'error');
-        return;
-      }
-
+    const installThemeFromServer = (data: any) => {
       const serverTheme: ThemeInfo = {
         id: data.theme.id,
         name: data.theme.name,
@@ -1122,6 +1097,91 @@ export default function AdminPanelTab({
       setZipError('');
       setShowUploadForm(false);
       setUploadMode('zip');
+    };
+
+    setIsInstallingZip(true);
+    setInstallJob(null);
+    try {
+      const replace = zipReplacesExisting ? '&replace=1' : '';
+      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}${replace}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: zipFileBytes as unknown as BodyInit,
+      });
+      // سرور (یا پروکسی) ممکن است HTML برگرداند — res.json() خطای بی‌فایده می‌داد؛ متن خام خوانده می‌شود.
+      const rawText = await res.text();
+      let data: any;
+      try { data = JSON.parse(rawText); } catch { data = null; }
+      if (!data) {
+        const proxyTimeout = res.status === 524 || /524|timeout/i.test(rawText.slice(0, 800));
+        const msg = proxyTimeout
+          ? L(language, {
+              fa: 'سرور پاسخ معتبری به درخواست نصب نداد (HTTP 524). اگر سرور اخیراً به‌روزرسانی شده چند لحظه صبر کنید و دوباره تلاش کنید.',
+              en: 'The server did not answer the install request properly (HTTP 524). If the server was updated recently, wait a moment and try again.',
+              ru: 'Сервер не ответил на запрос установки (HTTP 524). Если сервер недавно обновлялся — подождите и повторите.',
+              tr: 'Sunucu kurulum isteğine geçerli yanıt vermedi (HTTP 524). Sunucu yakın zamanda güncellendiyse biraz bekleyip tekrar deneyin.' })
+          : L(language, { fa: `پاسخ نامعتبر سرور (HTTP ${res.status})`, en: `Invalid server response (HTTP ${res.status})`, ru: `Неверный ответ сервера (HTTP ${res.status})`, tr: `Geçersiz sunucu yanıtı (HTTP ${res.status})` });
+        setZipError(msg);
+        addNotification(msg, 'error');
+        return;
+      }
+      if (!res.ok || !data.success) {
+        setZipError(data.error || L(language, { fa: 'خطا در نصب قالب', en: 'Theme installation failed', ru: 'Не удалось установить тему', tr: 'Tema kurulumu başarısız' }));
+        addNotification(L(language, { fa: `خطا در نصب: ${data.error || ''}`, en: `Install error: ${data.error || ''}`, ru: `Ошибка установки: ${data.error || ''}`, tr: `Yükleme hatası: ${data.error || ''}` }), 'error');
+        return;
+      }
+
+      // ── مسیر async (202): نصب در پس‌زمینه؛ تا وضعیت نهایی poll می‌کنیم ──
+      if (res.status === 202 && data.jobId) {
+        setInstallJob({ jobId: data.jobId, status: 'queued', filesDone: 0, filesTotal: data.progress?.filesTotal ?? 0 });
+        const POLL_MS = 1200;
+        const TIMEOUT_MS = 10 * 60 * 1000; // نصب‌های سنگین روی volume شبکه‌ای طول می‌کشند
+        const MAX_NET_ERRORS = 6; // تحمل خطای شبکه‌ای گذرا حین پولینگ
+        const deadline = Date.now() + TIMEOUT_MS;
+        let netErrors = 0;
+        let job: any = null;
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, POLL_MS));
+          try {
+            const pollRes = await fetch(`/api/admin/themes/install-jobs/${encodeURIComponent(data.jobId)}`);
+            if (!pollRes.ok) { netErrors += 1; if (netErrors >= MAX_NET_ERRORS) break; continue; }
+            netErrors = 0;
+            job = await pollRes.json();
+            setInstallJob({
+              jobId: job.jobId,
+              status: job.status,
+              filesDone: job.progress?.filesDone ?? 0,
+              filesTotal: job.progress?.filesTotal ?? 0,
+            });
+            if (job.status === 'completed' || job.status === 'failed') break;
+          } catch { netErrors += 1; if (netErrors >= MAX_NET_ERRORS) break; }
+        }
+        if (!job || (job.status !== 'completed' && job.status !== 'failed')) {
+          const msg = L(language, {
+            fa: 'وضعیت نصب پس از مدت طولانی نامشخص باقی ماند. لیست قالب‌ها را رفرش کنید؛ اگر قالب نیامده بود دوباره تلاش کنید.',
+            en: 'Install status stayed unknown for too long. Refresh the theme list; if the theme is missing, try again.',
+            ru: 'Статус установки слишком долго оставался неизвестным. Обновите список тем; если темы нет — повторите.',
+            tr: 'Kurulum durumu çok uzun süre belirsiz kaldı. Tema listesini yenileyin; tema yoksa tekrar deneyin.' });
+          setZipError(msg);
+          addNotification(msg, 'error');
+          return;
+        }
+        if (job.status === 'failed') {
+          // خطای واقعی job (نه 524 هاردکد) — با پیام دقیق سرور
+          setInstallJob(null);
+          setZipError(job.error || L(language, { fa: 'نصب قالب ناموفق بود', en: 'Theme installation failed', ru: 'Не удалось установить тему', tr: 'Tema kurulumu başarısız' }));
+          addNotification(L(language, { fa: `نصب ناموفق: ${job.error || ''}`, en: `Install failed: ${job.error || ''}`, ru: `Ошибка установки: ${job.error || ''}`, tr: `Kurulum başarısız: ${job.error || ''}` }), 'error');
+          return;
+        }
+        // completed — همان جریان موفقیت مسیر sync
+        setInstallJob(null);
+        installThemeFromServer(job);
+        return;
+      }
+
+      // ── مسیر sync قدیمی (200): پاسخ نهایی همین‌جا آمده ──
+      installThemeFromServer(data);
+
     } catch (err) {
       console.error('[Themes] Install error:', err);
       setZipError(L(language, { fa: 'خطا در ارتباط با سرور', en: 'Server connection error', ru: 'Ошибка соединения с сервером', tr: 'Sunucu bağlantı hatası' }));
@@ -2347,6 +2407,29 @@ export default function AdminPanelTab({
                         </div>
                       </div>
 
+                      {/* Install Job Progress (202 async pipeline) */}
+                      {installJob && (
+                        <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/30 text-primary text-xs font-bold leading-relaxed space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                              <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                              {installJob.status === 'queued' && L(language, { fa: 'در صف نصب…', en: 'Queued…', ru: 'В очереди…', tr: 'Kuyrukta…' })}
+                              {installJob.status === 'validating' && L(language, { fa: 'اعتبارسنجی بستهٔ قالب…', en: 'Validating package…', ru: 'Проверка пакета…', tr: 'Paket doğrulanıyor…' })}
+                              {installJob.status === 'extracting' && L(language, { fa: 'استخراج و پردازش فایل‌ها…', en: 'Extracting & processing files…', ru: 'Распаковка и обработка файлов…', tr: 'Dosyalar çıkarılıyor ve işleniyor…' })}
+                              {installJob.status === 'installing' && L(language, { fa: 'جایگزینی اتمیک و فعال‌سازی…', en: 'Atomic swap & activation…', ru: 'Атомарная замена и активация…', tr: 'Atomik değişim ve etkinleştirme…' })}
+                            </span>
+                            {installJob.filesTotal > 0 && (
+                              <span className="font-mono text-[10px] text-primary/80" dir="ltr">{installJob.filesDone}/{installJob.filesTotal}</span>
+                            )}
+                          </div>
+                          {installJob.filesTotal > 0 && (
+                            <div className="h-1.5 rounded-full bg-black/40 overflow-hidden">
+                              <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, Math.round((installJob.filesDone / Math.max(1, installJob.filesTotal)) * 100))}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Parse Error */}
                       {zipError && (
                         <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold leading-relaxed flex items-start gap-2">
@@ -2449,7 +2532,9 @@ export default function AdminPanelTab({
                               <span className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                             )}
                             {isInstallingZip
-                              ? (L(language, { fa: 'در حال نصب روی سرور...', en: 'Installing on server...', ru: 'Установка на сервер...', tr: 'Sunucuya yükleniyor...' }))
+                              ? (installJob
+                                  ? L(language, { fa: `نصب در پس‌زمینه (${installJob.filesDone}/${installJob.filesTotal})…`, en: `Installing in background (${installJob.filesDone}/${installJob.filesTotal})…`, ru: `Установка в фоне (${installJob.filesDone}/${installJob.filesTotal})…`, tr: `Arka planda kuruluyor (${installJob.filesDone}/${installJob.filesTotal})…` })
+                                  : L(language, { fa: 'در حال ارسال به سرور...', en: 'Uploading to server...', ru: 'Отправка на сервер...', tr: 'Sunucuya gönderiliyor...' }))
                               : (L(language, { fa: 'نصب و فعال‌سازی', en: 'Install & Activate', ru: 'Установить и активировать', tr: 'Yükle ve Etkinleştir' }))}
                           </button>
                         </div>

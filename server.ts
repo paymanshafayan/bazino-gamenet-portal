@@ -49,6 +49,13 @@ import {
   cleanupStaleThemeDirs,
   THEMES_DIR
 } from "./server/themeStore";
+import {
+  createThemeInstallJob,
+  getThemeInstallJob,
+  recoverThemeInstallJobs,
+  quickValidateThemeZip,
+  MAX_ZIP_BYTES as THEME_ZIP_MAX_BYTES
+} from "./server/themeInstallJobs";
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
@@ -720,6 +727,8 @@ async function startServer() {
   await initializeActiveProvider();
   ensureThemesDir();
   cleanupStaleThemeDirs();
+  // بازیابی jobهای نصب قالب که سرور وسطشان ری‌استارت شده → failed واضح + پاک‌سازی staging
+  recoverThemeInstallJobs();
   console.log(`[Storage] data dir: ${DATA_DIR}${IS_PERSISTENT_DATA_DIR ? " (persistent, BAZINO_DATA_DIR)" : " (cwd — set BAZINO_DATA_DIR for persistence on ephemeral hosts)"}`);
   const bootStore = getActiveDataProvider();
 
@@ -3896,6 +3905,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   // نصب قالب از فایل ZIP (body خام با Content-Type: application/zip)
   // ساختار: theme.json + theme.css + assets/
+  //
+  // ── معماری 202 (۲۰۲۶-۰۹-۱۲، رفع 524 قالب‌های پر-asset مثل bazino-arena3d):
+  // نصب‌های حجیم روی volume شبکه‌ای Railway از ~۱۰۰ ثانیهٔ Cloudflare بلندتر
+  // می‌شدند و کلادفلر پاسخ ۵۲۴ می‌بُرید. حالا این route فقط preflight سبک
+  // می‌کند (بدون decompress کل ZIP)، job پس‌زمینه‌ای می‌سازد و 202 + jobId
+  // برمی‌گرداند؛ نصب واقعی در background انجام می‌شود و وضعیتش از
+  // GET /api/admin/themes/install-jobs/:jobId poll می‌شود.
+  // ?async=0 → مسیر sync قدیمی (همان‌جا جواب نهایی) برای قالب‌های سبک/سازگاری.
   app.post(
     "/api/admin/themes/install",
     express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
@@ -3905,27 +3922,77 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         if (!buffer || buffer.length === 0) {
           return res.status(400).json(apiError(req, "ZIP_MISSING"));
         }
+        if (buffer.length > THEME_ZIP_MAX_BYTES) {
+          return res.status(413).json(apiError(req, "THEME_ZIP_TOO_LARGE", { size: Math.round(THEME_ZIP_MAX_BYTES / 1024 / 1024) }));
+        }
         const fallbackName = (req.query.name as string) || undefined;
         // replace=1 → نصب نسخه‌ی جدید روی همان شناسه (جایگزینی اتمیک پوشه)
         const replace = String(req.query.replace || "") === "1";
-        const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
-        if ("error" in result) {
-          return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
-        }
-        const store = getActiveDataProvider();
-        logDbQuery(store.name, "SYSTEM", `Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
-        // فعال‌سازی سراسری همین‌جا (اتمیک با نصب) — قبلاً کلاینت جداگانه صدا می‌زد و در صورت
-        // خطا، قالب نصب می‌شد ولی پیش‌فرض سایت عوض نمی‌شد.
         const activate = String(req.query.activate || "1") !== "0";
-        if (activate) await store.setSetting("activeThemeId", result.theme.id);
-        const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
-        res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
-      } catch (e) {
+        const forceSync = String(req.query.async || "1") === "0";
+
+        if (forceSync) {
+          // مسیر قدیمی — همان‌جا جواب نهایی می‌دهد (قالب‌های سبک؛ بدون timeout کلادفلر)
+          const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
+          if ("error" in result) {
+            return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
+          }
+          const store = getActiveDataProvider();
+          logDbQuery(store.name, "SYSTEM", `Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
+          if (activate) await store.setSetting("activeThemeId", result.theme.id);
+          const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+          return res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
+        }
+
+        // ── مسیر async (پیش‌فرض) ──
+        const store = getActiveDataProvider();
+        const pre = quickValidateThemeZip(new Uint8Array(buffer), fallbackName);
+        if (!pre.ok) {
+          return res.status(400).json({ error: pre.error, code: pre.code });
+        }
+        // قالب موجود بدون replace → همان 409 قبلی، قبل از اینکه job ساخته شود
+        const existing = listInstalledThemes().find((t: any) => t.id === pre.themeId);
+        if (existing && !replace) {
+          return res.status(409).json(apiError(req, "THEME_EXISTS_ID", { id: pre.themeId }));
+        }
+        const job = await createThemeInstallJob(new Uint8Array(buffer), {
+          replace,
+          activate,
+          fallbackName,
+          activateTheme: (themeId) => store.setSetting("activeThemeId", themeId),
+          readActiveThemeId: () => store.getSetting("activeThemeId"),
+        });
+        logDbQuery(store.name, "SYSTEM", `Theme install job ${job.jobId} queued for "${job.themeId}" v${job.version}`);
+        res.status(202).json({
+          success: true,
+          status: "processing",
+          jobId: job.jobId,
+          themeId: job.themeId,
+          version: job.version,
+          progress: job.progress,
+          pollUrl: `/api/admin/themes/install-jobs/${job.jobId}`,
+        });
+      } catch (e: any) {
+        if (e?.code && e?.message) {
+          return res.status(400).json({ error: e.message, code: e.code });
+        }
         console.error("Theme install error:", e);
         res.status(500).json({ error: String(e) });
       }
     }
   );
+
+  // وضعیت job نصب قالب — queued/validating/extracting/installing/completed/failed
+  // (requireAdmin از middleware سراسری /api/admin می‌آید)
+  app.get("/api/admin/themes/install-jobs/:jobId", (req, res) => {
+    try {
+      const job = getThemeInstallJob(String(req.params.jobId || ""));
+      if (!job) return res.status(404).json({ error: "JOB_NOT_FOUND", code: "JOB_NOT_FOUND" });
+      res.json({ success: true, ...job });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
 
   // سرو فایل CSS قالب (با بازنویسی مسیرهای assets)
   app.get("/api/themes/:id/theme.css", (req, res) => {

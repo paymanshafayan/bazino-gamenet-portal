@@ -30,8 +30,13 @@ export interface ThemePerformanceResult {
   canInstall: boolean;
 }
 
-const MAX_SINGLE_ASSET_BYTES = 3 * 1024 * 1024;
-const MAX_TOTAL_ASSET_BYTES = 8 * 1024 * 1024;
+// سقفهای حجم (۲۰۲۶-۰۹-۱۲): قالب‌های cinematic مثل bazino-arena3d
+// (۳۹۴ فریم WebP ≈ ۱۰.۶MB) با سقف مجموع ۸MB رد می‌شدند و نصبشان عملاً
+// غیرممکن بود. سقف جدید ۲۴MB/post-optimize با دفاع‌های ZIP-bomb جدا در
+// themeInstallJobs (سقف entry، سقف uncompressed، نسبت فشرده‌سازی) هم‌راستاست؛
+// محافظت اصلی کاربر موبایل همان بهینه‌سازی/تبدیل WebP خودکار است.
+const MAX_SINGLE_ASSET_BYTES = 8 * 1024 * 1024;
+const MAX_TOTAL_ASSET_BYTES = 24 * 1024 * 1024;
 const LARGE_IMAGE_BYTES = 250 * 1024;
 const IMAGE_EXTENSION = /\.(avif|gif|jpe?g|png|webp)$/i;
 const CONVERTIBLE_IMAGE_EXTENSION = /\.(jpe?g|png)$/i;

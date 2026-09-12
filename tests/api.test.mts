@@ -106,6 +106,34 @@ async function staffCashout(username:string,amount:number,key:string=crypto.rand
 const staffSettle=(id:string,key=`settle:${id}`)=>postJson(`${BASE}/api/sync/onsite-orders/${id}/settle`,{method:'cash',confirmed:true,idempotencyKey:key},adminAuth());
 
 
+/* نصب قالب از قرارداد جدید (۲۰۲۶-۰۹-۱۲): POST → 202 + jobId → poll تا نتیجه؛
+   پاسخ به شکل sync قبلی نرمال می‌شود تا assertionهای این‌جا مستقل از pipeline باشند.
+   (سطح ماژول — هم داخل boot-guard (suite 25) و هم بیرون آن (suite 33) دیده می‌شود) */
+async function installThemeSync(zip: Uint8Array, qs = ''): Promise<{ status: number; body: any }> {
+  const headers = () => ({ 'Content-Type': 'application/zip', Authorization: `Bearer ${adminToken}` });
+  const res = await fetch(`${BASE}/api/admin/themes/install?name=t${qs}`, {
+    method: 'POST', headers: headers(), body: Buffer.from(zip),
+  });
+  const body: any = await res.json().catch(() => null);
+  if (res.status === 202 && body?.jobId) {
+    const deadline = Date.now() + 60_000;
+    for (;;) {
+      const st = await fetch(`${BASE}/api/admin/themes/install-jobs/${body.jobId}`, { headers: { Authorization: `Bearer ${adminToken}` } });
+      assert.equal(st.status, 200, `job status endpoint failed: ${st.status}`);
+      const job: any = await st.json();
+      if (job.status === 'completed') {
+        return { status: 200, body: { success: true, theme: job.theme, replaced: job.replaced, activeThemeId: job.activeThemeId, performance: job.performance } };
+      }
+      if (job.status === 'failed') {
+        return { status: 400, body: { error: job.error, code: job.errorCode } };
+      }
+      if (Date.now() > deadline) throw new Error(`install job ${body.jobId} timed out in test`);
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  }
+  return { status: res.status, body };
+}
+
 if (bootError) {
   suite('17. API');
   skip('all API/end-to-end tests', `server did not boot: ${bootError.split('\n')[0]}`);
@@ -537,18 +565,15 @@ test('a theme ZIP can be installed, served, exported and deleted', async () => {
   const { buildSampleThemeZip, parseThemeZip, isZipParseError } = await import('../src/themes/themeZipCore.ts');
   const zip = buildSampleThemeZip();
 
-  // install
-  let res = await fetch(`${BASE}/api/admin/themes/install?name=e2e.zip`, {
-    method: 'POST', headers: { 'Content-Type': 'application/zip', ...adminAuth() },
-    body: new Uint8Array(zip) as unknown as BodyInit,
-  });
-  const installed = await res.json();
-  assert.equal(res.status, 200, `install failed: ${JSON.stringify(installed)}`);
+  // install (202 pipeline → poll → نتیجهٔ نهایی)
+  const installRes = await installThemeSync(zip, '?name=e2e.zip');
+  const installed = installRes.body;
+  assert.equal(installRes.status, 200, `install failed: ${JSON.stringify(installed)}`);
   assert.equal(installed.success, true);
   const id = installed.theme.id;
+  let res = await fetch(`${BASE}/api/themes/${id}/theme.css`);
 
   // css is served with asset urls rewritten to the theme route
-  res = await fetch(`${BASE}/api/themes/${id}/theme.css`);
   assert.equal(res.status, 200, 'theme.css not served');
   assert.match(await res.text(), new RegExp(`/api/themes/${id}/assets/`), 'asset urls were not rewritten');
 
@@ -1420,14 +1445,11 @@ const themeV1 = themeZipMod.buildSampleThemeZip();
 const parsedV1: any = themeZipMod.parseThemeZip(themeV1, 'x');
 const themeV2 = themeZipMod.buildThemeZip(parsedV1.css + '\n/* v2 */', { ...parsedV1.meta, version: '2.0.0' }, parsedV1.assets, parsedV1.componentJs);
 const THEME_ID = parsedV1.meta.id as string;
-const installTheme = (zip: Uint8Array, qs = '') => fetch(`${BASE}/api/admin/themes/install?name=t${qs}`, {
-  method: 'POST', headers: { ...adminAuth(), 'Content-Type': 'application/zip' }, body: Buffer.from(zip),
-});
+const installTheme = installThemeSync;
 
 test('install: creates the theme under BAZINO_DATA_DIR and makes it the site default', async () => {
-  const res = await installTheme(themeV1);
-  const body: any = await res.json();
-  assert.equal(res.status, 200, JSON.stringify(body));
+  const { status, body } = await installTheme(themeV1);
+  assert.equal(status, 200, JSON.stringify(body));
   assert.equal(body.theme.id, THEME_ID);
   assert.equal(body.activeThemeId, THEME_ID, 'install must activate site-wide atomically');
   assert.equal(body.replaced, false);
@@ -1438,25 +1460,24 @@ test('install: creates the theme under BAZINO_DATA_DIR and makes it the site def
 });
 
 test('install same id without replace → 409 THEME_EXISTS and old files untouched', async () => {
-  const res = await installTheme(themeV2);
-  const body: any = await res.json();
-  assert.equal(res.status, 409);
-  assert.equal(body.code, 'THEME_EXISTS');
+  const { status, body } = await installTheme(themeV2);
+  assert.equal(status, 409);
+  assert.equal(body.code, 'THEME_EXISTS_ID');
   const css = await (await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).text();
   assert.ok(!css.includes('/* v2 */'), 'v1 css must still be served');
 });
 
 test('install with replace=1 → atomic update, new version served, still active', async () => {
-  const res = await installTheme(themeV2, '&replace=1');
-  const body: any = await res.json();
-  assert.equal(res.status, 200, JSON.stringify(body));
+  const { status, body } = await installTheme(themeV2, '&replace=1');
+  assert.equal(status, 200, JSON.stringify(body));
   assert.equal(body.replaced, true);
   assert.equal(body.theme.version, '2.0.0');
   assert.equal(body.activeThemeId, THEME_ID);
   const css = await (await fetch(`${BASE}/api/themes/${THEME_ID}/theme.css`)).text();
   assert.ok(css.includes('/* v2 */'), 'v2 css must be served after update');
   const dirs = readdirSync(path.join(workDir, 'data', 'themes'));
-  assert.deepEqual(dirs.filter(d => d.startsWith('.')), [], 'no temp/backup dirs may remain');
+  // .staging = state معتبر jobهای نصب (تا ۶ ساعت برای poll می‌ماند)؛ بقیهٔ پوشه‌های نقطه‌دار temp/backup نشت‌اند.
+  assert.deepEqual(dirs.filter(d => d.startsWith('.') && d !== '.staging'), [], 'no temp/backup dirs may remain');
 });
 
 test('delete active theme → folder removed AND site default reset to dark-gold', async () => {
@@ -1473,13 +1494,13 @@ test('delete active theme → folder removed AND site default reset to dark-gold
 test('theme.js registering an unknown region is rejected; CSS-only package installs and reports regions=[]', async () => {
   const bad = themeZipMod.buildThemeZip(parsedV1.css, { ...parsedV1.meta, id: THEME_ID }, {}, "window.BazinoThemeSDK.registerComponent('sidebar', { render: function () { return null; } });");
   const r1 = await installTheme(bad, '&replace=1');
-  const b1: any = await r1.json();
+  const b1: any = r1.body;
   assert.equal(r1.status, 400, JSON.stringify(b1));
   assert.match(String(b1.error), /sidebar/);
 
   const cssOnly = themeZipMod.buildThemeZip(parsedV1.css, { ...parsedV1.meta, id: THEME_ID, tokens: { 'card-2': '#123456' } }, {});
   const r2 = await installTheme(cssOnly, '&replace=1');
-  const b2: any = await r2.json();
+  const b2: any = r2.body;
   assert.equal(r2.status, 200, JSON.stringify(b2));
   assert.equal(b2.theme.hasComponentJs, false);
   assert.deepEqual(b2.theme.regions, []);
@@ -1488,7 +1509,7 @@ test('theme.js registering an unknown region is rejected; CSS-only package insta
 
   // نسخه‌ی region-based (hero+footer) دوباره نصب می‌شود و بخش‌ها + strings در /api/themes گزارش می‌شوند
   const r3 = await installTheme(themeV2, '&replace=1');
-  assert.equal(r3.status, 200);
+  assert.equal(r3.status, 200, JSON.stringify(r3.body));
   const list: any = await getJson(`${BASE}/api/themes`);
   const t = list.serverThemes.find((x: any) => x.id === THEME_ID);
   assert.deepEqual([...t.regions].sort(), ['footer', 'hero']);

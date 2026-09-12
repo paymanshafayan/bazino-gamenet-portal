@@ -47,6 +47,7 @@ const LAYERS: Layer[] = [
   { id: 'integrations', file: 'integrations.test.mts', report: 'integrations.json', title: 'یکپارچه‌سازی — پاسخ غیبت اینستاگرام و ایمپورت بلاگ مانوس' },
   { id: 'jarvis', file: 'jarvis.test.mts', report: 'jarvis.json', title: 'جارویس — دستیار ادمین (Groq mock)' },
   { id: 'appetize', file: 'appetize.test.mts', report: 'appetize.json', title: 'آزمایشگاه اپ — امولاتور وب (Appetize ماک)', needsBuild: true },
+  { id: 'theme-install', file: 'theme-install.test.mts', report: 'theme-install.json', title: 'نصب قالب 202 — ZIP واقعی، بازیابی و امنیت', needsBuild: true },
   { id: 'api', file: 'api.test.mts', report: 'api.json', title: 'API — سرور واقعی (end-to-end)', needsBuild: true },
 ];
 

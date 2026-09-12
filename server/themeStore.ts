@@ -27,6 +27,7 @@ import {
   type ParsedZipTheme
 } from "../src/themes/themeZipCore";
 import { optimizeThemeImages, optimizeUploadedTheme, type ThemePerformanceReport } from "./themePerformance";
+import { parse as acornParse } from "acorn";
 import { dataPath } from "./paths";
 
 /** پوشه ریشه قالب‌های نصب‌شده روی سرور */
@@ -54,7 +55,10 @@ export function ensureThemesDir(): void {
 export function cleanupStaleThemeDirs(): void {
   try {
     for (const d of fs.readdirSync(THEMES_DIR, { withFileTypes: true })) {
-      if (d.isDirectory() && d.name.startsWith(".")) fs.rmSync(path.join(THEMES_DIR, d.name), { recursive: true, force: true });
+      // پوشه‌های نقطه‌دار موقت (‌.id.installing / .id.old) پاک می‌شوند؛
+      // .staging مال themeInstallJobs است — بازیابی/پاک‌سازی آن‌جا انجام
+      // می‌شود (recoverThemeInstallJobs بعد از همین تابع در boot صدا زده می‌شود).
+      if (d.isDirectory() && d.name.startsWith(".") && d.name !== ".staging") fs.rmSync(path.join(THEMES_DIR, d.name), { recursive: true, force: true });
     }
   } catch { /* پوشه هنوز ساخته نشده */ }
 }
@@ -174,28 +178,117 @@ export { listFilesRecursive };
 /* ═══════════════════════════════════════════════════════════════
  *  نصب قالب از ZIP — استخراج به پوشه اختصاصی قالب
  * ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+ *  اعتبارسنجی theme.js — تحلیل AST (acorn) به‌جای رجکس
+ *
+ *  چرا (۲۰۲۶-۰۹-۱۲، قالب bazino-arena3d): بن رجکسی هوک‌های React، الگوی
+ *  کاملاً سالمِ «کامپوننت React واقعی که فقط به‌صورت element برگردانده
+ *  می‌شود» را هم می‌گرفت:
+ *      function Home(p){ var r = R.useRef(null); R.useEffect(…); … }
+ *      S.registerComponent('home', { render: (p) => h(Home, p) })
+ *  SDK این خروجی را با React.isValidElement می‌پذیرد و Home را به‌عنوان
+ *  کامپوننت mount می‌کند — hookها داخلش قانونی‌اند. رجکس قبلی R.useRef(
+ *  را می‌دید و کل قالب را رد می‌کرد.
+ *
+ *  قاعدهٔ جدید: فراخوانی hook فقط وقتی مجاز است که داخل تابعی باشد که
+ *  «به‌عنوان کامپوننت» ارجاع شده (h(Home,…) / createElement(Home,…) —
+ *  ارجاع، نه فراخوانی). hook مستقیم در بدنهٔ render (حادثهٔ ۲۰۲۶-۰۹-۱۱
+ *  قالب «Bazino 3D Dimension»: render(p){ useState(…) }) همچنان رد می‌شود.
+ * ═══════════════════════════════════════════════════════════════════ */
+const REACT_HOOK_NAMES = new Set([
+  "useState", "useEffect", "useRef", "useMemo", "useCallback",
+  "useReducer", "useContext", "useLayoutEffect",
+]);
+
+/** walker عمومی روی ESTree — همهٔ نودها/بچه‌ها را با پشتهٔ توابع در برگیرنده می‌پیماید */
+function walkAst(
+  node: any,
+  visit: (node: any, fnStack: any[]) => void,
+  fnStack: any[] = []
+): void {
+  if (!node || typeof node !== "object") return;
+  visit(node, fnStack);
+  const nextStack = node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression"
+    ? [...fnStack, node]
+    : fnStack;
+  for (const key of Object.keys(node)) {
+    if (key === "start" || key === "end" || key === "loc" || key === "range" || key === "sourceFile") continue;
+    const value = (node as any)[key];
+    if (Array.isArray(value)) {
+      for (const child of value) if (child && typeof child.type === "string") walkAst(child, visit, nextStack);
+    } else if (value && typeof value === "object" && typeof value.type === "string") {
+      walkAst(value, visit, nextStack);
+    }
+  }
+}
+
+/** نام یک function node (declaration id، یا متغیری که expression به آن نسبت داده شده) */
+function functionOwnerName(fn: any): string | null {
+  if (fn?.id?.name) return fn.id.name;
+  // arrow/function expression داخل VariableDeclarator: var Home = function(…){…} / (p)=>…
+  if (fn?.__varName) return fn.__varName;
+  return null;
+}
+
 export function validateThemeComponentJs(componentJs: string): string | null {
   // theme.js اختیاری است — قالب CSS-only معتبر است
   if (!componentJs || !componentJs.trim()) return null;
+
+  // ۱) syntax (هم parse واقعی با acorn، هم برای پیام خطای دقیق‌تر از new Function)
+  let ast: any;
   try {
-    // Parse-only syntax validation; does not execute uploaded code.
-    // Runtime execution remains sandboxed to the browser, but invalid syntax or a
-    // missing SDK registration would otherwise break the homepage after install.
-    // eslint-disable-next-line no-new-func
-    new Function(componentJs);
+    ast = acornParse(componentJs, { ecmaVersion: "latest" });
   } catch (e: any) {
     return `theme.js خطای syntax دارد: ${e?.message || String(e)}`;
   }
-  // هوک‌های React/Preact داخل theme.js ممنوع است — render(props) به‌صورت «تابع ساده»
-  // (نه کامپوننت) اجرا می‌شود؛ فراخوانی useState در آنجا صفحهٔ اصلی را بعد از نصب
-  // کرش می‌کند (حادثهٔ ۲۰۲۶-۰۹-۱۱ قالب «Bazino 3D Dimension»). تعامل باید با
-  // ref + رویدادهای DOM ساخته شود. کامنت‌ها قبل از بررسی حذف می‌شوند.
-  const noComments = componentJs
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(^|[^:'"\\\w])\/\/[^\n\r]*/g, "$1");
-  if (/\b(?:useState|useEffect|useRef|useMemo|useCallback|useReducer|useContext|useLayoutEffect)\s*\(/.test(noComments)) {
-    return "theme.js نمی‌تواند از هوک‌های React (useState/useEffect/…) استفاده کند — render(props) به‌صورت تابع ساده اجرا می‌شود؛ برای تعامل از ref و رویدادهای DOM استفاده کنید";
-  }
+
+  // ۲) برچسب‌گذاری توابع بی‌نامِ نسبت‌یافته به متغیر (var Home = (p)=>…) تا صاحب hook معلوم شود
+  walkAst(ast, (node) => {
+    if (node.type === "VariableDeclarator" && node.init && typeof node.init.type === "string"
+      && /Function/.test(node.init.type) && node.id?.type === "Identifier") {
+      (node.init as any).__varName = node.id.name;
+    }
+  });
+
+  // ۳) شناسه‌هایی که به‌عنوان «کامپوننت» ارجاع شده‌اند: h(Home,…) / createElement(Home,…) / React.createElement(Home,…)
+  const componentRefs = new Set<string>();
+  walkAst(ast, (node) => {
+    if (node.type !== "CallExpression") return;
+    const callee = node.callee;
+    const isCreateCall =
+      (callee?.type === "Identifier" && (callee.name === "h" || callee.name === "createElement"))
+      || (callee?.type === "MemberExpression"
+        && callee.object?.type === "Identifier" && /^R$|React|Preact|preactH$/i.test(callee.object.name)
+        && callee.property?.name === "createElement");
+    if (!isCreateCall) return;
+    const first = node.arguments?.[0];
+    if (first?.type === "Identifier") componentRefs.add(first.name);
+  });
+
+  // ۴) همهٔ فراخوانی hookها باید داخل یک تابعِ «کامپوننت-رفرنس‌شده» باشند
+  //    (hookها هم به‌صورت bare مثل useState(…) و هم namespace مثل R.useState(…) / React.useEffect(…))
+  let hookViolation: string | null = null;
+  walkAst(ast, (node, fnStack) => {
+    if (hookViolation) return;
+    if (node.type !== "CallExpression") return;
+    const callee = node.callee;
+    let hookName: string | null = null;
+    if (callee?.type === "Identifier" && REACT_HOOK_NAMES.has(callee.name)) {
+      hookName = callee.name;
+    } else if (callee?.type === "MemberExpression" && callee.property?.type === "Identifier"
+      && REACT_HOOK_NAMES.has(callee.property.name)) {
+      hookName = callee.property.name;
+    }
+    if (!hookName) return;
+    const owner = fnStack[fnStack.length - 1] || null;
+    const ownerName = owner ? functionOwnerName(owner) : null;
+    if (ownerName && componentRefs.has(ownerName)) return; // کامپوننت واقعی — مجاز
+    hookViolation = `هوک ${hookName} فقط داخل کامپوننت React در theme.js مجاز است` +
+      (ownerName ? ` — تابع «${ownerName}» به‌عنوان کامپوننت به SDK داده نمی‌شود` : " — فراخوانی مستقیم در بدنهٔ render اجرا نمی‌شود") +
+      "؛ الگوی مجاز: function Comp(p){…} و سپس render:(p)=>h(Comp,p)";
+  });
+  if (hookViolation) return hookViolation;
+
   if (!/BazinoThemeSDK/.test(componentJs)) {
     return "theme.js باید بخش‌های قالب را با window.BazinoThemeSDK.registerComponent('<region>', ...) ثبت کند";
   }
@@ -210,7 +303,14 @@ export function validateThemeComponentJs(componentJs: string): string | null {
   return null;
 }
 
-export interface InstallOptions { /** نصب روی شناسه‌ی موجود = جایگزینی اتمیک نسخه‌ی قبلی */ replace?: boolean }
+export interface InstallOptions {
+  /** نصب روی شناسه‌ی موجود = جایگزینی اتمیک نسخه‌ی قبلی */
+  replace?: boolean;
+  /** پیشرفت استخراج/نوشتن فایل‌ها — برای job پس‌زمینه‌ای (پاسخ 202) */
+  onProgress?: (p: { filesDone: number; filesTotal: number }) => void;
+  /** لحظهٔ شروع swap اتمیک/ثبت نهایی — فاز installing در وضعیت job */
+  onInstalling?: () => void;
+}
 export type InstallResult =
   | { theme: InstalledThemeInfo; parsed: ParsedZipTheme; performance: ThemePerformanceReport; replaced: boolean }
   | { error: string; code?: "THEME_EXISTS" | "INVALID"; performance?: ThemePerformanceReport };
@@ -276,23 +376,52 @@ export async function installThemeZip(buffer: Uint8Array, fallbackName?: string,
     fs.writeFileSync(path.join(dir, "theme.js"), optimized.componentJs, "utf8");
   }
 
-  // assets/
+  // assets/ — نوشتن موازی با هم‌زمانیِ محدود + پیش‌ساخت یکتای پوشه‌ها
+  // (پرامت §3: بدون Promise.all بی‌سقف، mkdir یک‌بار برای هر پوشه، progress برای job 202).
   const assetNames = Object.keys(optimized.assets);
   if (assetNames.length > 0) {
     const assetsDir = path.join(dir, "assets");
     fs.mkdirSync(assetsDir, { recursive: true });
+    // پوشه‌های یکتا یک‌بار ساخته می‌شوند (برای قالب ۴۰۵-فایلی این یعنی
+    // صدها mkdir تکراری کمتر روی volume شبکه‌ای)
+    const uniqueDirs = new Set<string>();
     for (const rel of assetNames) {
-      // محافظت مضاعف از path traversal در نام فایل‌های asset
       const safeRel = rel.split("/").map(part => part.replace(/[^a-zA-Z0-9._-]/g, "_")).join("/");
       if (safeRel.includes("..")) continue;
       const dest = path.join(assetsDir, ...safeRel.split("/"));
       if (!dest.startsWith(assetsDir + path.sep)) continue;
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.writeFileSync(dest, optimized.assets[rel]);
+      const parent = path.dirname(dest);
+      if (parent !== assetsDir) uniqueDirs.add(parent);
     }
+    for (const d of uniqueDirs) fs.mkdirSync(d, { recursive: true });
+
+    let filesDone = 0;
+    const reportProgress = () => options.onProgress?.({ filesDone, filesTotal: assetNames.length });
+    reportProgress();
+    const ASSET_WRITE_CONCURRENCY = 8;
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const i = nextIndex++;
+        if (i >= assetNames.length) return;
+        const rel = assetNames[i];
+        // محافظت مضاعف از path traversal در نام فایل‌های asset
+        const safeRel = rel.split("/").map(part => part.replace(/[^a-zA-Z0-9._-]/g, "_")).join("/");
+        if (safeRel.includes("..")) continue;
+        const dest = path.join(assetsDir, ...safeRel.split("/"));
+        if (!dest.startsWith(assetsDir + path.sep)) continue;
+        await fs.promises.writeFile(dest, optimized.assets[rel]);
+        filesDone += 1;
+        reportProgress();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(ASSET_WRITE_CONCURRENCY, Math.max(1, assetNames.length)) }, worker));
+  } else {
+    options.onProgress?.({ filesDone: 0, filesTotal: 0 });
   }
 
   // جابه‌جایی اتمیک: نسخه‌ی قبلی → .old ، موقت → مقصد ، سپس حذف .old
+  options.onInstalling?.();
   const backup = path.join(THEMES_DIR, `.${id}.old-${Date.now()}`);
   try {
     if (alreadyInstalled) fs.renameSync(finalDir, backup);

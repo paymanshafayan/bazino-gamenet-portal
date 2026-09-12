@@ -1,16 +1,16 @@
 # Flutter CI report
 
-- commit: `ea03d969fda1f0477ab813324158d7621514a670`
-- branch: `main`
-- run:    33748394083
-- date:   2026-09-03 11:12 UTC
+- commit: `513017644086b29451661c244a01b95766d5c30e`
+- branch: `arena/01a089a9-bazino-gamenet-portal`
+- run:    34695818186
+- date:   2026-09-12 13:14 UTC
 
 ## flutter --version
 ```
-Flutter 3.47.2 • channel stable • https://github.com/flutter/flutter.git
-Framework • revision d3b14c8769 (8 days ago) • 2026-08-26 16:07:51 -0700
-Engine • hash 1cf1c4773fb941c4c74a7f8bb144a8837596c0f4 (revision a804b26164) (7 days ago) • 2026-08-26 18:46:13.000Z
-Tools • Dart 3.13.2 • DevTools 2.60.0
+Flutter 3.47.4 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision 9584c6713b (2 days ago) • 2026-09-10 15:25:10 -0700
+Engine • hash 0e228ec8c8d2abc9fcf1d053e8a40665bb859ec7 (revision 06a2e2a110) (9 days ago) • 2026-09-03 16:07:13.000Z
+Tools • Dart 3.13.3 • DevTools 2.60.0
 ```
 **exit 0 — OK**
 
@@ -61,13 +61,13 @@ Downloading packages...
 * path_provider_linux 2.2.2 (was 2.2.2)
 * path_provider_platform_interface 2.1.3 (was 2.1.3)
 * path_provider_windows 2.3.0 (was 2.3.0)
-* permission_handler 11.4.0 (was 11.4.0) (13.0.1 available)
-* permission_handler_android 12.1.0 (was 12.1.0) (14.0.0 available)
+* permission_handler 11.4.0 (was 11.4.0) (13.0.2 available)
+* permission_handler_android 12.1.0 (was 12.1.0) (14.1.0 available)
 * permission_handler_apple 9.6.1 (was 9.4.10)
 * permission_handler_html 0.1.4+1 (was 0.1.3+5)
-* permission_handler_platform_interface 4.4.0 (was 4.3.0)
+* permission_handler_platform_interface 4.4.1 (was 4.3.0)
 * permission_handler_windows 0.2.2 (was 0.2.1)
-* platform 3.1.6 (was 3.1.6)
+* platform 3.2.0 (was 3.1.6)
 * plugin_platform_interface 2.1.8 (was 2.1.8)
 * provider 6.1.5+1 (was 6.1.5+1)
 * pub_semver 2.2.1 (was 2.2.0)
@@ -92,7 +92,7 @@ Downloading packages...
 * vector_math 2.4.2 (was 2.2.0)
 + video_player 2.14.0
 + video_player_android 2.12.2
-+ video_player_avfoundation 2.11.1
++ video_player_avfoundation 2.12.0
 + video_player_platform_interface 6.9.0
 + video_player_web 2.4.0
 * vm_service 15.3.0 (was 15.2.0)
@@ -111,7 +111,7 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 8.3s)
+No issues found! (ran in 9.9s)
 ```
 **exit 0 — OK**
 
@@ -129,29 +129,34 @@ No issues found! (ran in 8.3s)
 ✅ parse کردن پاسخ سرور GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
 ✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
 ✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
+✅ هاب خانه — قالب کنسول سایت ارب مرکزی جارویس و پنج دکمهٔ مداری بخش‌ها رندر می‌شوند
+✅ هاب خانه — قالب کنسول سایت تب پروفایل نوار پایین صفحهٔ باشگاه/پروفایل را باز می‌کند نه مسابقات
+✅ جارویس — رابط گفتگومحور پیام خوش‌آمد، نوار ورودی و پیشنهادهای شروع نمایش داده می‌شوند
+✅ جارویس — رابط گفتگومحور پس از رشد گفتگو، پیشنهادهای شروع پنهان می‌شوند
+✅ جارویس — رابط گفتگومحور نشانگر «در حال تایپ» سه نقطهٔ متحرک دارد
+✅ جارویس — رابط گفتگومحور پیام جارویس با اکشن، نشان «عملیات انجام شد» می‌گیرد
 ::endgroup::
 
-🎉 10 tests passed.
+🎉 16 tests passed.
 ```
 **exit 0 — OK**
 
 ## flutter build web
 ```
 Compiling lib/main.dart for the Web...                          
-Wasm dry run failed:
+Wasm dry run findings:
 Found incompatibilities with WebAssembly.
 
 file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_web.dart 104:23 - invalid_runtime_check_with_js_interop_types lint violation: Cast from 'JSAny?' to 'int' casts a JS interop value to a Dart type, which might not be platform-consistent. (8)
 file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_web.dart 105:21 - invalid_runtime_check_with_js_interop_types lint violation: Cast from 'JSAny?' to 'String' casts a JS interop value to a Dart type, which might not be platform-consistent. (8)
 file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_web.dart 107:21 - invalid_runtime_check_with_js_interop_types lint violation: Cast from 'JSAny?' to 'String' casts a JS interop value to a Dart type, which might not be platform-consistent. (8)
 
-'record-use' is now enabled by default; this flag is no longer required.
-'record-use' is now enabled by default; this flag is no longer required.
+Consider addressing these issues to enable wasm builds. See docs for more info: https://docs.flutter.dev/platform-integration/web/wasm
 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14436 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             39.6s
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14840 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Compiling lib/main.dart for the Web...                             45.4s
 ✓ Built build/web
 ```
 **exit 0 — OK**

@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `4d2b3a640e6498ab611a4731dd5cec32a52a7566`
+- commit: `963045296a33bff69fd8a933b0f5852a3cc9fcf8`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34697728105
-- date:   2026-09-12 13:54 UTC
+- run:    34697820049
+- date:   2026-09-12 13:56 UTC
 
 ## flutter --version
 ```
@@ -129,37 +129,165 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ```
 Analyzing flutter_app...                                        
 
-  error • The getter 'tokens_rounded' isn't defined for the type 'Icons'. Try importing the library that defines 'tokens_rounded', correcting the name to the name of an existing getter, or defining a getter or field named 'tokens_rounded' • lib/screens/account_screen.dart:206:120 • undefined_getter
    info • Unnecessary use of string interpolation. Try replacing the string literal with the variable name • lib/screens/account_screen.dart:338:39 • unnecessary_string_interpolations
    info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/screens/account_screen.dart:1214:43 • prefer_const_constructors
-  error • The getter 'tokens_rounded' isn't defined for the type 'Icons'. Try importing the library that defines 'tokens_rounded', correcting the name to the name of an existing getter, or defining a getter or field named 'tokens_rounded' • lib/screens/reservation_screen.dart:335:24 • undefined_getter
 
-4 issues found. (ran in 9.6s)
+2 issues found. (ran in 9.0s)
 ```
 **exit 1 — FAILED**
 
 ## flutter test
 ```
+A RenderFlex overflowed by 19 pixels on the right.
 
-lib/screens/account_screen.dart:206:120: Error: Member not found: 'tokens_rounded'.
-                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.tokens_rounded, GamingTheme.secondary)),
-                                                                                          ^^^^^^^^^^^^^^
-lib/screens/reservation_screen.dart:335:24: Error: Member not found: 'tokens_rounded'.
-          icon = Icons.tokens_rounded;
-                       ^^^^^^^^^^^^^^
-::group::❌ loading /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart (failed)
-Failed to load "/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart":
-Compilation failed for testPath=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart: lib/screens/account_screen.dart:206:120: Error: Member not found: 'tokens_rounded'.
-                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.tokens_rounded, GamingTheme.secondary)),
-                                                                                                                       ^^^^^^^^^^^^^^
-lib/screens/reservation_screen.dart:335:24: Error: Member not found: 'tokens_rounded'.
-          icon = Icons.tokens_rounded;
-                       ^^^^^^^^^^^^^^
-.
+The relevant error-causing widget was:
+  Row
+  Row:file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/lib/screens/hub_screen.dart:260:18
+
+The overflowing RenderFlex has an orientation of Axis.horizontal.
+The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
+black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
+Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
+RenderFlex to fit within the available space instead of being sized to their natural size.
+This is considered an error condition because it indicates that there is content that cannot be
+seen. If the content is legitimately bigger than the available space, consider clipping it with a
+ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
+like a ListView.
+The specific RenderFlex in question is: RenderFlex#76f3b OVERFLOWING:
+  creator: Row ← Padding ← DecoratedBox ← Padding ← Container ← Listener ← RawGestureDetector ←
+    GestureDetector ← Semantics ← DefaultSelectionStyle ← Builder ← MouseRegion ← ⋯
+  parentData: offset=Offset(11.0, 7.0) (can use size)
+  constraints: BoxConstraints(w=18.0, h=26.0)
+  size: Size(18.0, 26.0)
+  direction: horizontal
+  mainAxisAlignment: start
+  mainAxisSize: min
+  crossAxisAlignment: center
+  textDirection: ltr
+  verticalDirection: down
+  spacing: 0.0
+◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Test failed. See exception logs above.
+The test description was: کاربری که intro را دیده، دیگر آن را نمی‌بیند
 
 ::endgroup::
+::group::✅ Passing tests
+✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
+::endgroup::
+::group::❌ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me (failed)
+type 'Null' is not a subtype of type 'num' in type cast
+package:bazino_app/models.dart 117:65  new UserState.fromJson
+test/widget_test.dart 90:27            main.<fn>.<fn>
+::endgroup::
+::group::❌ parse کردن پاسخ سرور UserState.fromJson — پاسخ ناقص نباید کرش کند (failed)
+type 'Null' is not a subtype of type 'int'
+package:bazino_app/models.dart 115:58  new UserState.fromJson
+test/widget_test.dart 104:27           main.<fn>.<fn>
+::endgroup::
+::group::✅ Passing tests
+✅ parse کردن پاسخ سرور GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
+✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
+✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
+::endgroup::
+::group::❌ هاب خانه — قالب کنسول سایت ارب مرکزی جارویس و پنج دکمهٔ مداری بخش‌ها رندر می‌شوند (failed)
+══╡ EXCEPTION CAUGHT BY RENDERING LIBRARY ╞═════════════════════════════════════════════════════════
+The following assertion was thrown during layout:
+A RenderFlex overflowed by 19 pixels on the right.
 
-::error::0 tests passed, 1 failed.
+The relevant error-causing widget was:
+  Row
+  Row:file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/lib/screens/hub_screen.dart:260:18
+
+The overflowing RenderFlex has an orientation of Axis.horizontal.
+The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
+black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
+Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
+RenderFlex to fit within the available space instead of being sized to their natural size.
+This is considered an error condition because it indicates that there is content that cannot be
+seen. If the content is legitimately bigger than the available space, consider clipping it with a
+ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
+like a ListView.
+The specific RenderFlex in question is: RenderFlex#04c42 OVERFLOWING:
+  creator: Row ← Padding ← DecoratedBox ← Padding ← Container ← Listener ← RawGestureDetector ←
+    GestureDetector ← Semantics ← DefaultSelectionStyle ← Builder ← MouseRegion ← ⋯
+  parentData: offset=Offset(11.0, 7.0) (can use size)
+  constraints: BoxConstraints(w=18.0, h=26.0)
+  size: Size(18.0, 26.0)
+  direction: horizontal
+  mainAxisAlignment: start
+  mainAxisSize: min
+  crossAxisAlignment: center
+  textDirection: ltr
+  verticalDirection: down
+  spacing: 0.0
+◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Test failed. See exception logs above.
+The test description was: ارب مرکزی جارویس و پنج دکمهٔ مداری بخش‌ها رندر می‌شوند
+
+::endgroup::
+::group::❌ هاب خانه — قالب کنسول سایت تب پروفایل نوار پایین مرکز حساب کاربری را باز می‌کند نه مسابقات (failed)
+══╡ EXCEPTION CAUGHT BY RENDERING LIBRARY ╞═════════════════════════════════════════════════════════
+The following assertion was thrown during layout:
+A RenderFlex overflowed by 19 pixels on the right.
+
+The relevant error-causing widget was:
+  Row
+  Row:file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/lib/screens/hub_screen.dart:260:18
+
+The overflowing RenderFlex has an orientation of Axis.horizontal.
+The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
+black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
+Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
+RenderFlex to fit within the available space instead of being sized to their natural size.
+This is considered an error condition because it indicates that there is content that cannot be
+seen. If the content is legitimately bigger than the available space, consider clipping it with a
+ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
+like a ListView.
+The specific RenderFlex in question is: RenderFlex#04759 OVERFLOWING:
+  creator: Row ← Padding ← DecoratedBox ← Padding ← Container ← Listener ← RawGestureDetector ←
+    GestureDetector ← Semantics ← DefaultSelectionStyle ← Builder ← MouseRegion ← ⋯
+  parentData: offset=Offset(11.0, 7.0) (can use size)
+  constraints: BoxConstraints(w=18.0, h=26.0)
+  size: Size(18.0, 26.0)
+  direction: horizontal
+  mainAxisAlignment: start
+  mainAxisSize: min
+  crossAxisAlignment: center
+  textDirection: ltr
+  verticalDirection: down
+  spacing: 0.0
+◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Test failed. See exception logs above.
+The test description was: تب پروفایل نوار پایین مرکز حساب کاربری را باز می‌کند نه مسابقات
+
+::endgroup::
+::group::✅ Passing tests
+✅ جارویس — رابط گفتگومحور پیام خوش‌آمد، نوار ورودی و پیشنهادهای شروع نمایش داده می‌شوند
+✅ جارویس — رابط گفتگومحور پس از رشد گفتگو، پیشنهادهای شروع پنهان می‌شوند
+✅ جارویس — رابط گفتگومحور نشانگر «در حال تایپ» سه نقطهٔ متحرک دارد
+✅ جارویس — رابط گفتگومحور پیام جارویس با اکشن، نشان «عملیات انجام شد» می‌گیرد
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور UserState.fromJson — فیلدهای کامل publicUser سرور
+::endgroup::
+::group::❌ حساب کاربری و پرداخت — parse کردن پاسخ سرور UserState.fromJson — پاسخ قدیمی سرور بدون فیلدهای جدید نباید کرش کند (failed)
+type 'Null' is not a subtype of type 'num' in type cast
+package:bazino_app/models.dart 117:65  new UserState.fromJson
+test/widget_test.dart 320:27           main.<fn>.<fn>
+::endgroup::
+::group::✅ Passing tests
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور UserState.toJson ↔ fromJson — رفت‌وبرگشت (لازم برای آپلود آواتار)
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور WalletTx.fromJson — تراکنش کیف پول
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور OnsiteOrder.fromJson — سفارش حضوری با مهلت
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور PaymentMethods.fromJson — قرارداد /api/payments/methods
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور MyReservationLog.fromJson — رزروهای من
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور MyOrder.fromJson + itemsSummary — خلاصهٔ اقلام سفارش
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور SupportTicket.fromJson — تیکت با پاسخ جدید
+✅ حساب کاربری و پرداخت — parse کردن پاسخ سرور TicketMessage.fromJson — پیام پشتیبانی
+::endgroup::
+
+::error::19 tests passed, 7 failed.
 ```
 **exit 1 — FAILED**
 
@@ -176,67 +304,12 @@ file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_
 Consider addressing these issues to enable wasm builds. See docs for more info: https://docs.flutter.dev/platform-integration/web/wasm
 
 Use --no-wasm-dry-run to disable these warnings.
-Target dart2js failed: ProcessException: Process exited abnormally with exit code 1:
-lib/screens/account_screen.dart:206:120:
-Error: Member not found: 'tokens_rounded'.
-                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.tokens_rounded, GamingTheme.secondary)),
-                                                                                          ^^^^^^^^^^^^^^
-lib/screens/reservation_screen.dart:335:24:
-Error: Member not found: 'tokens_rounded'.
-          icon = Icons.tokens_rounded;
-                       ^^^^^^^^^^^^^^
-Error: Compilation failed.
-  Command: /opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/dart-sdk/bin/dart compile js --platform-binaries=/opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/flutter_web_sdk/kernel --invoker=flutter_tool -Ddart.vm.product=true -DFLUTTER_BUILD_NAME=1.2.0 -DFLUTTER_BUILD_NUMBER=2 -DFLUTTER_VERSION=3.47.4 -DFLUTTER_CHANNEL=stable -DFLUTTER_GIT_URL=https://github.com/flutter/flutter.git -DFLUTTER_FRAMEWORK_REVISION=9584c6713b -DFLUTTER_ENGINE_REVISION=06a2e2a110 -DFLUTTER_DART_VERSION=3.13.3 -DFLUTTER_WEB_USE_SKIA=true -DFLUTTER_WEB_USE_SKWASM=false -DFLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/ --write-resources --native-null-assertions --no-source-maps -O4 --minify -o /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/flutter_build/7edee9b95ec7b37c7454a66dc424a75a/app.dill --packages=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/package_config.json --cfe-only /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/flutter_build/7edee9b95ec7b37c7454a66dc424a75a/main.dart
-#0      RunResult.throwException (package:flutter_tools/src/base/process.dart:153:5)
-#1      _DefaultProcessUtils.run (package:flutter_tools/src/base/process.dart:379:19)
-<asynchronous suspension>
-#2      Dart2JSTarget.build (package:flutter_tools/src/build_system/targets/web.dart:222:5)
-<asynchronous suspension>
-#3      _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:937:9)
-<asynchronous suspension>
-#4      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
-<asynchronous suspension>
-#5      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
-<asynchronous suspension>
-#6      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
-<asynchronous suspension>
-#7      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
-<asynchronous suspension>
-#8      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
-<asynchronous suspension>
-#9      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
-<asynchronous suspension>
-#10     FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:684:16)
-<asynchronous suspension>
-#11     WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:107:34)
-<asynchronous suspension>
-#12     BuildWebCommand.runCommand (package:flutter_tools/src/commands/build_web.dart:293:5)
-<asynchronous suspension>
-#13     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1663:27)
-<asynchronous suspension>
-#14     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
-<asynchronous suspension>
-#15     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
-<asynchronous suspension>
-#16     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:496:9)
-<asynchronous suspension>
-#17     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
-<asynchronous suspension>
-#18     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:431:5)
-<asynchronous suspension>
-#19     FlutterCommandRunner.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:307:33)
-<asynchronous suspension>
-#20     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
-<asynchronous suspension>
-#21     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
-<asynchronous suspension>
-#22     main (package:flutter_tools/executable.dart:103:3)
-<asynchronous suspension>
-
-Compiling lib/main.dart for the Web...                             40.1s
-Error: Failed to compile application for the Web.
+Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 19428 bytes (98.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Compiling lib/main.dart for the Web...                             44.5s
+✓ Built build/web
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## Summary
 ```
@@ -244,7 +317,7 @@ flutter --version=0
 flutter pub get=0
 flutter analyze=1
 flutter test=1
-flutter build web=1
+flutter build web=0
 ```
 
-build/web size: 37M
+build/web size: 46M

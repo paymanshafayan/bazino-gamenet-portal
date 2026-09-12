@@ -5781,62 +5781,6 @@ Example format:
     res.sendFile(path.join(managementAppDist, "index.html"));
   });
 
-  // وب‌اپ فلاتر بازینو — همان اپ موبایل، مستقیم در مرورگر (bazino.pro/app-web).
-  // بیلد وب توسط scripts/build-flutter-web.sh در زمان دیپلوی ساخته می‌شود؛
-  // اگر نباشد (بیلد لوکال/تست) این مسیر به‌سادگی وجود ندارد و دیپلوی سالم می‌ماند.
-  // کش: بدون maxAge ولی با etag — نام فایل‌های خروجی فلاتر پایدار است
-  // (main.dart.js و …) پس کش تهاجمی باعث کهنگی می‌شد؛ 304-revalidate کافی است.
-  // path.resolve: staticRoot ممکن است نسبی باشد (مثل Railway) — serve-static و
-  // res.sendFile با مسیر نسبی روی ریشهٔ mount بدون اسلش ۵۰۰ می‌دهند (باگ واقعی
-  // دیپلوی). مطلق‌سازی مسیر هر دو حالت را یکسان و سالم می‌کند.
-  const flutterWebDist = path.resolve(staticRoot, "flutter_app", "build", "web");
-  // دیباگ/شفافیت: وضعیت دقیق بیلد وبِ فلاتر روی این دیپلوی (کدام فایل‌ها هستند)
-  app.get("/api/app-web/status", (_req, res) => {
-    try {
-      const exists = (f: string) => fs.existsSync(path.join(flutterWebDist, f));
-      const size = (f: string) => {
-        try { return fs.statSync(path.join(flutterWebDist, f)).size; } catch { return 0; }
-      };
-      const files = fs.existsSync(flutterWebDist) ? fs.readdirSync(flutterWebDist) : [];
-      // کدام کامیت در حال سرو است؟ (dist/build-meta.json — در زمان build نوشته می‌شود)
-      let buildMeta: unknown = null;
-      try {
-        buildMeta = JSON.parse(fs.readFileSync(path.join(process.cwd(), "dist", "build-meta.json"), "utf8"));
-      } catch { /* لوکال/تست — مهم نیست */ }
-      res.json({
-        buildMeta,
-        dirExists: fs.existsSync(flutterWebDist),
-        served: exists("index.html"),
-        files,
-        indexHtml: exists("index.html"),
-        mainDartJs: exists("main.dart.js"),
-        mainDartJsSize: size("main.dart.js"),
-        flutterJs: exists("flutter.js"),
-        bootstrap: exists("flutter_bootstrap.js"),
-        canvaskit: exists("canvaskit/canvaskit.js"),
-      });
-    } catch (e) {
-      res.status(500).json({ error: String(e) });
-    }
-  });
-  // گارد روی index.html نه فقط دایرکتوری — بیلد ناتمامِ فلاتر (main.dart.js بدون
-  // index.html) هرگز نباید مسیر را با 500 فعال کند (درس دیپلوی اول).
-  if (fs.existsSync(path.join(flutterWebDist, "index.html"))) {
-    app.use("/app-web", express.static(flutterWebDist, { etag: true, maxAge: 0, redirect: false }));
-    // فرم { root } + next() در خطا: هرگز ۵۰۰ ندهیم؛ بدترین حالت به SPA سایت می‌رسد.
-    app.get("/app-web", (_req, res, next) => {
-      res.sendFile("index.html", { root: flutterWebDist }, (err) => {
-        if (err && !res.headersSent) next();
-      });
-    });
-    app.get("/app-web/*", (_req, res, next) => {
-      res.sendFile("index.html", { root: flutterWebDist }, (err) => {
-        if (err && !res.headersSent) next();
-      });
-    });
-    console.info("[Web App] Flutter web app served at /app-web");
-  }
-
   // فایل‌های بهینه‌شده‌ی موبایل که پنل مدیریت در لحظه (runtime) می‌سازد. در production
   // فقط dist سرو می‌شود و این فایل‌ها در public نوشته می‌شوند، پس بدون این mount
   // موقتی ۴۰۴ می‌شدند. نام فایل هشِ محتواست پس کش immutable همیشه امن است.

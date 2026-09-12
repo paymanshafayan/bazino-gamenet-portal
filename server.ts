@@ -5786,7 +5786,10 @@ Example format:
   // اگر نباشد (بیلد لوکال/تست) این مسیر به‌سادگی وجود ندارد و دیپلوی سالم می‌ماند.
   // کش: بدون maxAge ولی با etag — نام فایل‌های خروجی فلاتر پایدار است
   // (main.dart.js و …) پس کش تهاجمی باعث کهنگی می‌شد؛ 304-revalidate کافی است.
-  const flutterWebDist = path.join(staticRoot, "flutter_app", "build", "web");
+  // path.resolve: staticRoot ممکن است نسبی باشد (مثل Railway) — serve-static و
+  // res.sendFile با مسیر نسبی روی ریشهٔ mount بدون اسلش ۵۰۰ می‌دهند (باگ واقعی
+  // دیپلوی). مطلق‌سازی مسیر هر دو حالت را یکسان و سالم می‌کند.
+  const flutterWebDist = path.resolve(staticRoot, "flutter_app", "build", "web");
   // دیباگ/شفافیت: وضعیت دقیق بیلد وبِ فلاتر روی این دیپلوی (کدام فایل‌ها هستند)
   app.get("/api/app-web/status", (_req, res) => {
     try {
@@ -5814,11 +5817,16 @@ Example format:
   // index.html) هرگز نباید مسیر را با 500 فعال کند (درس دیپلوی اول).
   if (fs.existsSync(path.join(flutterWebDist, "index.html"))) {
     app.use("/app-web", express.static(flutterWebDist, { etag: true, maxAge: 0, redirect: false }));
-    app.get("/app-web", (_req, res) => {
-      res.sendFile(path.join(flutterWebDist, "index.html"));
+    // فرم { root } + next() در خطا: هرگز ۵۰۰ ندهیم؛ بدترین حالت به SPA سایت می‌رسد.
+    app.get("/app-web", (_req, res, next) => {
+      res.sendFile("index.html", { root: flutterWebDist }, (err) => {
+        if (err && !res.headersSent) next();
+      });
     });
-    app.get("/app-web/*", (_req, res) => {
-      res.sendFile(path.join(flutterWebDist, "index.html"));
+    app.get("/app-web/*", (_req, res, next) => {
+      res.sendFile("index.html", { root: flutterWebDist }, (err) => {
+        if (err && !res.headersSent) next();
+      });
     });
     console.info("[Web App] Flutter web app served at /app-web");
   }

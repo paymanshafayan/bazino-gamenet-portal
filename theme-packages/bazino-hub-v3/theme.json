@@ -1,9 +1,9 @@
 {
   "id": "bazino-hub-v3",
   "name": "Bazino Hub v3 (Hasti)",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "layout": "hub",
-  "description": "Bazino Hub v3.2.0 — ref-01 visual match: 3-zone hero with giant display type, uniform magenta tiles, labeled footer, single-page no-scroll.",
+  "description": "Bazino Hub v3.3.0 — ref-01 per employer walkthrough: language flags, 20/60/20 hero, colorful PNG tile icons, 4 contact boxes (location/hours/whatsapp/instagram), slim footer, single-page no-scroll.",
   "author": "Bazino",
   "sdkVersion": 2,
   "colors": {
@@ -78,7 +78,8 @@
       "footer.club": "GAMING CLUB",
       "hero.live.header": "LIVE MATCH",
       "footer.location": "LOCATION",
-      "contact.map": "Click to view"
+      "contact.map": "Click to view",
+      "footer.tagline": "GOOD GAMES · GOOD PEOPLE"
     },
     "fa": {
       "header.club": "گیمینگ کلاب",
@@ -124,7 +125,8 @@
       "footer.club": "GAMING CLUB",
       "hero.live.header": "مسابقه زنده",
       "footer.location": "آدرس",
-      "contact.map": "مشاهدهٔ مسیر"
+      "contact.map": "مشاهدهٔ مسیر",
+      "footer.tagline": "بازی خوب، رفاقت بهتر"
     },
     "tr": {
       "header.club": "OYUN KULÜBÜ",
@@ -146,7 +148,8 @@
       "footer.club": "GAMING CLUB",
       "hero.live.header": "CANLI MAÇ",
       "footer.location": "KONUM",
-      "contact.map": "Görüntüle"
+      "contact.map": "Görüntüle",
+      "footer.tagline": "IYI OYUNLAR · IYI ARKADAŞLAR"
     },
     "ru": {
       "header.club": "ИГРОВОЙ КЛУБ",
@@ -168,7 +171,8 @@
       "footer.club": "GAMING CLUB",
       "hero.live.header": "LIVE МАТЧ",
       "footer.location": "АДРЕС",
-      "contact.map": "Смотреть"
+      "contact.map": "Смотреть",
+      "footer.tagline": "ХОРОШИЕ ИГРЫ · ХОРОШИЕ ЛЮДИ"
     }
   }
 }

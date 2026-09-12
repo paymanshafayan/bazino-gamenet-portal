@@ -215,18 +215,19 @@
 .hz-ico { width: 26px; height: 26px; }
 .hz-ico-sm { width: 17px; height: 17px; }
 .hz-home { max-width: 1280px; margin: 0 auto; padding: 20px 20px 4px; }
-.hz-section { margin-top: 26px; }
+.hz-section { margin-top: 20px; }
 /* ───────── hero — کارت سه‌ناحیه‌ای (بالا/وسط/پایین) مرجع ۰۱ ───────── */
 .hz-hero {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr; /* مرجع: سه ستون تقریباً برابر */
+  grid-template-columns: 1fr 3fr 1fr; /* دستور کارفرما: چپ/راست ۲۰٪ — وسط ۶۰٪ */
   gap: 14px;
 }
 .hz-hero-card {
   position: relative;
   overflow: hidden;
   border-radius: 16px;
-  min-height: min(452px, calc(100dvh - 348px));
+  container-type: inline-size; /* فونت‌های غول‌پیکر وابسته به عرض خود کارت */
+  min-height: min(430px, calc(100dvh - 452px));
   border: 1px solid var(--hz-line);
   cursor: pointer;
   padding: 0;
@@ -265,20 +266,20 @@
 }
 .hz-hero-game {
   font-family: 'Orbitron', sans-serif; font-weight: 900;
-  font-size: clamp(52px, 5.4vw, 88px); line-height: 0.92; letter-spacing: 1px;
+  font-size: clamp(34px, 17cqw, 96px); line-height: 0.92; letter-spacing: 1px;
   color: #fff;
   text-shadow: 0 0 26px rgba(60, 202, 245, 0.55), 0 0 64px rgba(60, 202, 245, 0.28);
 }
 .hz-hero-display {
   font-family: 'Orbitron', sans-serif; font-weight: 900; font-style: italic;
-  font-size: clamp(34px, 3.8vw, 60px); line-height: 1.02; letter-spacing: 1px;
+  font-size: clamp(30px, 10.5cqw, 104px); line-height: 1.02; letter-spacing: 1px;
   background: linear-gradient(180deg, #ffffff 30%, #ff2db0 82%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 0 18px rgba(255, 45, 176, 0.45));
 }
 .hz-hero-vs {
   font-family: 'Orbitron', sans-serif; font-weight: 900;
-  font-size: clamp(38px, 3.6vw, 58px); line-height: 1;
+  font-size: clamp(26px, 15cqw, 84px); line-height: 1;
   color: #fff; text-shadow: 0 0 24px rgba(218, 106, 210, 0.65), 0 0 56px rgba(218, 106, 210, 0.3);
 }
 .hz-hero-match {
@@ -362,7 +363,12 @@
   width: 52px; height: 52px; border-radius: 14px;
   background: rgba(4, 5, 13, 0.6);
 }
-.hz-quick-ico .hz-ico { width: 28px; height: 28px; }
+.hz-quick-png { width: 46px; height: 46px; display: block; margin: 0 auto; }
+.hz-tone-indigo  { --tone: #6a5ae0; }
+.hz-tone-crimson { --tone: #e0447a; }
+.hz-tone-teal    { --tone: #2ec4b6; }
+.hz-tone-amber   { --tone: #ffc93c; }
+.hz-tone-violet  { --tone: #9d5cff; }
 .hz-tone-cyan { --tone: var(--hz-cyan); }
 .hz-tone-purple { --tone: var(--hz-purple); }
 .hz-tone-pink { --tone: var(--hz-pink); }
@@ -380,50 +386,66 @@
 .hz-quick:hover .hz-quick-arrow { color: var(--tone); }
 .hz-quick:hover .hz-quick-title { text-shadow: 0 0 14px color-mix(in srgb, var(--tone) 65%, transparent); }
 
-/* ───────── footer — چهار گروه لیبل‌دار (مرجع ۰۱) ───────── */
+/* ───────── contact boxes — چهارکادر (لوکیشن/ساعات/واتساپ/اینستاگرام — دستور کارفرما) ───────── */
+.hz-cbox-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr;
+  gap: 12px;
+}
+.hz-cbox {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--hz-card), rgba(12, 14, 26, 0.85));
+  border: 1px solid color-mix(in srgb, var(--tone) 34%, transparent);
+  cursor: pointer; text-align: left; text-decoration: none;
+  font-family: 'Rajdhani', sans-serif;
+  transition: transform 0.3s var(--hz-ease), box-shadow 0.3s var(--hz-ease), border-color 0.3s var(--hz-ease);
+}
+.hz-cbox:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--tone) 70%, transparent);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--tone) 20%, transparent);
+}
+.hz-cbox-ico { width: 42px; height: 42px; flex: 0 0 42px; }
+.hz-cbox-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hz-cbox-label {
+  font-family: 'Orbitron', sans-serif; font-weight: 700;
+  font-size: 9px; letter-spacing: 2.2px; color: var(--tone);
+}
+.hz-cbox-val { font-size: 14.5px; font-weight: 700; color: #e7ecff; letter-spacing: 0.3px; white-space: nowrap; }
+.hz-cbox-val-sm {
+  font-size: 12.5px; white-space: normal; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hz-ct-pink   { --tone: #ff2db0; }
+.hz-ct-gold   { --tone: #ffc93c; }
+.hz-ct-green  { --tone: #2ee87e; }
+.hz-ct-purple { --tone: #b067e9; }
+
+/* ───────── footer — نوار باریک ───────── */
 .hz-footer {
   margin-top: auto;
   border-top: 1px solid var(--hz-line);
   background: linear-gradient(180deg, rgba(7, 11, 22, 0.55), rgba(5, 4, 14, 0.95));
 }
-.hz-foot-row {
+.hz-foot-slim {
   max-width: 1280px; margin: 0 auto;
-  padding: 13px 20px;
-  display: grid;
-  grid-template-columns: 1.35fr 1fr 1fr 1fr;
-  gap: 18px; align-items: center;
+  padding: 11px 20px;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  flex-wrap: wrap;
 }
-.hz-foot-col {
-  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
-  background: none; border: 0; padding: 0; margin: 0;
-  cursor: pointer; text-align: left; text-decoration: none;
-  font-family: 'Rajdhani', sans-serif;
+.hz-foot-brand {
+  font-family: 'Orbitron', sans-serif; font-weight: 900;
+  font-size: 12.5px; letter-spacing: 2.6px; color: #fff;
 }
-.hz-foot-label {
+.hz-foot-brand i { font-style: normal; color: var(--hz-magenta); text-shadow: 0 0 12px rgba(218, 106, 210, 0.5); }
+.hz-foot-sep { width: 4px; height: 4px; border-radius: 50%; background: var(--hz-dim); opacity: 0.6; }
+.hz-foot-tag {
   font-family: 'Orbitron', sans-serif; font-weight: 700;
-  font-size: 9.5px; letter-spacing: 2.4px; color: var(--hz-dim);
+  font-size: 9.5px; letter-spacing: 2.8px; color: var(--hz-pink);
 }
-.hz-foot-val { font-size: 14.5px; font-weight: 700; color: #e7ecff; letter-spacing: 0.4px; }
-.hz-foot-sub { font-size: 12px; color: var(--hz-dim); font-weight: 500; }
-.hz-foot-addr {
-  max-width: 320px; line-height: 1.3;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-a.hz-foot-col:hover .hz-foot-val, button.hz-foot-col:hover .hz-foot-val { color: #fff; text-shadow: 0 0 12px rgba(255, 45, 176, 0.45); }
-
-/* ───────── تک‌صفحه: فشرده‌سازی برای ارتفاع‌های کوتاه ───────── */
-@media (max-height: 840px) {
-  .hz-home { padding: 10px 20px 2px; }
-  .hz-section { margin-top: 12px; }
-  .hz-hero-card { min-height: min(368px, calc(100dvh - 438px)); }
-  .hz-hero-game { font-size: clamp(40px, 4.2vw, 62px); }
-  .hz-hero-display { font-size: clamp(26px, 3vw, 44px); }
-  .hz-hero-vs { font-size: clamp(30px, 2.8vw, 44px); }
-  .hz-quick { padding: 16px 10px 12px; }
-  .hz-quick-ico { width: 40px; height: 40px; }
-  .hz-foot-addr { -webkit-line-clamp: 1; }
-  .hz-foot-row { padding: 8px 20px; }
-}
+.hz-foot-copy { font-size: 12px; color: var(--hz-dim); font-weight: 600; letter-spacing: 1px; }
 
 /* ───────── mobile nav ───────── */
 .hz-mnav {
@@ -468,7 +490,8 @@ a.hz-foot-col:hover .hz-foot-val, button.hz-foot-col:hover .hz-foot-val { color:
   .hz-hero-card { min-height: 240px; }
   .hz-hero-live { display: flex; }
   .hz-quick-grid { grid-template-columns: repeat(2, 1fr); }
-  .hz-foot-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .hz-cbox-grid { grid-template-columns: repeat(2, 1fr); }
+  .hz-cbox-val { white-space: normal; }
   .hz-header-in { height: 60px; padding: 0 12px; }
   .hz-member-name { display: none; }
 }

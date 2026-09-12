@@ -84,6 +84,11 @@ function textOf(node) {
 
 // ── هدر ──
 console.log('── هدر ──');
+const headerEl = regions.header.render(baseProps);
+const langSelF = findAll(headerEl, (n) => n.type === 'select').find((n) => (n.props['aria-label'] || '') === 'Language');
+ok(!!langSelF, 'سلکتور زبان موجود');
+const optLabels = (langSelF.kids || []).map((o) => (o.kids || []).join('')).join('|');
+ok(/\uD83C\uDDEC/.test(optLabels) && /\uD83C\uDDF9/.test(optLabels), `پرچم کشور کنار کد زبان (${optLabels})`);
 const header = regions.header.render(baseProps);
 const navLinks = findAll(header, (n) => n.type === 'button' && /hz-nav-link/.test(n.props.className || ''));
 ok(navLinks.length === 8, `۸ آیتم ناوبری (شبکهٔ واقعی پرتال) — ${navLinks.length}`);
@@ -128,8 +133,12 @@ ok(gtaBadge.length === 1 && /SOON/i.test(textOf(gtaBadge[0])), 'بج COMING SOON
 ok(findAll(home, (n) => /hz-article/.test(n.props.className || '')).length === 0, 'بدون مقاله → نوار مقالات رندر نمی‌شود');
 const quick = findAll(home, (n) => /(^|\s)hz-quick(\s|$)/.test(n.props.className || ''));
 ok(quick.length === 7, '۷ کارت دسترسی سریع');
+const quickPngs = quick.map((q) => findAll(q, (n) => n.type === 'img' && /hz-quick-png/.test(n.props.className || ''))).flat();
+ok(quickPngs.length === 7 && quickPngs.every((im) => /\/icons\/[a-z]+\.png$/.test(String(im.props.src))), 'آیکون‌های PNG رنگی کاشی‌ها (نه SVG خطی)');
+const pngNames = quickPngs.map((im) => String(im.props.src).split('/').pop()).sort().join(',');
+ok(pngNames === 'blog.png,club.png,contact.png,events.png,food.png,games.png,shop.png', `هر ۷ آیکون متمایز (${pngNames})`);
 const tones = quick.map((q) => (q.props.className.match(/hz-tone-(\w+)/) || [])[1]);
-ok(new Set(tones).size <= 3 && tones.every(t => ['magenta', 'pink', 'purple'].includes(t)), `تن یکدست سرخابی/بنفش مثل مرجع (${tones.join(',')})`);
+ok(new Set(tones).size === 7 && tones.every(t => ['indigo', 'crimson', 'magenta', 'teal', 'purple', 'amber', 'violet'].includes(t)), `۷ تن متنوع — هر کاشی پالت خودش (${tones.join(',')})`);
 quick[0].props.onClick();
 ok(calls.some((c) => c[0] === 'nav' && c[1] === '/games'), 'کلیک کارت GAMES → /games');
 
@@ -182,7 +191,7 @@ dynHeroCards[1].props.onClick();
 ok(calls.some((c) => c[0] === 'nav' && c[1] === '/shop'), 'کلیک کارت مرکزی → مسیر هدف اسلاید (target=shop → /shop)');
 // تک‌صفحه (مرجع ۰۱) — حتی با articles سرور، نوار مقالات رندر نمی‌شود
 ok(findAll(homeDyn, (n) => /hz-article/.test(n.props.className || '')).length === 0, 'articles سرور → بدون نوار مقالات (تک‌صفحه)');
-ok(findAll(homeDyn, (n) => /(^|\s)hz-contact(\s|$)/.test(n.props.className || '')).length === 0, 'بدون بخش FIND US (اطلاعات در فوتر)');
+ok(findAll(homeDyn, (n) => /(^|\s)hz-contact(\s|$)/.test(n.props.className || '')).length === 0, 'کلاس قدیمی hz-contact استفاده نشده');
 
 // ── override تصاویر ادمین (theme_img.*) ──
 console.log('── override تصاویر ادمین ──');
@@ -197,30 +206,35 @@ const homeSoon = regions.home.render({ ...serverProps, slides: [], eventsFeed: {
 ok(/COMING UP/.test(textOf(homeSoon)), 'live بدون bracket → بج COMING UP (طلایی)');
 ok(!findAll(homeSoon, (n) => /hz-hero-livebadge/.test(n.props.className || '')).length, 'live بدون bracket → بدون بج قرمز LIVE');
 
-// ── تماس → فقط در فوتر (مرجع ۰۱: آدرس | ساعت | واتساپ | اینستاگرام) ──
-console.log('── تماس (فوتر) ──');
+// ── تماس: چهارکادر مستقل بین کاشی‌ها و فوتر (دستور کارفرما) ──
+console.log('── چهارکادر تماس ──');
+const cboxes = findAll(home, (n) => /(^|\s)hz-cbox(\s|$)/.test(n.props.className || ''));
+ok(cboxes.length === 4, '۴ کادر تماس (لوکیشن/ساعات/واتساپ/اینستاگرام)');
+const cboxIcons = cboxes.map((b) => findAll(b, (n) => n.type === 'img' && /hz-cbox-ico/.test(n.props.className || ''))).flat();
+ok(cboxIcons.length === 4 && cboxIcons.every((im) => String(im.props.src).includes('/icons/c-')), 'آیکون‌های PNG رنگی تماس (c-*.png)');
+const cboxText = cboxes.map((b) => textOf(b)).join(' ');
+ok(/LOCATION/.test(cboxText) && /OPEN EVERYDAY/.test(cboxText) && /WHATSAPP/.test(cboxText) && /INSTAGRAM/.test(cboxText), 'لیبل‌های چهار کادر');
+ok(/11:00/.test(cboxText) && /23:50/.test(cboxText), 'ساعات کاری در کادر ساعت');
+ok(/@bazinopro/.test(cboxText), 'اینستاگرام @bazinopro');
+const waBox = cboxes.find((b) => b.type === 'a' && /wa\.me/.test(String(b.props.href || '')));
+ok(!!waBox, 'لینک WhatsApp در کادر');
+const igBox = cboxes.find((b) => b.type === 'a' && /instagram\.com/.test(String(b.props.href || '')));
+ok(!!igBox, 'لینک Instagram در کادر');
+const homeS2 = regions.home.render({ ...baseProps, settings: { club_hours: '10:00 - 01:00', club_phone: '+90 555 000 11 22' } });
+const cboxS = findAll(homeS2, (n) => /(^|\s)hz-cbox(\s|$)/.test(n.props.className || ''));
+ok(/10:00/.test(textOf(cboxS[1])), 'ساعات از settings.club_hours');
+const waS2 = cboxS.find((b) => b.type === 'a' && /wa\.me/.test(String(b.props.href || '')));
+ok(/wa\.me\/905550001122/.test(String(waS2.props.href)), 'WhatsApp از club_phone');
 
-// ── فوتر: نوار تک‌ردیف مرجع ۰۱ ──
+// ── فوتر: نوار باریک (برند + تگ‌لاین + ©) ──
 console.log('── فوتر ──');
 const footer = regions.footer.render(baseProps);
-const footRow = findAll(footer, (n) => /hz-foot-row/.test(n.props.className || ''));
-ok(footRow.length === 1, 'فوتر = یک ردیف چهار گروهی');
+const slim = findAll(footer, (n) => /hz-foot-slim/.test(n.props.className || ''));
+ok(slim.length === 1, 'فوتر = نوار باریک');
 const footText = textOf(footer);
-const footLabels = findAll(footer, (n) => /hz-foot-label/.test(n.props.className || ''));
-ok(footLabels.length === 4, '۴ لیبل گروه فوتر (LOCATION/OPEN EVERYDAY/WHATSAPP/INSTAGRAM)');
-ok(/OPEN EVERYDAY/.test(footText) && /WHATSAPP/.test(footText) && /INSTAGRAM/.test(footText), 'لیبل‌های مرجع در فوتر');
-ok(/11:00/.test(footText) && /23:50/.test(footText), 'ساعات کاری 11:00–23:50 (پیش‌فرض مرجع)');
-ok(/OPEN EVERYDAY/.test(footText), 'OPEN EVERYDAY در نوار');
-ok(/@bazinopro/.test(footText), 'اینستاگرام @bazinopro در نوار');
-const waF = findAll(footer, (n) => n.type === 'a' && /wa\.me/.test(String(n.props.href || '')));
-ok(waF.length === 1 && /wa\.me\/\d+/.test(String(waF[0].props.href)), 'لینک WhatsApp از شمارهٔ settings');
-const igF = findAll(footer, (n) => n.type === 'a' && /instagram\.com/.test(String(n.props.href || '')));
-ok(igF.length === 1, 'لینک Instagram');
-const footerS = regions.footer.render({ ...baseProps, settings: { club_hours: '10:00 - 01:00', club_phone: '+90 555 000 11 22' } });
-const footTextS = textOf(footerS);
-ok(/10:00/.test(footTextS), 'ساعات از settings.club_hours خوانده می‌شود');
-const waFS = findAll(footerS, (n) => n.type === 'a' && /wa\.me/.test(String(n.props.href || '')));
-ok(waFS.length === 1 && /wa\.me\/905550001122/.test(String(waFS[0].props.href)), 'WhatsApp از club_phone ساخته می‌شود');
+ok(/BAZINO/.test(footText) && /GAMING CLUB/.test(footText), 'برند در فوتر');
+ok(/GOOD GAMES/.test(footText), 'تگ‌لاین در فوتر');
+ok(/\u00A9|©/.test(footText), 'کپی‌رایت سال');
 
 // ── موبایل‌ناو ──
 console.log('── موبایل‌ناو ──');

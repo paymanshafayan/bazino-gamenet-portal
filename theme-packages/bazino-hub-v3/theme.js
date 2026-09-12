@@ -1,5 +1,5 @@
-// BAZINO HUB v3.2.0 — ref-01 visual match: 3-zone hero cards (giant display type),
-// no section headers, labeled 4-group footer, Hasti pink/magenta palette, single-page no-scroll.
+// BAZINO HUB v3.3.0 — employer walkthrough of ref-01: language flags beside codes,
+// 20/60/20 hero split, colorful designed PNG tile icons, 4 contact boxes above slim footer.
 // SDK v2 — no React hooks, no timers. Interactive via props callbacks and DOM events.
 //
 // IMAGE POLICY (employer spec):
@@ -101,11 +101,12 @@
     { key: 'nav.blog', path: '/blog' },
     { key: 'nav.contact', path: '/contact' }
   ];
+  // پرچم کشور کنار کد زبان (دستور کارفرما — مثل مرجع: TR با پرچم)
   var LANGS = [
-    { code: 'en', label: 'EN' },
-    { code: 'fa', label: 'FA' },
-    { code: 'tr', label: 'TR' },
-    { code: 'ru', label: 'RU' }
+    { code: 'en', label: '\uD83C\uDDEC\uD83C\uDDE7 EN' },
+    { code: 'fa', label: '\uD83C\uDDEE\uD83C\uDDF7 FA' },
+    { code: 'tr', label: '\uD83C\uDDF9\uD83C\uDDF7 TR' },
+    { code: 'ru', label: '\uD83C\uDDF7\uD83C\uDDFA RU' }
   ];
 
   function contactInfo(props) {
@@ -309,15 +310,15 @@
   }
 
   // ---------- quick access cards ----------
-  // مرجع ۰۱: کاشی‌ها با اکسانت یکدست سرخابی/بنفش (نه رنگین‌کمانی)
+  // مرجع ۰۱: کاشی‌ها با آیکون‌های PNG رنگیِ طراحی‌شده (هر کدام پالت خودش)
   var QUICK = [
-    { key: 'quick.games', path: '/games', ico: 'gamepad', tone: 'magenta', sub: 'quick.games.sub' },
-    { key: 'quick.events', path: '/events', ico: 'trophy', tone: 'pink', sub: 'quick.events.sub' },
-    { key: 'quick.shop', path: '/shop', ico: 'cart', tone: 'purple', sub: 'quick.shop.sub' },
-    { key: 'quick.food', path: '/food', ico: 'burger', tone: 'pink', sub: 'quick.food.sub' },
-    { key: 'quick.club', path: '/club', ico: 'crown', tone: 'magenta', sub: 'quick.club.sub' },
-    { key: 'quick.blog', path: '/blog', ico: 'pen', tone: 'purple', sub: 'quick.blog.sub' },
-    { key: 'quick.contact', path: '/contact', ico: 'pin', tone: 'pink', sub: 'quick.contact.sub' }
+    { key: 'quick.games', path: '/games', png: 'games', tone: 'indigo', sub: 'quick.games.sub' },
+    { key: 'quick.events', path: '/events', png: 'events', tone: 'crimson', sub: 'quick.events.sub' },
+    { key: 'quick.shop', path: '/shop', png: 'shop', tone: 'magenta', sub: 'quick.shop.sub' },
+    { key: 'quick.food', path: '/food', png: 'food', tone: 'teal', sub: 'quick.food.sub' },
+    { key: 'quick.club', path: '/club', png: 'club', tone: 'purple', sub: 'quick.club.sub' },
+    { key: 'quick.blog', path: '/blog', png: 'blog', tone: 'amber', sub: 'quick.blog.sub' },
+    { key: 'quick.contact', path: '/contact', png: 'contact', tone: 'violet', sub: 'quick.contact.sub' }
   ];
   function QuickCards(props) {
     var cards = [];
@@ -328,7 +329,7 @@
         className: 'hz-quick hz-tone-' + q.tone,
         onClick: (function (p) { return function () { go(props, p); }; })(q.path)
       },
-        h('span', { className: 'hz-quick-ico' }, icon(q.ico)),
+        h('img', { className: 'hz-quick-png', src: asset(props, 'icons/' + q.png + '.png'), alt: '', loading: 'lazy' }),
         h('span', { className: 'hz-quick-title' }, tsx(props, q.key, q.key)),
         h('span', { className: 'hz-quick-sub' }, tsx(props, q.sub, q.sub)),
         h('span', { className: 'hz-quick-arrow' }, '\u2192')
@@ -340,32 +341,53 @@
     );
   }
 
+  // ---------- contact boxes (چهارکادر: لوکیشن/ساعات/واتساپ/اینستاگرام — دستور کارفرما) ----------
+  function ContactBoxes(props) {
+    var c = contactInfo(props);
+    return h('section', { className: 'hz-section hz-contactsec' },
+      h('div', { className: 'hz-cbox-grid' },
+        h('button', { className: 'hz-cbox hz-ct-pink', onClick: function () { go(props, '/contact'); } },
+          h('img', { className: 'hz-cbox-ico', src: asset(props, 'icons/c-location.png'), alt: '', loading: 'lazy' }),
+          h('span', { className: 'hz-cbox-txt' },
+            h('span', { className: 'hz-cbox-label' }, tsx(props, 'footer.location', 'LOCATION')),
+            h('b', { className: 'hz-cbox-val hz-cbox-val-sm' }, c.address))),
+        h('button', { className: 'hz-cbox hz-ct-gold', onClick: function () { go(props, '/contact'); } },
+          h('img', { className: 'hz-cbox-ico', src: asset(props, 'icons/c-hours.png'), alt: '', loading: 'lazy' }),
+          h('span', { className: 'hz-cbox-txt' },
+            h('span', { className: 'hz-cbox-label' }, tsx(props, 'contact.open', 'OPEN EVERYDAY')),
+            h('b', { className: 'hz-cbox-val' }, c.hours))),
+        h('a', { className: 'hz-cbox hz-ct-green', href: c.whatsapp, target: '_blank', rel: 'noreferrer' },
+          h('img', { className: 'hz-cbox-ico', src: asset(props, 'icons/c-whatsapp.png'), alt: '', loading: 'lazy' }),
+          h('span', { className: 'hz-cbox-txt' },
+            h('span', { className: 'hz-cbox-label' }, 'WHATSAPP'),
+            h('b', { className: 'hz-cbox-val' }, c.phone))),
+        h('a', { className: 'hz-cbox hz-ct-purple', href: c.instagram, target: '_blank', rel: 'noreferrer' },
+          h('img', { className: 'hz-cbox-ico', src: asset(props, 'icons/c-instagram.png'), alt: '', loading: 'lazy' }),
+          h('span', { className: 'hz-cbox-txt' },
+            h('span', { className: 'hz-cbox-label' }, 'INSTAGRAM'),
+            h('b', { className: 'hz-cbox-val' }, '@bazinopro')))
+      )
+    );
+  }
+
   // ---------- home ----------
   function HomePage(props) {
     return h('div', { className: 'hz-home' },
       Hero(props),
-      QuickCards(props)
+      QuickCards(props),
+      ContactBoxes(props)
     );
   }
 
-  // ---------- footer — چهار گروه لیبل‌دار (مرجع ۰۱) ----------
+  // ---------- footer — نوار باریک (دستور کارفرما: تماس در بخش جدا بالای فوتر) ----------
   function Footer(props) {
-    var c = contactInfo(props);
     return h('footer', { className: 'hz-footer' },
-      h('div', { className: 'hz-foot-row' },
-        h('div', { className: 'hz-foot-col hz-foot-addr-col' },
-          h('span', { className: 'hz-foot-label' }, tsx(props, 'footer.location', 'LOCATION')),
-          h('span', { className: 'hz-foot-val hz-foot-addr' }, c.address)),
-        h('button', { className: 'hz-foot-col', onClick: function () { go(props, '/contact'); } },
-          h('span', { className: 'hz-foot-label' }, tsx(props, 'contact.open', 'OPEN EVERYDAY')),
-          h('span', { className: 'hz-foot-val' }, c.hours),
-          h('span', { className: 'hz-foot-sub' }, tsx(props, 'contact.map', 'Click to view'))),
-        h('a', { className: 'hz-foot-col', href: c.whatsapp, target: '_blank', rel: 'noreferrer' },
-          h('span', { className: 'hz-foot-label' }, 'WHATSAPP'),
-          h('span', { className: 'hz-foot-val' }, c.phone)),
-        h('a', { className: 'hz-foot-col', href: c.instagram, target: '_blank', rel: 'noreferrer' },
-          h('span', { className: 'hz-foot-label' }, 'INSTAGRAM'),
-          h('span', { className: 'hz-foot-val' }, '@bazinopro'))
+      h('div', { className: 'hz-foot-slim' },
+        h('span', { className: 'hz-foot-brand' }, 'BAZINO ', h('i', null, tsx(props, 'footer.club', 'GAMING CLUB'))),
+        h('span', { className: 'hz-foot-sep' }),
+        h('span', { className: 'hz-foot-tag' }, tsx(props, 'footer.tagline', 'GOOD GAMES \u00B7 GOOD PEOPLE')),
+        h('span', { className: 'hz-foot-sep' }),
+        h('span', { className: 'hz-foot-copy' }, '\u00A9 ' + new Date().getFullYear())
       )
     );
   }

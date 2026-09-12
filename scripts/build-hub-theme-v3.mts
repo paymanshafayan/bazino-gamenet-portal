@@ -3,7 +3,7 @@
  * Assemble the Bazino Hub v3 (Hasti design) theme ZIP from committed sources:
  *   theme-packages/bazino-hub-v3/{theme.json, theme.css, theme.js}
  *   assets (fonts + hero images) are shared with theme-packages/bazino-hub/assets.
- * Output: cdp-tools/build/bazino-hub-v3.3.1.2.zip (gitignored local artifact).
+ * Output: cdp-tools/build/bazino-hub-v3.3.2.0.zip (gitignored local artifact).
  * Self-contained — works offline on a fresh clone.
  *
  * The script also runs the SAME static install gate as the server
@@ -19,7 +19,7 @@ import { buildThemeZip } from '../src/themes/themeZipCore.ts';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'theme-packages', 'bazino-hub-v3');
 const SHARED_ASSETS = path.join(ROOT, 'theme-packages', 'bazino-hub', 'assets');
-const OUT = path.join(ROOT, 'cdp-tools', 'build', 'bazino-hub-v3.3.1.2.zip');
+const OUT = path.join(ROOT, 'cdp-tools', 'build', 'bazino-hub-v3.3.2.0.zip');
 
 function read(p: string): string { return fs.readFileSync(p, 'utf8'); }
 

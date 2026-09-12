@@ -1,9 +1,9 @@
 {
   "id": "bazino-hub-v3",
   "name": "Bazino Hub v3 (Hasti)",
-  "version": "3.1.2",
+  "version": "3.2.0",
   "layout": "hub",
-  "description": "Bazino Hub v3.1.0 — Hasti reference design: dark neon gaming, split hero. Dynamic images read live from the server (admin slider = center promo card; tournaments & live match data from events feed; blog strip from article covers). Static decorative art (hero cards) is admin-replaceable via Admin ▸ Customization uploads (theme_img.* settings).",
+  "description": "Bazino Hub v3.2.0 — ref-01 visual match: 3-zone hero with giant display type, uniform magenta tiles, labeled footer, single-page no-scroll.",
   "author": "Bazino",
   "sdkVersion": 2,
   "colors": {
@@ -75,7 +75,10 @@
       "contact.open": "OPEN EVERYDAY",
       "hero.more": "MORE INFO",
       "hero.live.next": "COMING UP",
-      "footer.club": "GAMING CLUB"
+      "footer.club": "GAMING CLUB",
+      "hero.live.header": "LIVE MATCH",
+      "footer.location": "LOCATION",
+      "contact.map": "Click to view"
     },
     "fa": {
       "header.club": "گیمینگ کلاب",
@@ -118,7 +121,10 @@
       "contact.open": "هر روز باز",
       "hero.more": "اطلاعات بیشتر",
       "hero.live.next": "به‌زودی",
-      "footer.club": "GAMING CLUB"
+      "footer.club": "GAMING CLUB",
+      "hero.live.header": "مسابقه زنده",
+      "footer.location": "آدرس",
+      "contact.map": "مشاهدهٔ مسیر"
     },
     "tr": {
       "header.club": "OYUN KULÜBÜ",
@@ -137,7 +143,10 @@
       "contact.open": "HER GÜN AÇIK",
       "hero.more": "DAHA FAZLA BİLGİ",
       "hero.live.next": "YAKINDA",
-      "footer.club": "GAMING CLUB"
+      "footer.club": "GAMING CLUB",
+      "hero.live.header": "CANLI MAÇ",
+      "footer.location": "KONUM",
+      "contact.map": "Görüntüle"
     },
     "ru": {
       "header.club": "ИГРОВОЙ КЛУБ",
@@ -156,7 +165,10 @@
       "contact.open": "ОТКРЫТО КАЖДЫЙ ДЕНЬ",
       "hero.more": "ПОДРОБНЕЕ",
       "hero.live.next": "СКОРО",
-      "footer.club": "GAMING CLUB"
+      "footer.club": "GAMING CLUB",
+      "hero.live.header": "LIVE МАТЧ",
+      "footer.location": "АДРЕС",
+      "contact.map": "Смотреть"
     }
   }
 }

@@ -129,7 +129,7 @@ ok(findAll(home, (n) => /hz-article/.test(n.props.className || '')).length === 0
 const quick = findAll(home, (n) => /(^|\s)hz-quick(\s|$)/.test(n.props.className || ''));
 ok(quick.length === 7, '۷ کارت دسترسی سریع');
 const tones = quick.map((q) => (q.props.className.match(/hz-tone-(\w+)/) || [])[1]);
-ok(new Set(tones).size === 7, `۷ تن رنگ متفاوت (${tones.join(',')})`);
+ok(new Set(tones).size <= 3 && tones.every(t => ['magenta', 'pink', 'purple'].includes(t)), `تن یکدست سرخابی/بنفش مثل مرجع (${tones.join(',')})`);
 quick[0].props.onClick();
 ok(calls.some((c) => c[0] === 'nav' && c[1] === '/games'), 'کلیک کارت GAMES → /games');
 
@@ -204,9 +204,11 @@ console.log('── تماس (فوتر) ──');
 console.log('── فوتر ──');
 const footer = regions.footer.render(baseProps);
 const footRow = findAll(footer, (n) => /hz-foot-row/.test(n.props.className || ''));
-ok(footRow.length === 1, 'فوتر = یک نوار تک‌ردیف');
+ok(footRow.length === 1, 'فوتر = یک ردیف چهار گروهی');
 const footText = textOf(footer);
-ok(/BAZINO/.test(footText) && /GAMING CLUB/.test(footText), 'برند BAZINO GAMING CLUB در نوار');
+const footLabels = findAll(footer, (n) => /hz-foot-label/.test(n.props.className || ''));
+ok(footLabels.length === 4, '۴ لیبل گروه فوتر (LOCATION/OPEN EVERYDAY/WHATSAPP/INSTAGRAM)');
+ok(/OPEN EVERYDAY/.test(footText) && /WHATSAPP/.test(footText) && /INSTAGRAM/.test(footText), 'لیبل‌های مرجع در فوتر');
 ok(/11:00/.test(footText) && /23:50/.test(footText), 'ساعات کاری 11:00–23:50 (پیش‌فرض مرجع)');
 ok(/OPEN EVERYDAY/.test(footText), 'OPEN EVERYDAY در نوار');
 ok(/@bazinopro/.test(footText), 'اینستاگرام @bazinopro در نوار');

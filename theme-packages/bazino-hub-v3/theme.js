@@ -1,4 +1,5 @@
-// BAZINO HUB v3.1.2 — Hasti reference design (single-page no-scroll per ref-01: hero + 7 tiles + slim footer bar)
+// BAZINO HUB v3.2.0 — ref-01 visual match: 3-zone hero cards (giant display type),
+// no section headers, labeled 4-group footer, Hasti pink/magenta palette, single-page no-scroll.
 // SDK v2 — no React hooks, no timers. Interactive via props callbacks and DOM events.
 //
 // IMAGE POLICY (employer spec):
@@ -204,13 +205,12 @@
     );
   }
 
-  // ---------- hero (split 3-card: tournament / main promo / live) ----------
+  // ---------- hero (split 3-card: tournament / main promo / live) — مرجع ۰۱ ----------
+  // ساختار هر کارت: بالا (بج/سرتیتر) → وسط (تایپوگرافی غول‌پیکر) → پایین (متا + دکمه)
   // CENTER = admin slider (slides[0]) — fully dynamic from the server.
-  // LEFT   = next tournament from the live events feed (dynamic data) over
-  //          admin-replaceable decorative art.
-  // RIGHT  = live/featured tournament (dynamic) over admin-replaceable art.
+  // LEFT   = next tournament from the live events feed (dynamic data).
+  // RIGHT  = live/featured tournament (dynamic).
   function Hero(props) {
-    var c = contactInfo(props);
     var lang = (props && props.language) || 'en';
     var slides = (props && props.slides) || [];
     var feed = props && props.eventsFeed;
@@ -218,7 +218,7 @@
     var tour = pickTournament(feed);
     var live = feed && feed.live;
 
-    // ── center card ──
+    // ── center card: بج بالا + عنوان غول‌پیکر + زیرنویس و دکمه پایین ──
     var center;
     if (mainSlide && mainSlide.imageUrl) {
       var sTitle = langTitle(mainSlide.title, lang);
@@ -226,102 +226,98 @@
       center = h('button', { className: 'hz-hero-card hz-hero-gta', onClick: function () { go(props, slideTargetPath(mainSlide.target)); } },
         h('img', { className: 'hz-hero-img', src: mainSlide.imageUrl, alt: sTitle || 'BAZINO', loading: 'lazy' }),
         h('div', { className: 'hz-hero-veil' }),
-        h('div', { className: 'hz-hero-body' },
-          sTitle ? h('span', { className: 'hz-hero-title hz-hero-title-xl' }, sTitle) : h('span', { className: 'hz-hero-title hz-hero-title-xl' }, tsx(props, 'hero.gta.title', 'GTA VI')),
+        h('span', { className: 'hz-hero-top' },
+          h('span', { className: 'hz-hero-badge' }, tsx(props, 'hero.gta.badge', 'COMING SOON'))),
+        h('span', { className: 'hz-hero-mid' },
+          h('span', { className: 'hz-hero-display' }, sTitle || tsx(props, 'hero.gta.title', 'GTA VI'))),
+        h('span', { className: 'hz-hero-body' },
           sDesc ? h('span', { className: 'hz-hero-sub' }, sDesc) : h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.gta.sub', 'Next-gen open world - play it first at Bazino')),
-          h('span', { className: 'hz-hero-btn hz-b-purple' }, tsx(props, 'hero.more', 'MORE INFO'))
-        )
+          h('span', { className: 'hz-hero-btn hz-b-purple' }, tsx(props, 'hero.more', 'MORE INFO')))
       );
     } else {
       center = h('button', { className: 'hz-hero-card hz-hero-gta', onClick: function () { go(props, '/events'); } },
         h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_main', 'slide-city.jpg'), alt: 'GTA VI', loading: 'lazy' }),
         h('div', { className: 'hz-hero-veil' }),
-        h('div', { className: 'hz-hero-body' },
-          h('span', { className: 'hz-hero-badge' }, tsx(props, 'hero.gta.badge', 'COMING SOON')),
-          h('span', { className: 'hz-hero-title hz-hero-title-xl' }, tsx(props, 'hero.gta.title', 'GTA VI')),
+        h('span', { className: 'hz-hero-top' },
+          h('span', { className: 'hz-hero-badge' }, tsx(props, 'hero.gta.badge', 'COMING SOON'))),
+        h('span', { className: 'hz-hero-mid' },
+          h('span', { className: 'hz-hero-display' }, tsx(props, 'hero.gta.title', 'GTA VI'))),
+        h('span', { className: 'hz-hero-body' },
           h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.gta.sub', 'Next-gen open world - play it first at Bazino')),
-          h('span', { className: 'hz-hero-btn hz-b-purple' }, tsx(props, 'hero.more', 'MORE INFO'))
-        )
+          h('span', { className: 'hz-hero-btn hz-b-purple' }, tsx(props, 'hero.more', 'MORE INFO')))
       );
     }
 
-    // ── left card: next tournament (live server data) ──
+    // ── left card: نام بازی غول‌پیکر بالا + تگ TOURNAMENT و تاریخ پایین ──
+    function gameWord(t) {
+      var g = (t && t.game) || 'FC 26';
+      return String(g).split(/\s+/)[0].toUpperCase();
+    }
     var left;
     if (tour) {
-      var meta = [tour.game, tour.startDate].filter(Boolean).join('  ·  ');
       left = h('button', { className: 'hz-hero-card hz-hero-fc', onClick: function () { go(props, '/events'); } },
         h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_tournament', 'slide-fc26.jpg'), alt: tour.title, loading: 'lazy' }),
         h('div', { className: 'hz-hero-veil' }),
-        h('div', { className: 'hz-hero-body' },
+        h('span', { className: 'hz-hero-top' },
+          h('span', { className: 'hz-hero-game' }, gameWord(tour))),
+        h('span', { className: 'hz-hero-mid' },
+          tour.title ? h('span', { className: 'hz-hero-match' }, tour.title) : null),
+        h('span', { className: 'hz-hero-body' },
           h('span', { className: 'hz-hero-tag hz-t-cyan' }, tsx(props, 'hero.fc.tag', 'TOURNAMENT')),
-          h('span', { className: 'hz-hero-title' }, tour.title),
-          meta ? h('span', { className: 'hz-hero-meta' }, meta) : null,
-          h('span', { className: 'hz-hero-btn hz-b-cyan' }, tsx(props, 'hero.fc.btn', 'JOIN NOW'))
-        )
+          tour.startDate ? h('span', { className: 'hz-hero-meta' }, tour.startDate) : null,
+          h('span', { className: 'hz-hero-btn hz-b-cyan' }, tsx(props, 'hero.fc.btn', 'JOIN NOW')))
       );
     } else {
       left = h('button', { className: 'hz-hero-card hz-hero-fc', onClick: function () { go(props, '/events'); } },
         h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_tournament', 'slide-fc26.jpg'), alt: 'FC Tournament', loading: 'lazy' }),
         h('div', { className: 'hz-hero-veil' }),
-        h('div', { className: 'hz-hero-body' },
+        h('span', { className: 'hz-hero-top' },
+          h('span', { className: 'hz-hero-game' }, tsx(props, 'hero.fc.title', 'FC 26'))),
+        h('span', { className: 'hz-hero-mid' },
+          h('span', { className: 'hz-hero-match' }, tsx(props, 'hero.fc.sub', 'Weekly FIFA cups - prize pool every week'))),
+        h('span', { className: 'hz-hero-body' },
           h('span', { className: 'hz-hero-tag hz-t-cyan' }, tsx(props, 'hero.fc.tag', 'TOURNAMENT')),
-          h('span', { className: 'hz-hero-title' }, tsx(props, 'hero.fc.title', 'FC 24 / FC 26')),
-          h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.fc.sub', 'Weekly FIFA cups - prize pool every week')),
-          h('span', { className: 'hz-hero-btn hz-b-cyan' }, tsx(props, 'hero.fc.btn', 'JOIN NOW'))
-        )
+          h('span', { className: 'hz-hero-btn hz-b-cyan' }, tsx(props, 'hero.fc.btn', 'JOIN NOW')))
       );
     }
 
-    // ── right card: live / featured match (live server data) ──
+    // ── right card: سرتیتر LIVE بالا + VS غول‌پیکر وسط + زمان پایین ──
     var right;
-    if (live && live.title) {
-      var isLive = !!(live.bracketTotal && live.bracketTotal > 0);
-      right = h('button', { className: 'hz-hero-card hz-hero-live', onClick: function () { go(props, '/events/brackets'); } },
-        h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_live', 'slide-match.jpg'), alt: live.title, loading: 'lazy' }),
-        h('div', { className: 'hz-hero-veil' }),
-        h('div', { className: 'hz-hero-body' },
-          isLive
-            ? h('span', { className: 'hz-hero-livebadge' }, h('i', { className: 'hz-dot' }), 'LIVE')
-            : h('span', { className: 'hz-hero-tag hz-t-gold' }, tsx(props, 'hero.live.next', 'COMING UP')),
-          h('span', { className: 'hz-hero-title' }, live.title),
-          live.game ? h('span', { className: 'hz-hero-sub' }, live.game) : null,
-          h('span', { className: 'hz-hero-btn hz-b-magenta' }, tsx(props, 'hero.live.btn', 'WATCH'))
-        )
-      );
-    } else {
-      right = h('button', { className: 'hz-hero-card hz-hero-live', onClick: function () { go(props, '/events'); } },
-        h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_live', 'slide-match.jpg'), alt: 'Live match', loading: 'lazy' }),
-        h('div', { className: 'hz-hero-veil' }),
-        h('div', { className: 'hz-hero-body' },
-          h('span', { className: 'hz-hero-livebadge' }, h('i', { className: 'hz-dot' }), 'LIVE'),
-          h('span', { className: 'hz-hero-title' }, tsx(props, 'hero.live.title', 'LIVE MATCH')),
-          h('span', { className: 'hz-hero-sub' }, tsx(props, 'hero.live.sub', 'Watch the action on the big wall')),
-          h('span', { className: 'hz-hero-btn hz-b-magenta' }, tsx(props, 'hero.live.btn', 'WATCH'))
-        )
-      );
-    }
+    var liveName = (live && live.title) ? live.title : tsx(props, 'hero.live.title', 'LIVE MATCH');
+    var liveGame = (live && live.game) ? live.game : tsx(props, 'hero.live.sub', 'Watch the action on the big wall');
+    var isLive = !!(live && live.bracketTotal && live.bracketTotal > 0);
+    right = h('button', { className: 'hz-hero-card hz-hero-live', onClick: function () { go(props, '/events/brackets'); } },
+      h('img', { className: 'hz-hero-img', src: imgSrc(props, 'hero_live', 'slide-match.jpg'), alt: liveName, loading: 'lazy' }),
+      h('div', { className: 'hz-hero-veil' }),
+      h('span', { className: 'hz-hero-top' },
+        isLive
+          ? h('span', { className: 'hz-hero-livebadge' }, h('i', { className: 'hz-dot' }), tsx(props, 'hero.live.header', 'LIVE MATCH'))
+          : h('span', { className: 'hz-hero-tag hz-t-gold' }, tsx(props, 'hero.live.next', 'COMING UP'))),
+      h('span', { className: 'hz-hero-mid' },
+        h('span', { className: 'hz-hero-vs' }, 'VS'),
+        h('span', { className: 'hz-hero-match' }, liveName)),
+      h('span', { className: 'hz-hero-body' },
+        h('span', { className: 'hz-hero-sub' }, liveGame),
+        h('span', { className: 'hz-hero-btn hz-b-magenta' }, tsx(props, 'hero.live.btn', 'WATCH')))
+    );
 
     return h('section', { className: 'hz-hero' },
       left,
       center,
-      right,
-      h('div', { className: 'hz-hero-strip' },
-        h('span', { className: 'hz-strip-item' }, icon('clock', 'hz-ico hz-ico-sm'), tsx(props, 'contact.open', 'OPEN EVERYDAY'), h('b', null, c.hours)),
-        h('span', { className: 'hz-strip-sep' }),
-        h('span', { className: 'hz-strip-item' }, icon('pin', 'hz-ico hz-ico-sm'), c.address)
-      )
+      right
     );
   }
 
   // ---------- quick access cards ----------
+  // مرجع ۰۱: کاشی‌ها با اکسانت یکدست سرخابی/بنفش (نه رنگین‌کمانی)
   var QUICK = [
-    { key: 'quick.games', path: '/games', ico: 'gamepad', tone: 'cyan', sub: 'quick.games.sub' },
-    { key: 'quick.events', path: '/events', ico: 'trophy', tone: 'purple', sub: 'quick.events.sub' },
-    { key: 'quick.shop', path: '/shop', ico: 'cart', tone: 'pink', sub: 'quick.shop.sub' },
-    { key: 'quick.food', path: '/food', ico: 'burger', tone: 'orange', sub: 'quick.food.sub' },
-    { key: 'quick.club', path: '/club', ico: 'crown', tone: 'green', sub: 'quick.club.sub' },
-    { key: 'quick.blog', path: '/blog', ico: 'pen', tone: 'blue', sub: 'quick.blog.sub' },
-    { key: 'quick.contact', path: '/contact', ico: 'pin', tone: 'magenta', sub: 'quick.contact.sub' }
+    { key: 'quick.games', path: '/games', ico: 'gamepad', tone: 'magenta', sub: 'quick.games.sub' },
+    { key: 'quick.events', path: '/events', ico: 'trophy', tone: 'pink', sub: 'quick.events.sub' },
+    { key: 'quick.shop', path: '/shop', ico: 'cart', tone: 'purple', sub: 'quick.shop.sub' },
+    { key: 'quick.food', path: '/food', ico: 'burger', tone: 'pink', sub: 'quick.food.sub' },
+    { key: 'quick.club', path: '/club', ico: 'crown', tone: 'magenta', sub: 'quick.club.sub' },
+    { key: 'quick.blog', path: '/blog', ico: 'pen', tone: 'purple', sub: 'quick.blog.sub' },
+    { key: 'quick.contact', path: '/contact', ico: 'pin', tone: 'pink', sub: 'quick.contact.sub' }
   ];
   function QuickCards(props) {
     var cards = [];
@@ -338,11 +334,8 @@
         h('span', { className: 'hz-quick-arrow' }, '\u2192')
       ));
     }
-    return h('section', { className: 'hz-section' },
-      h('div', { className: 'hz-section-head' },
-        h('span', { className: 'hz-section-kicker' }, 'BAZINO'),
-        h('h2', { className: 'hz-section-title' }, tsx(props, 'quick.title', 'QUICK ACCESS'))
-      ),
+    // مرجع ۰۱: کاشی‌ها بدون عنوان بخش، مستقیم بعد از هرو
+    return h('section', { className: 'hz-section hz-quicksec' },
       h('div', { className: 'hz-quick-grid' }, cards)
     );
   }
@@ -355,19 +348,24 @@
     );
   }
 
-  // ---------- footer (نوار تک‌ردیف — مرجع ۰۱) ----------
+  // ---------- footer — چهار گروه لیبل‌دار (مرجع ۰۱) ----------
   function Footer(props) {
     var c = contactInfo(props);
     return h('footer', { className: 'hz-footer' },
       h('div', { className: 'hz-foot-row' },
-        h('span', { className: 'hz-foot-item hz-foot-brand-sm' },
-          h('b', null, 'BAZINO'), ' ', tsx(props, 'footer.club', 'GAMING CLUB')),
-        h('span', { className: 'hz-foot-item hz-foot-addr' }, c.address),
-        h('span', { className: 'hz-foot-item' }, c.hours, ' \u00B7 ', tsx(props, 'contact.open', 'OPEN EVERYDAY')),
-        h('a', { className: 'hz-foot-item hz-foot-link', href: c.whatsapp, target: '_blank', rel: 'noreferrer' },
-          icon('whatsapp', 'hz-ico hz-ico-sm'), ' ', c.phone),
-        h('a', { className: 'hz-foot-item hz-foot-link', href: c.instagram, target: '_blank', rel: 'noreferrer' },
-          icon('instagram', 'hz-ico hz-ico-sm'), ' @bazinopro')
+        h('div', { className: 'hz-foot-col hz-foot-addr-col' },
+          h('span', { className: 'hz-foot-label' }, tsx(props, 'footer.location', 'LOCATION')),
+          h('span', { className: 'hz-foot-val hz-foot-addr' }, c.address)),
+        h('button', { className: 'hz-foot-col', onClick: function () { go(props, '/contact'); } },
+          h('span', { className: 'hz-foot-label' }, tsx(props, 'contact.open', 'OPEN EVERYDAY')),
+          h('span', { className: 'hz-foot-val' }, c.hours),
+          h('span', { className: 'hz-foot-sub' }, tsx(props, 'contact.map', 'Click to view'))),
+        h('a', { className: 'hz-foot-col', href: c.whatsapp, target: '_blank', rel: 'noreferrer' },
+          h('span', { className: 'hz-foot-label' }, 'WHATSAPP'),
+          h('span', { className: 'hz-foot-val' }, c.phone)),
+        h('a', { className: 'hz-foot-col', href: c.instagram, target: '_blank', rel: 'noreferrer' },
+          h('span', { className: 'hz-foot-label' }, 'INSTAGRAM'),
+          h('span', { className: 'hz-foot-val' }, '@bazinopro'))
       )
     );
   }

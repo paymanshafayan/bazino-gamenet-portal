@@ -31,10 +31,15 @@ class JarvisMessage {
   final bool isUser;
   final String timestamp;
 
+  /// نام اکشن سرور (مثلاً order_cafe_item) برای پیام‌های جارویس — برای نمایش
+  /// نشان «عملیات انجام شد» زیر حباب. برای chitchat و پیام‌های کاربر null است.
+  final String? action;
+
   JarvisMessage({
     required this.content,
     required this.isUser,
     required this.timestamp,
+    this.action,
   });
 }
 
@@ -285,6 +290,23 @@ class JarvisStateProvider extends ChangeNotifier {
     await _sendCommandToServer(command, appState);
   }
 
+  /// آخرین نوبت‌های گفتگو برای ارسال به سرور — تا جارویس بتواند پیام‌های پیگیری
+  /// («همونو دوباره»، «یک ساعت دیگه») را بفهمد. پیام کاربرِ همان لحظه داخل
+  /// `command` می‌رود و از تاریخچه حذف می‌شود تا دوباره ارسال نشود.
+  List<Map<String, String>> _recentHistoryPayload() {
+    final source = (_chatHistory.isNotEmpty && _chatHistory.last.isUser)
+        ? _chatHistory.sublist(0, _chatHistory.length - 1)
+        : _chatHistory;
+    final turns = source.length <= 12 ? source : source.sublist(source.length - 12);
+    return turns.map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.content}).toList();
+  }
+
+  /// فقط برای تست‌های ویجت — افزودن پیام بدون رفت‌وبرگشت شبکه.
+  void debugAppendMessage(JarvisMessage message) {
+    _chatHistory.add(message);
+    notifyListeners();
+  }
+
   /// Sends the command to the REAL backend brain (`/api/assistant/command`),
   /// which decides the intent (via Gemini function-calling, or a keyword
   /// fallback if no API key is configured) and performs the REAL action —
@@ -304,14 +326,24 @@ class JarvisStateProvider extends ChangeNotifier {
               'Content-Type': 'application/json',
               if (appState.authToken != null) 'Authorization': 'Bearer ${appState.authToken}',
             },
-            body: jsonEncode({'command': command, 'language': appState.language}),
+            body: jsonEncode({
+              'command': command,
+              'language': appState.language,
+              'history': _recentHistoryPayload(),
+            }),
           )
           .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         final reply = data['reply'] as String? ?? '...';
-        _chatHistory.add(JarvisMessage(content: reply, isUser: false, timestamp: _now()));
+        final action = data['action'] as String?;
+        _chatHistory.add(JarvisMessage(
+          content: reply,
+          isUser: false,
+          timestamp: _now(),
+          action: action,
+        ));
         await _speak(reply, appState.language);
 
         final clientCommand = data['clientCommand'];
@@ -323,7 +355,6 @@ class JarvisStateProvider extends ChangeNotifier {
           }
         }
 
-        final action = data['action'] as String?;
         _avatarState = (action == 'chitchat' || action == null)
             ? JarvisAvatarState.idle
             : JarvisAvatarState.happy;
@@ -690,7 +721,16 @@ class _JarvisCorePainter extends CustomPainter {
   }
 }
 
-/// Floating cybernetic voice assistant panel sliding from bottom
+// ============================================================
+// JarvisAssistantModal — رابط گفتگومحور (سبک ChatGPT)
+//
+// بازطراحی‌شده به دستور کارفرما: جارویس باید مثل یک دستیار گفتگویی
+// واقعی باشد — صفحهٔ گفتگو قهرمانِ رابط است، نه آواتار بزرگ وسط صفحه.
+// آواتار فقط به‌صورت فشرده در هدر می‌ماند، حباب‌های پیام تمام‌عرض،
+// نشانگر «در حال تایپ»، پیشنهادهای شروع فقط وقتی گفتگو تازه است،
+// نوار ورودی pill شکل با میکروفن و دکمهٔ ارسال گرادیانی. صدا و حالت
+// دست‌آزاد (مکالمهٔ پیوسته) دقیقاً مثل قبل کار می‌کنند.
+// ============================================================
 class JarvisAssistantModal extends StatefulWidget {
   const JarvisAssistantModal({super.key, this.onNavigate});
 
@@ -703,14 +743,14 @@ class JarvisAssistantModal extends StatefulWidget {
 class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
-  // Suggested commands in Persian gamer-slang — matched exactly to the 4 real
-  // actions the assistant can perform (backend: /api/assistant/command)
-  final List<String> _suggestedCommands = [
-    "یک پیتزا پپرونی برام سفارش بده 🍕",
-    "سیستم من رو یک ساعت تمدید کن ⚡",
-    "ادمین فنی سالن رو صدا بزن 🛎️",
-    "این پیام رو توی چت‌روم CS2 بفرست 🎙️"
+
+  // پیشنهادهای شروع گفتگو — دقیقاً منطبق با اکشن‌های واقعی سرور
+  // (/api/assistant/command). فقط وقتی نمایش داده می‌شوند که گفتگو تازه است.
+  static const List<String> _suggestedCommands = [
+    "یک پیتزا پپرونی برام سفارش بده",
+    "یک سیستم برای یک ساعت رزرو کن",
+    "بهترین سیستم رو پیشنهاد بده",
+    "ادمین فنی سالن رو صدا بزن",
   ];
 
   @override
@@ -732,6 +772,25 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
     });
   }
 
+  void _send(JarvisStateProvider jarvis, AppState appState) {
+    final text = _textController.text.trim();
+    if (text.isEmpty || jarvis.isProcessing) return;
+    jarvis.sendTextCommand(text, appState);
+    _textController.clear();
+    _scrollToBottom();
+  }
+
+  Future<void> _onMicTap(JarvisStateProvider jarvis, AppState appState) async {
+    if (jarvis.handsFreeMode) {
+      await jarvis.toggleHandsFreeConversation(appState);
+    } else if (jarvis.isListening) {
+      await jarvis.stopListeningAndProcess(appState);
+      _scrollToBottom();
+    } else {
+      await jarvis.startListening(appState);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final jarvisState = Provider.of<JarvisStateProvider>(context);
@@ -744,382 +803,462 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
       });
     }
     final isFa = appState.language == 'fa';
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.92,
       decoration: const BoxDecoration(
-        color: Color(0xFB0A0D1E), // Deep glassmorphic cyberpunk navy background
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF10142B), Color(0xFF07040F)],
+        ),
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(32),
-          topRight: Radius.circular(32),
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
         ),
         border: Border(
-          top: BorderSide(color: GamingTheme.primary, width: 2),
+          top: BorderSide(color: GamingTheme.primary, width: 1.5),
         ),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Tech pull handle
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 50,
-              height: 4,
-              decoration: BoxDecoration(
-                color: GamingTheme.primary.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            
-            // Header bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.settings_suggest_rounded, color: GamingTheme.primary, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        isFa ? "دستیار هوشمند جارویس" : "JARVIS VOICE COMPANION",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            // با باز شدن کیبورد، نوار ورودی بالای کیبورد بماند
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Column(
+              children: [
+                // دستگیرهٔ کشیدن
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  width: 50,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: GamingTheme.primary.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  Row(
-                    children: [
-                      // Mute toggle
-                      IconButton(
-                        icon: Icon(
-                          jarvisState.isMuted ? Icons.volume_off : Icons.volume_up,
-                          color: jarvisState.isMuted ? GamingTheme.accentRed : GamingTheme.primary,
-                          size: 20,
-                        ),
-                        onPressed: jarvisState.toggleMute,
-                      ),
-                      // Clear history
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.white60, size: 20),
-                        onPressed: () => jarvisState.clearHistory(),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            const Divider(color: Colors.white10),
-
-            // Top Skin Selector for Avatar (Multiple characters supported)
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    isFa ? "انتخاب پوسته دستیار:" : "Assistant Character:",
-                    style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 8),
-                  Wrap(
-                    spacing: 6,
-                    children: JarvisCharacter.values.map((skin) {
-                      final isSelected = jarvisState.character == skin;
-                      return ChoiceChip(
-                        label: Text(
-                          _getSkinName(skin, isFa),
-                          style: TextStyle(
-                            color: isSelected ? Colors.black : Colors.white70,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        selected: isSelected,
-                        selectedColor: GamingTheme.primary,
-                        backgroundColor: Colors.white.withValues(alpha: 0.04),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(
-                            color: isSelected ? GamingTheme.primary : Colors.white10,
-                          ),
-                        ),
-                        showCheckmark: false,
-                        onSelected: (val) {
-                          if (val) jarvisState.setCharacter(skin);
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 10),
-
-            // Center Dynamic Avatar View
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              alignment: Alignment.center,
-              child: JarvisAvatar(
-                character: jarvisState.character,
-                state: jarvisState.avatarState,
-                voiceLevel: jarvisState.voiceLevel,
-                size: 150,
-              ),
-            ),
-            
-            // Pulse subtitle describing active state
-            Text(
-              _getStateSubtitle(jarvisState.avatarState, jarvisState.isListening, isFa),
-              style: TextStyle(
-                color: _getStateColor(jarvisState.avatarState),
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.1,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Dialogue Scroll History
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                 ),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  itemCount: jarvisState.chatHistory.length,
-                  itemBuilder: (context, index) {
-                    final msg = jarvisState.chatHistory[index];
-                    return Align(
-                      alignment: msg.isUser ? Alignment.centerLeft : Alignment.centerRight,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: msg.isUser
-                              ? GamingTheme.secondary.withValues(alpha: 0.25)
-                              : GamingTheme.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(16),
-                            topRight: const Radius.circular(16),
-                            bottomLeft: Radius.circular(msg.isUser ? 0 : 16),
-                            bottomRight: Radius.circular(msg.isUser ? 16 : 0),
-                          ),
-                          border: Border.all(
-                            color: msg.isUser
-                                ? GamingTheme.secondary.withValues(alpha: 0.4)
-                                : GamingTheme.primary.withValues(alpha: 0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              msg.content,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                height: 1.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textDirection: isFa ? TextDirection.rtl : TextDirection.ltr,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              msg.timestamp,
-                              style: const TextStyle(
-                                color: Colors.white30,
-                                fontSize: 9,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+
+                // هدر فشرده: آواتار کوچک + وضعیت + کنترل‌ها
+                _buildHeader(jarvisState, isFa),
+                const Divider(height: 1, color: Colors.white10),
+
+                // بخش گفتگو — قهرمان صفحه
+                Expanded(
+                  child: _buildChatArea(jarvisState, appState, isFa, isRtl),
                 ),
-              ),
-            ),
 
-            // Horizontal suggested voice commands (Farsi gamer-slang)
-            Container(
-              height: 48,
-              margin: const EdgeInsets.only(top: 8),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _suggestedCommands.length,
-                itemBuilder: (context, index) {
-                  final cmd = _suggestedCommands[index];
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    child: ActionChip(
-                      label: Text(
-                        cmd,
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                      backgroundColor: Colors.white.withValues(alpha: 0.04),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(color: GamingTheme.primary.withValues(alpha: 0.15)),
-                      ),
-                      onPressed: () {
-                        // Clean emoji for actual matching
-                        final cleaned = cmd.replaceAll(RegExp(r'[\u2600-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]'), '').trim();
-                        jarvisState.sendTextCommand(cleaned, appState);
-                        _scrollToBottom();
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
+                // نوار ورودی pill شکل
+                _buildInputBar(jarvisState, appState, isFa),
 
-            // Bottom Audio Microphone Action or Text input
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  // Text input for typing commands
-                  Expanded(
-                    child: Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _textController,
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                              decoration: InputDecoration(
-                                hintText: isFa ? "تایپ دستور صوتی یا متنی..." : "Type voice command...",
-                                hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-                                border: InputBorder.none,
-                              ),
-                              onSubmitted: (val) {
-                                if (val.trim().isNotEmpty) {
-                                  jarvisState.sendTextCommand(val, appState);
-                                  _textController.clear();
-                                  _scrollToBottom();
-                                }
-                              },
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.send_rounded, color: GamingTheme.primary, size: 18),
-                            onPressed: () {
-                              final text = _textController.text;
-                              if (text.trim().isNotEmpty) {
-                                jarvisState.sendTextCommand(text, appState);
-                                _textController.clear();
-                                _scrollToBottom();
-                              }
-                            },
-                          ),
-                        ],
+                // خط وضعیت صدا
+                _buildStatusLine(jarvisState, isFa),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------- هدر ----------
+  Widget _buildHeader(JarvisStateProvider jarvis, bool isFa) {
+    final stateColor = _getStateColor(jarvis.avatarState);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          // آواتار زندهٔ فشرده — همان انیمیشن سایبری، در اندازهٔ کوچک
+          JarvisAvatar(
+            character: jarvis.character,
+            state: jarvis.avatarState,
+            voiceLevel: jarvis.voiceLevel,
+            size: 44,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'JARVIS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.5,
                       ),
                     ),
-                  ),
-                  
-                  const SizedBox(width: 12),
-
-                  // Tap-to-talk microphone. In hands-free mode Jarvis keeps the
-                  // conversation going: listen → think/action → speak → listen again.
-                  GestureDetector(
-                    onTap: () async {
-                      if (jarvisState.handsFreeMode) {
-                        await jarvisState.toggleHandsFreeConversation(appState);
-                      } else if (jarvisState.isListening) {
-                        await jarvisState.stopListeningAndProcess(appState);
-                        _scrollToBottom();
-                      } else {
-                        await jarvisState.startListening(appState);
-                      }
-                    },
-                    onLongPress: () => jarvisState.toggleHandsFreeConversation(appState),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: 52,
-                      height: 52,
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 7,
+                      height: 7,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: jarvisState.handsFreeMode
-                            ? GamingTheme.goldAccent
-                            : jarvisState.isListening
-                                ? GamingTheme.secondary
-                                : GamingTheme.primary,
+                        color: stateColor,
                         boxShadow: [
-                          BoxShadow(
-                            color: (jarvisState.handsFreeMode
-                                    ? GamingTheme.goldAccent
-                                    : jarvisState.isListening
-                                        ? GamingTheme.secondary
-                                        : GamingTheme.primary)
-                                .withValues(alpha: 0.4),
-                            blurRadius: jarvisState.isListening || jarvisState.handsFreeMode ? 22 : 10,
-                            spreadRadius: jarvisState.isListening || jarvisState.handsFreeMode ? 4 : 1,
-                          )
+                          BoxShadow(color: stateColor.withValues(alpha: 0.7), blurRadius: 6),
                         ],
                       ),
-                      child: Icon(
-                        jarvisState.handsFreeMode
-                            ? Icons.record_voice_over_rounded
-                            : jarvisState.isListening
-                                ? Icons.stop_rounded
-                                : Icons.mic_none,
-                        color: Colors.black,
-                        size: 24,
-                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _getStateSubtitle(jarvis.avatarState, jarvis.isListening, isFa),
+                  style: TextStyle(
+                    color: stateColor.withValues(alpha: 0.9),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          // قطع/وصل صدای پاسخ
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              jarvis.isMuted ? Icons.volume_off : Icons.volume_up,
+              color: jarvis.isMuted ? GamingTheme.accentRed : GamingTheme.primary,
+              size: 20,
+            ),
+            onPressed: jarvis.toggleMute,
+          ),
+          // منوی تنظیمات: پوستهٔ دستیار + پاک کردن گفتگو
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.tune, color: Colors.white70, size: 20),
+            color: GamingTheme.darkCardSolid,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: GamingTheme.primary.withValues(alpha: 0.3)),
+            ),
+            onSelected: (value) {
+              if (value == 'clear') {
+                jarvis.clearHistory();
+              } else if (value.startsWith('skin:')) {
+                final name = value.substring(5);
+                for (final skin in JarvisCharacter.values) {
+                  if (skin.name == name) {
+                    jarvis.setCharacter(skin);
+                    break;
+                  }
+                }
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem<String>(
+                enabled: false,
+                height: 32,
+                child: Text(
+                  isFa ? 'پوستهٔ دستیار' : 'Assistant skin',
+                  style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+              ...JarvisCharacter.values.map((skin) {
+                final selected = jarvis.character == skin;
+                return PopupMenuItem<String>(
+                  value: 'skin:${skin.name}',
+                  child: Row(
+                    children: [
+                      Icon(
+                        selected ? Icons.check_circle : Icons.circle_outlined,
+                        color: selected ? GamingTheme.primary : Colors.white24,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _getSkinName(skin, isFa),
+                        style: TextStyle(
+                          color: selected ? GamingTheme.primary : Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'clear',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, color: GamingTheme.accentRed, size: 16),
+                    SizedBox(width: 8),
+                    Text('پاک کردن گفتگو', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          // بستن
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------- بخش گفتگو ----------
+  Widget _buildChatArea(JarvisStateProvider jarvis, AppState appState, bool isFa, bool isRtl) {
+    final items = <Widget>[
+      for (final msg in jarvis.chatHistory) _buildMessageBubble(msg, isFa, isRtl),
+      if (jarvis.isProcessing) _buildTypingRow(isRtl),
+    ];
+    // پیشنهادهای شروع فقط وقتی گفتگو تازه است — مثل صفحهٔ اول ChatGPT
+    if (jarvis.chatHistory.length <= 1) {
+      items.add(_buildSuggestions(jarvis, appState, isFa));
+    }
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      children: items,
+    );
+  }
+
+  Widget _buildMessageBubble(JarvisMessage msg, bool isFa, bool isRtl) {
+    // در رابط راست‌به‌چپ، پیام‌های کاربر سمت چپ می‌نشینند (آینهٔ ChatGPT فارسی)
+    final userAlign = isRtl ? Alignment.centerLeft : Alignment.centerRight;
+    final botAlign = isRtl ? Alignment.centerRight : Alignment.centerLeft;
+    final isUserSide = msg.isUser;
+
+    return Align(
+      alignment: isUserSide ? userAlign : botAlign,
+      child: Container(
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isUserSide
+              ? GamingTheme.secondary.withValues(alpha: 0.28)
+              : Colors.white.withValues(alpha: 0.045),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isUserSide && isRtl ? 4 : 16),
+            bottomRight: Radius.circular(isUserSide && !isRtl ? 4 : 16),
+          ),
+          border: Border.all(
+            color: isUserSide
+                ? GamingTheme.secondary.withValues(alpha: 0.45)
+                : GamingTheme.primary.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              msg.content,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13.5,
+                height: 1.55,
+                fontWeight: FontWeight.w600,
+              ),
+              textDirection: isFa ? TextDirection.rtl : TextDirection.ltr,
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (msg.action != null && msg.action != 'chitchat')
+                  _buildActionBadge(msg.action!, isFa),
+                const Spacer(),
+                Text(
+                  msg.timestamp,
+                  style: const TextStyle(color: Colors.white24, fontSize: 9, fontFamily: 'monospace'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// نشان «عملیات واقعی انجام شد» زیر پیام جارویس — مثل رسید سفارش.
+  Widget _buildActionBadge(String action, bool isFa) {
+    final label = _actionLabel(action, isFa);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: GamingTheme.goldAccent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: GamingTheme.goldAccent.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle, color: GamingTheme.goldAccent, size: 10),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: GamingTheme.goldAccent,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypingRow(bool isRtl) {
+    return Align(
+      alignment: isRtl ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.045),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: GamingTheme.primary.withValues(alpha: 0.25)),
+        ),
+        child: const TypingDots(color: GamingTheme.primary),
+      ),
+    );
+  }
+
+  Widget _buildSuggestions(JarvisStateProvider jarvis, AppState appState, bool isFa) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isFa ? 'می‌تونی از این‌ها شروع کنی:' : 'Try asking:',
+            style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final cmd in _suggestedCommands)
+                ActionChip(
+                  label: Text(
+                    cmd,
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: Colors.white.withValues(alpha: 0.05),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(color: GamingTheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  onPressed: () {
+                    jarvis.sendTextCommand(cmd, appState);
+                    _scrollToBottom();
+                  },
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------- نوار ورودی ----------
+  Widget _buildInputBar(JarvisStateProvider jarvis, AppState appState, bool isFa) {
+    final micColor = jarvis.handsFreeMode
+        ? GamingTheme.goldAccent
+        : jarvis.isListening
+            ? GamingTheme.secondary
+            : GamingTheme.primary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: jarvis.isListening
+                ? GamingTheme.primary.withValues(alpha: 0.6)
+                : Colors.white.withValues(alpha: 0.12),
+          ),
+          boxShadow: [
+            BoxShadow(color: GamingTheme.primary.withValues(alpha: 0.10), blurRadius: 18, spreadRadius: -4),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _textController,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                decoration: InputDecoration(
+                  hintText: jarvis.isListening && jarvis.liveTranscript.isNotEmpty
+                      ? jarvis.liveTranscript
+                      : (isFa ? 'از جارویس بپرس یا دستور بده…' : 'Ask or command Jarvis…'),
+                  hintStyle: TextStyle(
+                    color: jarvis.isListening ? GamingTheme.primary : Colors.white30,
+                    fontSize: 12.5,
+                  ),
+                  border: InputBorder.none,
+                ),
+                onSubmitted: (_) => _send(jarvis, appState),
               ),
             ),
-            
-            // Instruction caption / live transcript / unavailable-speech warning
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                jarvisState.isListening
-                    ? (jarvisState.liveTranscript.isNotEmpty
-                        ? jarvisState.liveTranscript
-                        : (isFa ? "در حال گوش دادن..." : "Listening..."))
-                    : jarvisState.isSpeaking
-                        ? (isFa ? "جارویس در حال پاسخ صوتی است..." : "Jarvis is speaking...")
-                        : !jarvisState.speechAvailable
-                            ? (isFa
-                                ? "تشخیص گفتار روی این دستگاه در دسترس نیست، از تایپ استفاده کنید"
-                                : "Speech recognition unavailable on this device, please type")
-                            : jarvisState.handsFreeMode
-                                ? (isFa ? "حالت مکالمه فعال است؛ طبیعی صحبت کنید" : "Hands-free conversation is active; speak naturally")
-                                : (isFa
-                                    ? "یک‌بار میکروفون را لمس کنید؛ نگه‌داشتن طولانی = مکالمه پیوسته"
-                                    : "Tap mic to talk; long-press for hands-free conversation"),
-                style: TextStyle(
-                  color: jarvisState.isListening ? GamingTheme.primary : Colors.white30,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
+            // میکروفن: لمس = ضبط/ارسال، نگه‌داشتن = مکالمهٔ پیوسته (دست‌آزاد)
+            GestureDetector(
+              onTap: () => _onMicTap(jarvis, appState),
+              onLongPress: () => jarvis.toggleHandsFreeConversation(appState),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: micColor.withValues(alpha: 0.16),
+                  border: Border.all(color: micColor.withValues(alpha: 0.6)),
                 ),
+                child: Icon(
+                  jarvis.handsFreeMode
+                      ? Icons.record_voice_over_rounded
+                      : jarvis.isListening
+                          ? Icons.stop_rounded
+                          : Icons.mic_none,
+                  color: micColor,
+                  size: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // دکمهٔ ارسال گرادیانی
+            GestureDetector(
+              onTap: () => _send(jarvis, appState),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: GamingTheme.ctaGradient,
+                  boxShadow: [
+                    BoxShadow(
+                      color: GamingTheme.secondary.withValues(alpha: 0.4),
+                      blurRadius: 14,
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.send_rounded, color: Colors.white, size: 19),
               ),
             ),
           ],
@@ -1128,6 +1267,43 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
     );
   }
 
+  // ---------- خط وضعیت ----------
+  Widget _buildStatusLine(JarvisStateProvider jarvis, bool isFa) {
+    final String status;
+    if (jarvis.isListening) {
+      status = jarvis.liveTranscript.isNotEmpty
+          ? jarvis.liveTranscript
+          : (isFa ? 'در حال گوش دادن… صحبت کن' : 'Listening… speak now');
+    } else if (jarvis.isSpeaking) {
+      status = isFa ? 'جارویس در حال پاسخ صوتی است…' : 'Jarvis is speaking…';
+    } else if (!jarvis.speechAvailable) {
+      status = isFa
+          ? 'تشخیص گفتار روی این دستگاه در دسترس نیست؛ با تایپ گفتگو کن'
+          : 'Speech recognition unavailable; chat by typing';
+    } else if (jarvis.handsFreeMode) {
+      status = isFa ? 'حالت مکالمهٔ پیوسته فعال است؛ طبیعی صحبت کن' : 'Hands-free mode is on; speak naturally';
+    } else {
+      status = isFa
+          ? 'لمس میکروفن = صحبت با جارویس • نگه‌داشتن = مکالمهٔ پیوسته'
+          : 'Tap mic to talk • long-press for hands-free';
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 2),
+      child: Text(
+        status,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: jarvis.isListening ? GamingTheme.primary : Colors.white24,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // ---------- برچسب‌ها ----------
   String _getSkinName(JarvisCharacter skin, bool isFa) {
     switch (skin) {
       case JarvisCharacter.cyberRobot:
@@ -1141,17 +1317,17 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
 
   String _getStateSubtitle(JarvisAvatarState state, bool listening, bool isFa) {
     if (listening) {
-      return isFa ? "درحال ضبط صدا... صحبت کنید" : "LISTENING... SPEAK NOW";
+      return isFa ? "درحال ضبط صدا… صحبت کنید" : "LISTENING… SPEAK NOW";
     }
     switch (state) {
       case JarvisAvatarState.idle:
-        return isFa ? "سیستم هوشیار - آماده به کار" : "SYSTEM ONLINE - IDLE";
+        return isFa ? "آنلاین — آمادهٔ گفتگو" : "ONLINE — READY TO CHAT";
       case JarvisAvatarState.talking:
-        return isFa ? "در حال پردازش و پاسخگویی..." : "ANALYZING VOICE PATTERNS...";
+        return isFa ? "در حال پردازش…" : "THINKING…";
       case JarvisAvatarState.happy:
-        return isFa ? "عملیات با موفقیت انجام شد ✨" : "OPERATION SUCCESSFUL ✨";
+        return isFa ? "عملیات با موفقیت انجام شد" : "OPERATION SUCCESSFUL";
       case JarvisAvatarState.error:
-        return isFa ? "خطا در برقراری ارتباط با هسته" : "SYSTEM MALFUNCTION / ERROR";
+        return isFa ? "خطا در برقراری ارتباط" : "CONNECTION ERROR";
     }
   }
 
@@ -1166,5 +1342,85 @@ class _JarvisAssistantModalState extends State<JarvisAssistantModal> {
       case JarvisAvatarState.error:
         return GamingTheme.accentRed;
     }
+  }
+
+  String _actionLabel(String action, bool isFa) {
+    const labels = <String, (String, String)>{
+      'order_cafe_item': ('سفارش کافه ثبت شد', 'CAFE ORDER'),
+      'extend_reservation': ('رزرو تمدید شد', 'RESERVATION EXTENDED'),
+      'reserve_system': ('سیستم رزرو شد', 'SYSTEM RESERVED'),
+      'cancel_reservation': ('رزرو لغو شد', 'RESERVATION CANCELLED'),
+      'contact_admin': ('به ادمین اعلام شد', 'ADMIN NOTIFIED'),
+      'send_chat_message': ('در چت ارسال شد', 'CHAT SENT'),
+      'purchase_shop_item': ('خرید ثبت شد', 'PURCHASE DONE'),
+      'search_shop': ('نتایج فروشگاه', 'SHOP RESULTS'),
+      'list_tournaments': ('مسابقات', 'TOURNAMENTS'),
+      'register_tournament': ('ثبت‌نام مسابقه', 'TOURNAMENT ENTRY'),
+      'read_messages': ('پیام‌ها خوانده شد', 'MESSAGES READ'),
+      'change_language': ('زبان تغییر کرد', 'LANGUAGE CHANGED'),
+      'open_app_section': ('بخش باز شد', 'SECTION OPENED'),
+      'show_wallet': ('کیف پول', 'WALLET'),
+      'suggest_best_system': ('پیشنهاد سیستم', 'SYSTEM PICK'),
+    };
+    final l = labels[action];
+    if (l == null) return action;
+    return isFa ? l.$1 : l.$2;
+  }
+}
+
+/// سه نقطهٔ «در حال تایپ» — همان حس ChatGPT وقتی دستیار داره فکر می‌کنه.
+class TypingDots extends StatefulWidget {
+  final Color color;
+  const TypingDots({super.key, this.color = GamingTheme.primary});
+
+  @override
+  State<TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<TypingDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < 3; i++) ...[
+              if (i > 0) const SizedBox(width: 5),
+              Opacity(
+                opacity: 0.25 + 0.75 * math.max(0.0, math.sin(_controller.value * 2 * math.pi - i * 0.9)),
+                child: Container(
+                  key: ValueKey('jarvis_typing_dot_$i'),
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.color,
+                    boxShadow: [
+                      BoxShadow(color: widget.color.withValues(alpha: 0.6), blurRadius: 6),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
   }
 }

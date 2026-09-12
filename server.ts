@@ -1569,6 +1569,12 @@ async function startServer() {
   // =========================================================================
   function heuristicJarvisIntent(command: string) {
     const cmd = command.toLowerCase();
+    // ناوبری باید قبل از بقیه چک شود: قبلاً «برو به کافه» به‌جای باز کردن بخش کافه،
+    // سفارش آیتم کافه می‌شد (الگوی «کافه» زودتر می‌چسبید) و «برو به چت» پیام چت
+    // می‌فرستاد. هر دستوری که با «برو به/باز کن/نمایش بده» شروع می‌شود ناوبری است.
+    if (/(برو به|باز کن|نمایش بده|نشان بده).*(کافه|بوفه|فروشگاه|تورنمنت|مسابق|چت|بلاگ|مجله|پیام|رزرو|باشگاه|امتیاز|خانه|خونه)/.test(cmd)) {
+      return { action: "open_app_section", params: { section: command }, aiReply: "" };
+    }
     if (/(سفارش|کافه|بوفه|پیتزا|همبرگر|نوشیدنی|ردبول)/.test(cmd)) {
       const itemName = cmd.includes("همبرگر") ? "همبرگر" : (cmd.includes("ردبول") || cmd.includes("نوشیدنی")) ? "ردبول" : "پیتزا";
       return { action: "order_cafe_item", params: { itemName }, aiReply: "" };
@@ -1577,17 +1583,49 @@ async function startServer() {
     if (/(ادمین|پشتیبان|خراب|کمک)/.test(cmd)) return { action: "contact_admin", params: { message: command }, aiReply: "" };
     if (/(چت|ارسال پیام|پیام بفرست)/.test(cmd)) return { action: "send_chat_message", params: { room: "", message: command }, aiReply: "" };
     if (/(رزرو کن|رزرو سیستم|سیستم بگیر|کامپیوتر بگیر)/.test(cmd)) return { action: "reserve_system", params: { hours: 1 }, aiReply: "" };
-    if (/(لغو رزرو|کنسل رزرو|رزرو را لغو)/.test(cmd)) return { action: "cancel_reservation", params: {}, aiReply: "" };
+    if (/(لغو|کنسل|cancel)/.test(cmd) && /رزرو/.test(cmd)) return { action: "cancel_reservation", params: {}, aiReply: "" };
     if (/(کیف پول|امتیاز|کوپن|کد تخفیف)/.test(cmd)) return { action: "show_wallet", params: {}, aiReply: "" };
     if (/(بهترین سیستم|سیستم آزاد|پیشنهاد سیستم)/.test(cmd)) return { action: "suggest_best_system", params: {}, aiReply: "" };
     if (/(تورنمنت|مسابقه)/.test(cmd) && /(لیست|چی|نمایش)/.test(cmd)) return { action: "list_tournaments", params: {}, aiReply: "" };
     if (/(ثبت.?نام).*(تورنمنت|مسابقه)/.test(cmd)) return { action: "register_tournament", params: { tournamentName: command }, aiReply: "" };
-    if (/(جستجو|پیدا کن).*(فروشگاه|کالا|موس|کیبورد|هدست)/.test(cmd)) return { action: "search_shop", params: { query: command }, aiReply: "" };
-    if (/(بخر|خرید).*(موس|کیبورد|هدست|دسته|ماوس)/.test(cmd)) return { action: "purchase_shop_item", params: { query: command }, aiReply: "" };
+    // جستجو/خرید فروشگاه: ترتیب کلمات مهم نیست («توی فروشگاه هدست پیدا کن» هم باید
+    // جستجو شود، نه chitchat). جستجو قبل از خرید چک می‌شود تا «سرچ کن و بعد بخر» جستجو بماند.
+    if (/(جستجو|پیدا کن|سرچ)/.test(cmd) && /(فروشگاه|کالا|موس|ماوس|کیبورد|هدست|دسته)/.test(cmd)) return { action: "search_shop", params: { query: command }, aiReply: "" };
+    if (/(بخر|خرید)/.test(cmd) && /(موس|ماوس|کیبورد|هدست|دسته)/.test(cmd)) return { action: "purchase_shop_item", params: { query: command }, aiReply: "" };
     if (/(پیام‌ها|پیام ها|نوتیفیکیشن|اعلان)/.test(cmd)) return { action: "read_messages", params: {}, aiReply: "" };
     if (/(زبان|language)/.test(cmd)) return { action: "change_language", params: { language: cmd.includes('english') || cmd.includes('انگلیسی') ? 'en' : cmd.includes('روسی') ? 'ru' : cmd.includes('ترکی') ? 'tr' : 'fa' }, aiReply: "" };
     if (/(برو به|باز کن|نشان بده)/.test(cmd)) return { action: "open_app_section", params: { section: command }, aiReply: "" };
     return null;
+  }
+
+  // تطبیق کالای فروشگاه با کلمات کلیدی دستور. قبلاً کلِ جمله باید زیررشتهٔ دقیق نام
+  // کالا می‌بود؛ نتیجه: «توی فروشگاه هدست پیدا کن» هیچ‌وقت چیزی پیدا نمی‌کرد و
+  // «یک ماوس گیمینگ بخر» بی‌صدا کالای اول لیست (کیبورد!) را می‌خرید. حالا جمله به
+  // واژه شکسته می‌شود (نیم‌فاصله حذف و «ماوس/موس» یکسان‌سازی می‌شود) و تطبیق واژهٔ
+  // کامل (۱۵ امتیاز) از زیررشته (۱۰ امتیاز) جلو می‌زند تا «موس گیمینگ» از «ماوس‌پد»
+  // قابل تفکیک باشد؛ بدون هیچ هم‌پوشانی، صادقانه «نیست» می‌گوید.
+  function normalizeAccessoryText(s: string) {
+    return s.toLowerCase().replace(/\u200c/g, "").replace(/ماوس/g, "موس");
+  }
+  function matchAccessoriesByQuery(items: any[], query: string) {
+    const q = normalizeAccessoryText(query.trim());
+    if (!q) return items;
+    const tokens = q.split(/[\s،,.!?؟:;()]+/).filter((t) => t.length > 2);
+    const scored = items
+      .map((item) => {
+        const hay = normalizeAccessoryText(`${item.name} ${item.description ?? ""} ${item.category ?? ""}`);
+        if (hay.includes(q)) return { item, score: 100 };
+        const words = hay.split(/[\s،,.!?؟:;()]+/).filter(Boolean);
+        let score = 0;
+        for (const t of tokens) {
+          if (words.includes(t)) score += 15;
+          else if (hay.includes(t)) score += 10;
+        }
+        return { item, score };
+      })
+      .filter((s) => s.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.item);
   }
 
   const jarvisActionNames = [
@@ -1646,7 +1684,7 @@ async function startServer() {
     return response.text || "";
   }
 
-  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any; language?: string }) {
+  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any; language?: string; history?: Array<{ role: string; content: string }> }) {
     // Cost saver + safety: clear app commands are routed deterministically without any LLM call.
     const deterministic = heuristicJarvisIntent(command);
     if (deterministic) return deterministic;
@@ -1655,15 +1693,32 @@ async function startServer() {
     const systemPrompt = `You are Jarvis, the in-app assistant for BAZINO gaming lounge. Current user: ${context.user.username === "Guest" ? "guest" : context.user.username}. ${context.activeReservation ? `Active reservation: ${context.activeReservation.systemName}.` : "No active reservation."}
 Return ONLY valid JSON: {"action":"one_of_allowed_actions","params":{},"reply":"short natural reply in ${replyLanguage}"}.
 Allowed actions: ${jarvisActionNames.join(", ")}.
-Use chitchat for normal conversation or unclear requests. For app tasks, choose the closest action and fill params. Never invent prices or claim an action happened; server executes actions after you classify.`;
+Use chitchat for normal conversation or unclear requests. For app tasks, choose the closest action and fill params. Never invent prices or claim an action happened; server executes actions after you classify. Earlier conversation turns may be provided; use them to resolve follow-up references like "the same one" or "again".`;
     const userPrompt = `User said: ${command}`;
-    const messages = [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }];
+    // Conversation memory (ChatGPT-style follow-ups): the app sends its recent chat
+    // turns with each command, so the model can resolve follow-up requests without
+    // any server-side session store. Sanitised hard: roles whitelisted, capped at
+    // 12 turns / 600 chars each — the client can never inject a system turn.
+    const history = (Array.isArray(context.history) ? context.history : [])
+      .filter((h: any) => h && (h.role === "user" || h.role === "assistant") && typeof h.content === "string" && h.content.trim())
+      .slice(-12)
+      .map((h: any) => ({ role: h.role as string, content: h.content.slice(0, 600) }));
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...history,
+      { role: "user", content: userPrompt },
+    ];
     const providers = await getJarvisAiProviders(true);
 
     for (const provider of providers) {
       try {
         let text = "";
-        if (provider.provider === "gemini") text = await callGeminiJarvis(provider, `${systemPrompt}\n\n${userPrompt}`);
+        if (provider.provider === "gemini") {
+          const transcript = history.length
+            ? `Conversation so far:\n${history.map((h: any) => `${h.role === "user" ? "User" : "Jarvis"}: ${h.content}`).join("\n")}\n\n`
+            : "";
+          text = await callGeminiJarvis(provider, `${systemPrompt}\n\n${transcript}${userPrompt}`);
+        }
         else if (provider.provider === "ollama") text = await callOllamaJarvis(provider, messages);
         else text = await callOpenAiCompatibleJarvis(provider, messages);
         const parsed = parseJarvisAiJson(text);
@@ -1859,15 +1914,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       case "search_shop": {
         const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
-        const q = String(intent.params.query || "").toLowerCase();
-        const matches = items.filter(i => i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())).slice(0, 5);
+        const matches = matchAccessoriesByQuery(items, String(intent.params.query || "")).slice(0, 5);
         return { reply: matches.length ? `این کالاها را پیدا کردم: ${matches.map(i => `${i.name} (${i.price.toLocaleString()} لیر)`).join("، ")}` : "کالایی با این مشخصات پیدا نکردم." };
       }
 
       case "purchase_shop_item": {
         const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
-        const q = String(intent.params.query || "").toLowerCase();
-        const item = items.find(i => i.name.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())) || items[0];
+        const item = matchAccessoriesByQuery(items, String(intent.params.query || ""))[0];
         if (!item || item.stock < 1) return { reply: "این کالا موجود نیست." };
         const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode, user.username);
         await store.decrementAccessoryStock(item.id, 1);
@@ -1901,7 +1954,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/assistant/command", async (req, res) => {
     try {
-      const { command, language } = req.body;
+      const { command, language, history } = req.body;
       if (!command || !String(command).trim()) {
         return res.status(400).json(apiError(req, "COMMAND_EMPTY"));
       }
@@ -1910,7 +1963,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const user = await getCurrentUser(req);
       const activeReservation = user.username !== "Guest" ? await store.getActiveReservationForUser(user.username) : undefined;
 
-      const intent = await resolveAssistantIntent(String(command), { user, activeReservation, language });
+      const intent = await resolveAssistantIntent(String(command), { user, activeReservation, language, history });
       const result = await executeAssistantIntent(intent, { user, activeReservation });
 
       // Real-time side effects: broadcast to WebSocket clients exactly like the normal endpoints do

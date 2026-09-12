@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Globe, CheckCircle2, ShieldCheck, X, Key, Server, ArrowUpRight, ArrowDownLeft, Terminal, Copy, Check, Settings, Activity, Calendar, Clock, User, CheckCircle, XCircle, AlertCircle, ListFilter, FileText, Download, Smartphone, Monitor } from 'lucide-react';
+import { RefreshCw, Globe, CheckCircle2, ShieldCheck, X, Key, Server, ArrowUpRight, ArrowDownLeft, Terminal, Copy, Check, Settings, Activity, Calendar, Clock, User, CheckCircle, XCircle, AlertCircle, ListFilter, FileText, Download, Smartphone, Monitor, Palette, Upload, RotateCcw, Package, Image as ImageIcon } from 'lucide-react';
 import { WebSyncStatus } from '../types';
 import { buildSyncUrl, syncHeaders } from '../utils/syncClient';
 import { useModalDismiss } from '../hooks/useModalDismiss';
@@ -42,7 +42,7 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
   // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
   useModalDismiss(true, onClose);
 
-  const [activeTab, setActiveTab] = useState<'status' | 'reservations' | 'config' | 'payload' | 'logs' | 'docs'>('status');
+  const [activeTab, setActiveTab] = useState<'status' | 'reservations' | 'themes' | 'config' | 'payload' | 'logs' | 'docs'>('status');
   // Draft fields for the config tab — only actually applied (and persisted) when the user
   // clicks "ذخیره تنظیمات". Seeded from the real, persisted settings (`status`), not fake
   // placeholder values, so what you see here is what's really being used to connect.
@@ -58,6 +58,132 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
   const [reservations, setReservations] = useState<WebReservation[]>([]);
   const [logs, setLogs] = useState<SyncLogEntry[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
+
+  // ── مدیریت قالب‌های سایت (همان امکانات پنل ادمین وب — از طریق sync) ──
+  interface SiteTheme { id: string; name: string; version?: string; regions?: string[]; hasComponentJs?: boolean; }
+  const [siteThemes, setSiteThemes] = useState<SiteTheme[]>([]);
+  const [activeSiteThemeId, setActiveSiteThemeId] = useState('');
+  const [themeImgSlots, setThemeImgSlots] = useState<Record<string, string>>({});
+  const [isLoadingThemes, setIsLoadingThemes] = useState(false);
+  const [themesError, setThemesError] = useState('');
+  const [themeBusy, setThemeBusy] = useState<string | null>(null);
+  const [themeMsg, setThemeMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [zipReplace, setZipReplace] = useState(true);
+  const [zipActivate, setZipActivate] = useState(true);
+  const zipInputRef = React.useRef<HTMLInputElement>(null);
+
+  const THEME_IMG_SLOTS: { slot: string; label: string }[] = [
+    { slot: 'hero_main', label: 'هرو مرکزی — کارت بزرگ تبلیغاتی' },
+    { slot: 'hero_tournament', label: 'کارت تورنمنت هرو (سمت چپ)' },
+    { slot: 'hero_live', label: 'کارت مسابقه زنده (سمت راست)' },
+  ];
+
+  const prettySyncError = (err: any): string => {
+    const m = String(err?.message || err || '');
+    if (/FORBIDDEN/i.test(m)) return 'کلید API دسترسی لازم (مجوز configure) را ندارد — از توکن کارمند ادمین استفاده کنید';
+    if (/401|Invalid or missing sync API key/i.test(m)) return 'کلید API نامعتبر است — تب «تنظیمات کلید API» را بررسی کنید';
+    return m || 'خطای ناشناخته';
+  };
+
+  const fetchThemes = async () => {
+    setIsLoadingThemes(true); setThemesError('');
+    try {
+      const res = await fetch(buildSyncUrl(status.webServerUrl, '/api/sync/themes'), {
+        headers: syncHeaders(status.apiKey),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      setSiteThemes(data.serverThemes || []);
+      setActiveSiteThemeId(data.activeThemeId || '');
+      setThemeImgSlots(data.themeImg || {});
+    } catch (err) {
+      setThemesError(prettySyncError(err));
+    } finally {
+      setIsLoadingThemes(false);
+    }
+  };
+
+  const handleInstallThemeZip = async (file: File) => {
+    setThemeBusy('install'); setThemeMsg(null);
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const qs = `?name=${encodeURIComponent(file.name)}&replace=${zipReplace ? '1' : '0'}&activate=${zipActivate ? '1' : '0'}`;
+      const res = await fetch(buildSyncUrl(status.webServerUrl, '/api/sync/themes/install' + qs), {
+        method: 'POST',
+        headers: { ...syncHeaders(status.apiKey), 'Content-Type': 'application/zip' },
+        body: bytes,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      setThemeMsg({
+        ok: true,
+        text: `قالب «${data.theme?.name || data.theme?.id}» نسخه ${data.theme?.version || '?'} نصب شد${data.replaced ? ' (جایگزینی نسخهٔ قبلی)' : ''}${data.activeThemeId === data.theme?.id ? ' — و فعال شد' : ''}`,
+      });
+      await fetchThemes();
+    } catch (err) {
+      setThemeMsg({ ok: false, text: 'نصب ناموفق: ' + prettySyncError(err) });
+    } finally {
+      setThemeBusy(null);
+    }
+  };
+
+  const handleActivateTheme = async (themeId: string) => {
+    setThemeBusy('act-' + themeId); setThemeMsg(null);
+    try {
+      const res = await fetch(buildSyncUrl(status.webServerUrl, '/api/sync/themes/activate'), {
+        method: 'POST',
+        headers: syncHeaders(status.apiKey, true),
+        body: JSON.stringify({ themeId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      setActiveSiteThemeId(data.activeThemeId || themeId);
+      setThemeMsg({ ok: true, text: `قالب «${themeId}» روی سایت فعال شد` });
+    } catch (err) {
+      setThemeMsg({ ok: false, text: 'فعال‌سازی ناموفق: ' + prettySyncError(err) });
+    } finally {
+      setThemeBusy(null);
+    }
+  };
+
+  const handleThemeImage = async (slot: string, file: File) => {
+    setThemeBusy('img-' + slot); setThemeMsg(null);
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const res = await fetch(buildSyncUrl(status.webServerUrl, `/api/sync/themes/image?slot=${encodeURIComponent(slot)}`), {
+        method: 'POST',
+        headers: { ...syncHeaders(status.apiKey), 'Content-Type': file.type || 'image/jpeg' },
+        body: bytes,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      setThemeImgSlots((prev) => ({ ...prev, [slot]: data.url }));
+      setThemeMsg({ ok: true, text: `تصویر «${slot}» به‌روزرسانی شد (WebP بهینه)` });
+    } catch (err) {
+      setThemeMsg({ ok: false, text: 'آپلود تصویر ناموفق: ' + prettySyncError(err) });
+    } finally {
+      setThemeBusy(null);
+    }
+  };
+
+  const handleThemeImageReset = async (slot: string) => {
+    setThemeBusy('rst-' + slot); setThemeMsg(null);
+    try {
+      const res = await fetch(buildSyncUrl(status.webServerUrl, '/api/sync/themes/image-reset'), {
+        method: 'POST',
+        headers: syncHeaders(status.apiKey, true),
+        body: JSON.stringify({ slot }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      setThemeImgSlots((prev) => ({ ...prev, [slot]: '' }));
+      setThemeMsg({ ok: true, text: `اسلات «${slot}» به تصویر پیش‌فرض قالب برگشت` });
+    } catch (err) {
+      setThemeMsg({ ok: false, text: 'بازگردانی ناموفق: ' + prettySyncError(err) });
+    } finally {
+      setThemeBusy(null);
+    }
+  };
 
   const handleSaveSettings = () => {
     onUpdateSyncSettings({ ...status, webServerUrl: apiUrlDraft.trim(), apiKey: apiKeyDraft.trim() });
@@ -96,6 +222,12 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
     // Re-fetch whenever the active (saved) server URL/key actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status.webServerUrl, status.apiKey]);
+
+  // هر بار تب «قالب‌های سایت» باز می‌شود، لیست تازه گرفته شود.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (activeTab === 'themes') fetchThemes();
+  }, [activeTab]);
 
   const sampleJsonPayload = JSON.stringify(
     {
@@ -245,6 +377,18 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
                 {reservations.filter(r => r.status === 'PENDING').length}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('themes')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === 'themes'
+                ? 'border-amber-500 text-amber-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Palette className="w-4 h-4" />
+            <span>قالب‌های سایت</span>
           </button>
 
           <button
@@ -445,6 +589,185 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'themes' && (
+            <div className="space-y-4">
+              {/* هدر */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-amber-400" />
+                  <h3 className="font-bold text-zinc-100">مدیریت قالب‌های سایت (همان پنل ادمین وب)</h3>
+                </div>
+                <button
+                  onClick={fetchThemes}
+                  disabled={isLoadingThemes || !!themeBusy}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingThemes ? 'animate-spin' : ''}`} />
+                  بروزرسانی
+                </button>
+              </div>
+
+              {themesError && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{themesError}</span>
+                </div>
+              )}
+              {themeMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border ${themeMsg.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                  {themeMsg.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                  <span>{themeMsg.text}</span>
+                </div>
+              )}
+
+              {/* لیست قالب‌های نصب‌شده */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-zinc-200 font-bold">
+                  <Package className="w-4 h-4 text-amber-400" />
+                  قالب‌های نصب‌شده روی سایت {isLoadingThemes && <RefreshCw className="w-3.5 h-3.5 animate-spin text-zinc-500" />}
+                </div>
+                {siteThemes.length === 0 && !isLoadingThemes && (
+                  <p className="text-zinc-500">قالبی یافت نشد — یا اتصال برقرار نیست یا قالبی نصب نشده است.</p>
+                )}
+                <div className="grid gap-2">
+                  {siteThemes.map((t) => {
+                    const isActive = t.id === activeSiteThemeId;
+                    return (
+                      <div
+                        key={t.id}
+                        className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${
+                          isActive ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-zinc-800 bg-zinc-950'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-zinc-100">{t.name || t.id}</span>
+                            {t.version && <span className="px-1.5 py-0.5 bg-zinc-800 rounded text-[10px] text-zinc-400">v{t.version}</span>}
+                            {t.hasComponentJs && <span className="px-1.5 py-0.5 bg-amber-500/10 rounded text-[10px] text-amber-400">پیشرفته</span>}
+                            {isActive && (
+                              <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/15 border border-emerald-500/40 rounded-full text-[10px] text-emerald-300 font-bold">
+                                <CheckCircle2 className="w-3 h-3" /> فعال
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-zinc-500 mt-1 truncate">
+            شناسه: {t.id}{t.regions?.length ? ` — ${t.regions.length} ناحیه: ${t.regions.join(', ')}` : ''}
+                          </div>
+                        </div>
+                        {!isActive && (
+                          <button
+                            onClick={() => handleActivateTheme(t.id)}
+                            disabled={!!themeBusy}
+                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 font-bold rounded-lg"
+                          >
+                            {themeBusy === 'act-' + t.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            فعال‌سازی
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* نصب قالب از ZIP */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-zinc-200 font-bold">
+                  <Upload className="w-4 h-4 text-amber-400" />
+                  نصب قالب جدید از فایل ZIP
+                </div>
+                <p className="text-zinc-500 leading-relaxed">
+                  فایل ZIP باید شامل <code className="text-zinc-400">theme.json</code> + <code className="text-zinc-400">theme.css</code> + پوشهٔ <code className="text-zinc-400">assets/</code> باشد (مثل قالب‌های BAZINO HUB).
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={zipReplace} onChange={(e) => setZipReplace(e.target.checked)} className="accent-amber-500" />
+                    <span className="text-zinc-300">جایگزینی نسخهٔ قبلی (همان شناسه)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={zipActivate} onChange={(e) => setZipActivate(e.target.checked)} className="accent-amber-500" />
+                    <span className="text-zinc-300">فعال‌سازی پس از نصب</span>
+                  </label>
+                </div>
+                <input
+                  ref={zipInputRef}
+                  type="file"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleInstallThemeZip(f);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  onClick={() => zipInputRef.current?.click()}
+                  disabled={!!themeBusy}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl"
+                >
+                  {themeBusy === 'install' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {themeBusy === 'install' ? 'در حال نصب…' : 'انتخاب فایل ZIP و نصب'}
+                </button>
+              </div>
+
+              {/* تصاویر سفارشی قالب هاب */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-zinc-200 font-bold">
+                  <ImageIcon className="w-4 h-4 text-amber-400" />
+                  تصاویر سفارشی قالب هاب (اسلات‌های تزئینی)
+                </div>
+                <p className="text-zinc-500 leading-relaxed">
+                  برای هر کارت هرو می‌توانید تصویر دلخواه آپلود کنید (JPG/PNG/WebP — روی سرور به WebP بهینه تبدیل می‌شود). بدون آپلود، تصویر پیش‌فرض خود قالب استفاده می‌شود.
+                </p>
+                <div className="space-y-2">
+                  {THEME_IMG_SLOTS.map(({ slot, label }) => {
+                    const custom = !!themeImgSlots[slot];
+                    return (
+                      <div key={slot} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-zinc-800 bg-zinc-950">
+                        <div className="min-w-0">
+                          <div className="text-zinc-200 font-bold">{label}</div>
+                          <div className={`text-[10px] mt-0.5 ${custom ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                            {custom ? 'تصویر سفارشی فعال است' : 'تصویر پیش‌فرض قالب'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <label
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold cursor-pointer ${
+                              themeBusy ? 'opacity-50 pointer-events-none' : 'bg-amber-500 hover:bg-amber-400 text-zinc-950'
+                            }`}
+                          >
+                            {themeBusy === 'img-' + slot ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                            آپلود
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleThemeImage(slot, f);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          {custom && (
+                            <button
+                              onClick={() => handleThemeImageReset(slot)}
+                              disabled={!!themeBusy}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 rounded-lg font-bold"
+                            >
+                              {themeBusy === 'rst-' + slot ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                              پیش‌فرض
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 

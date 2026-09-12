@@ -606,7 +606,8 @@ async function startServer() {
       signedPaths.has(req.path) ||
       req.path === "/api/admin/mobile-app/upload-apk" ||
       req.path === "/api/admin/mobile-app/upload-apk/chunk" ||
-      req.path === "/api/admin/themes/install"
+      req.path === "/api/admin/themes/install" ||
+      req.path === "/api/sync/themes/install"
     ) return next();
     return jsonParser(req, res, next);
   });
@@ -2002,6 +2003,31 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   }
 
+  // نوشتن تنظیمات قالب از نرم‌افزار مدیریت: یا توکن کارمند با مجوز «configure»،
+  // یا همان کلید sync که ادمین در تنظیمات سایت (gamenet_sync_api_key) تعیین کرده.
+  // (کلید سادهٔ sync فقط خواندن را باز نمی‌کند برای نوشتن — اینجا صریحاً اجازه می‌دهیم
+  // چون دارندهٔ کلید، اپراتور خود سایت است؛ مسیرها همه پشت requireSyncApiKey هستند.)
+  async function requireSyncThemeWrite(req: express.Request, res: express.Response, next: express.NextFunction) {
+    try {
+      if ((req as any).authUsername) {
+        const staff = await management.staff((req as any).authUsername);
+        if (!staff.permissions.includes("configure")) {
+          return res.status(403).json({ success: false, error: "FORBIDDEN" });
+        }
+        return next();
+      }
+      const expectedKey = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
+      const header = req.headers.authorization || "";
+      if (expectedKey && header.startsWith("Bearer ") && header.slice(7) === expectedKey) {
+        return next();
+      }
+      return res.status(403).json({ success: false, error: "FORBIDDEN" });
+    } catch (err) {
+      console.error("[Sync Theme Auth]", err);
+      res.status(500).json({ success: false, error: "Failed to verify theme write permission" });
+    }
+  }
+
   app.post("/api/sync/webservice", requireSyncApiKey, async (req, res) => {
     try {
       const { action, station_id, stations, active_stations_count, total_revenue_today } = req.body || {};
@@ -2076,6 +2102,132 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.get("/api/sync/logs", requireSyncApiKey, (req, res) => {
     res.json({ success: true, logs: syncActivityLogs });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // مدیریت قالب‌های سایت از نرم‌افزار مدیریت گیم‌نت (Management App)
+  // همان امکانات پنل ادمین وب (لیست/نصب ZIP/فعال‌سازی/تصاویر سفارشی)،
+  // با احراز sync: کلید API + مجوز «configure» برای عملیات نوشتاری.
+  // GET  /api/sync/themes                 → لیست قالب‌ها + قالب فعال + theme_img.*
+  // POST /api/sync/themes/install         → نصب ZIP خام (name/replace/activate مثل ادمین)
+  // POST /api/sync/themes/activate        → فعال‌سازی سراسری {themeId}
+  // POST /api/sync/themes/image?slot=     → تصویر سفارشی اسلات (WebP) + ثبت theme_img.<slot>
+  // POST /api/sync/themes/image-reset     → بازگردانی پیش‌فرض اسلات {slot}
+  // ═══════════════════════════════════════════════════════════════════
+  const SYNC_THEME_IMG_SLOTS = ["hero_main", "hero_tournament", "hero_live"] as const;
+  app.get("/api/sync/themes", requireSyncApiKey, async (_req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const themes = await store.listThemes();
+      const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+      const themeImg: Record<string, string> = {};
+      for (const slot of SYNC_THEME_IMG_SLOTS) {
+        themeImg[slot] = (await store.getSetting(`theme_img.${slot}`)) || "";
+      }
+      res.json({ success: true, themes, serverThemes: listInstalledThemes(), activeThemeId, themeImg });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post(
+    "/api/sync/themes/install",
+    requireSyncApiKey,
+    requireSyncThemeWrite,
+    express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
+    async (req, res) => {
+      try {
+        const buffer = req.body as Buffer | undefined;
+        if (!buffer || buffer.length === 0) {
+          return res.status(400).json({ error: "ZIP_MISSING", code: "ZIP_MISSING" });
+        }
+        const fallbackName = (req.query.name as string) || undefined;
+        const replace = String(req.query.replace || "") === "1";
+        const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
+        if ("error" in result) {
+          return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
+        }
+        const store = getActiveDataProvider();
+        logDbQuery(store.name, "SYSTEM", `[sync] Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} via Management App`);
+        const activate = String(req.query.activate || "1") !== "0";
+        if (activate) await store.setSetting("activeThemeId", result.theme.id);
+        const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+        res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
+      } catch (e) {
+        console.error("[sync] Theme install error:", e);
+        res.status(500).json({ error: String(e) });
+      }
+    }
+  );
+
+  app.post("/api/sync/themes/activate", requireSyncApiKey, requireSyncThemeWrite, async (req, res) => {
+    try {
+      const { themeId } = req.body || {};
+      const store = getActiveDataProvider();
+      const themes = await store.listThemes();
+      const themeExists =
+        themes.some((t: any) => t.id === themeId) ||
+        listInstalledThemes().some((t: any) => t.id === themeId);
+      if (!themeExists) {
+        return res.status(404).json({ error: "THEME_NOT_FOUND" });
+      }
+      await store.setSetting("activeThemeId", themeId);
+      res.json({ success: true, themes, activeThemeId: themeId });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post(
+    "/api/sync/themes/image",
+    requireSyncApiKey,
+    requireSyncThemeWrite,
+    express.raw({ type: ["image/jpeg", "image/png", "image/webp", "image/gif"], limit: "8mb" }),
+    async (req, res) => {
+      try {
+        const slot = String(req.query.slot || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || "image";
+        const buf: Buffer | undefined = Buffer.isBuffer(req.body) ? req.body : undefined;
+        if (!buf || buf.length < 100) {
+          return res.status(400).json({ error: "Invalid or empty image", code: "INVALID_IMAGE" });
+        }
+        let out: Buffer;
+        try {
+          const sharp = (await import("sharp")).default;
+          out = await sharp(buf)
+            .rotate()
+            .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+        } catch (e) {
+          console.error("[sync theme-image] sharp failed:", e);
+          return res.status(400).json({ error: "Unsupported image format", code: "INVALID_IMAGE" });
+        }
+        fs.mkdirSync(themeImgDir, { recursive: true });
+        const fileName = `${slot}.webp`;
+        fs.writeFileSync(path.join(themeImgDir, fileName), out);
+        const url = `/uploads/theme/${fileName}?v=${Date.now().toString(36)}`;
+        // در پنل وب، کلاینت بعد از آپلود تنظیم را جدا ذخیره می‌کند؛ اینجا برای سادگیِ
+        // نرم‌افزار مدیریت، همان‌جا ثبت می‌شود تا قالب بی‌درنگ تصویر جدید را بخواند.
+        await getActiveDataProvider().setSetting(`theme_img.${slot}`, url);
+        console.info(`[sync theme-image] slot «${slot}» updated (${out.length} bytes webp)`);
+        res.json({ success: true, url, slot });
+      } catch (err) {
+        console.error("[sync theme-image] Error:", err);
+        res.status(500).json({ error: "Failed to store theme image" });
+      }
+    }
+  );
+
+  app.post("/api/sync/themes/image-reset", requireSyncApiKey, requireSyncThemeWrite, async (req, res) => {
+    try {
+      const slot = String((req.body || {}).slot || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+      if (!slot) return res.status(400).json({ error: "SLOT_REQUIRED" });
+      await getActiveDataProvider().setSetting(`theme_img.${slot}`, "");
+      res.json({ success: true, slot });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
 
   // Cafe Buffet Catalog & Orders
   app.get("/api/cafe", async (req, res) => {

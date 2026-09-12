@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Globe, CheckCircle2, ShieldCheck, X, Key, Server, ArrowUpRight, ArrowDownLeft, Terminal, Copy, Check, Settings, Activity, Calendar, Clock, User, CheckCircle, XCircle, AlertCircle, ListFilter, FileText, Download, Smartphone, Monitor, Palette, Upload, RotateCcw, Package, Image as ImageIcon } from 'lucide-react';
+import { RefreshCw, Globe, CheckCircle2, ShieldCheck, X, Key, Server, ArrowUpRight, ArrowDownLeft, Terminal, Copy, Check, Settings, Activity, Calendar, Clock, User, CheckCircle, XCircle, AlertCircle, ListFilter, FileText, Download, Smartphone, Monitor, Palette, Upload, RotateCcw, Package, Image as ImageIcon, LifeBuoy, Mail, MessageSquare, Radio, Sliders } from 'lucide-react';
 import { WebSyncStatus } from '../types';
 import { buildSyncUrl, syncHeaders } from '../utils/syncClient';
 import { useModalDismiss } from '../hooks/useModalDismiss';
+import { SiteTicketsPanel } from './site/SiteTicketsPanel';
+import { SiteMessagesPanel } from './site/SiteMessagesPanel';
+import { SiteChatPanel } from './site/SiteChatPanel';
+import { SiteSmsPanel } from './site/SiteSmsPanel';
+import { SiteSettingsPanel } from './site/SiteSettingsPanel';
+import { SiteSlidersPanel } from './site/SiteSlidersPanel';
+import { SiteDbLogsPanel } from './site/SiteDbLogsPanel';
+import { SiteApiTokensPanel } from './site/SiteApiTokensPanel';
 
 interface WebReservation {
   id: string;
@@ -42,7 +50,7 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
   // این مودال فقط وقتی باز است mount می‌شود، پس isOpen همیشه true است.
   useModalDismiss(true, onClose);
 
-  const [activeTab, setActiveTab] = useState<'status' | 'reservations' | 'themes' | 'config' | 'payload' | 'logs' | 'docs'>('status');
+  const [activeTab, setActiveTab] = useState<'status' | 'reservations' | 'themes' | 'tickets' | 'messages' | 'chat' | 'sms' | 'siteSettings' | 'sliders' | 'config' | 'payload' | 'logs' | 'docs'>('status');
   // Draft fields for the config tab — only actually applied (and persisted) when the user
   // clicks "ذخیره تنظیمات". Seeded from the real, persisted settings (`status`), not fake
   // placeholder values, so what you see here is what's really being used to connect.
@@ -389,6 +397,78 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
           >
             <Palette className="w-4 h-4" />
             <span>قالب‌های سایت</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tickets')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === 'tickets'
+                ? 'border-amber-500 text-amber-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <LifeBuoy className="w-4 h-4" />
+            <span>تیکت‌های پشتیبانی</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('messages')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === 'messages'
+                ? 'border-amber-500 text-amber-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            <span>پیام‌ها و نوتیفیکیشن</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === 'chat'
+                ? 'border-amber-500 text-amber-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>گفتگوی زنده</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('sms')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === 'sms'
+                ? 'border-amber-500 text-amber-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Radio className="w-4 h-4" />
+            <span>پیامک گروهی</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('siteSettings')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === 'siteSettings'
+                ? 'border-amber-500 text-amber-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            <span>تنظیمات سایت</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('sliders')}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === 'sliders'
+                ? 'border-amber-500 text-amber-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>اسلایدر سایت/اپ</span>
           </button>
 
           <button
@@ -771,6 +851,18 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
             </div>
           )}
 
+          {activeTab === 'tickets' && <SiteTicketsPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />}
+
+          {activeTab === 'messages' && <SiteMessagesPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />}
+
+          {activeTab === 'chat' && <SiteChatPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />}
+
+          {activeTab === 'sms' && <SiteSmsPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />}
+
+          {activeTab === 'siteSettings' && <SiteSettingsPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />}
+
+          {activeTab === 'sliders' && <SiteSlidersPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />}
+
           {activeTab === 'logs' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
@@ -812,6 +904,9 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
                   ))
                 )}
               </div>
+
+              {/* لاگ دیتابیس سایت — همان بخش لاگ دیتابیس پنل ادمین وب */}
+              <SiteDbLogsPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />
             </div>
           )}
 
@@ -914,6 +1009,9 @@ export const WebSyncModal: React.FC<WebSyncModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* توکن‌های اتصال خارجی — همان بخش API Key پنل ادمین وب */}
+              <SiteApiTokensPanel webServerUrl={status.webServerUrl} apiKey={status.apiKey} />
             </div>
           )}
 

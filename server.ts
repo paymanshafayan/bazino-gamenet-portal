@@ -73,13 +73,13 @@ import { seedAffiliateSettings } from "./server/affiliate/settings";
 import { registerPublishing } from './server/publishing/routes';
 import { protectedIntegrationSetting } from './server/publishing/settings';
 import { registerIgRoutes } from "./server/affiliate/igRoutes";
-import { registerManusRoutes } from "./server/manus/routes";
+import { listApiTokens, createApiToken, deleteApiToken } from "./server/affiliate/igSettings";import { registerManusRoutes } from "./server/manus/routes";
 import { registerManusBlogRoutes } from "./server/manus/blog";
 import { registerJarvis } from "./server/jarvis/routes";
 import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
 import { onReservationAttended } from "./server/affiliate/engine";
 import { isOnlinePaymentEnabled } from "./server/payments/paytr";
-import { registerAccountRoutes, publicUser } from "./server/accountRoutes";
+import { registerAccountRoutes, publicUser, autoCloseStaleTickets } from "./server/accountRoutes";
 import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2003,11 +2003,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   }
 
-  // نوشتن تنظیمات قالب از نرم‌افزار مدیریت: یا توکن کارمند با مجوز «configure»،
+  // نوشتن تنظیمات و داده‌های سایت از نرم‌افزار مدیریت: یا توکن کارمند با مجوز «configure»،
   // یا همان کلید sync که ادمین در تنظیمات سایت (gamenet_sync_api_key) تعیین کرده.
   // (کلید سادهٔ sync فقط خواندن را باز نمی‌کند برای نوشتن — اینجا صریحاً اجازه می‌دهیم
   // چون دارندهٔ کلید، اپراتور خود سایت است؛ مسیرها همه پشت requireSyncApiKey هستند.)
-  async function requireSyncThemeWrite(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // این گارد علاوه بر قالب‌ها، همهٔ سرویس‌های نوشتاری «ابزارهای سایت» (تیکت، پیام،
+  // گفتگو، پیامک گروهی، تنظیمات، اسلایدر، توکن) را هم پوشش می‌دهد.
+  async function requireSyncSiteWrite(req: express.Request, res: express.Response, next: express.NextFunction) {
     try {
       if ((req as any).authUsername) {
         const staff = await management.staff((req as any).authUsername);
@@ -2132,7 +2134,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.post(
     "/api/sync/themes/install",
     requireSyncApiKey,
-    requireSyncThemeWrite,
+    requireSyncSiteWrite,
     express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
     async (req, res) => {
       try {
@@ -2159,7 +2161,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   );
 
-  app.post("/api/sync/themes/activate", requireSyncApiKey, requireSyncThemeWrite, async (req, res) => {
+  app.post("/api/sync/themes/activate", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
     try {
       const { themeId } = req.body || {};
       const store = getActiveDataProvider();
@@ -2180,7 +2182,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.post(
     "/api/sync/themes/image",
     requireSyncApiKey,
-    requireSyncThemeWrite,
+    requireSyncSiteWrite,
     express.raw({ type: ["image/jpeg", "image/png", "image/webp", "image/gif"], limit: "8mb" }),
     async (req, res) => {
       try {
@@ -2217,12 +2219,413 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   );
 
-  app.post("/api/sync/themes/image-reset", requireSyncApiKey, requireSyncThemeWrite, async (req, res) => {
+  app.post("/api/sync/themes/image-reset", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
     try {
       const slot = String((req.body || {}).slot || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
       if (!slot) return res.status(400).json({ error: "SLOT_REQUIRED" });
       await getActiveDataProvider().setSetting(`theme_img.${slot}`, "");
       res.json({ success: true, slot });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ابزارهای پنل سایت در نرم‌افزار مدیریت (WebSyncModal → تب‌های جدید)
+  // برابری کامل با امکانات پنل ادمین وب: تیکت پشتیبانی، پیام/نوتیفیکیشن،
+  // اتاق‌های گفتگو، پیامک گروهی (مساجیو)، سفارشی‌سازی سایت (تنظیمات،
+  // بخش‌های صفحه اصلی، شبکه‌های اجتماعی، مشخصات قانونی)، اسلایدر سایت/اپ،
+  // منبع داده، ریست/پاک‌سازی دیتابیس، کردیت دستی، لاگ دیتابیس و توکن‌های API.
+  // خواندن: requireSyncApiKey — نوشتن: requireSyncSiteWrite (configure یا کلید sync).
+  // منطق هر مسیر عیناً همان منطق مسیر /api/admin/* مربوطه است (بدون تغییر رفتار).
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ── تیکت‌های پشتیبانی (مانند /api/admin/tickets*) ──
+  app.get("/api/sync/tickets", requireSyncApiKey, async (req, res) => {
+    try {
+      await autoCloseStaleTickets(getActiveDataProvider()).catch(() => 0);
+      const status = String(req.query.status || "");
+      const valid = ["open", "answered", "customer_reply", "closed"].includes(status);
+      const store = getActiveDataProvider();
+      res.json({
+        success: true,
+        tickets: await store.listTickets(valid ? status : undefined),
+        openCount: await store.countOpenTickets(),
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.get("/api/sync/tickets/:id", requireSyncApiKey, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const t = await store.getTicketById(req.params.id);
+      if (!t) return res.status(404).json({ error: "TICKET_NOT_FOUND" });
+      const user = await store.getUserByUsername(t.username);
+      res.json({ success: true, ticket: t, messages: await store.listTicketMessages(t.id), user: user ? publicUser(user) : null });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/tickets/:id/reply", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const t = await store.getTicketById(req.params.id);
+      if (!t) return res.status(404).json({ error: "TICKET_NOT_FOUND" });
+      const body = String((req.body || {}).message || "").trim().slice(0, 4000);
+      if (!body) return res.status(400).json({ error: "MESSAGE_REQUIRED" });
+      const author = (req as any).authUsername || "support";
+      const now = new Date().toISOString();
+      await store.addTicketMessage({ id: randomUUID(), ticketId: t.id, author, isStaff: 1, body, createdAt: now });
+      await store.updateTicket(t.id, { status: "answered", updatedAt: now, lastStaffReplyAt: now });
+      logDbQuery(store.name, "SYSTEM", `[sync] Ticket "${t.id}" answered from Management App`);
+      res.json({ success: true, ticket: await store.getTicketById(t.id), messages: await store.listTicketMessages(t.id) });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/tickets/:id/status", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const t = await store.getTicketById(req.params.id);
+      if (!t) return res.status(404).json({ error: "TICKET_NOT_FOUND" });
+      const status = String((req.body || {}).status || "");
+      if (!["open", "answered", "customer_reply", "closed"].includes(status)) {
+        return res.status(400).json({ error: "INVALID_STATUS" });
+      }
+      await store.updateTicket(t.id, { status, updatedAt: new Date().toISOString() });
+      res.json({ success: true, ticket: await store.getTicketById(t.id) });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── پیام و نوتیفیکیشن به کاربران سایت (مانند /api/admin/messages) ──
+  app.get("/api/sync/messages", requireSyncApiKey, async (_req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const users = (await store.listUsers()).map(({ passwordHash, ...safe }: any) => safe);
+      res.json({ success: true, messages: await store.listUserMessages(), users });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/messages", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const { recipient, title, body, sendAsNotification } = req.body || {};
+      if (!recipient || !title || !body) return res.status(400).json({ error: "MESSAGE_INCOMPLETE" });
+      const newMsg = {
+        id: "msg-" + Math.random().toString(36).substring(2, 9),
+        sender: "مدیریت سالن",
+        recipient,
+        title,
+        body,
+        date: "امروز",
+        isRead: false,
+        type: sendAsNotification ? "notification" : "message",
+      };
+      await getActiveDataProvider().addUserMessage(newMsg);
+      // ارسال زندهٔ نوتیفیکیشن — دقیقاً مثل پنل ادمین وب
+      const payload = JSON.stringify({ event: "notification", data: newMsg });
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) client.send(payload);
+      });
+      const list = await getActiveDataProvider().listUserMessages();
+      res.json({ success: true, message: newMsg, messages: list });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── اتاق‌های گفتگوی زنده سایت (مانند /api/chat/rooms و /api/admin/chat-rooms) ──
+  app.get("/api/sync/chat-rooms", requireSyncApiKey, async (_req, res) => {
+    try {
+      res.json({ success: true, rooms: await getActiveDataProvider().listChatRooms() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.get("/api/sync/chat-rooms/:name/messages", requireSyncApiKey, async (req, res) => {
+    try {
+      res.json({ success: true, messages: await getActiveDataProvider().listChatMessages(decodeURIComponent(req.params.name)) });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/chat-rooms", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const name = String((req.body || {}).name || "").trim();
+      if (!name) return res.status(400).json({ error: "ROOM_NAME_REQUIRED" });
+      const store = getActiveDataProvider();
+      await store.createChatRoom(name);
+      res.json({ success: true, rooms: await store.listChatRooms() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete("/api/sync/chat-rooms/:name", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      await store.deleteChatRoom(decodeURIComponent(req.params.name));
+      res.json({ success: true, rooms: await store.listChatRooms() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── پیامک گروهی مساجیو (SMS/Viber/WhatsApp — همان /api/management/messaging/*) ──
+  app.get("/api/sync/messaging/overview", requireSyncApiKey, async (_req, res) => {
+    try {
+      res.json({
+        success: true,
+        config: await messagingOps.config(),
+        audience: await messagingOps.audiencePreview(),
+        campaigns: await messagingOps.listCampaigns(),
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/messaging/send", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const actor = (req as any).authUsername || "management-app";
+      res.json(await messagingOps.sendCampaign(actor, req.body || {}));
+    } catch (e: any) {
+      res.status(e?.statusCode || 500).json({ error: e?.code || String(e) });
+    }
+  });
+
+  // ── تنظیمات سایت (سفارشی‌سازی کلوپ) — لیست سفید کلیدها؛ بدون هیچ سکرت ──
+  const SYNC_SITE_SETTING_KEYS = new Set([
+    "club_phone", "club_hours", "club_address", "club_map_url", "club_map_lat", "club_map_lng",
+    "chat_enabled", "food_coming_soon", "shop_coming_soon",
+    "extra_controller_hourly", "gaming_credits_per_hour", "extra_controller_credits_per_hour",
+    "social_media_links",
+  ]);
+  const SYNC_SITE_SETTING_PREFIXES = ["section_", "company_", "legal_", "theme_img."];
+  const syncSiteSettingAllowed = (key: string) =>
+    SYNC_SITE_SETTING_KEYS.has(key) || SYNC_SITE_SETTING_PREFIXES.some((p) => key.startsWith(p));
+
+  app.get("/api/sync/site-settings", requireSyncApiKey, async (_req, res) => {
+    try {
+      const rows = await getActiveDataProvider().listSettings();
+      const settings: Record<string, string> = {};
+      for (const r of rows) {
+        if (syncSiteSettingAllowed(r.key) && !SECRET_SETTING_KEYS.has(r.key) && !protectedIntegrationSetting(r.key)) {
+          settings[r.key] = r.value;
+        }
+      }
+      res.json({ success: true, settings, dataSource: await getDataSourceMode() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/site-settings", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const { updates, key, value } = req.body || {};
+      const pairs: Record<string, string> = updates && typeof updates === "object" ? updates : key ? { [key]: value } : {};
+      const keys = Object.keys(pairs).filter(syncSiteSettingAllowed);
+      if (!keys.length) return res.status(400).json({ error: "NO_VALID_KEYS" });
+      const store = getActiveDataProvider();
+      for (const k of keys) {
+        if (SECRET_SETTING_KEYS.has(k) || protectedIntegrationSetting(k)) continue;
+        await store.setSetting(k, String(pairs[k] ?? ""));
+      }
+      logDbQuery(store.name, "SYSTEM", `[sync] ${keys.length} site setting(s) updated from Management App`);
+      res.json({ success: true, saved: keys.length });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── منبع داده سایت (نمونه ⇄ دیتابیس) — مانند /api/admin/data-source ──
+  app.post("/api/sync/data-source", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const mode = String((req.body || {}).mode || "");
+      if (mode !== "sample" && mode !== "database") {
+        return res.status(400).json({ error: "mode must be 'sample' or 'database'" });
+      }
+      await setDataSourceMode(mode);
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", `Data source switched to "${mode}" (Management App)`);
+      res.json({ success: true, mode });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── شارژ/کسر دستی کردیت بازینو — مانند /api/admin/credits/adjust ──
+  app.post("/api/sync/credits/adjust", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const username = String((req.body || {}).username || "").trim();
+      const delta = Number((req.body || {}).delta);
+      const note = String((req.body || {}).note || "").slice(0, 200);
+      if (!username) return res.status(400).json({ error: "USERNAME_REQUIRED" });
+      if (!Number.isSafeInteger(delta) || delta === 0 || Math.abs(delta) > 1_000_000) {
+        return res.status(400).json({ error: "INVALID_DELTA" });
+      }
+      const store = getActiveDataProvider();
+      const user = await store.getUserByUsername(username);
+      if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+      const before = Number(user.credits) || 0;
+      if (before + delta < 0) return res.status(400).json({ error: "INSUFFICIENT_CREDITS" });
+      await store.addCreditsToUser(username, delta);
+      await store.addTransaction({
+        id: Math.random().toString(36).substring(2, 9),
+        points: delta,
+        description: delta > 0 ? `شارژ ${delta} کردیت (BC) توسط ادمین${note ? ` — ${note}` : ""}` : `کسر ${Math.abs(delta)} کردیت (BC) توسط ادمین${note ? ` — ${note}` : ""}`,
+        type: "Credits",
+        date: "امروز",
+        username,
+      });
+      res.json({ success: true, username, delta, credits: before + delta });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── بازنشانی/پاک‌سازی داده‌های سایت — مانند /api/admin/reset-database و clear-database ──
+  app.post("/api/sync/reset-database", requireSyncApiKey, requireSyncSiteWrite, async (_req, res) => {
+    try {
+      await getActiveDataProvider().seedSampleData();
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", "Sample data reseeded from Management App");
+      res.json({ success: true, message: "SAMPLE_LOADED" });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load sample data" });
+    }
+  });
+
+  app.post("/api/sync/clear-database", requireSyncApiKey, requireSyncSiteWrite, async (_req, res) => {
+    try {
+      await getActiveDataProvider().purgeSampleData();
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", "Sample data purged from Management App");
+      res.json({ success: true, message: "SAMPLE_REMOVED" });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to purge sample data" });
+    }
+  });
+
+  // ── اسلایدر سایت/اپ (مانند /api/admin/app-sliders*) ──
+  app.get("/api/sync/app-sliders", requireSyncApiKey, async (_req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      // مثل پنل ادمین: نمایش لیست ادغام‌شده با داده نمونه (حالت sample)
+      res.json({
+        success: true,
+        sliders: await resolveMergedList(await store.listSliders(), SAMPLE_SLIDERS),
+        dataSource: await getDataSourceMode(),
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/app-sliders", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const { imageUrl, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr } = req.body || {};
+      if (!imageUrl || !target) return res.status(400).json({ error: "SLIDE_FIELDS_REQUIRED" });
+      const store = getActiveDataProvider();
+      const newSlide = {
+        id: "slide-" + Math.random().toString(36).substring(2, 9),
+        imageUrl,
+        mobileImageUrl: imageUrl, // نسخهٔ موبایل: بدون تولید خودکار (فقط آدرس) — اپ فقط آدرس می‌فرستد
+        target,
+        titleFa: titleFa || "",
+        titleEn: titleEn || "",
+        titleRu: titleRu || "",
+        titleTr: titleTr || "",
+        descFa: typeof descFa === "string" ? descFa : "",
+        descEn: typeof descEn === "string" ? descEn : "",
+        descRu: typeof descRu === "string" ? descRu : "",
+        descTr: typeof descTr === "string" ? descTr : "",
+      };
+      await store.createSlider(newSlide);
+      res.json({ success: true, sliders: await store.listSliders() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.put("/api/sync/app-sliders/:id", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const slide = await store.getSliderById(req.params.id);
+      if (!slide) return res.status(404).json({ error: "SLIDE_NOT_FOUND" });
+      const b = req.body || {};
+      await store.updateSlider(req.params.id, {
+        ...(b.imageUrl !== undefined ? { imageUrl: b.imageUrl } : {}),
+        ...(b.mobileImageUrl !== undefined ? { mobileImageUrl: b.mobileImageUrl } : {}),
+        ...(b.target !== undefined ? { target: b.target } : {}),
+        ...(b.titleFa !== undefined ? { titleFa: b.titleFa } : {}),
+        ...(b.titleEn !== undefined ? { titleEn: b.titleEn } : {}),
+        ...(b.titleRu !== undefined ? { titleRu: b.titleRu } : {}),
+        ...(b.titleTr !== undefined ? { titleTr: b.titleTr } : {}),
+        ...(b.descFa !== undefined ? { descFa: b.descFa } : {}),
+        ...(b.descEn !== undefined ? { descEn: b.descEn } : {}),
+        ...(b.descRu !== undefined ? { descRu: b.descRu } : {}),
+        ...(b.descTr !== undefined ? { descTr: b.descTr } : {}),
+      });
+      res.json({ success: true, sliders: await store.listSliders() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete("/api/sync/app-sliders/:id", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      await store.deleteSlider(req.params.id);
+      res.json({ success: true, sliders: await store.listSliders() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── لاگ دیتابیس (مانند /api/admin/db-logs) ──
+  app.get("/api/sync/db-logs", requireSyncApiKey, (_req, res) => {
+    try {
+      res.json({ success: true, logs: dbQueryLogs });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── توکن‌های اتصال (Manus/Zernio — مانند /api/admin/api-tokens) ──
+  const SYNC_API_TOKEN_SCOPES = ["instagram:ingest", "manus:telegram", "manus:blog"] as const;
+  app.get("/api/sync/api-tokens", requireSyncApiKey, async (_req, res) => {
+    try {
+      res.json({ success: true, tokens: await listApiTokens(getActiveDataProvider()), scopes: SYNC_API_TOKEN_SCOPES });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/api-tokens", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const name = String((req.body || {}).name || "").trim() || "API token";
+      const requested = Array.isArray((req.body || {}).scopes) ? (req.body || {}).scopes : [];
+      const scopes = requested.map(String).filter((s) => (SYNC_API_TOKEN_SCOPES as readonly string[]).includes(s));
+      const row = await createApiToken(getActiveDataProvider(), name, scopes.length ? scopes : undefined);
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", `[sync] API token "${name}" created from Management App`);
+      res.json({ success: true, token: row });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete("/api/sync/api-tokens/:id", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const ok = await deleteApiToken(getActiveDataProvider(), String(req.params.id));
+      if (!ok) return res.status(404).json({ error: "NOT_FOUND" });
+      res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }

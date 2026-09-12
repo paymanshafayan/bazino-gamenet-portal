@@ -1934,8 +1934,9 @@ let cafeOnsiteOrder = '';
 
 test('payment methods: wallet+onsite for reservation/tournament, onsite-only for cafe/shop', async () => {
   const m: any = await getJson(`${BASE}/api/payments/methods`);
-  // با PAYMENT_ONLINE_ENABLED=1 گزینهٔ «online» به انتهای فهرست اضافه می‌شود؛ ترتیب wallet→onsite ثابت است
-  assert.equal(JSON.stringify(m.methods.reservation.slice(0, 2)), '["wallet","onsite"]');
+  // با PAYMENT_ONLINE_ENABLED=1 گزینهٔ «online» به انتهای فهرست اضافه می‌شود.
+  // رزرو: wallet→credits→onsite (کردیت BC فعلاً فقط برای رزرو)؛ تورنمنت: wallet→onsite.
+  assert.equal(JSON.stringify(m.methods.reservation.slice(0, 3)), '["wallet","credits","onsite"]');
   assert.equal(JSON.stringify(m.methods.tournament.slice(0, 2)), '["wallet","onsite"]');
   assert.equal(m.online, true);
   assert.equal(m.methods.cafe[0], 'onsite'); assert.ok(!m.methods.cafe.includes('wallet'));

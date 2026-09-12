@@ -5781,6 +5781,23 @@ Example format:
     res.sendFile(path.join(managementAppDist, "index.html"));
   });
 
+  // وب‌اپ فلاتر بازینو — همان اپ موبایل، مستقیم در مرورگر (bazino.pro/app-web).
+  // بیلد وب توسط scripts/build-flutter-web.sh در زمان دیپلوی ساخته می‌شود؛
+  // اگر نباشد (بیلد لوکال/تست) این مسیر به‌سادگی وجود ندارد و دیپلوی سالم می‌ماند.
+  // کش: بدون maxAge ولی با etag — نام فایل‌های خروجی فلاتر پایدار است
+  // (main.dart.js و …) پس کش تهاجمی باعث کهنگی می‌شد؛ 304-revalidate کافی است.
+  const flutterWebDist = path.join(staticRoot, "flutter_app", "build", "web");
+  if (fs.existsSync(flutterWebDist)) {
+    app.use("/app-web", express.static(flutterWebDist, { etag: true, maxAge: 0, redirect: false }));
+    app.get("/app-web", (_req, res) => {
+      res.sendFile(path.join(flutterWebDist, "index.html"));
+    });
+    app.get("/app-web/*", (_req, res) => {
+      res.sendFile(path.join(flutterWebDist, "index.html"));
+    });
+    console.info("[Web App] Flutter web app served at /app-web");
+  }
+
   // فایل‌های بهینه‌شده‌ی موبایل که پنل مدیریت در لحظه (runtime) می‌سازد. در production
   // فقط dist سرو می‌شود و این فایل‌ها در public نوشته می‌شوند، پس بدون این mount
   // موقتی ۴۰۴ می‌شدند. نام فایل هشِ محتواست پس کش immutable همیشه امن است.

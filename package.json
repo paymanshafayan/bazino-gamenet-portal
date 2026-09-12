@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && npm --prefix \"Management App/Bazino\" install && npm --prefix \"Management App/Bazino\" run build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && npm --prefix \"Management App/Bazino\" install && npm --prefix \"Management App/Bazino\" run build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && bash scripts/build-flutter-web.sh",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
@@ -20,7 +20,8 @@
     "test:ui": "tsx tests/ui.test.mts",
     "test:providers": "tsx tests/providers.test.mts",
     "postinstall": "node scripts/prepare-media-tools.mjs",
-    "prepare:media": "node scripts/prepare-media-tools.mjs"
+    "prepare:media": "node scripts/prepare-media-tools.mjs",
+    "build:site": "vite build && npm --prefix \"Management App/Bazino\" install && npm --prefix \"Management App/Bazino\" run build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs"
   },
   "dependencies": {
     "@ffprobe-installer/ffprobe": "^2.1.2",

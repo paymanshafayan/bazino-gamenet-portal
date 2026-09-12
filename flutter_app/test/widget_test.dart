@@ -444,7 +444,7 @@ void main() {
   // آزمایشگاه رابط کاربری — صفحات جدید (فاز ۱/۲)
   // ============================================================
   group('آزمایشگاه UI — ورود OTP، حساب، تورنمنت، زبان', () {
-    Widget _wrap(Widget child, {AppState? appState}) => MultiProvider(
+    Widget wrapScreen(Widget child, {AppState? appState}) => MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => appState ?? AppState()),
       ],
@@ -452,7 +452,7 @@ void main() {
     );
 
     testWidgets('صفحهٔ ورود: حالت پیامک OTP فرم شماره و دکمهٔ دریافت کد را نشان می‌دهد', (tester) async {
-      await tester.pumpWidget(_wrap(const AuthScreen()));
+      await tester.pumpWidget(wrapScreen(const AuthScreen()));
       await tester.pumpAndSettle();
 
       // حالت پیش‌فرض رمز است؛ به حالت پیامک سوییچ می‌کنیم
@@ -466,7 +466,7 @@ void main() {
     });
 
     testWidgets('مرکز حساب کاربر مهمان: دعوت به ورود و باز شدن صفحهٔ ورود', (tester) async {
-      await tester.pumpWidget(_wrap(const AccountScreen()));
+      await tester.pumpWidget(wrapScreen(const AccountScreen()));
       await tester.pumpAndSettle();
 
       expect(find.text('ورود / ثبت‌نام'), findsOneWidget);
@@ -491,7 +491,7 @@ void main() {
         }),
       ];
 
-      await tester.pumpWidget(_wrap(const TournamentScreen(), appState: appState));
+      await tester.pumpWidget(wrapScreen(const TournamentScreen(), appState: appState));
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('ثبت‌نام سریع تیم در تورنمنت'));

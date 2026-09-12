@@ -1,9 +1,9 @@
 # Flutter CI report
 
-- commit: `513017644086b29451661c244a01b95766d5c30e`
+- commit: `4d2b3a640e6498ab611a4731dd5cec32a52a7566`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34695818186
-- date:   2026-09-12 13:14 UTC
+- run:    34697728105
+- date:   2026-09-12 13:54 UTC
 
 ## flutter --version
 ```
@@ -25,19 +25,33 @@ Downloading packages...
 * clock 1.1.3 (was 1.1.2)
 * code_assets 2.0.0 (was 1.2.1)
 * collection 1.19.1 (was 1.19.1)
++ cross_file 0.3.5+5
 * crypto 3.0.7 (was 3.0.7)
 + csslib 1.0.2
 * cupertino_icons 1.0.9 (was 1.0.9)
 * fake_async 1.3.3 (was 1.3.3)
 * ffi 2.2.0 (was 2.2.0)
 * file 7.0.1 (was 7.0.1)
++ file_selector_linux 0.9.4+1
++ file_selector_macos 0.9.5+1
++ file_selector_platform_interface 2.7.0
++ file_selector_windows 0.9.3+6
 * flutter_lints 2.0.3 (was 2.0.3) (6.0.0 available)
++ flutter_plugin_android_lifecycle 2.0.35
 + flutter_tts 4.2.5
 ! google_fonts 6.3.3 (overridden) (8.2.1 available)
 * hooks 2.2.0 (was 2.0.2)
 + html 0.15.7
 * http 1.6.0 (was 1.6.0)
 * http_parser 4.1.2 (was 4.1.2)
++ image_picker 1.2.3
++ image_picker_android 0.8.13+23
++ image_picker_for_web 3.1.1
++ image_picker_ios 0.8.13+7
++ image_picker_linux 0.2.2
++ image_picker_macos 0.2.2+1
++ image_picker_platform_interface 2.11.1
++ image_picker_windows 0.2.2
 * intl 0.18.1 (was 0.18.1) (0.20.3 available)
 * jni 1.0.3 (was 1.0.0)
 * jni_flutter 1.0.3 (was 1.0.1)
@@ -51,6 +65,7 @@ Downloading packages...
 * matcher 0.12.20 (was 0.12.19)
 * material_color_utilities 0.13.0 (was 0.13.0) (0.13.1 available)
 * meta 1.19.0 (was 1.18.0)
++ mime 2.1.0
 * nested 1.0.0 (was 1.0.0)
 * objective_c 9.6.0 (was 9.4.1)
 * package_config 3.0.0 (was 2.2.0)
@@ -71,6 +86,8 @@ Downloading packages...
 * plugin_platform_interface 2.1.8 (was 2.1.8)
 * provider 6.1.5+1 (was 6.1.5+1)
 * pub_semver 2.2.1 (was 2.2.0)
++ qr 3.0.2 (4.0.0 available)
++ qr_flutter 4.1.0
 * record_use 1.1.1 (was 0.6.0)
 * shared_preferences 2.5.5 (was 2.5.5)
 * shared_preferences_android 2.4.28 (was 2.4.27)
@@ -101,8 +118,8 @@ Downloading packages...
 * web_socket_channel 3.0.3 (was 3.0.3)
 * xdg_directories 1.1.0 (was 1.1.0)
 * yaml 3.1.4 (was 3.1.3)
-Changed 82 dependencies!
-8 packages have newer versions incompatible with dependency constraints.
+Changed 99 dependencies!
+9 packages have newer versions incompatible with dependency constraints.
 Try `flutter pub outdated` for more information.
 Upgrading analysis_options.yaml to exclude build and platform directories.
 ```
@@ -111,35 +128,40 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 9.9s)
+
+  error • The getter 'tokens_rounded' isn't defined for the type 'Icons'. Try importing the library that defines 'tokens_rounded', correcting the name to the name of an existing getter, or defining a getter or field named 'tokens_rounded' • lib/screens/account_screen.dart:206:120 • undefined_getter
+   info • Unnecessary use of string interpolation. Try replacing the string literal with the variable name • lib/screens/account_screen.dart:338:39 • unnecessary_string_interpolations
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/screens/account_screen.dart:1214:43 • prefer_const_constructors
+  error • The getter 'tokens_rounded' isn't defined for the type 'Icons'. Try importing the library that defines 'tokens_rounded', correcting the name to the name of an existing getter, or defining a getter or field named 'tokens_rounded' • lib/screens/reservation_screen.dart:335:24 • undefined_getter
+
+4 issues found. (ran in 9.6s)
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## flutter test
 ```
 
-::group::✅ Passing tests
-✅ BazinoApp — رندر بدون استثنا بالا می‌آید و MaterialApp با عنوان درست می‌دهد
-✅ BazinoApp — رندر اولین فریم قبل از خواندن SharedPreferences، لودر نشان می‌دهد
-✅ BazinoApp — رندر کاربر تازه صفحه‌ی intro را می‌بیند
-✅ BazinoApp — رندر کاربری که intro را دیده، دیگر آن را نمی‌بیند
-✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
-✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me
-✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ ناقص نباید کرش کند
-✅ parse کردن پاسخ سرور GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
-✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
-✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
-✅ هاب خانه — قالب کنسول سایت ارب مرکزی جارویس و پنج دکمهٔ مداری بخش‌ها رندر می‌شوند
-✅ هاب خانه — قالب کنسول سایت تب پروفایل نوار پایین صفحهٔ باشگاه/پروفایل را باز می‌کند نه مسابقات
-✅ جارویس — رابط گفتگومحور پیام خوش‌آمد، نوار ورودی و پیشنهادهای شروع نمایش داده می‌شوند
-✅ جارویس — رابط گفتگومحور پس از رشد گفتگو، پیشنهادهای شروع پنهان می‌شوند
-✅ جارویس — رابط گفتگومحور نشانگر «در حال تایپ» سه نقطهٔ متحرک دارد
-✅ جارویس — رابط گفتگومحور پیام جارویس با اکشن، نشان «عملیات انجام شد» می‌گیرد
+lib/screens/account_screen.dart:206:120: Error: Member not found: 'tokens_rounded'.
+                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.tokens_rounded, GamingTheme.secondary)),
+                                                                                          ^^^^^^^^^^^^^^
+lib/screens/reservation_screen.dart:335:24: Error: Member not found: 'tokens_rounded'.
+          icon = Icons.tokens_rounded;
+                       ^^^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart (failed)
+Failed to load "/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart":
+Compilation failed for testPath=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart: lib/screens/account_screen.dart:206:120: Error: Member not found: 'tokens_rounded'.
+                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.tokens_rounded, GamingTheme.secondary)),
+                                                                                                                       ^^^^^^^^^^^^^^
+lib/screens/reservation_screen.dart:335:24: Error: Member not found: 'tokens_rounded'.
+          icon = Icons.tokens_rounded;
+                       ^^^^^^^^^^^^^^
+.
+
 ::endgroup::
 
-🎉 16 tests passed.
+::error::0 tests passed, 1 failed.
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## flutter build web
 ```
@@ -154,20 +176,75 @@ file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_
 Consider addressing these issues to enable wasm builds. See docs for more info: https://docs.flutter.dev/platform-integration/web/wasm
 
 Use --no-wasm-dry-run to disable these warnings.
-Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14840 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             45.4s
-✓ Built build/web
+Target dart2js failed: ProcessException: Process exited abnormally with exit code 1:
+lib/screens/account_screen.dart:206:120:
+Error: Member not found: 'tokens_rounded'.
+                    Expanded(child: _statChip(isFa ? 'کردیت BC' : 'Credits BC', user.credits.toStringAsFixed(0), Icons.tokens_rounded, GamingTheme.secondary)),
+                                                                                          ^^^^^^^^^^^^^^
+lib/screens/reservation_screen.dart:335:24:
+Error: Member not found: 'tokens_rounded'.
+          icon = Icons.tokens_rounded;
+                       ^^^^^^^^^^^^^^
+Error: Compilation failed.
+  Command: /opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/dart-sdk/bin/dart compile js --platform-binaries=/opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/flutter_web_sdk/kernel --invoker=flutter_tool -Ddart.vm.product=true -DFLUTTER_BUILD_NAME=1.2.0 -DFLUTTER_BUILD_NUMBER=2 -DFLUTTER_VERSION=3.47.4 -DFLUTTER_CHANNEL=stable -DFLUTTER_GIT_URL=https://github.com/flutter/flutter.git -DFLUTTER_FRAMEWORK_REVISION=9584c6713b -DFLUTTER_ENGINE_REVISION=06a2e2a110 -DFLUTTER_DART_VERSION=3.13.3 -DFLUTTER_WEB_USE_SKIA=true -DFLUTTER_WEB_USE_SKWASM=false -DFLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/ --write-resources --native-null-assertions --no-source-maps -O4 --minify -o /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/flutter_build/7edee9b95ec7b37c7454a66dc424a75a/app.dill --packages=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/package_config.json --cfe-only /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/flutter_build/7edee9b95ec7b37c7454a66dc424a75a/main.dart
+#0      RunResult.throwException (package:flutter_tools/src/base/process.dart:153:5)
+#1      _DefaultProcessUtils.run (package:flutter_tools/src/base/process.dart:379:19)
+<asynchronous suspension>
+#2      Dart2JSTarget.build (package:flutter_tools/src/build_system/targets/web.dart:222:5)
+<asynchronous suspension>
+#3      _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:937:9)
+<asynchronous suspension>
+#4      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
+<asynchronous suspension>
+#5      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#6      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
+<asynchronous suspension>
+#7      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#8      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
+<asynchronous suspension>
+#9      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#10     FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:684:16)
+<asynchronous suspension>
+#11     WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:107:34)
+<asynchronous suspension>
+#12     BuildWebCommand.runCommand (package:flutter_tools/src/commands/build_web.dart:293:5)
+<asynchronous suspension>
+#13     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1663:27)
+<asynchronous suspension>
+#14     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#15     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#16     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:496:9)
+<asynchronous suspension>
+#17     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#18     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:431:5)
+<asynchronous suspension>
+#19     FlutterCommandRunner.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:307:33)
+<asynchronous suspension>
+#20     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
+<asynchronous suspension>
+#21     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#22     main (package:flutter_tools/executable.dart:103:3)
+<asynchronous suspension>
+
+Compiling lib/main.dart for the Web...                             40.1s
+Error: Failed to compile application for the Web.
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## Summary
 ```
 flutter --version=0
 flutter pub get=0
-flutter analyze=0
-flutter test=0
-flutter build web=0
+flutter analyze=1
+flutter test=1
+flutter build web=1
 ```
 
-build/web size: 45M
+build/web size: 37M

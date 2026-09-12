@@ -5197,57 +5197,128 @@ Example format:
   // =========================================================================
   // DESKTOP APP DOWNLOADS (Management App → Settings → "دانلود نسخه دسکتاپ")
   // =========================================================================
-  // Real installers are NOT built by this server — they're produced separately by running
-  // `npm run dist:win` / `dist:mac` / `dist:linux` inside /desktop-app on a real machine of
-  // each target OS (native modules can't be reliably cross-compiled — see
-  // desktop-app/README.md). Whatever ends up in /desktop-builds/<platform>/ after that gets
-  // served here. Until a real build is placed there, this responds with 404 + a clear
-  // message instead of pretending a download exists.
+  // Real installers are NOT built by this server — they're built by GitHub Actions
+  // (.github/workflows/desktop-installers.yml, matrix over windows/macos/linux) and
+  // published to the GitHub Releases of this (public) repository: tag «desktop-v*» =
+  // انتشار پایدار، «desktop-dev-*» = بیلد آزمایشی. فایل‌های نصاب ۱۰۰MB+ هستند و در
+  // گیت جا نمی‌شوند؛ به همین دلیل سرور فقط به فایل ریلیز redirect می‌کند و خودش
+  // فایل را نگه نمی‌دارد. اگر ادمین خروجی محلی در /desktop-builds/<platform>/ گذاشته
+  // باشد، آن فایل (مثل قبل) اولویت دارد.
   const desktopBuildsDir = path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "desktop-builds");
   const desktopPlatforms: Record<string, { dir: string; label: string }> = {
     windows: { dir: "windows", label: "ویندوز (.exe)" },
     mac: { dir: "mac", label: "مک (.dmg)" },
     linux: { dir: "linux", label: "لینوکس (.AppImage)" },
   };
+  const GITHUB_REPO = process.env.BAZINO_GITHUB_REPO || "paymanshafayan/bazino-gamenet-portal";
+  /** پسوند فایل نصاب هر پلتفرم در ریلیز گیت‌هاب. */
+  const DESKTOP_ASSET_EXTS: Record<string, string[]> = {
+    windows: [".exe"],
+    mac: [".dmg"],
+    linux: [".AppImage", ".deb"],
+  };
+  interface DesktopGhAsset { name: string; url: string; size: number; }
+  interface DesktopGhRelease { tag: string; name: string; prerelease: boolean; assets: DesktopGhAsset[]; }
+  let desktopGhCache: { at: number; release: DesktopGhRelease | null } = { at: 0, release: null };
+
+  /** آخرین ریلیز دسکتاپ از GitHub — پایدار (desktop-v*) مقدم بر آزمایشی (desktop-dev-). کش ۶۰ ثانیه. */
+  async function latestDesktopGithubRelease(): Promise<DesktopGhRelease | null> {
+    if (Date.now() - desktopGhCache.at < 60_000) return desktopGhCache.release;
+    try {
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=50`, {
+        headers: { "User-Agent": "bazino-portal-desktop-download", Accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) throw new Error(`GitHub HTTP ${r.status}`);
+      const list = (await r.json()) as any[];
+      const pick =
+        list.find((x) => /^desktop-v\d/i.test(String(x?.tag_name || ""))) ||
+        list.find((x) => /^desktop-dev-/i.test(String(x?.tag_name || ""))) ||
+        null;
+      const release: DesktopGhRelease | null = pick
+        ? {
+            tag: pick.tag_name,
+            name: String(pick.name || pick.tag_name),
+            prerelease: !!pick.prerelease,
+            assets: (pick.assets || [])
+              .map((a: any) => ({ name: String(a.name || ""), url: String(a.browser_download_url || ""), size: Number(a.size) || 0 }))
+              .filter((a: DesktopGhAsset) => a.name && a.url),
+          }
+        : null;
+      desktopGhCache = { at: Date.now(), release };
+      return release;
+    } catch (e) {
+      // گیت‌هاب در دسترس نبود — آخرین دادهٔ کش‌شده (حتی کهنه) برگردد تا دکمه‌ها نچسبند
+      console.warn("[desktop] GitHub release lookup failed:", e);
+      return desktopGhCache.release;
+    }
+  }
+
+  function desktopLocalFiles(platform: { dir: string }): string[] {
+    const platformDir = path.join(desktopBuildsDir, platform.dir);
+    try {
+      return fs.readdirSync(platformDir).filter((f) => !f.startsWith("."));
+    } catch {
+      return [];
+    }
+  }
 
   // Tells the UI which platforms actually have a real installer available right now, so it
   // can show working download buttons instead of dead links for platforms not built yet.
-  app.get("/api/desktop/availability", (req, res) => {
+  // منبع: فایل محلی desktop-builds/ یا آخرین ریلیز دسکتاپ GitHub.
+  app.get("/api/desktop/availability", async (req, res) => {
     const availability: Record<string, boolean> = {};
-    for (const [platform, { dir }] of Object.entries(desktopPlatforms)) {
-      const platformDir = path.join(desktopBuildsDir, dir);
-      try {
-        availability[platform] = fs.existsSync(platformDir) && fs.readdirSync(platformDir).length > 0;
-      } catch {
-        availability[platform] = false;
+    let source: "local" | "github" | "none" = "none";
+    for (const platform of Object.keys(desktopPlatforms)) {
+      availability[platform] = desktopLocalFiles(desktopPlatforms[platform]).length > 0;
+      if (availability[platform]) source = "local";
+    }
+    let release: DesktopGhRelease | null = null;
+    if (source === "none") {
+      release = await latestDesktopGithubRelease();
+      if (release) {
+        source = "github";
+        for (const [platform, exts] of Object.entries(DESKTOP_ASSET_EXTS)) {
+          availability[platform] = release.assets.some((a) => exts.some((ext) => a.name.toLowerCase().endsWith(ext.toLowerCase())));
+        }
       }
     }
-    res.json({ availability });
+    res.json({ availability, source, release: release ? { tag: release.tag, name: release.name, prerelease: release.prerelease } : null });
   });
 
-  app.get("/api/desktop/download/:platform", (req, res) => {
+  app.get("/api/desktop/download/:platform", async (req, res) => {
     const platform = desktopPlatforms[req.params.platform];
     if (!platform) {
       return res.status(400).json(apiError(req, "INVALID_PLATFORM"));
     }
-    const platformDir = path.join(desktopBuildsDir, platform.dir);
-    if (!fs.existsSync(platformDir)) {
-      return res.status(404).json({
-        ...apiError(req, "DESKTOP_NOT_BUILT", { platform: platform.label }),
-        hint: "راهنما: desktop-app/README.md — دستور 'npm run dist' را روی یک دستگاه واقعی همان سیستم‌عامل اجرا کنید و خروجی را در desktop-builds/" + platform.dir + "/ قرار دهید."
+    // ۱) فایل محلی (خروجی dist روی خودِ سرور) — مثل قبل
+    const localFiles = desktopLocalFiles(platform);
+    if (localFiles.length > 0) {
+      // If multiple files exist (e.g. both nsis installer + portable exe), prefer the first one alphabetically.
+      const fileName = localFiles.sort()[0];
+      return res.download(path.join(desktopBuildsDir, platform.dir, fileName), fileName, (err) => {
+        if (err) {
+          console.error("Error downloading desktop build:", err);
+          if (!res.headersSent) res.status(500).json(apiError(req, "FILE_DOWNLOAD_FAILED"));
+        }
       });
     }
-    const files = fs.readdirSync(platformDir).filter(f => !f.startsWith("."));
-    if (files.length === 0) {
-      return res.status(404).json(apiError(req, "DESKTOP_FILE_NOT_FOUND", { platform: platform.label }));
-    }
-    // If multiple files exist (e.g. both nsis installer + portable exe), prefer the first one alphabetically.
-    const fileName = files.sort()[0];
-    res.download(path.join(platformDir, fileName), fileName, (err) => {
-      if (err) {
-        console.error("Error downloading desktop build:", err);
-        if (!res.headersSent) res.status(500).json(apiError(req, "FILE_DOWNLOAD_FAILED"));
+    // ۲) آخرین ریلیز دسکتاپ GitHub — دانلود مستقیم از CDN گیت‌هاب (ریپو عمومی)
+    const release = await latestDesktopGithubRelease();
+    if (release) {
+      const exts = DESKTOP_ASSET_EXTS[req.params.platform] || [];
+      // Setup.exe (نصبی کامل) بر portable exe ترجیح دارد؛ AppImage بر deb.
+      const asset =
+        release.assets.find((a) => exts.some((ext) => a.name.toLowerCase().endsWith(ext.toLowerCase())) && /setup|appimage/i.test(a.name)) ||
+        release.assets.find((a) => exts.some((ext) => a.name.toLowerCase().endsWith(ext.toLowerCase())));
+      if (asset) {
+        console.info(`[desktop] download ${req.params.platform} → GitHub ${release.tag}/${asset.name}`);
+        return res.redirect(302, asset.url);
       }
+    }
+    return res.status(404).json({
+      ...apiError(req, "DESKTOP_NOT_BUILT", { platform: platform.label }),
+      hint: "راهنما: بیلد نصاب‌ها با GitHub Actions (desktop-installers.yml) انجام و در Releases ریپو منتشر می‌شود؛ خروجی دستی نیز می‌تواند در desktop-builds/" + platform.dir + "/ قرار گیرد."
     });
   });
 

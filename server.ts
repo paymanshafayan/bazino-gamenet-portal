@@ -5787,7 +5787,9 @@ Example format:
   // کش: بدون maxAge ولی با etag — نام فایل‌های خروجی فلاتر پایدار است
   // (main.dart.js و …) پس کش تهاجمی باعث کهنگی می‌شد؛ 304-revalidate کافی است.
   const flutterWebDist = path.join(staticRoot, "flutter_app", "build", "web");
-  if (fs.existsSync(flutterWebDist)) {
+  // گارد روی index.html نه فقط دایرکتوری — بیلد ناتمامِ فلاتر (main.dart.js بدون
+  // index.html) هرگز نباید مسیر را با 500 فعال کند (درس دیپلوی اول).
+  if (fs.existsSync(path.join(flutterWebDist, "index.html"))) {
     app.use("/app-web", express.static(flutterWebDist, { etag: true, maxAge: 0, redirect: false }));
     app.get("/app-web", (_req, res) => {
       res.sendFile(path.join(flutterWebDist, "index.html"));

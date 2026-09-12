@@ -66,10 +66,12 @@ cd "$ROOT/flutter_app" || { fail_soft "flutter_app dir missing"; exit 0; }
 flutter config --no-analytics >/dev/null 2>&1 || true
 flutter pub get || { fail_soft "flutter pub get failed"; exit 0; }
 
-if ! flutter build web --release; then
-  echo "[flutter-web] build attempt 1 failed — retrying once (warm cache)…"
-  sleep 5
-  flutter build web --release || true
+# سقف زمانی سخت: بدترین حالت ۱۵ دقیقه برای خودِ کامپایل. اگر تایم‌اوتِ کل بیلد
+# Railway فرا برسد، کل دیپلوی شکست می‌خورد و سایتِ سالمِ قبلی با نسخهٔ قدیمی
+# می‌ماند (اتفاقی که برای دیپلوی retry-دار افتاد: ۲ بیلد پشت‌سرهم = تایم‌اوت).
+# با سقف، حتی شکستِ کامپایل هم به مرحلهٔ «نجات» می‌رسد و بیلد ناتمام usable می‌شود.
+if ! timeout "${BAZINO_FLUTTER_BUILD_TIMEOUT:-900}" flutter build web --release; then
+  echo "[flutter-web] flutter build failed or timed out — moving to the rescue step"
 fi
 
 # ── ۳) نجات «بیلد ناتمام»: main.dart.js هست ولی index.html نه ─────────────

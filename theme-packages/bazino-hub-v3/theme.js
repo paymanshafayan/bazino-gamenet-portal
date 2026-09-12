@@ -312,13 +312,13 @@
   // ---------- quick access cards ----------
   // مرجع ۰۱: کاشی‌ها با آیکون‌های PNG رنگیِ طراحی‌شده (هر کدام پالت خودش)
   var QUICK = [
-    { key: 'quick.games', path: '/games', png: 'games', tone: 'indigo', sub: 'quick.games.sub' },
-    { key: 'quick.events', path: '/events', png: 'events', tone: 'crimson', sub: 'quick.events.sub' },
-    { key: 'quick.shop', path: '/shop', png: 'shop', tone: 'magenta', sub: 'quick.shop.sub' },
-    { key: 'quick.food', path: '/food', png: 'food', tone: 'teal', sub: 'quick.food.sub' },
-    { key: 'quick.club', path: '/club', png: 'club', tone: 'purple', sub: 'quick.club.sub' },
-    { key: 'quick.blog', path: '/blog', png: 'blog', tone: 'amber', sub: 'quick.blog.sub' },
-    { key: 'quick.contact', path: '/contact', png: 'contact', tone: 'violet', sub: 'quick.contact.sub' }
+    { key: 'quick.games', path: '/games', png: 'icons/games.png', tone: 'indigo', sub: 'quick.games.sub' },
+    { key: 'quick.events', path: '/events', png: 'icons/events.png', tone: 'crimson', sub: 'quick.events.sub' },
+    { key: 'quick.shop', path: '/shop', png: 'icons/shop.png', tone: 'magenta', sub: 'quick.shop.sub' },
+    { key: 'quick.food', path: '/food', png: 'icons/food.png', tone: 'teal', sub: 'quick.food.sub' },
+    { key: 'quick.club', path: '/club', png: 'icons/club.png', tone: 'purple', sub: 'quick.club.sub' },
+    { key: 'quick.blog', path: '/blog', png: 'icons/blog.png', tone: 'amber', sub: 'quick.blog.sub' },
+    { key: 'quick.contact', path: '/contact', png: 'icons/contact.png', tone: 'violet', sub: 'quick.contact.sub' }
   ];
   function QuickCards(props) {
     var cards = [];
@@ -329,7 +329,7 @@
         className: 'hz-quick hz-tone-' + q.tone,
         onClick: (function (p) { return function () { go(props, p); }; })(q.path)
       },
-        h('img', { className: 'hz-quick-png', src: asset(props, 'icons/' + q.png + '.png'), alt: '', loading: 'lazy' }),
+        h('img', { className: 'hz-quick-png', src: asset(props, q.png), alt: '', loading: 'lazy' }),
         h('span', { className: 'hz-quick-title' }, tsx(props, q.key, q.key)),
         h('span', { className: 'hz-quick-sub' }, tsx(props, q.sub, q.sub)),
         h('span', { className: 'hz-quick-arrow' }, '\u2192')

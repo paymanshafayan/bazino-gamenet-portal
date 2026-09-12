@@ -54,6 +54,11 @@ for (const rel of ASSET_FILES) {
   if (!fs.existsSync(src)) { console.error(`✗ asset missing: ${src}`); process.exit(1); }
   assets[rel] = new Uint8Array(fs.readFileSync(src));
 }
+// آیکون‌های PNG رنگی (مخصوص پکیج v3 — کاشی‌ها و چهارکادر تماس)
+const ICONS_DIR = path.join(SRC, 'assets', 'icons');
+for (const f of fs.readdirSync(ICONS_DIR).filter((x) => x.endsWith('.png')).sort()) {
+  assets[`icons/${f}`] = new Uint8Array(fs.readFileSync(path.join(ICONS_DIR, f)));
+}
 
 const css = read(path.join(SRC, 'theme.css'));
 const js = read(path.join(SRC, 'theme.js'));

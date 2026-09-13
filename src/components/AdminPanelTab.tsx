@@ -41,7 +41,8 @@ import {
   LifeBuoy,
   Wallet,
   Megaphone,
-  Ticket
+  Ticket,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeScreenshot from './ThemeScreenshot';
@@ -64,6 +65,7 @@ import { LegalAdminSection } from '../legal/LegalAdminSection';
 /** نام و کلیدواژه‌های هر بخش پنل — برای عنوان صفحه، هدر بخش و جستجوی سریع */
 export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; ru: string; tr: string; keywords: string }> = {
   dashboard:         { fa: 'داشبورد و آمار زنده', en: 'Dashboard & Live Stats', ru: 'Дашборд и живая статистика', tr: 'Gösterge Paneli ve Canlı İstatistikler', keywords: 'stats آمار statistics dashboard home' },
+  jarvis:            { fa: 'جارویس — دستیار مدیر (AI)', en: 'Jarvis — Admin AI Assistant', ru: 'Джарвис — ИИ-помощник админа', tr: 'Jarvis — Yönetici AI Asistanı', keywords: 'ai جارویس jarvis assistant chatbot groq automation' },
   systems:           { fa: 'مدیریت کلاینت‌ها و سیستم‌ها', en: 'Clients & Systems', ru: 'Клиенты и системы', tr: 'İstemciler ve Sistemler', keywords: 'pc ps5 console کنسول کامپیوتر رزرو reservation station' },
   cafe:              { fa: 'بوفه و کافه', en: 'Cafe Buffet', ru: 'Кафе-буфет', tr: 'Kafe Büfe', keywords: 'menu منو غذا نوشیدنی food drink' },
   shop:              { fa: 'فروشگاه لوازم جانبی', en: 'Accessory Shop', ru: 'Магазин аксессуаров', tr: 'Ekipman Mağazası', keywords: 'products محصول کالا mouse headset' },
@@ -93,6 +95,7 @@ const AdminTicketsSection = React.lazy(() => import('./AdminTicketsSection'));
 const AdminWalletSection = React.lazy(() => import('./AdminWalletSection'));
 const AdminAffiliatesSection = React.lazy(() => import('./AdminAffiliatesSection'));
 const PromotionsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Promotions')).PromotionsConsole as unknown as React.ComponentType }));
+const JarvisConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Jarvis')).JarvisConsole as unknown as React.ComponentType }));
 const TournamentsOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Tournaments')).TournamentsConsole as unknown as React.ComponentType }));
 const AdminTournamentPlanner = React.lazy(() => import('./admin/AdminTournamentPlanner'));
 const AdminMessagingPanel = React.lazy(() => import('./admin/AdminMessagingPanel'));
@@ -193,6 +196,8 @@ export default function AdminPanelTab({
   // Customization & Settings states
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
   const [isResettingDb, setIsResettingDb] = useState(false);
+  // آپلود تصاویر سفارشی قالب هاب (اسلات‌های تزئینی — theme_img.<slot>)
+  const [themeImgBusy, setThemeImgBusy] = useState<string | null>(null);
   // فرم شارژ دستی کردیت بازینو (تا نهایی شدن روش‌های کسب کردیت)
   const [grantUsername, setGrantUsername] = useState('');
   const [grantDelta, setGrantDelta] = useState('');
@@ -222,6 +227,8 @@ export default function AdminPanelTab({
   const [zipError, setZipError] = useState('');
   const [isParsingZip, setIsParsingZip] = useState(false);
   const [isInstallingZip, setIsInstallingZip] = useState(false);
+  /** job نصب اِسنک (پاسخ 202 سرور): وضعیت/پیشرفت برای پولینگ و نمایش progress */
+  const [installJob, setInstallJob] = useState<{ jobId: string; status: string; filesDone: number; filesTotal: number } | null>(null);
 
   // Messages form and states
   const [recipient, setRecipient] = useState('All');
@@ -509,6 +516,34 @@ export default function AdminPanelTab({
       console.error(err);
       addNotification(L(language, { fa: 'خطا در ذخیره تنظیمات', en: 'Error saving setting', ru: 'Ошибка сохранения настройки', tr: 'Ayar kaydedilirken hata oluştu' }), 'error');
       return false;
+    }
+  };
+
+  // آپلود تصویر سفارشی برای اسلات‌های تزئینی قالب هاب: فایل → WebP سرور → تنظیم theme_img.<slot>
+  const handleThemeImageUpload = async (slot: string, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      addNotification(L(language, { fa: 'فقط فایل تصویری مجاز است', en: 'Only image files are allowed', ru: 'Разрешены только изображения', tr: 'Sadece görsel dosyaları kabul edilir' }), 'error');
+      return;
+    }
+    setThemeImgBusy(slot);
+    try {
+      const res = await fetch(`/api/admin/theme-image?slot=${encodeURIComponent(slot)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+        body: await file.arrayBuffer(),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (res.ok && data.success && data.url) {
+        const saved = await handleSaveSetting(`theme_img.${slot}`, data.url);
+        if (saved) return;
+        throw new Error('save failed');
+      }
+      throw new Error(data.error || `HTTP ${res.status}`);
+    } catch (err) {
+      console.error(err);
+      addNotification(L(language, { fa: 'خطا در بارگذاری تصویر قالب', en: 'Error uploading theme image', ru: 'Ошибка загрузки изображения темы', tr: 'Tema görseli yüklenirken hata oluştu' }), 'error');
+    } finally {
+      setThemeImgBusy(null);
     }
   };
 
@@ -1003,26 +1038,16 @@ export default function AdminPanelTab({
     }
   };
 
-  /* ---------- نصب روی سرور (پوشه اختصاصی قالب + assets) ---------- */
+  /* ---------- نصب روی سرور (پوشه اختصاصی قالب + assets) ----------
+   * ۲۰۲۶-۰۹-۱۲: نصب قالب‌های پر-asset دیگر داخل همان درخواست HTTP انجام
+   * نمی‌شود (خطای 524 کلادفلر). سرور 202 + jobId برمی‌گرداند و نصب در
+   * پس‌زمینه ادامه می‌یابد؛ این‌جا تا وضعیت نهایی poll می‌کنیم و فاز/پیشرفت
+   * واقعی را نشان می‌دهیم. پاسخ sync قدیمی (200) هم برای سازگاری هندل می‌شود. */
   const handleInstallZip = async () => {
     if (!zipParsed || !zipFileBytes) return;
     if (!setAvailableThemes) return;
 
-    setIsInstallingZip(true);
-    try {
-      const replace = zipReplacesExisting ? '&replace=1' : '';
-      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}${replace}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/zip' },
-        body: zipFileBytes as unknown as BodyInit,
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setZipError(data.error || L(language, { fa: 'خطا در نصب قالب', en: 'Theme installation failed', ru: 'Не удалось установить тему', tr: 'Tema kurulumu başarısız' }));
-        addNotification(L(language, { fa: `خطا در نصب: ${data.error || ''}`, en: `Install error: ${data.error || ''}`, ru: `Ошибка установки: ${data.error || ''}`, tr: `Yükleme hatası: ${data.error || ''}` }), 'error');
-        return;
-      }
-
+    const installThemeFromServer = (data: any) => {
       const serverTheme: ThemeInfo = {
         id: data.theme.id,
         name: data.theme.name,
@@ -1072,6 +1097,91 @@ export default function AdminPanelTab({
       setZipError('');
       setShowUploadForm(false);
       setUploadMode('zip');
+    };
+
+    setIsInstallingZip(true);
+    setInstallJob(null);
+    try {
+      const replace = zipReplacesExisting ? '&replace=1' : '';
+      const res = await fetch(`/api/admin/themes/install?name=${encodeURIComponent(zipParsed.meta.name || zipFileName)}${replace}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: zipFileBytes as unknown as BodyInit,
+      });
+      // سرور (یا پروکسی) ممکن است HTML برگرداند — res.json() خطای بی‌فایده می‌داد؛ متن خام خوانده می‌شود.
+      const rawText = await res.text();
+      let data: any;
+      try { data = JSON.parse(rawText); } catch { data = null; }
+      if (!data) {
+        const proxyTimeout = res.status === 524 || /524|timeout/i.test(rawText.slice(0, 800));
+        const msg = proxyTimeout
+          ? L(language, {
+              fa: 'سرور پاسخ معتبری به درخواست نصب نداد (HTTP 524). اگر سرور اخیراً به‌روزرسانی شده چند لحظه صبر کنید و دوباره تلاش کنید.',
+              en: 'The server did not answer the install request properly (HTTP 524). If the server was updated recently, wait a moment and try again.',
+              ru: 'Сервер не ответил на запрос установки (HTTP 524). Если сервер недавно обновлялся — подождите и повторите.',
+              tr: 'Sunucu kurulum isteğine geçerli yanıt vermedi (HTTP 524). Sunucu yakın zamanda güncellendiyse biraz bekleyip tekrar deneyin.' })
+          : L(language, { fa: `پاسخ نامعتبر سرور (HTTP ${res.status})`, en: `Invalid server response (HTTP ${res.status})`, ru: `Неверный ответ сервера (HTTP ${res.status})`, tr: `Geçersiz sunucu yanıtı (HTTP ${res.status})` });
+        setZipError(msg);
+        addNotification(msg, 'error');
+        return;
+      }
+      if (!res.ok || !data.success) {
+        setZipError(data.error || L(language, { fa: 'خطا در نصب قالب', en: 'Theme installation failed', ru: 'Не удалось установить тему', tr: 'Tema kurulumu başarısız' }));
+        addNotification(L(language, { fa: `خطا در نصب: ${data.error || ''}`, en: `Install error: ${data.error || ''}`, ru: `Ошибка установки: ${data.error || ''}`, tr: `Yükleme hatası: ${data.error || ''}` }), 'error');
+        return;
+      }
+
+      // ── مسیر async (202): نصب در پس‌زمینه؛ تا وضعیت نهایی poll می‌کنیم ──
+      if (res.status === 202 && data.jobId) {
+        setInstallJob({ jobId: data.jobId, status: 'queued', filesDone: 0, filesTotal: data.progress?.filesTotal ?? 0 });
+        const POLL_MS = 1200;
+        const TIMEOUT_MS = 10 * 60 * 1000; // نصب‌های سنگین روی volume شبکه‌ای طول می‌کشند
+        const MAX_NET_ERRORS = 6; // تحمل خطای شبکه‌ای گذرا حین پولینگ
+        const deadline = Date.now() + TIMEOUT_MS;
+        let netErrors = 0;
+        let job: any = null;
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, POLL_MS));
+          try {
+            const pollRes = await fetch(`/api/admin/themes/install-jobs/${encodeURIComponent(data.jobId)}`);
+            if (!pollRes.ok) { netErrors += 1; if (netErrors >= MAX_NET_ERRORS) break; continue; }
+            netErrors = 0;
+            job = await pollRes.json();
+            setInstallJob({
+              jobId: job.jobId,
+              status: job.status,
+              filesDone: job.progress?.filesDone ?? 0,
+              filesTotal: job.progress?.filesTotal ?? 0,
+            });
+            if (job.status === 'completed' || job.status === 'failed') break;
+          } catch { netErrors += 1; if (netErrors >= MAX_NET_ERRORS) break; }
+        }
+        if (!job || (job.status !== 'completed' && job.status !== 'failed')) {
+          const msg = L(language, {
+            fa: 'وضعیت نصب پس از مدت طولانی نامشخص باقی ماند. لیست قالب‌ها را رفرش کنید؛ اگر قالب نیامده بود دوباره تلاش کنید.',
+            en: 'Install status stayed unknown for too long. Refresh the theme list; if the theme is missing, try again.',
+            ru: 'Статус установки слишком долго оставался неизвестным. Обновите список тем; если темы нет — повторите.',
+            tr: 'Kurulum durumu çok uzun süre belirsiz kaldı. Tema listesini yenileyin; tema yoksa tekrar deneyin.' });
+          setZipError(msg);
+          addNotification(msg, 'error');
+          return;
+        }
+        if (job.status === 'failed') {
+          // خطای واقعی job (نه 524 هاردکد) — با پیام دقیق سرور
+          setInstallJob(null);
+          setZipError(job.error || L(language, { fa: 'نصب قالب ناموفق بود', en: 'Theme installation failed', ru: 'Не удалось установить тему', tr: 'Tema kurulumu başarısız' }));
+          addNotification(L(language, { fa: `نصب ناموفق: ${job.error || ''}`, en: `Install failed: ${job.error || ''}`, ru: `Ошибка установки: ${job.error || ''}`, tr: `Kurulum başarısız: ${job.error || ''}` }), 'error');
+          return;
+        }
+        // completed — همان جریان موفقیت مسیر sync
+        setInstallJob(null);
+        installThemeFromServer(job);
+        return;
+      }
+
+      // ── مسیر sync قدیمی (200): پاسخ نهایی همین‌جا آمده ──
+      installThemeFromServer(data);
+
     } catch (err) {
       console.error('[Themes] Install error:', err);
       setZipError(L(language, { fa: 'خطا در ارتباط با سرور', en: 'Server connection error', ru: 'Ошибка соединения с сервером', tr: 'Sunucu bağlantı hatası' }));
@@ -1572,6 +1682,18 @@ export default function AdminPanelTab({
           >
             <BarChart3 className="w-4 h-4" />
             <span>{L(language, { fa: 'داشبورد و آمار زنده', en: 'Dashboard & Live Stats', ru: 'Дашборд и живая статистика', tr: 'Gösterge Paneli ve Canlı İstatistikler' })}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('jarvis')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+              activeSubTab === 'jarvis'
+                ? 'bg-primary text-black shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{L(language, { fa: 'جارویس — دستیار مدیر (AI)', en: 'Jarvis — Admin AI Assistant', ru: 'Джарвис — ИИ-помощник', tr: 'Jarvis — Yönetici AI Asistanı' })}</span>
           </button>
 
           <button
@@ -2285,6 +2407,29 @@ export default function AdminPanelTab({
                         </div>
                       </div>
 
+                      {/* Install Job Progress (202 async pipeline) */}
+                      {installJob && (
+                        <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/30 text-primary text-xs font-bold leading-relaxed space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                              <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                              {installJob.status === 'queued' && L(language, { fa: 'در صف نصب…', en: 'Queued…', ru: 'В очереди…', tr: 'Kuyrukta…' })}
+                              {installJob.status === 'validating' && L(language, { fa: 'اعتبارسنجی بستهٔ قالب…', en: 'Validating package…', ru: 'Проверка пакета…', tr: 'Paket doğrulanıyor…' })}
+                              {installJob.status === 'extracting' && L(language, { fa: 'استخراج و پردازش فایل‌ها…', en: 'Extracting & processing files…', ru: 'Распаковка и обработка файлов…', tr: 'Dosyalar çıkarılıyor ve işleniyor…' })}
+                              {installJob.status === 'installing' && L(language, { fa: 'جایگزینی اتمیک و فعال‌سازی…', en: 'Atomic swap & activation…', ru: 'Атомарная замена и активация…', tr: 'Atomik değişim ve etkinleştirme…' })}
+                            </span>
+                            {installJob.filesTotal > 0 && (
+                              <span className="font-mono text-[10px] text-primary/80" dir="ltr">{installJob.filesDone}/{installJob.filesTotal}</span>
+                            )}
+                          </div>
+                          {installJob.filesTotal > 0 && (
+                            <div className="h-1.5 rounded-full bg-black/40 overflow-hidden">
+                              <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, Math.round((installJob.filesDone / Math.max(1, installJob.filesTotal)) * 100))}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Parse Error */}
                       {zipError && (
                         <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold leading-relaxed flex items-start gap-2">
@@ -2387,7 +2532,9 @@ export default function AdminPanelTab({
                               <span className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                             )}
                             {isInstallingZip
-                              ? (L(language, { fa: 'در حال نصب روی سرور...', en: 'Installing on server...', ru: 'Установка на сервер...', tr: 'Sunucuya yükleniyor...' }))
+                              ? (installJob
+                                  ? L(language, { fa: `نصب در پس‌زمینه (${installJob.filesDone}/${installJob.filesTotal})…`, en: `Installing in background (${installJob.filesDone}/${installJob.filesTotal})…`, ru: `Установка в фоне (${installJob.filesDone}/${installJob.filesTotal})…`, tr: `Arka planda kuruluyor (${installJob.filesDone}/${installJob.filesTotal})…` })
+                                  : L(language, { fa: 'در حال ارسال به سرور...', en: 'Uploading to server...', ru: 'Отправка на сервер...', tr: 'Sunucuya gönderiliyor...' }))
                               : (L(language, { fa: 'نصب و فعال‌سازی', en: 'Install & Activate', ru: 'Установить и активировать', tr: 'Yükle ve Etkinleştir' }))}
                           </button>
                         </div>
@@ -4156,6 +4303,82 @@ export default function AdminPanelTab({
                 </div>
               </div>
 
+              {/* SECTION 6: HUB THEME DECORATIVE IMAGES (upload & replace) */}
+              <div className="bg-dark-card border border-white/10 rounded-2xl p-6 space-y-5">
+                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-display uppercase tracking-wider border-b border-white/5 pb-3">
+                  <ImageIcon className="w-4 h-4 text-fuchsia-400" />
+                  <span>{L(language, { fa: 'تصاویر تزئینی قالب هاب (آپلود و جایگزینی)', en: 'Hub Theme Decorative Images (Upload & Replace)', ru: 'Декоративные изображения темы Hub (загрузка и замена)', tr: 'Hub Tema Dekoratif Görselleri (Yükle ve Değiştir)' })}</span>
+                </h3>
+                <p className="text-[10px] text-gray-400 mb-6">
+                  {L(language, {
+                    fa: 'تصاویر پویا (اسلایدهای هرو، تورنمنت‌ها، اخبار و ...) همیشه از سرور خوانده می‌شوند و از بخش‌های خودشان (مدیریت اسلایدر، تورنمنت‌ها، بلاگ) مدیریت می‌شوند. این‌جا فقط جایگزینی تصاویر استاتیک و تزئینی قالب هاب ممکن است: برای هر کارت، تصویر دلخواه آپلود کنید یا به پیش‌فرض قالب بازگردانید. اگر اسلایدی از مدیریت اسلایدر تنظیم شده باشد، تصویر اسلاید اولویت دارد.',
+                    en: 'Dynamic images (hero slides, tournaments, blog posts…) are always read live from the server and managed in their own sections. Here you only replace the theme\'s static decorative images: upload your own artwork per card or reset to the theme default. A slider image (managed in Slider Management) always takes priority on the hero.',
+                    ru: 'Динамические изображения (слайды, турниры, новости…) всегда читаются с сервера и управляются в своих разделах. Здесь заменяются только статичные декоративные изображения темы: загрузите свой арт для каждой карточки или верните стандартный. Слайд из управления слайдером имеет приоритет.',
+                    tr: 'Dinamik görseller (slaytlar, turnuvalar, yazılar…) her zaman sunucudan okunur ve kendi bölümlerinden yönetilir. Burada yalnızca temanın statik dekoratif görselleri değiştirilir: her kart için kendi görselinizi yükleyin veya varsayılana döndürün. Slayt yönetiminden bir görsel varsa hero üzerinde önceliklidir.' })}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {([
+                    { slot: 'hero_main', fa: 'هرو مرکزی — کارت بزرگ تبلیغاتی', en: 'Center hero — main promo card', ru: 'Центральный герой — главная карточка', tr: 'Merkez hero — ana tanıtım kartı', def: '/api/themes/bazino-hub-v3/assets/slide-city.webp' },
+                    { slot: 'hero_tournament', fa: 'کارت تورنمنت هرو (سمت چپ)', en: 'Hero tournament card (left)', ru: 'Карточка турнира (слева)', tr: 'Hero turnuva kartı (sol)', def: '/api/themes/bazino-hub-v3/assets/slide-fc26.webp' },
+                    { slot: 'hero_live', fa: 'کارت مسابقه زنده (سمت راست)', en: 'Live match card (right)', ru: 'Карточка живого матча (справа)', tr: 'Canlı maç kartı (sağ)', def: '/api/themes/bazino-hub-v3/assets/slide-match.webp' },
+                  ] as const).map(imgSlot => {
+                    const key = `theme_img.${imgSlot.slot}`;
+                    const current = siteSettings[key] || '';
+                    return (
+                      <div key={imgSlot.slot} className="bg-black/30 border border-white/5 rounded-xl p-3.5 flex flex-col gap-3">
+                        <span className="text-[11px] font-bold text-white">{L(language, { fa: imgSlot.fa, en: imgSlot.en, ru: imgSlot.ru, tr: imgSlot.tr })}</span>
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-[#0d122b] border border-white/10">
+                          <img
+                            src={current || imgSlot.def}
+                            alt={imgSlot.slot}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.25'; }}
+                          />
+                          {current && (
+                            <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-fuchsia-500/85 text-black text-[9px] font-black uppercase tracking-wider">
+                              {L(language, { fa: 'سفارشی', en: 'CUSTOM', ru: 'СВОЁ', tr: 'ÖZEL' })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all border ${current ? 'bg-transparent border-white/15 text-white hover:border-fuchsia-400/60' : 'bg-fuchsia-600 hover:bg-fuchsia-500 border-fuchsia-500 text-white'}`}>
+                            {themeImgBusy === imgSlot.slot ? (
+                              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <ImageIcon className="w-3.5 h-3.5" />
+                            )}
+                            <span>{current
+                              ? L(language, { fa: 'جایگزینی تصویر', en: 'Replace image', ru: 'Заменить изображение', tr: 'Görseli Değiştir' })
+                              : L(language, { fa: 'آپلود تصویر دلخواه', en: 'Upload custom image', ru: 'Загрузить своё изображение', tr: 'Özel Görsel Yükle' })}</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              className="hidden"
+                              disabled={themeImgBusy === imgSlot.slot}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                e.target.value = '';
+                                if (f) handleThemeImageUpload(imgSlot.slot, f);
+                              }}
+                            />
+                          </label>
+                          {current && (
+                            <button
+                              type="button"
+                              disabled={themeImgBusy === imgSlot.slot}
+                              onClick={() => handleSaveSetting(key, '')}
+                              className="w-full px-3 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:text-white border border-white/10 hover:border-white/25 transition-all cursor-pointer uppercase tracking-wider"
+                            >
+                              {L(language, { fa: 'بازگشت به پیش‌فرض قالب', en: 'Reset to theme default', ru: 'Вернуть стандартное', tr: 'Varsayılana Dön' })}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -4387,6 +4610,12 @@ export default function AdminPanelTab({
           {activeSubTab === 'promotions' && (
             <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading...</div>}>
               <OpsProvider language={language}><PromotionsConsole /></OpsProvider>
+            </React.Suspense>
+          )}
+
+          {activeSubTab === 'jarvis' && (
+            <React.Suspense fallback={<div className="p-8 text-center text-primary text-xs font-bold animate-pulse">Loading Jarvis...</div>}>
+              <OpsProvider language={language}><JarvisConsole /></OpsProvider>
             </React.Suspense>
           )}
 

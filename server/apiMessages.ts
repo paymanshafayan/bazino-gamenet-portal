@@ -55,6 +55,8 @@ export const M = {
   REQUIRED_FIELD_EMPTY: { fa: 'یکی از فیلدهای الزامی خالی است.', en: 'One of the required fields is empty.', ru: 'Одно из обязательных полей не заполнено.', tr: 'Zorunlu alanlardan biri boş.' },
   DB_WRITE_FAILED: { fa: 'ثبت اطلاعات در پایگاه داده انجام نشد. جزئیات در لاگ سرور ثبت شد.', en: 'Could not save to the database. Details were written to the server log.', ru: 'Не удалось сохранить в базу данных. Подробности в логе сервера.', tr: 'Veritabanına kaydedilemedi. Ayrıntılar sunucu günlüğüne yazıldı.' },
   ZIP_MISSING: { fa: 'فایل ZIP ارسال نشده است', en: 'No ZIP file was uploaded.', ru: 'ZIP-файл не загружен.', tr: 'ZIP dosyası gönderilmedi.' },
+  THEME_ZIP_TOO_LARGE: { fa: 'حجم فایل ZIP قالب از سقف {size} مگابایت بیشتر است.', en: 'The theme ZIP exceeds the {size} MB limit.', ru: 'ZIP-файл темы превышает лимит {size} МБ.', tr: 'Tema ZIP dosyası {size} MB sınırını aşıyor.' },
+  THEME_EXISTS_ID: { fa: 'قالبی با شناسه «{id}» قبلاً نصب شده است — برای جایگزینی، گزینهٔ به‌روزرسانی را فعال کنید.', en: 'A theme with id “{id}” is already installed — enable the replace option to update it.', ru: 'Тема с id «{id}» уже установлена — включите опцию замены для обновления.', tr: '«{id}» kimliğine sahip bir tema zaten yüklü — güncellemek için değiştirme seçeneğini etkinleştirin.' },
   THEME_INCOMPLETE: { fa: 'اطلاعات تم ناقص است.', en: 'Theme data is incomplete.', ru: 'Данные темы неполные.', tr: 'Tema bilgileri eksik.' },
   THEME_NOT_FOUND: { fa: 'تم یافت نشد.', en: 'Theme not found.', ru: 'Тема не найдена.', tr: 'Tema bulunamadı.' },
   SLIDE_FIELDS_REQUIRED: { fa: 'آدرس تصویر و بخش هدف الزامی هستند.', en: 'Image URL and target section are required.', ru: 'Укажите URL изображения и целевой раздел.', tr: 'Görsel adresi ve hedef bölüm zorunludur.' },
@@ -86,6 +88,11 @@ export const M = {
   TICKET_NOT_FOUND: { fa: 'تیکت پیدا نشد.', en: 'Ticket not found.', ru: 'Тикет не найден.', tr: 'Destek talebi bulunamadı.' },
   TICKET_CLOSED: { fa: 'این تیکت بسته شده است.', en: 'This ticket is closed.', ru: 'Этот тикет закрыт.', tr: 'Bu destek talebi kapatılmış.' },
   MESSAGE_REQUIRED: { fa: 'متن پیام خالی است.', en: 'Message text is empty.', ru: 'Текст сообщения пуст.', tr: 'Mesaj metni boş.' },
+  APPETIZE_NOT_CONFIGURED: { fa: 'توکن API اپتایز (Appetize) هنوز ثبت نشده است. آن را از appetize.io بگیرید و در همین بخش ذخیره کنید.', en: 'The Appetize API token has not been saved yet. Get one from appetize.io and save it here first.', ru: 'API-токен Appetize ещё не сохранён. Получите его на appetize.io и сохраните здесь.', tr: 'Appetize API anahtarı henüz kaydedilmedi. appetize.io\'dan alın ve buraya kaydedin.' },
+  APPETIZE_TOKEN_INVALID: { fa: 'توکن Appetize معتبر نیست (حداقل ۸ کاراکتر).', en: 'Invalid Appetize token (at least 8 characters).', ru: 'Недействительный токен Appetize (минимум 8 символов).', tr: 'Geçersiz Appetize anahtarı (en az 8 karakter).' },
+  APPETIZE_URL_INVALID: { fa: 'آدرس APK معتبر نیست (باید با http/https شروع شود).', en: 'Invalid APK URL (must start with http/https).', ru: 'Неверный URL APK (должен начинаться с http/https).', tr: 'Geçersiz APK adresi (http/https ile başlamalı).' },
+  APPETIZE_SOURCE_INVALID: { fa: 'منبع ارسال نامعتبر است.', en: 'Invalid push source.', ru: 'Недопустимый источник публикации.', tr: 'Geçersiz gönderim kaynağı.' },
+  APPETIZE_APK_REQUIRED: { fa: 'فایل APK ارسال نشده است.', en: 'No APK file was uploaded.', ru: 'APK-файл не загружен.', tr: 'APK dosyası gönderilmedi.' },
 } satisfies Record<string, Msg>;
 
 export type ApiMessageKey = keyof typeof M;

@@ -351,6 +351,7 @@ export const Header: React.FC<HeaderProps> = ({
           {can('tournaments') && <button onClick={() => setActiveTab('tournaments')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='tournaments'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}><Trophy className="w-4 h-4" />مسابقات</button>}
           {can('promotions') && <button onClick={() => setActiveTab('promotions')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='promotions'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}><Ticket className="w-4 h-4" />کوپن و ساعات ویژه</button>}
           {(can('content')||can('publish')) && <button onClick={() => setActiveTab('content')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='content'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}><Megaphone className="w-4 h-4" />محتوا و انتشار</button>}
+          {can('content') && <button onClick={() => setActiveTab('jarvis')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab==='jarvis'?'bg-amber-500 text-zinc-950':'text-zinc-400 hover:bg-zinc-900'}`}><Sparkles className="w-4 h-4" />جارویس</button>}
           {activeOperator.permissions.canAccessReports && (
             <button
               onClick={() => setActiveTab('accounting')}

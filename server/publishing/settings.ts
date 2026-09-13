@@ -3,9 +3,9 @@ import { OpsCore, fail, nowISO, stringValue } from '../management/core';
 import { CAMPAIGN_MESSAGES } from '../../shared/publishing/messages';
 import type { AgentProfile, CampaignPolicy, PublishingConfig } from '../../shared/publishing/types';
 
-export const SECRET_NAMES = ['zernio_api_key', 'zernio_webhook_secret', 'zernio_analytics_webhook_secret', 'invite_signing_key'] as const;
+export const SECRET_NAMES = ['zernio_api_key', 'zernio_webhook_secret', 'zernio_analytics_webhook_secret', 'invite_signing_key', 'imejis_api_key', 'cloudflare_api_token', 'cloudflare_account_id', 'cloudflare_zone_id', 'elevenlabs_api_key', 'youtube_api_key', 'twitch_client_id', 'twitch_client_secret'] as const;
 export function protectedIntegrationSetting(key: string): boolean {
-  return /(?:api[_-]?key|secret|token|credential)/i.test(key) || /^(publishing_|zernio_|manus_|agent_|ig_|integration_api_tokens|BAZINO_SECRETS|ZERNIO_|MANUS_)/.test(key);
+  return /(?:api[_-]?key|secret|token|credential)/i.test(key) || /^(publishing_|zernio_|manus_|agent_|ig_|cloudflare_|imejis_|elevenlabs_|youtube_|twitch_|integration_api_tokens|BAZINO_SECRETS|ZERNIO_|MANUS_|CLOUDFLARE_|IMEJIS_|ELEVENLABS_|YOUTUBE_|TWITCH_)/.test(key);
 }
 export class SecretVault {
   constructor(public core: OpsCore) {}
@@ -78,6 +78,7 @@ export class PublishingSettings {
       if (!await this.core.read('pub-campaign','SQUAD26')) await this.core.save('pub-campaign','SQUAD26',defaultCampaign(),0);
       await this.core.save('pub-config','main',{
         selectedMode:null,defaultAgentId:'builtin-manus',defaultCampaignId:'SQUAD26',zernioAccountId:'',zernioProfileId:'',outboundEnabled:false,baseUrl:'https://bazino.pro',timezone:'Asia/Famagusta',
+        mediagenEnabled:false,mediagenDesigns:[],mediagenImejisLimit:100,mediagenFluxLimit:300,mediagenComposeLimit:20,
       } satisfies PublishingConfig,0);
     });
   }
@@ -99,8 +100,14 @@ export class PublishingSettings {
     if(!await this.core.read('pub-campaign',String(b.defaultCampaignId)))fail('CAMPAIGN_NOT_FOUND');
     if((process.env.ZERNIO_IG_ACCOUNT_ID||process.env.ZERNIO_ACCOUNT_ID) && b.zernioAccountId!==old.data.zernioAccountId)fail('HOST_MANAGED',409);
     if(b.outboundEnabled===true && (!await this.vault.zernio('zernio_api_key') || !await this.vault.zernio('zernio_webhook_secret') || !b.zernioAccountId))fail('INTEGRATION_NOT_CONFIGURED',409);
+    const designs=Array.isArray(b.mediagenDesigns)?[...new Set<string>(b.mediagenDesigns.map((d:any)=>String(d)).filter(d=>/^[\w-]{1,64}$/.test(d)))].slice(0,20):old.data.mediagenDesigns||[];
+    const imejisLimit=b.mediagenImejisLimit===undefined?old.data.mediagenImejisLimit??100:Number(b.mediagenImejisLimit);
+    const fluxLimit=b.mediagenFluxLimit===undefined?old.data.mediagenFluxLimit??300:Number(b.mediagenFluxLimit);
+    const composeLimit=b.mediagenComposeLimit===undefined?old.data.mediagenComposeLimit??20:Number(b.mediagenComposeLimit);
+    if(!Number.isInteger(imejisLimit)||imejisLimit<0||imejisLimit>10000||!Number.isInteger(fluxLimit)||fluxLimit<0||fluxLimit>100000||!Number.isInteger(composeLimit)||composeLimit<0||composeLimit>10000)fail('INVALID_POLICY_VALUE');
     const data:PublishingConfig={selectedMode:b.selectedMode,defaultAgentId:agent?.id||'',defaultCampaignId:String(b.defaultCampaignId),
-      zernioAccountId:stringValue(b.zernioAccountId,100),zernioProfileId:stringValue(b.zernioProfileId,100),outboundEnabled:b.outboundEnabled===true,baseUrl:base.origin,timezone};
+      zernioAccountId:stringValue(b.zernioAccountId,100),zernioProfileId:stringValue(b.zernioProfileId,100),outboundEnabled:b.outboundEnabled===true,baseUrl:base.origin,timezone,
+      mediagenEnabled:b.mediagenEnabled===undefined?old.data.mediagenEnabled===true:b.mediagenEnabled===true,mediagenDesigns:designs,mediagenImejisLimit:imejisLimit,mediagenFluxLimit:fluxLimit,mediagenComposeLimit:composeLimit};
     return this.core.command(actor,b.idempotencyKey,'publishing.settings',data,()=>this.core.save('pub-config','main',data,Number(b.version)));
   }
   async saveCampaign(actor:string,id:string,b:any) {

@@ -1,4 +1,4 @@
-package com.example.bazino_app
+package pro.bazino.app
 
 import io.flutter.embedding.android.FlutterActivity
 

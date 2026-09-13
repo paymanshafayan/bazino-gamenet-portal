@@ -1,0 +1,2351 @@
+{
+  "capturedAt": "2026-09-12T21:04:27.237Z",
+  "base": "http://127.0.0.1:3000",
+  "user": {
+    "username": "admin",
+    "role": "admin"
+  },
+  "endpoints": {
+    "/api/admin/stats": {
+      "status": 200,
+      "sample": {
+        "totalSales": 0,
+        "totalReservations": 3,
+        "cafeSales": 0,
+        "shopSales": 0,
+        "activeReservations": 2,
+        "activeSystems": 5,
+        "cafeOrdersCount": 0,
+        "shopOrdersCount": 0,
+        "totalUsers": 1,
+        "cafeOrders": [],
+        "shopOrders": [],
+        "reservationLogs": [
+          {
+            "id": "r1",
+            "systemId": "s2",
+            "username": "",
+            "systemName": "سیستم شماره ۲ (VIP PC)",
+            "startTime": "14:00",
+            "endTime": "16:00",
+            "totalPrice": 300,
+            "date": "امروز",
+            "checkedIn": false,
+            "timestamp": "2026-09-12T19:04:01.533Z",
+            "extraControllers": 0
+          },
+          {
+            "id": "r2",
+            "systemId": "s5",
+            "username": "",
+            "systemName": "کنسول پلی‌استیشن ۵ (VIP Booth)",
+            "startTime": "18:00",
+            "endTime": "20:00",
+            "totalPrice": 400,
+            "date": "امروز",
+            "checkedIn": true,
+            "timestamp": "2026-09-12T17:04:01.533Z",
+            "extraControllers": 0
+          },
+          {
+            "id": "r3",
+            "systemId": "s3",
+            "username": "",
+            "systemName": "سیستم شماره ۳ (Standard)",
+            "startTime": "20:00",
+            "endTime": "22:30",
+            "totalPrice": 250,
+            "date": "دیروز",
+            "checkedIn": true,
+            "timestamp": "2026-09-11T20:04:01.533Z",
+            "extraControllers": 0
+          }
+        ],
+        "dataSource": "sample",
+        "gamenetSyncStatus": null
+      }
+    },
+    "/api/admin/storage-status": {
+      "status": 200,
+      "sample": {
+        "dataDir": "/home/user/preview-run",
+        "persistent": false,
+        "writable": true,
+        "platform": "generic",
+        "usedBytes": 1330673,
+        "themesDir": "/home/user/preview-run/themes",
+        "installedThemes": [],
+        "activeThemeId": "dark-gold",
+        "db": {
+          "provider": "SQLite",
+          "connected": true,
+          "configSource": "default",
+          "sqliteFile": "/home/user/preview-run/bazino.sqlite3",
+          "sqliteBytes": 4096
+        }
+      }
+    },
+    "/api/data-source": {
+      "status": 200,
+      "sample": {
+        "mode": "sample",
+        "sample": {
+          "systems": 5,
+          "cafeItems": 5,
+          "accessories": 5,
+          "tournaments": 4,
+          "articles": 4,
+          "sliders": 4,
+          "coupons": 4,
+          "transactions": 4,
+          "chatRooms": 5,
+          "reservations": 3,
+          "settings": 19
+        },
+        "database": {
+          "systems": 0,
+          "cafeItems": 0,
+          "accessories": 0,
+          "tournaments": 0,
+          "articles": 0,
+          "sliders": 0,
+          "coupons": 0,
+          "transactions": 0,
+          "chatRooms": 0,
+          "reservations": 0
+        }
+      }
+    },
+    "/api/admin/users": {
+      "status": 200,
+      "sample": [
+        {
+          "username": "admin",
+          "email": "admin@gamenet.com",
+          "phone": "09123456780",
+          "loyaltyPoints": 1000,
+          "role": "admin",
+          "credits": 0,
+          "displayName": "",
+          "avatarUrl": "",
+          "bio": "",
+          "gamerTag": "",
+          "city": "",
+          "birthDate": "",
+          "phoneVerifiedAt": "",
+          "hasPassword": 1,
+          "createdAt": "",
+          "walletBalance": 0
+        }
+      ]
+    },
+    "/api/systems": {
+      "status": 200,
+      "sample": [
+        {
+          "id": "s1",
+          "name": "سیستم شماره ۱ (VIP PC)",
+          "nameFa": "سیستم شماره ۱ (VIP PC)",
+          "nameEn": "System #1 (VIP PC)",
+          "nameRu": "Система №1 (VIP PC)",
+          "nameTr": "Sistem No.1 (VIP PC)",
+          "type": "PC",
+          "hourlyRate": 150,
+          "isActive": true,
+          "isReserved": false,
+          "audience": "adults"
+        },
+        {
+          "id": "s2",
+          "name": "سیستم شماره ۲ (VIP PC)",
+          "nameFa": "سیستم شماره ۲ (VIP PC)",
+          "nameEn": "System #2 (VIP PC)",
+          "nameRu": "Система №2 (VIP PC)",
+          "nameTr": "Sistem No.2 (VIP PC)",
+          "type": "PC",
+          "hourlyRate": 150,
+          "isActive": true,
+          "isReserved": true,
+          "audience": "adults"
+        },
+        {
+          "id": "s3",
+          "name": "سیستم شماره ۳ (Standard)",
+          "nameFa": "سیستم شماره ۳ (Standard)",
+          "nameEn": "System #3 (Standard)",
+          "nameRu": "Система №3 (Standard)",
+          "nameTr": "Sistem No.3 (Standard)",
+          "type": "PC",
+          "hourlyRate": 100,
+          "isActive": true,
+          "isReserved": false,
+          "audience": "kids"
+        },
+        {
+          "id": "s4",
+          "name": "سیستم شماره ۴ (Standard)",
+          "nameFa": "سیستم شماره ۴ (Standard)",
+          "nameEn": "System #4 (Standard)",
+          "nameRu": "Система №4 (Standard)",
+          "nameTr": "Sistem No.4 (Standard)",
+          "type": "PC",
+          "hourlyRate": 100,
+          "isActive": true,
+          "isReserved": false,
+          "audience": "kids"
+        },
+        {
+          "id": "s5",
+          "name": "کنسول پلی‌استیشن ۵ (VIP Booth)",
+          "nameFa": "کنسول پلی‌استیشن ۵ (VIP Booth)",
+          "nameEn": "PlayStation 5 Console (VIP Booth)",
+          "nameRu": "Консоль PlayStation 5 (VIP-кабина)",
+          "nameTr": "PlayStation 5 Konsolu (VIP Kabin)",
+          "type": "PS5",
+          "hourlyRate": 200,
+          "isActive": true,
+          "isReserved": true
+        }
+      ]
+    },
+    "/api/cafe": {
+      "status": 200,
+      "sample": [
+        {
+          "id": "c1",
+          "name": "پیتزا پپرونی مخصوص گیمرها",
+          "nameFa": "پیتزا پپرونی مخصوص گیمرها",
+          "nameEn": "Gamer Pepperoni Pizza",
+          "nameRu": "Пицца пепперони для геймеров",
+          "nameTr": "Oyuncu Pepperoni Pizzası",
+          "category": "Foods",
+          "price": 250,
+          "imageUrl": "/images/home/pizza-400.webp",
+          "mobileImageUrl": "/images/mobile/item-pizza.webp",
+          "inventory": 15,
+          "isAvailable": true,
+          "creditPrice": 0
+        },
+        {
+          "id": "c2",
+          "name": "همبرگر دوبل با پنیر گودا",
+          "nameFa": "همبرگر دوبل با پنیر گودا",
+          "nameEn": "Double Gouda Cheeseburger",
+          "nameRu": "Двойной бургер с гаудой",
+          "nameTr": "Çift Gouda Peynirli Burger",
+          "category": "Foods",
+          "price": 220,
+          "imageUrl": "/images/home/burger-400.webp",
+          "mobileImageUrl": "/images/mobile/item-burger.webp",
+          "inventory": 10,
+          "isAvailable": true,
+          "creditPrice": 0
+        },
+        {
+          "id": "c3",
+          "name": "نوشابه ردبول خنک (RedBull)",
+          "nameFa": "نوشابه ردبول خنک",
+          "nameEn": "Cold Red Bull Energy Drink",
+          "nameRu": "Холодный энергетик Red Bull",
+          "nameTr": "Soğuk Red Bull Enerji İçeceği",
+          "category": "Drinks",
+          "price": 90,
+          "imageUrl": "/images/home/energy-drink-400.webp",
+          "mobileImageUrl": "/images/mobile/item-energy-drink.webp",
+          "inventory": 32,
+          "isAvailable": true,
+          "creditPrice": 0
+        },
+        {
+          "id": "c4",
+          "name": "سیب‌زمینی سرخ‌کرده با پنیر چدار",
+          "nameFa": "سیب‌زمینی سرخ‌کرده با پنیر چدار",
+          "nameEn": "Cheddar Loaded Fries",
+          "nameRu": "Картофель фри с чеддером",
+          "nameTr": "Çedarlı Patates Kızartması",
+          "category": "Snacks",
+          "price": 120,
+          "imageUrl": "/images/home/fries-400.webp",
+          "mobileImageUrl": "/images/mobile/item-fries.webp",
+          "inventory": 20,
+          "isAvailable": true,
+          "creditPrice": 0
+        },
+        {
+          "id": "c5",
+          "name": "قهوه اسپرسو دبل شات",
+          "nameFa": "قهوه اسپرسو دبل شات",
+          "nameEn": "Double Shot Espresso",
+          "nameRu": "Двойной эспрессо",
+          "nameTr": "Double Shot Espresso",
+          "category": "Drinks",
+          "price": 80,
+          "imageUrl": "/images/home/espresso-400.webp",
+          "mobileImageUrl": "/images/mobile/item-espresso.webp",
+          "inventory": 25,
+          "isAvailable": true,
+          "creditPrice": 0
+        }
+      ]
+    },
+    "/api/accessories": {
+      "status": 200,
+      "sample": [
+        {
+          "id": "a1",
+          "name": "کیبورد مکانیکال Redragon K552 RGB",
+          "nameFa": "کیبورد مکانیکال Redragon K552 RGB",
+          "nameEn": "Redragon K552 RGB Mechanical Keyboard",
+          "nameRu": "Механическая клавиатура Redragon K552 RGB",
+          "nameTr": "Redragon K552 RGB Mekanik Klavye",
+          "description": "کیبورد مکانیکال گیمینگ با سوییچ‌های آبی مقاوم، نورپردازی RGB.",
+          "descriptionFa": "کیبورد مکانیکال گیمینگ با سوییچ‌های آبی مقاوم و نورپردازی RGB.",
+          "descriptionEn": "Gaming mechanical keyboard with durable blue switches and RGB lighting.",
+          "descriptionRu": "Игровая механическая клавиатура с синими свитчами и RGB подсветкой.",
+          "descriptionTr": "Dayanıklı blue switch ve RGB aydınlatmalı mekanik oyuncu klavyesi.",
+          "price": 3500,
+          "imageUrl": "/images/home/keyboard-400.webp",
+          "mobileImageUrl": "/images/mobile/item-keyboard.webp",
+          "stock": 5,
+          "category": "Keyboard",
+          "creditPrice": 0
+        },
+        {
+          "id": "a2",
+          "name": "موس گیمینگ Logitech G502 HERO",
+          "nameFa": "موس گیمینگ Logitech G502 HERO",
+          "nameEn": "Logitech G502 HERO Gaming Mouse",
+          "nameRu": "Игровая мышь Logitech G502 HERO",
+          "nameTr": "Logitech G502 HERO Oyuncu Mouse",
+          "description": "موس حرفه‌ای با حسگر HERO 25K، یازده کلید قابل برنامه‌ریزی.",
+          "descriptionFa": "موس حرفه‌ای با حسگر HERO 25K و یازده کلید قابل برنامه‌ریزی.",
+          "descriptionEn": "Pro gaming mouse with HERO 25K sensor and 11 programmable buttons.",
+          "descriptionRu": "Профессиональная мышь с сенсором HERO 25K и 11 кнопками.",
+          "descriptionTr": "HERO 25K sensörlü, 11 programlanabilir tuşlu profesyonel mouse.",
+          "price": 2500,
+          "imageUrl": "/images/home/mouse-400.webp",
+          "mobileImageUrl": "/images/mobile/item-mouse.webp",
+          "stock": 8,
+          "category": "Mouse",
+          "creditPrice": 0
+        },
+        {
+          "id": "a3",
+          "name": "هدست گیمینگ Razer Kraken V3",
+          "nameFa": "هدست گیمینگ Razer Kraken V3",
+          "nameEn": "Razer Kraken V3 Gaming Headset",
+          "nameRu": "Игровая гарнитура Razer Kraken V3",
+          "nameTr": "Razer Kraken V3 Oyuncu Kulaklığı",
+          "description": "هدست سیمی با صدای فراگیر ۷.۱، میکروفون نویزگیر.",
+          "descriptionFa": "هدست سیمی با صدای فراگیر ۷.۱ و میکروفون نویزگیر.",
+          "descriptionEn": "Wired headset with 7.1 surround sound and noise-cancelling microphone.",
+          "descriptionRu": "Проводная гарнитура 7.1 с микрофоном шумоподавления.",
+          "descriptionTr": "7.1 surround ses ve gürültü engelleyici mikrofonlu kablolu kulaklık.",
+          "price": 4200,
+          "imageUrl": "/images/home/headset-400.webp",
+          "mobileImageUrl": "/images/mobile/item-headset.webp",
+          "stock": 4,
+          "category": "Headset",
+          "creditPrice": 0
+        },
+        {
+          "id": "a4",
+          "name": "دسته بازی پلی‌استیشن ۵ (DualSense)",
+          "nameFa": "دسته بازی پلی‌استیشن ۵",
+          "nameEn": "PlayStation 5 DualSense Controller",
+          "nameRu": "Контроллер PlayStation 5 DualSense",
+          "nameTr": "PlayStation 5 DualSense Kol",
+          "description": "دسته رسمی سونی با فناوری هپتیک و تریگرهای تطبیقی.",
+          "descriptionFa": "دسته رسمی سونی با فناوری هپتیک و تریگرهای تطبیقی.",
+          "descriptionEn": "Official Sony controller with haptics and adaptive triggers.",
+          "descriptionRu": "Официальный контроллер Sony с тактильной отдачей.",
+          "descriptionTr": "Haptik geri bildirimli ve adaptif tetikli resmi Sony kolu.",
+          "price": 3900,
+          "imageUrl": "/images/home/controller-400.webp",
+          "mobileImageUrl": "/images/mobile/item-controller.webp",
+          "stock": 6,
+          "category": "Controller",
+          "creditPrice": 0
+        },
+        {
+          "id": "a5",
+          "name": "ماوس‌پد گیمینگ RGB 900x400",
+          "nameFa": "ماوس‌پد گیمینگ RGB 900x400",
+          "nameEn": "RGB Gaming Mousepad 900x400",
+          "nameRu": "Игровой коврик RGB 900x400",
+          "nameTr": "RGB Oyuncu Mousepad 900x400",
+          "description": "ماوس‌پد بزرگ با نورپردازی RGB دورتادور و سطح نرم.",
+          "descriptionFa": "ماوس‌پد بزرگ با نورپردازی RGB دورتادور و سطح نرم.",
+          "descriptionEn": "Large soft gaming mousepad with edge-to-edge RGB lighting.",
+          "descriptionRu": "Большой мягкий коврик с RGB подсветкой по краям.",
+          "descriptionTr": "Kenar RGB aydınlatmalı büyük ve yumuşak oyuncu mousepadi.",
+          "price": 650,
+          "imageUrl": "/images/home/mousepad-400.webp",
+          "mobileImageUrl": "/images/mobile/item-mousepad.webp",
+          "stock": 12,
+          "category": "Mouse",
+          "creditPrice": 0
+        }
+      ]
+    },
+    "/api/tournaments": {
+      "status": 200,
+      "sample": [
+        {
+          "id": "t1",
+          "title": "مسابقات قهرمانی Counter-Strike 2 سالن",
+          "titleFa": "مسابقات قهرمانی Counter-Strike 2 سالن",
+          "titleEn": "Counter-Strike 2 Club Championship",
+          "titleRu": "Чемпионат клуба по Counter-Strike 2",
+          "titleTr": "Counter-Strike 2 Kulüp Şampiyonası",
+          "game": "CS2 5v5",
+          "registrationFee": 500,
+          "startDate": "۱۴۰۵/۰۷/۱۵",
+          "maxTeams": 8,
+          "status": "Active",
+          "registeredTeamsCount": 2,
+          "teams": [
+            {
+              "name": "Zero Ping",
+              "leader": "ali_gamer",
+              "members": [
+                "reza",
+                "sina"
+              ]
+            },
+            {
+              "name": "Cyber Storm",
+              "leader": "neda",
+              "members": [
+                "aria",
+                "sara"
+              ]
+            }
+          ],
+          "bracket": {}
+        },
+        {
+          "id": "t2",
+          "title": "لیگ هفتگی دوتا ۲ (Dota 2 Arena)",
+          "titleFa": "لیگ هفتگی دوتا ۲",
+          "titleEn": "Weekly Dota 2 Arena League",
+          "titleRu": "Еженедельная лига Dota 2 Arena",
+          "titleTr": "Haftalık Dota 2 Arena Ligi",
+          "game": "Dota 2 5v5",
+          "registrationFee": 600,
+          "startDate": "۱۴۰۵/۰۷/۲۵",
+          "maxTeams": 8,
+          "status": "Upcoming",
+          "registeredTeamsCount": 3,
+          "teams": [
+            {
+              "name": "VIP Gladiators",
+              "leader": "amir",
+              "members": []
+            },
+            {
+              "name": "Persian Hawks",
+              "leader": "hossein",
+              "members": []
+            },
+            {
+              "name": "Night Owls",
+              "leader": "maryam",
+              "members": []
+            }
+          ],
+          "bracket": {}
+        },
+        {
+          "id": "t3",
+          "title": "جام باشگاه‌های فیفا ۲۶",
+          "titleFa": "جام باشگاه‌های فیفا ۲۶",
+          "titleEn": "FIFA 26 Clubs Cup",
+          "titleRu": "Кубок клубов FIFA 26",
+          "titleTr": "FIFA 26 Kulüpler Kupası",
+          "game": "FIFA 26 1v1",
+          "registrationFee": 300,
+          "startDate": "۱۴۰۵/۰۸/۰۵",
+          "maxTeams": 16,
+          "status": "Upcoming",
+          "registeredTeamsCount": 5,
+          "teams": [
+            {
+              "name": "Barca King",
+              "leader": "ehsan",
+              "members": []
+            },
+            {
+              "name": "Real Fan",
+              "leader": "kiarash",
+              "members": []
+            }
+          ],
+          "bracket": {}
+        },
+        {
+          "id": "t4",
+          "title": "تورنمنت شبانه والورانت (Midnight Clash)",
+          "titleFa": "تورنمنت شبانه والورانت",
+          "titleEn": "Valorant Midnight Clash",
+          "titleRu": "Ночной турнир Valorant",
+          "titleTr": "Valorant Gece Turnuvası",
+          "game": "Valorant 5v5",
+          "registrationFee": 400,
+          "startDate": "۱۴۰۵/۰۸/۱۵",
+          "maxTeams": 8,
+          "status": "Completed",
+          "registeredTeamsCount": 8,
+          "teams": [
+            {
+              "name": "Phoenix",
+              "leader": "sara",
+              "members": []
+            },
+            {
+              "name": "Radiant",
+              "leader": "danial",
+              "members": []
+            }
+          ],
+          "bracket": {}
+        }
+      ]
+    },
+    "/api/tournaments/events": {
+      "status": 200,
+      "sample": {
+        "weekly": [
+          {
+            "id": "t4",
+            "title": "تورنمنت شبانه والورانت",
+            "game": "Valorant 5v5",
+            "startDate": "۱۴۰۵/۰۸/۱۵",
+            "registrationFee": 400,
+            "maxTeams": 8,
+            "registeredTeamsCount": 8,
+            "status": "Completed",
+            "kind": "weekly",
+            "signupMode": "open",
+            "prizes": {},
+            "teamCount": 0,
+            "checkedIn": 0,
+            "bracketTotal": 0,
+            "bracketDone": 0,
+            "liveState": "upcoming",
+            "finalized": false,
+            "version": 0
+          },
+          {
+            "id": "t3",
+            "title": "جام باشگاه‌های فیفا ۲۶",
+            "game": "FIFA 26 1v1",
+            "startDate": "۱۴۰۵/۰۸/۰۵",
+            "registrationFee": 300,
+            "maxTeams": 16,
+            "registeredTeamsCount": 5,
+            "status": "Upcoming",
+            "kind": "weekly",
+            "signupMode": "open",
+            "prizes": {},
+            "teamCount": 0,
+            "checkedIn": 0,
+            "bracketTotal": 0,
+            "bracketDone": 0,
+            "liveState": "upcoming",
+            "finalized": false,
+            "version": 0
+          },
+          {
+            "id": "t2",
+            "title": "لیگ هفتگی دوتا ۲",
+            "game": "Dota 2 5v5",
+            "startDate": "۱۴۰۵/۰۷/۲۵",
+            "registrationFee": 600,
+            "maxTeams": 8,
+            "registeredTeamsCount": 3,
+            "status": "Upcoming",
+            "kind": "weekly",
+            "signupMode": "open",
+            "prizes": {},
+            "teamCount": 0,
+            "checkedIn": 0,
+            "bracketTotal": 0,
+            "bracketDone": 0,
+            "liveState": "upcoming",
+            "finalized": false,
+            "version": 0
+          },
+          {
+            "id": "t1",
+            "title": "مسابقات قهرمانی Counter-Strike 2 سالن",
+            "game": "CS2 5v5",
+            "startDate": "۱۴۰۵/۰۷/۱۵",
+            "registrationFee": 500,
+            "maxTeams": 8,
+            "registeredTeamsCount": 2,
+            "status": "Active",
+            "kind": "weekly",
+            "signupMode": "open",
+            "prizes": {},
+            "teamCount": 0,
+            "checkedIn": 0,
+            "bracketTotal": 0,
+            "bracketDone": 0,
+            "liveState": "upcoming",
+            "finalized": false,
+            "version": 0
+          }
+        ],
+        "special": [],
+        "season": {
+          "id": "season-2026-AUTUMN",
+          "name": "AUTUMN",
+          "year": 2026,
+          "startsAt": "2026-09-01T00:00:00.000Z",
+          "endsAt": "2026-12-01T00:00:00.000Z",
+          "daysLeft": 80,
+          "standings": [],
+          "top3": [],
+          "scoring": {
+            "weekly": {
+              "1": 5,
+              "2": 2,
+              "3": 1
+            },
+            "special": {
+              "1": 10,
+              "2": 4,
+              "3": 2
+            }
+          }
+        },
+        "live": {
+          "id": "t4",
+          "title": "تورنمنت شبانه والورانت",
+          "game": "Valorant 5v5",
+          "version": 0,
+          "bracketTotal": 0
+        }
+      }
+    },
+    "/api/articles": {
+      "status": 200,
+      "sample": [
+        {
+          "id": "art-1",
+          "title": "معرفی آپدیت جدید Counter-Strike 2 و تغییرات کلیدی نقشه‌ها",
+          "titleFa": "معرفی آپدیت جدید Counter-Strike 2",
+          "titleEn": "Counter-Strike 2 Update Highlights",
+          "titleRu": "Главное в обновлении Counter-Strike 2",
+          "titleTr": "Counter-Strike 2 Güncelleme Özeti",
+          "content": "شرکت ولو آپدیت جدید کانتر استرایک ۲ را منتشر کرد؛ در این مطلب مهم‌ترین تغییرات گیم‌پلی و نقشه‌ها را مرور می‌کنیم.",
+          "contentFa": "شرکت ولو آپدیت جدید کانتر استرایک ۲ را منتشر کرد؛ در این مطلب مهم‌ترین تغییرات گیم‌پلی و نقشه‌ها را مرور می‌کنیم.",
+          "contentEn": "Valve released a new Counter-Strike 2 update. Here we review the key gameplay and map changes.",
+          "contentRu": "Valve выпустила обновление Counter-Strike 2. Разбираем главные изменения карт и геймплея.",
+          "contentTr": "Valve yeni Counter-Strike 2 güncellemesini yayınladı. Harita ve oynanış değişikliklerini inceliyoruz.",
+          "category": "CS2",
+          "imageUrl": "/images/home/esports-800.webp",
+          "mobileImageUrl": "/images/home/esports-320.webp",
+          "author": "آرش قاسمی",
+          "authorFa": "آرش قاسمی",
+          "authorEn": "Arash Ghasemi",
+          "authorRu": "Араш Гасеми",
+          "authorTr": "Arash Ghasemi",
+          "date": "۱۴۰۵/۰۴/۱۱",
+          "comments": [
+            {
+              "id": "cm1",
+              "gamerTag": "ali_gamer",
+              "content": "مقاله عالی بود!"
+            }
+          ]
+        },
+        {
+          "id": "art-2",
+          "title": "راهنمای انتخاب سیستم مناسب برای رقابت‌های حرفه‌ای",
+          "titleFa": "راهنمای انتخاب سیستم مناسب",
+          "titleEn": "Choosing the Right Pro Gaming Rig",
+          "titleRu": "Как выбрать игровой ПК для турниров",
+          "titleTr": "Doğru Profesyonel Oyuncu Bilgisayarını Seçme",
+          "content": "برای رقابت حرفه‌ای، فریم‌ریت بالا و پینگ پایین مهم است. این راهنما انتخاب سیستم مناسب را ساده می‌کند.",
+          "contentFa": "برای رقابت حرفه‌ای، فریم‌ریت بالا و پینگ پایین مهم است. این راهنما انتخاب سیستم مناسب را ساده می‌کند.",
+          "contentEn": "High FPS and low latency matter in competitive play. This guide helps you pick the right rig.",
+          "contentRu": "Для соревнований важны высокий FPS и низкий пинг. Это руководство поможет выбрать ПК.",
+          "contentTr": "Rekabetçi oyunlarda yüksek FPS ve düşük gecikme önemlidir. Bu rehber doğru sistemi seçmenize yardım eder.",
+          "category": "Hardware",
+          "imageUrl": "/images/home/hardware-pc-800.webp",
+          "mobileImageUrl": "/images/home/hardware-pc-400.webp",
+          "author": "سینا رضایی",
+          "authorFa": "سینا رضایی",
+          "authorEn": "Sina Rezaei",
+          "authorRu": "Сина Резаи",
+          "authorTr": "Sina Rezaei",
+          "date": "۱۴۰۵/۰۴/۰۵",
+          "comments": []
+        },
+        {
+          "id": "art-3",
+          "title": "گزارش مسابقات آخر هفته: صدرنشینی تیم Zero Ping",
+          "titleFa": "گزارش مسابقات آخر هفته",
+          "titleEn": "Weekend Tournament Report",
+          "titleRu": "Отчёт о турнире выходного дня",
+          "titleTr": "Hafta Sonu Turnuva Raporu",
+          "content": "مسابقات آخر هفته با قهرمانی تیم Zero Ping پایان یافت و جوایز به تیم‌های برتر اهدا شد.",
+          "contentFa": "مسابقات آخر هفته با قهرمانی تیم Zero Ping پایان یافت و جوایز به تیم‌های برتر اهدا شد.",
+          "contentEn": "The weekend tournament ended with Zero Ping on top, and rewards went to the best teams.",
+          "contentRu": "Турнир выходного дня завершился победой Zero Ping, призы получили лучшие команды.",
+          "contentTr": "Hafta sonu turnuvası Zero Ping zaferiyle bitti ve ödüller en iyi takımlara verildi.",
+          "category": "Tournaments",
+          "imageUrl": "/images/home/rpg-openworld-800.webp",
+          "mobileImageUrl": "/images/home/rpg-openworld-320.webp",
+          "author": "سورنا قاسمی",
+          "authorFa": "سورنا قاسمی",
+          "authorEn": "Sorena Ghasemi",
+          "authorRu": "Сорена Гасеми",
+          "authorTr": "Sorena Ghasemi",
+          "date": "۱۴۰۵/۰۳/۲۸",
+          "comments": []
+        },
+        {
+          "id": "art-4",
+          "title": "منوی جدید بوفه: پیتزا پپرونی مخصوص گیمرها",
+          "titleFa": "منوی جدید بوفه بازینو",
+          "titleEn": "New Cafe Menu for Gamers",
+          "titleRu": "Новое меню кафе для геймеров",
+          "titleTr": "Oyuncular İçin Yeni Kafe Menüsü",
+          "content": "منوی بوفه با پیتزا، برگر و نوشیدنی انرژی‌زا به‌روزرسانی شد و سفارش‌ها پشت سیستم تحویل می‌شوند.",
+          "contentFa": "منوی بوفه با پیتزا، برگر و نوشیدنی انرژی‌زا به‌روزرسانی شد و سفارش‌ها پشت سیستم تحویل می‌شوند.",
+          "contentEn": "The cafe menu now includes pizza, burgers, and energy drinks delivered right to your station.",
+          "contentRu": "В меню кафе теперь пицца, бургеры и энергетики с доставкой к игровому месту.",
+          "contentTr": "Kafe menüsünde artık pizza, burger ve enerji içecekleri oyun istasyonunuza teslim ediliyor.",
+          "category": "Cafe",
+          "imageUrl": "/images/home/pizza-800.webp",
+          "mobileImageUrl": "/images/home/pizza-400.webp",
+          "author": "آریا محمدی",
+          "authorFa": "آریا محمدی",
+          "authorEn": "Aria Mohammadi",
+          "authorRu": "Ария Мохаммади",
+          "authorTr": "Aria Mohammadi",
+          "date": "۱۴۰۵/۰۳/۱۵",
+          "comments": []
+        }
+      ]
+    },
+    "/api/app-sliders": {
+      "status": 200,
+      "sample": [
+        {
+          "id": "slide-1",
+          "imageUrl": "/images/home/esports-960.webp",
+          "mobileImageUrl": "/images/mobile/slide-esports.webp",
+          "target": "reserve",
+          "titleFa": "رزرو سیستم‌های گیمینگ فوق پیشرفته",
+          "titleEn": "Reserve High-End Gaming Rigs",
+          "titleRu": "Забронировать мощные игровые ПК",
+          "titleTr": "Son Teknoloji Oyun Bilgisayarlarını Rezerve Edin"
+        },
+        {
+          "id": "slide-2",
+          "imageUrl": "/images/home/pizza-960.webp",
+          "mobileImageUrl": "/images/mobile/slide-pizza.webp",
+          "target": "cafe",
+          "titleFa": "سفارش آنلاین انواع پیتزا و نوشیدنی انرژی‌زا",
+          "titleEn": "Order Pizza & Energy Drinks Online",
+          "titleRu": "Заказать пиццу и энергетики онлайн",
+          "titleTr": "Online Pizza ve Enerji İçeceği Sipariş Et"
+        },
+        {
+          "id": "slide-3",
+          "imageUrl": "/images/home/keyboard-960.webp",
+          "mobileImageUrl": "/images/mobile/slide-keyboard.webp",
+          "target": "shop",
+          "titleFa": "تجهیزات اورجینال گیمینگ با گارانتی کلوپ",
+          "titleEn": "Original Gaming Gear with Club Warranty",
+          "titleRu": "Оригинальные игровые девайсы с гарантией",
+          "titleTr": "Kulüp Garantili Orijinal Oyun Ekipmanları"
+        },
+        {
+          "id": "slide-4",
+          "imageUrl": "/images/home/rpg-openworld-960.webp",
+          "mobileImageUrl": "/images/mobile/slide-rpg-openworld.webp",
+          "target": "tournaments",
+          "titleFa": "ثبت‌نام در مسابقات با جوایز نقدی بزرگ",
+          "titleEn": "Join Tournaments with Big Cash Prizes",
+          "titleRu": "Участвуйте в турнирах с крупными призами",
+          "titleTr": "Büyük Nakit Ödüllü Turnuvalara Katılın"
+        }
+      ]
+    },
+    "/api/messages": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/chat/rooms": {
+      "status": 200,
+      "sample": [
+        "عمومی (General)",
+        "CS2",
+        "FIFA 26",
+        "Dota 2",
+        "Valorant"
+      ]
+    },
+    "/api/themes": {
+      "status": 200,
+      "sample": {
+        "themes": [
+          {
+            "id": "cyberpunk-cyan",
+            "name": "گیمینگ امپ (سرمه ای و فیروزه ای)",
+            "nameEn": "Gaming AMP (Navy & Cyan)",
+            "primaryColor": "#00d8ff",
+            "primaryHover": "#00b5d6",
+            "darkBg": "#11121a",
+            "darkCard": "#191a24",
+            "accentRed": "#ff3b30"
+          },
+          {
+            "id": "dark-gold",
+            "name": "طلایی ذغالی (کلاسیک قبلی)",
+            "nameEn": "Dark Gold (Classic)",
+            "primaryColor": "#ffb800",
+            "primaryHover": "#e09900",
+            "darkBg": "#07080a",
+            "darkCard": "#12141c",
+            "accentRed": "#ff3b30"
+          }
+        ],
+        "serverThemes": [],
+        "activeThemeId": "dark-gold"
+      }
+    },
+    "/api/coupons": {
+      "status": 200,
+      "sample": [
+        {
+          "code": "BAZINO10",
+          "type": "Percent",
+          "value": 10,
+          "minOrder": 300,
+          "expiry": "۳۰ روز دیگر",
+          "expiryDate": "2026-10-12T21:04:01.532Z",
+          "maxUsageCount": 100,
+          "usageCount": 12,
+          "isActive": true,
+          "ownerUsername": ""
+        },
+        {
+          "code": "VIPGOLD",
+          "type": "Percent",
+          "value": 15,
+          "minOrder": 600,
+          "expiry": "۱۵ روز دیگر",
+          "expiryDate": "2026-09-27T21:04:01.533Z",
+          "maxUsageCount": 50,
+          "usageCount": 4,
+          "isActive": true,
+          "ownerUsername": ""
+        },
+        {
+          "code": "REDBULL",
+          "type": "Fixed",
+          "value": 90,
+          "minOrder": 400,
+          "expiry": "۷ روز دیگر",
+          "expiryDate": "2026-09-19T21:04:01.533Z",
+          "maxUsageCount": 25,
+          "usageCount": 0,
+          "isActive": true,
+          "ownerUsername": ""
+        },
+        {
+          "code": "WELCOME",
+          "type": "Fixed",
+          "value": 100,
+          "minOrder": 500,
+          "expiry": "۶۰ روز دیگر",
+          "expiryDate": "2026-11-11T21:04:01.533Z",
+          "maxUsageCount": 200,
+          "usageCount": 31,
+          "isActive": true,
+          "ownerUsername": ""
+        }
+      ]
+    },
+    "/api/settings": {
+      "status": 200,
+      "sample": {
+        "club_phone": "+90 539 133 37 47",
+        "club_map_url": "https://maps.app.goo.gl/rUohkLWxSmpBTjsKA",
+        "club_map_lat": "35.2628",
+        "club_map_lng": "33.9084",
+        "club_hours": "۲۴ ساعته شبانه‌روز (۷ روز هفته)",
+        "club_address": "Derviş İzzigil Sokak No.12, İskele adresinde kain Vista Mare Ana Lobi dükkan No.5 olarak tasniflendirilmiş dükkan",
+        "company_legal_name": "Bazino Gaming Lounge",
+        "company_tax_no": "",
+        "company_registration_no": "",
+        "company_email": "info@bazino.club",
+        "company_landline": "",
+        "company_country": "KKTC",
+        "chat_enabled": "false",
+        "food_coming_soon": "true",
+        "shop_coming_soon": "true",
+        "extra_controller_hourly": "25",
+        "gaming_credits_per_hour": "100",
+        "extra_controller_credits_per_hour": "20",
+        "social_media_links": "[{\"id\":\"1\",\"name\":\"اینستاگرام کلوپ\",\"platform\":\"instagram\",\"url\":\"https://instagram.com/bazino\"},{\"id\":\"2\",\"name\":\"کانال تلگرام\",\"platform\":\"telegram\",\"url\":\"https://t.me/bazino\"},{\"id\":\"3\",\"name\":\"یوتیوب کلوپ\",\"platform\":\"youtube\",\"url\":\"https://youtube.com/bazino\"}]",
+        "activeThemeId": "dark-gold",
+        "affiliate_new_pct": "10",
+        "affiliate_return_pct": "5",
+        "affiliate_tournament_pct": "10",
+        "affiliate_override_pct": "0",
+        "affiliate_window_days": "30",
+        "wallet_cashout_min_tl": "0",
+        "affiliate_excluded_roles": "admin",
+        "affiliate_program_open": "1",
+        "data_source": "sample"
+      }
+    },
+    "/api/admin/tickets": {
+      "status": 200,
+      "sample": {
+        "success": true,
+        "tickets": [],
+        "openCount": 0
+      }
+    },
+    "/api/admin/db-logs": {
+      "status": 200,
+      "sample": {
+        "logs": [
+          {
+            "id": "log-uhu76oy",
+            "provider": "SQLite",
+            "type": "SYSTEM",
+            "command": "Minimal database initialized with Admin user (password hashed with bcrypt).",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-q1lx4xy",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "CREATE TABLE IF NOT EXISTS ... (17 tables verified)",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-c3leee5",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE shop_orders ADD COLUMN username",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-wgkvwwi",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE cafe_orders ADD COLUMN username",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-u367gfe",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN walletBalance",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-wgi91xv",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN createdAt",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-xr5g6di",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN hasPassword",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-0of1xso",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN phoneVerifiedAt",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-79hep5d",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN birthDate",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-1wi4niw",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN city",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-cizdc92",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN gamerTag",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-sytpxzd",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN bio",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-7gy7kt6",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN avatarUrl",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-x7cao80",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE users ADD COLUMN displayName",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-w0hw2om",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE active_coupons ADD COLUMN scopes",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-0tgexve",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE active_coupons ADD COLUMN ownerUsername",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-sa18sea",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "ALTER TABLE transactions ADD COLUMN username",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-nhz64pt",
+            "provider": "SQLite",
+            "type": "SQL",
+            "command": "CREATE TABLE IF NOT EXISTS ... (17 tables verified)",
+            "timestamp": "21:04:01"
+          },
+          {
+            "id": "log-2aylri8",
+            "provider": "SQLite",
+            "type": "SYSTEM",
+            "command": "Connected to SQLite file: /home/user/preview-run/bazino.sqlite3",
+            "timestamp": "21:04:01"
+          }
+        ]
+      }
+    },
+    "/api/admin/affiliates": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/admin/affiliates/report": {
+      "status": 200,
+      "sample": {
+        "totals": {
+          "walletCredited": 0,
+          "clicks": 0,
+          "leads": 0,
+          "reserved": 0,
+          "paid": 0,
+          "attended": 0,
+          "netSales": 0,
+          "pending": 0,
+          "approved": 0,
+          "paidOut": 0,
+          "reversed": 0,
+          "rejected": 0,
+          "commissionCost": 0
+        },
+        "affiliates": [],
+        "since": null
+      }
+    },
+    "/api/admin/affiliate-settings": {
+      "status": 200,
+      "sample": {
+        "affiliate_new_pct": "10",
+        "affiliate_return_pct": "5",
+        "affiliate_tournament_pct": "10",
+        "affiliate_override_pct": "0",
+        "affiliate_window_days": "30",
+        "wallet_cashout_min_tl": "0",
+        "affiliate_excluded_roles": "admin",
+        "affiliate_program_open": "1"
+      }
+    },
+    "/api/admin/ig-campaign": {
+      "status": 200,
+      "sample": {
+        "settings": {
+          "ig_campaign_ids": "SQUAD26",
+          "ig_campaign_keyword": "SQUAD",
+          "ig_program_open": "1",
+          "ig_invite_base_url": "https://bazino.pro",
+          "ig_friend_coupon_type": "percent",
+          "ig_friend_coupon_value": "0",
+          "ig_msg_lang": "tr",
+          "ig_msg_partner1_tr": "Bazino Pro davet kampanyasına katılmak için @bazinopro sayfasını takip et ve «{{follow_button}}» düğmesine bas.\n\nSonraki mesajda sana özel kod ve arkadaşın için hazır metin gelir. O mesajı olduğu gibi arkadaşınla paylaş; sana gönderilen Bazino gönderisini de paylaş.\n\nInstagram şifreni asla istemeyiz. Rezervasyon ve koşullar: bazino.pro",
+          "ig_msg_partner1_fa": "برای شرکت در طرح دعوت بازینو، پیج @bazinopro را Follow کن و روی دکمهٔ «{{follow_button}}» بزن.\n\nپیام بعدی کد شناسایی اختصاصی تو و متن آماده برای دوستت را دارد. همان پیام را بدون تغییر برای دوستت بفرست و پستی که برایت فرستاده شده را هم Share کن.\n\nرمز اینستاگرام را هرگز نمی‌خواهیم. رزرو و شرایط: bazino.pro",
+          "ig_msg_partner1_en": "To join the Bazino Pro invite campaign, follow @bazinopro and tap «{{follow_button}}».\n\nThe next message will include your unique code and a ready-made text for your friend. Send that message unchanged and share the Bazino post that was sent to you.\n\nWe never ask for your Instagram password. Booking details: bazino.pro",
+          "ig_msg_partner1_ru": "Чтобы участвовать в кампании Bazino Pro, подпишись на @bazinopro и нажми «{{follow_button}}».\n\nСледующее сообщение будет с твоим уникальным кодом и готовым текстом для друга. Перешли его без изменений и поделись постом Bazino, который тебе отправили.\n\nПароль Instagram мы никогда не просим. Бронь: bazino.pro",
+          "ig_msg_partner2_tr": "Özel kodun: {{code}}\n\nBu metni değiştirmeden arkadaşınla paylaş ve sana gönderdiğim Bazino gönderisini de paylaş:\n\n«Bazino davet linki ve kuponu için {{code}} sayısını, sana gönderdiğim Bazino gönderisinin altına yorum yaz. @bazinopro sayfasını takip et ve «{{follow_button}}» düğmesine bas.»",
+          "ig_msg_partner2_fa": "کد شناسایی اختصاصی تو: {{code}}\n\nاین متن را بدون تغییر برای دوستت بفرست و پستی که برایت فرستادم را هم Share کن:\n\n«برای دریافت لینک دعوت و کوپن بازینو، عدد {{code}} را زیر پستی که برایت فرستاده‌ام کامنت کن، پیج @bazinopro را Follow کن و روی «{{follow_button}}» بزن.»",
+          "ig_msg_partner2_en": "Your unique code: {{code}}\n\nSend this text unchanged to your friend and share the Bazino post I sent you:\n\n«To get the Bazino invite link and coupon, comment {{code}} under the Bazino post I sent you, follow @bazinopro and tap «{{follow_button}}».»",
+          "ig_msg_partner2_ru": "Твой код: {{code}}\n\nОтправь этот текст другу без изменений и поделись постом Bazino:\n\n«Чтобы получить ссылку и купон Bazino, напиши {{code}} комментарием под постом, который я тебе отправил, подпишись на @bazinopro и нажми «{{follow_button}}».»",
+          "ig_msg_friend_tr": "Kodun alındı. @bazinopro sayfasını takip et ve «{{follow_button}}» düğmesine bas; davet linkin ve kupon koşulları gelecek.\n\nBu yorum, kampanyada gönderiyi aldığının ve paylaştığının pratik kaydıdır. Resmi rezervasyon: bazino.pro",
+          "ig_msg_friend_fa": "کد دعوتت دریافت شد. پیج @bazinopro را Follow کن و روی «{{follow_button}}» بزن تا لینک دعوت و شرایط کوپن برایت ارسال شود.\n\nکامنت کد تو زیر پست بازینو در این کمپین به‌عنوان تأیید عملی دریافت پست و Share ثبت شد. جزئیات رزرو: bazino.pro",
+          "ig_msg_friend_en": "Your invite code was received. Follow @bazinopro and tap «{{follow_button}}» so we can send your invite link and coupon terms.\n\nCommenting the code under the Bazino post is this campaign’s practical proof that the post reached you. Official booking: bazino.pro",
+          "ig_msg_friend_ru": "Код получен. Подпишись на @bazinopro и нажми «{{follow_button}}» — пришлём ссылку и условия купона.\n\nЭтот комментарий в кампании считается практическим подтверждением, что пост до тебя дошёл. Бронь: bazino.pro",
+          "ig_msg_invite_tr": "Davet linkin hazır:\n{{invite_url}}\n{{coupon_line}}\nRezervasyon ve turnuva koşulları sadece bazino.pro üzerindedir.",
+          "ig_msg_invite_fa": "لینک دعوتت آماده است:\n{{invite_url}}\n{{coupon_line}}\nشرایط رزرو و تورنمنت فقط در bazino.pro است.",
+          "ig_msg_invite_en": "Your invite link is ready:\n{{invite_url}}\n{{coupon_line}}\nBooking and tournament rules live only on bazino.pro.",
+          "ig_msg_invite_ru": "Ссылка готова:\n{{invite_url}}\n{{coupon_line}}\nУсловия брони только на bazino.pro.",
+          "ig_btn_follow_tr": "Takip ediyorum",
+          "ig_btn_follow_fa": "فالو دارم",
+          "ig_btn_follow_en": "I follow",
+          "ig_btn_follow_ru": "Я подписан",
+          "ig_ingest_token": "2a0dfb5c0cfd168b482f9fb83ac966076d93a332092d285b66d8a5f604a87038"
+        },
+        "media": [],
+        "members": [],
+        "zernioConfigured": false,
+        "ingestPath": "/api/integrations/instagram/published-media"
+      }
+    },
+    "/api/admin/appetize/status": {
+      "status": 200,
+      "sample": {
+        "configured": false,
+        "tokenHint": "",
+        "app": null,
+        "apkAvailable": false,
+        "apkSize": 0
+      }
+    },
+    "/api/management/me": {
+      "status": 200,
+      "sample": {
+        "staff": {
+          "username": "admin",
+          "displayName": "admin",
+          "admin": true,
+          "permissions": [
+            "reservations",
+            "orders",
+            "collect",
+            "wallet",
+            "cashout",
+            "affiliates",
+            "promotions",
+            "content",
+            "publish",
+            "tournaments",
+            "reports",
+            "configure"
+          ]
+        },
+        "timezone": "Asia/Famagusta",
+        "provider": "SQLite",
+        "serverTime": "2026-09-12T21:04:27.342Z",
+        "posMode": "manual"
+      }
+    },
+    "/api/management/bootstrap": {
+      "status": 200,
+      "sample": {
+        "staff": {
+          "username": "admin",
+          "displayName": "admin",
+          "admin": true,
+          "permissions": [
+            "reservations",
+            "orders",
+            "collect",
+            "wallet",
+            "cashout",
+            "affiliates",
+            "promotions",
+            "content",
+            "publish",
+            "tournaments",
+            "reports",
+            "configure"
+          ]
+        },
+        "stations": [],
+        "systems": [
+          {
+            "id": "s1",
+            "name": "سیستم شماره ۱ (VIP PC)",
+            "nameFa": "سیستم شماره ۱ (VIP PC)",
+            "nameEn": "System #1 (VIP PC)",
+            "nameRu": "Система №1 (VIP PC)",
+            "nameTr": "Sistem No.1 (VIP PC)",
+            "type": "PC",
+            "hourlyRate": 150,
+            "isActive": true,
+            "isReserved": false,
+            "audience": "adults"
+          },
+          {
+            "id": "s2",
+            "name": "سیستم شماره ۲ (VIP PC)",
+            "nameFa": "سیستم شماره ۲ (VIP PC)",
+            "nameEn": "System #2 (VIP PC)",
+            "nameRu": "Система №2 (VIP PC)",
+            "nameTr": "Sistem No.2 (VIP PC)",
+            "type": "PC",
+            "hourlyRate": 150,
+            "isActive": true,
+            "isReserved": true,
+            "audience": "adults"
+          },
+          {
+            "id": "s3",
+            "name": "سیستم شماره ۳ (Standard)",
+            "nameFa": "سیستم شماره ۳ (Standard)",
+            "nameEn": "System #3 (Standard)",
+            "nameRu": "Система №3 (Standard)",
+            "nameTr": "Sistem No.3 (Standard)",
+            "type": "PC",
+            "hourlyRate": 100,
+            "isActive": true,
+            "isReserved": false,
+            "audience": "kids"
+          },
+          {
+            "id": "s4",
+            "name": "سیستم شماره ۴ (Standard)",
+            "nameFa": "سیستم شماره ۴ (Standard)",
+            "nameEn": "System #4 (Standard)",
+            "nameRu": "Система №4 (Standard)",
+            "nameTr": "Sistem No.4 (Standard)",
+            "type": "PC",
+            "hourlyRate": 100,
+            "isActive": true,
+            "isReserved": false,
+            "audience": "kids"
+          },
+          {
+            "id": "s5",
+            "name": "کنسول پلی‌استیشن ۵ (VIP Booth)",
+            "nameFa": "کنسول پلی‌استیشن ۵ (VIP Booth)",
+            "nameEn": "PlayStation 5 Console (VIP Booth)",
+            "nameRu": "Консоль PlayStation 5 (VIP-кабина)",
+            "nameTr": "PlayStation 5 Konsolu (VIP Kabin)",
+            "type": "PS5",
+            "hourlyRate": 200,
+            "isActive": true,
+            "isReserved": true
+          }
+        ],
+        "timezone": "Asia/Famagusta",
+        "serverTime": "2026-09-12T21:04:27.344Z"
+      }
+    },
+    "/api/management/floor": {
+      "status": 200,
+      "sample": {
+        "stations": [],
+        "reservations": [],
+        "sessions": [],
+        "timezone": "Asia/Famagusta",
+        "serverTime": "2026-09-12T21:04:27.348Z"
+      }
+    },
+    "/api/management/reservations": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/orders": {
+      "status": 400,
+      "sample": {
+        "error": "INVALID_KIND",
+        "message": "INVALID_KIND"
+      }
+    },
+    "/api/management/onsite-orders": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/cashouts": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/customers": {
+      "status": 200,
+      "sample": [
+        {
+          "username": "admin",
+          "displayName": "admin",
+          "phone": "09123456780",
+          "balance": 0,
+          "stats": {}
+        }
+      ]
+    },
+    "/api/management/receipts": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/reports": {
+      "status": 200,
+      "sample": {
+        "from": "2026-09-13",
+        "to": "2026-09-13",
+        "timezone": "Asia/Famagusta",
+        "currency": "TRY",
+        "receipts": [],
+        "byKind": {
+          "reservation": 0,
+          "tournament": 0,
+          "cafe": 0,
+          "shop": 0,
+          "session": 0
+        },
+        "grossSales": 0,
+        "returns": 0,
+        "netSales": 0,
+        "cashIn": 0,
+        "posIn": 0,
+        "cashOut": 0,
+        "walletAvailable": 0,
+        "pendingCashouts": 0,
+        "customerLiability": 0
+      }
+    },
+    "/api/management/settlements": {
+      "status": 404,
+      "sample": ""
+    },
+    "/api/management/coupons": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/special-hours": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/content": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/tournaments": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/messaging/audience": {
+      "status": 200,
+      "sample": {
+        "count": 1,
+        "sample": [
+          "091***80"
+        ]
+      }
+    },
+    "/api/management/messaging/campaigns": {
+      "status": 200,
+      "sample": []
+    },
+    "/api/management/jarvis/state": {
+      "status": 200,
+      "sample": {
+        "configured": false,
+        "config": {
+          "apiKey": "",
+          "model": "openai/gpt-oss-120b",
+          "lightModel": "openai/gpt-oss-20b",
+          "dailyCallCap": 800,
+          "backup": {
+            "openrouter": {
+              "enabled": false,
+              "apiKey": "",
+              "model": "google/gemma-4-31b-it:free",
+              "dailyCallCap": 50
+            },
+            "openai": {
+              "enabled": false,
+              "apiKey": "",
+              "model": "gpt-4o-mini",
+              "dailyCallCap": 200
+            }
+          },
+          "automation": {
+            "dailyBrief": true,
+            "weeklyDigest": true,
+            "igReplies": false,
+            "chatFaq": false,
+            "faqAutoSend": false
+          }
+        },
+        "freeModels": [
+          {
+            "id": "openai/gpt-oss-120b",
+            "label": "GPT-OSS 120B",
+            "note": "پیشنهادی — قوی، رایگان، فراخوانی ابزار (تست‌شده)"
+          },
+          {
+            "id": "openai/gpt-oss-20b",
+            "label": "GPT-OSS 20B",
+            "note": "سبک و سریع — مناسب مدل جانشین"
+          },
+          {
+            "id": "qwen/qwen3.6-27b",
+            "label": "Qwen3.6 27B",
+            "note": "رایگان، فراخوانی ابزار (تست‌شده)"
+          },
+          {
+            "id": "qwen/qwen3.8-27b",
+            "label": "Qwen3.8 27B",
+            "note": "رایگان — جدیدتر از 3.6"
+          }
+        ],
+        "providers": {
+          "groq": {
+            "id": "groq",
+            "label": "Groq",
+            "role": "primary",
+            "configured": false,
+            "model": "openai/gpt-oss-120b",
+            "usageToday": 0,
+            "cap": 800
+          },
+          "openrouter": {
+            "id": "openrouter",
+            "label": "OpenRouter",
+            "role": "backup",
+            "configured": false,
+            "enabled": false,
+            "model": "google/gemma-4-31b-it:free",
+            "usageToday": 0,
+            "cap": 50
+          },
+          "openai": {
+            "id": "openai",
+            "label": "OpenAI",
+            "role": "backup",
+            "configured": false,
+            "enabled": false,
+            "model": "gpt-4o-mini",
+            "usageToday": 0,
+            "cap": 200
+          }
+        },
+        "suggestedModels": {
+          "groq": [
+            {
+              "id": "openai/gpt-oss-120b",
+              "label": "GPT-OSS 120B",
+              "note": "پیشنهادی — قوی، رایگان، فراخوانی ابزار (تست‌شده)"
+            },
+            {
+              "id": "openai/gpt-oss-20b",
+              "label": "GPT-OSS 20B",
+              "note": "سبک و سریع — مناسب مدل جانشین"
+            },
+            {
+              "id": "qwen/qwen3.6-27b",
+              "label": "Qwen3.6 27B",
+              "note": "رایگان، فراخوانی ابزار (تست‌شده)"
+            },
+            {
+              "id": "qwen/qwen3.8-27b",
+              "label": "Qwen3.8 27B",
+              "note": "رایگان — جدیدتر از 3.6"
+            }
+          ],
+          "openrouter": [
+            {
+              "id": "google/gemma-4-31b-it:free",
+              "label": "Gemma 4 31B (free)",
+              "note": "پیشنهادی — عمومی، رایگان، فراخوانی ابزار (تست‌شده)"
+            },
+            {
+              "id": "nvidia/nemotron-3-super-120b-a12b:free",
+              "label": "Nemotron 3 Super 120B (free)",
+              "note": "رایگان، قوی"
+            },
+            {
+              "id": "google/gemma-4-26b-a4b-it:free",
+              "label": "Gemma 4 26B (free)",
+              "note": "رایگان، سبک‌تر"
+            },
+            {
+              "id": "nvidia/nemotron-3.5-lightning:free",
+              "label": "Nemotron 3.5 Lightning (free)",
+              "note": "رایگان، سریع"
+            },
+            {
+              "id": "thinkingmachines/inkling:free",
+              "label": "Inkling (free)",
+              "note": "رایگان"
+            }
+          ],
+          "openai": [
+            {
+              "id": "gpt-4o-mini",
+              "label": "GPT-4o mini",
+              "note": "پیشنهادی — ارزان ($0.15/$0.60 per 1M)، فراخوانی ابزار کامل"
+            },
+            {
+              "id": "gpt-4.1-nano",
+              "label": "GPT-4.1 nano",
+              "note": "ارزان‌ترین ($0.10/$0.40)"
+            },
+            {
+              "id": "gpt-4.1-mini",
+              "label": "GPT-4.1 mini",
+              "note": "قوی‌تر ($0.40/$1.60)"
+            },
+            {
+              "id": "gpt-5-mini",
+              "label": "GPT-5 mini",
+              "note": "متعادل ($0.25/$2.00)"
+            }
+          ]
+        },
+        "usage": {
+          "today": 0,
+          "cap": 800
+        },
+        "pendingApprovals": 0,
+        "skills": [
+          {
+            "id": "portal_stats",
+            "title": "آمار کلی پورتال",
+            "description": "Counts of users, systems (free/reserved), open tickets, unread user messages, today reservations, menu/shop/tournament/article counts.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": true
+          },
+          {
+            "id": "portal_health",
+            "title": "سلامت/عملکرد پورتال",
+            "description": "Live portal health snapshot: publishing/Zernio queue, Telegram gateway reachability, DB latency, memory, uptime and active alerts.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": true
+          },
+          {
+            "id": "list_reservations",
+            "title": "رزروها",
+            "description": "Recent reservation logs (date, user, system, status).",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "limit": {
+                  "type": "number",
+                  "description": "Max rows (default 15, max 50)"
+                }
+              },
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "search_user",
+            "title": "جستجوی کاربر",
+            "description": "Find portal users by username/displayName/phone substring.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Search text (username, name or phone)"
+                }
+              },
+              "required": [
+                "query"
+              ]
+            },
+            "support": true
+          },
+          {
+            "id": "user_details",
+            "title": "جزئیات کاربر",
+            "description": "Wallet credits, loyalty points and recent transactions of one user.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "description": "Exact username"
+                }
+              },
+              "required": [
+                "username"
+              ]
+            },
+            "support": true
+          },
+          {
+            "id": "list_tickets",
+            "title": "تیکت‌های پشتیبانی",
+            "description": "Support tickets with status filter (open/answered/closed).",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "description": "Filter by status, e.g. 'open'"
+                }
+              },
+              "required": []
+            },
+            "support": true
+          },
+          {
+            "id": "ticket_details",
+            "title": "جزئیات تیکت",
+            "description": "Full message thread of one support ticket.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "ticketId": {
+                  "type": "string",
+                  "description": "Ticket id"
+                }
+              },
+              "required": [
+                "ticketId"
+              ]
+            },
+            "support": true
+          },
+          {
+            "id": "list_user_messages",
+            "title": "پیام‌های کاربران",
+            "description": "Inbox messages users received from the management (optionally only unread).",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "unreadOnly": {
+                  "type": "boolean",
+                  "description": "Only unread"
+                }
+              },
+              "required": []
+            },
+            "support": true
+          },
+          {
+            "id": "list_cafe_menu",
+            "title": "منوی کافه",
+            "description": "Cafe items with price, inventory and availability.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "list_shop_items",
+            "title": "کالاهای فروشگاه",
+            "description": "Shop accessories with price and stock.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "list_tournaments",
+            "title": "تورنمنت‌ها",
+            "description": "Tournaments with date, prize and status.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "list_coupons",
+            "title": "کوپن‌ها",
+            "description": "Active coupons with value and expiry.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "list_transactions",
+            "title": "تراکنش‌ها",
+            "description": "Recent wallet/credit transactions.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "limit": {
+                  "type": "number",
+                  "description": "Max rows (default 15)"
+                }
+              },
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "list_articles",
+            "title": "مقاله‌های بلاگ",
+            "description": "Blog articles with title and date.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "ig_inbox_summary",
+            "title": "صندوق دایرکت اینستاگرام",
+            "description": "Recent inbound Instagram DMs with language, reply status and reason.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": true
+          },
+          {
+            "id": "publishing_report",
+            "title": "گزارش انتشار و صف",
+            "description": "Publishing inbox/outbox queue health, campaign members and campaigns.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "content_list",
+            "title": "محتواهای پیش‌نویس/انتشار",
+            "description": "Content pipeline items (draft/review/scheduled/published).",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "audit_recent",
+            "title": "آخرین رویدادهای ممیزی",
+            "description": "Recent audit log entries (actor, action, target).",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": false
+          },
+          {
+            "id": "away_status",
+            "title": "وضعیت پاسخ خودکار غیبت",
+            "description": "Instagram away auto-reply settings and whether it is active right now.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "support": true
+          },
+          {
+            "id": "chat_rooms",
+            "title": "اتاق‌های چت",
+            "description": "Chat room names and recent messages of one room.",
+            "risk": "read",
+            "params": {
+              "type": "object",
+              "properties": {
+                "room": {
+                  "type": "string",
+                  "description": "Room name (optional; without it lists rooms)"
+                }
+              },
+              "required": []
+            },
+            "support": true
+          },
+          {
+            "id": "send_user_message",
+            "title": "ارسال پیام به کاربر",
+            "description": "Send an inbox message/notification from the management to one portal user.",
+            "risk": "write",
+            "params": {
+              "type": "object",
+              "properties": {
+                "recipient": {
+                  "type": "string",
+                  "description": "Username"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Message title"
+                },
+                "body": {
+                  "type": "string",
+                  "description": "Message body"
+                },
+                "notification": {
+                  "type": "boolean",
+                  "description": "Send as notification"
+                }
+              },
+              "required": [
+                "recipient",
+                "title",
+                "body"
+              ]
+            },
+            "support": true
+          },
+          {
+            "id": "create_content_draft",
+            "title": "ساخت پیش‌نویس محتوا",
+            "description": "Create a blog content DRAFT (never publishes; admin approves in Content & Publish Queue).",
+            "risk": "write",
+            "params": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Draft title"
+                },
+                "body": {
+                  "type": "string",
+                  "description": "Blog body text"
+                },
+                "language": {
+                  "type": "string",
+                  "description": "fa|en|tr|ru"
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category (default Instagram)"
+                },
+                "idempotencyKey": {
+                  "type": "string",
+                  "description": "Unique key"
+                }
+              },
+              "required": [
+                "title",
+                "body"
+              ]
+            },
+            "support": false
+          },
+          {
+            "id": "adjust_credits",
+            "title": "شارژ/کسر کردیت",
+            "description": "Add or subtract Bazino credits (BC) of a user. Mirrors /api/admin/credits/adjust.",
+            "risk": "sensitive",
+            "params": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "description": "Username"
+                },
+                "delta": {
+                  "type": "number",
+                  "description": "Non-zero integer, positive=charge negative=deduct"
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Reason note"
+                }
+              },
+              "required": [
+                "username",
+                "delta"
+              ]
+            },
+            "support": false
+          },
+          {
+            "id": "update_cafe_item",
+            "title": "ویرایش آیتم کافه",
+            "description": "Update price, inventory or availability of a cafe item.",
+            "risk": "sensitive",
+            "params": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Cafe item id"
+                },
+                "price": {
+                  "type": "number",
+                  "description": "New price (TL)"
+                },
+                "inventory": {
+                  "type": "number",
+                  "description": "New stock count"
+                },
+                "isAvailable": {
+                  "type": "boolean",
+                  "description": "Available on/off"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "support": false
+          },
+          {
+            "id": "create_coupon",
+            "title": "ساخت کوپن تخفیف",
+            "description": "Create a discount coupon via the promotions service.",
+            "risk": "sensitive",
+            "params": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "Coupon code"
+                },
+                "percent": {
+                  "type": "number",
+                  "description": "Percent discount 1-100"
+                },
+                "amount": {
+                  "type": "number",
+                  "description": "Fixed amount discount (TL)"
+                },
+                "minAmount": {
+                  "type": "number",
+                  "description": "Minimum order amount"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "description": "ISO date"
+                }
+              },
+              "required": [
+                "code"
+              ]
+            },
+            "support": false
+          },
+          {
+            "id": "answer_ticket",
+            "title": "پاسخ تیکت",
+            "description": "Post a staff reply on a support ticket and mark it answered.",
+            "risk": "sensitive",
+            "params": {
+              "type": "object",
+              "properties": {
+                "ticketId": {
+                  "type": "string",
+                  "description": "Ticket id"
+                },
+                "body": {
+                  "type": "string",
+                  "description": "Reply text"
+                }
+              },
+              "required": [
+                "ticketId",
+                "body"
+              ]
+            },
+            "support": true
+          },
+          {
+            "id": "ig_away_toggle",
+            "title": "روشن/خاموش کردن پاسخ غیبت",
+            "description": "Enable/disable the Instagram away auto-reply and optionally change its window hours.",
+            "risk": "sensitive",
+            "params": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "On/off"
+                },
+                "startHour": {
+                  "type": "number",
+                  "description": "Start hour 0-23"
+                },
+                "endHour": {
+                  "type": "number",
+                  "description": "End hour 0-23"
+                }
+              },
+              "required": [
+                "enabled"
+              ]
+            },
+            "support": false
+          },
+          {
+            "id": "publish_content",
+            "title": "انتشار محتوای تأییدشده",
+            "description": "Approve and publish-now a content item that already has a version (blog destination).",
+            "risk": "sensitive",
+            "params": {
+              "type": "object",
+              "properties": {
+                "contentId": {
+                  "type": "string",
+                  "description": "Content id"
+                },
+                "version": {
+                  "type": "number",
+                  "description": "Current version number"
+                }
+              },
+              "required": [
+                "contentId"
+              ]
+            },
+            "support": false
+          },
+          {
+            "id": "send_ig_reply",
+            "title": "ارسال دایرکت اینستاگرام",
+            "description": "Send a DM reply in an Instagram conversation through the durable outbox (stage jarvis_reply).",
+            "risk": "sensitive",
+            "params": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "type": "string",
+                  "description": "Conversation id"
+                },
+                "authorId": {
+                  "type": "string",
+                  "description": "Recipient user id"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Message text"
+                },
+                "accountId": {
+                  "type": "string",
+                  "description": "Zernio account id (optional)"
+                },
+                "username": {
+                  "type": "string",
+                  "description": "Username (optional)"
+                }
+              },
+              "required": [
+                "conversationId",
+                "authorId",
+                "text"
+              ]
+            },
+            "support": true
+          }
+        ],
+        "incidents": [],
+        "monitor": null,
+        "briefsCount": 0
+      }
+    },
+    "/api/management/jarvis/sessions": {
+      "status": 200,
+      "sample": {
+        "sessions": []
+      }
+    },
+    "/api/management/jarvis/approvals": {
+      "status": 200,
+      "sample": {
+        "items": []
+      }
+    },
+    "/api/management/publishing/reports": {
+      "status": 200,
+      "sample": {
+        "campaigns": [
+          {
+            "id": "SQUAD26",
+            "name": "Invite Your Squad",
+            "partners": 0,
+            "friends": 0,
+            "verifiedFollows": 0,
+            "buttonOnly": 0,
+            "sent": 0,
+            "failed": 0,
+            "clicks": 0,
+            "leads": 0,
+            "reserved": 0,
+            "paid": 0,
+            "attended": 0,
+            "netSales": 0,
+            "pending": 0,
+            "approved": 0,
+            "walletCredited": 0,
+            "reversed": 0,
+            "insights": null,
+            "payoutsAreWalletCredits": true
+          }
+        ],
+        "financial": {
+          "walletCredited": 0,
+          "physicalHandoverTotal": 0,
+          "physicalHandoverIsAllWallets": true
+        }
+      }
+    },
+    "/api/management/publishing/campaigns": {
+      "status": 200,
+      "sample": [
+        {
+          "kind": "pub-campaign",
+          "id": "SQUAD26",
+          "version": 1,
+          "data": {
+            "name": "Invite Your Squad",
+            "active": false,
+            "accountId": "",
+            "languages": [
+              "tr",
+              "fa",
+              "en",
+              "ru"
+            ],
+            "keywords": {
+              "fa": "آماده",
+              "tr": "Hazır",
+              "en": "Ready",
+              "ru": "Готово"
+            },
+            "requireVerifiedFollow": false,
+            "requireLikeAttestation": true,
+            "couponEnabled": false,
+            "couponValue": 0,
+            "couponType": "percent",
+            "couponDays": 30,
+            "couponMinOrder": 0,
+            "financialApproved": false,
+            "newCustomerOnly": true,
+            "commissionPct": 0,
+            "refundDays": 0,
+            "attributionDays": 30,
+            "payoutMin": 0,
+            "responsible": "",
+            "messages": {
+              "fa": {
+                "partner1": "برای شرکت در طرح دعوت بازینو، پیج @bazinopro را Follow کن و روی دکمهٔ «فالو دارم» بزن. بعد از این مرحله، یک پیام دوم برایت ارسال میشود که شامل کد شناسایی اختصاصی تو و متن آمادهٔ دعوت است. آن پیام را عیناً برای دوستت بفرست و این پست را نیز برای دوستت Share کن. دوستت باید عدد داخل پیام را زیر همان پست کامنت کند و پیج بازینو را Follow کند تا لینک دعوتبرایش ارسال و کوپن تخفیف برایش فعال شود. ما رمز عبور اینستاگرام را نمیخواهیم.",
+                "partner2": "این کد: [عدد یکتا] را زیر پستی که برایت فرستادم کامنت کن و پیج @bazinopro را Follow کن. این پیام را عیناً برای دوستت بفرست و پست بازی‌نو را نیز برای او Share کن. دوستت باید عدد داخل پیام را زیر همان پست کامنت کند و پیج @bazinopro را Follow کند تا لینک دعوت و کوپن تخفیف برای او فعال شود. ممنون میشوم اگر این کار را برایم انجام بدهی.",
+                "friend": "کد دعوتت دریافت شد. پیج @bazinopro را Follow کن و روی «فالو دارم» بزن. کامنت این کد، شاهد عملی رسیدن پست در این کمپین است؛ نه تأیید رسمی Share فردی.",
+                "invite": "لینک دعوت خصوصی شما:\n{{invite_url}}\nبرای مشاهدهٔ شرایط و فعال‌سازی کوپن، وارد سایت شوید و رضایت و شرط‌های نمایش‌داده‌شده را تکمیل کنید.",
+                "button": "فالو دارم"
+              },
+              "tr": {
+                "partner1": "Bazino davet kampanyasına katılmak için @bazinopro sayfasını Follow et ve “Takip ettim” butonuna dokun. Bu adımdan sonra sana özel kimlik kodunu ve arkadaşına gönderebileceğin hazır mesajı içeren ikinci bir mesaj gönderilecek. Bu mesajı olduğu gibi arkadaşına gönder ve bu gönderiyi de arkadaşınla Share et. Arkadaşın mesajdaki numarayı aynı gönderinin altına yorumlamalı ve Bazino sayfasını Follow etmelidir; ardından davet bağlantısı gönderilecek ve indirim kuponu onun için etkinleştirilecektir. Instagram şifreni istemiyoruz.",
+                "partner2": "Bu kodu: [benzersiz numara], sana gönderdiğim gönderinin altına yorumla ve @bazinopro sayfasını Follow et. Bu mesajı olduğu gibi arkadaşına gönder ve Bazino gönderisini de onunla Share et. Arkadaşın bu numarayı aynı gönderinin altına yorumlamalı ve @bazinopro sayfasını Follow etmelidir; davet bağlantısı ve indirim kuponu yalnızca arkadaşına gönderilecektir. Bunu benim için yaparsan çok memnun olurum.",
+                "friend": "Kod alındı. @bazinopro sayfasını takip et ve «Takip ettim» düğmesine bas. Bu yorum kampanyanın dolaylı paylaşım kanıtıdır.",
+                "invite": "Özel davet bağlantın:\n{{invite_url}}\nKoşulları görmek ve kuponu etkinleştirmek için giriş yapıp onay adımlarını tamamla.",
+                "button": "Takip ettim"
+              },
+              "en": {
+                "partner1": "To join Bazino’s invitation campaign, Follow @bazinopro and tap the “I followed” button. After this step, you will receive a second message containing your unique identification code and a ready-to-send invitation message. Send that message to your friend exactly as written and Share this post with your friend. Your friend must comment the number in the message under the same post and Follow Bazino; then an invitation link will be sent and the discount coupon will be activated for them. We do not need your Instagram password.",
+                "partner2": "Comment this code: [unique number] under the post I sent you and Follow @bazinopro. Send this message to your friend exactly as written and Share the Bazino post with them. Your friend must comment this number under the same post and Follow @bazinopro; the invitation link and discount coupon will be sent only to your friend. I would really appreciate it if you could do this for me.",
+                "friend": "Code received. Follow @bazinopro and tap “I followed”. Your comment is indirect campaign evidence of receiving the post, not individual Share verification.",
+                "invite": "Your private invitation:\n{{invite_url}}\nSign in and complete the displayed consent and conditions to activate an eligible coupon.",
+                "button": "I followed"
+              },
+              "ru": {
+                "partner1": "Чтобы участвовать в пригласительной кампании Bazino, подпишись на @bazinopro и нажми кнопку «Я подписался». После этого тебе будет отправлено второе сообщение с твоим уникальным идентификационным кодом и готовым текстом приглашения. Отправь это сообщение другу без изменений и поделись с ним этой публикацией. Друг должен прокомментировать число из сообщения под этой же публикацией и подписаться на Bazino; после этого ему будет отправлена пригласительная ссылка и активирован купон на скидку. Нам не нужен пароль от Instagram.",
+                "partner2": "Прокомментируй этот код: [уникальный номер] под публикацией, которую я отправил тебе, и подпишись на @bazinopro. Отправь это сообщение другу без изменений и поделись публикацией Bazino с ним. Друг должен прокомментировать это число под той же публикацией и подписаться на @bazinopro; пригласительная ссылка и купон на скидку будут отправлены только другу. Буду очень благодарен, если ты сделаешь это для меня.",
+                "friend": "Код получен. Подпишись на @bazinopro и нажми «Я подписался». Комментарий — косвенное подтверждение кампании, не официальная проверка Share.",
+                "invite": "Ваша личная ссылка:\n{{invite_url}}\nВойдите и выполните условия согласия для активации доступного купона.",
+                "button": "Я подписался"
+              }
+            }
+          },
+          "uniqueKey": null,
+          "updatedAt": "2026-09-12T21:04:04.843Z"
+        }
+      ]
+    },
+    "/api/management/publishing/events": {
+      "status": 200,
+      "sample": {
+        "inbox": [],
+        "outbox": [],
+        "counts": {
+          "received": 0,
+          "sent": 0,
+          "unknown": 0,
+          "queued": 0
+        }
+      }
+    }
+  },
+  "writes": {
+    "system_create": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "systems": [
+          {
+            "id": "sys-311e26",
+            "name": "CT-TEST",
+            "type": "PC",
+            "hourlyRate": 120000,
+            "isActive": true,
+            "isReserved": false,
+            "audience": ""
+          }
+        ]
+      }
+    },
+    "system_update": {
+      "status": 200,
+      "body": {
+        "id": "sys-311e26",
+        "name": "CT-TEST",
+        "type": "PC",
+        "hourlyRate": 130000,
+        "isActive": true,
+        "isReserved": false,
+        "audience": ""
+      }
+    },
+    "system_delete": {
+      "status": 200
+    },
+    "cafe_create": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "cafeItems": [
+          {
+            "id": "cafe-b1ead6",
+            "name": "Test Item",
+            "category": "Foods",
+            "price": 50000,
+            "imageUrl": "/images/home/pizza-480.webp",
+            "mobileImageUrl": "/images/mobile/generated/gen-item-c9f7127c86.webp",
+            "inventory": 5,
+            "isAvailable": true,
+            "creditPrice": 0
+          }
+        ]
+      }
+    },
+    "cafe_delete": {
+      "status": 200
+    },
+    "article_create": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "articles": [
+          {
+            "id": "art-bd83ae",
+            "title": "Test Article",
+            "content": "body",
+            "category": "News",
+            "imageUrl": "/images/home/esports-480.webp",
+            "mobileImageUrl": "/images/mobile/generated/gen-article-f5dcb8e65b.webp",
+            "author": "admin",
+            "date": "۱۴۰۵/۰۴/۱۴",
+            "comments": []
+          }
+        ]
+      }
+    },
+    "article_delete": {
+      "status": 200
+    },
+    "slider_create": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "appSliders": [
+          {
+            "id": "slide-kmmzqzs",
+            "imageUrl": "/images/hero/main.webp",
+            "mobileImageUrl": null,
+            "target": "home",
+            "titleFa": "",
+            "titleEn": "",
+            "titleRu": "",
+            "titleTr": "",
+            "descFa": "",
+            "descEn": "",
+            "descRu": "",
+            "descTr": ""
+          }
+        ]
+      }
+    },
+    "coupon_create": {
+      "status": 400,
+      "body": {
+        "error": "INVALID_TEXT",
+        "message": "INVALID_TEXT"
+      }
+    },
+    "message_create": {
+      "status": 400,
+      "body": {
+        "error": "اطلاعات پیام ناقص است.",
+        "code": "MESSAGE_INCOMPLETE"
+      }
+    }
+  },
+  "themeInstallFlow": {
+    "note": "POST /api/admin/themes/install → 202 {jobId,themeId,version,progress,pollUrl} → GET /api/admin/themes/install-jobs/:jobId تا completed/failed",
+    "verified": true
+  }
+}

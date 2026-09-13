@@ -1,0 +1,208 @@
+# پلن اتوماسیون تولید محتوا با Predis.ai + انتشار با Zernio
+
+> تاریخ: ۲۰۲۶-۰۹-۱۳ · وضعیت: **پیشنهاد — منتظر تأیید کاربر** · هیچ کدی تغییر نکرده
+
+## ۱. کشف کلیدی: مرحلهٔ «انتشار» از قبل کامل است
+
+پرتال سیستم انتشار نسخهٔ ۴ (publishing v4) دارد که **همین حالا** با Zernio یکپارچه است:
+
+- `ZernioClient` (server/publishing/provider.ts) — REST با Bearer key از SecretVault (AES-256-GCM) → `https://zernio.com/api/v1/...`
+- انتشار واقعی: presign آپلود رسانه → `POST /v1/posts` → تأیید nativeId از طریق وب‌هوک HMAC (`/api/webhooks/zernio`) یا polling reconcile
+- خط‌لولهٔ کامل Draft → Approve (fingerprint) → Schedule → Publish با CAS، lease، idempotency، audit
+- قواعد کمپین افیلیت (۳ پست، ۴ اسلاید ترکی)، اعتبارسنجی aspect-ratio/caption، صف‌های durable (inbox/outbox)
+- تولید متن کپشن از طریق **Manus** (`drafts/:id/generate` → pub-agent-task → workGenerations هر ۴ ثانیه)
+
+پس سندِ «Zernio MCP» لازم نیست — پرتال خودش عامل است و یکپارچه‌سازی server-to-server (قوی‌تر از MCP) از قبل کار می‌کند.
+
+**شکاف واقعی:** تولید **رسانهٔ بصری** (تصویر/کاروسل/ریلز) — الان ۱۰۰٪ دستی است. Predis دقیقاً همین لایه را پر می‌کند.
+
+## ۲. یافته‌های API پریدیس (راستی‌آزمایی‌شده از مستندات رسمی)
+
+- ساخت: `POST https://brain.predis.ai/predis_api/v1/create_content/` — هدر `Authorization: <API_KEY>`؛ پارامترها: `brand_id` (الزامی)، `text` (الزامی، ≥۲۰ کاراکتر)، `media_type` (single_image | carousel | video)، `video_duration` (short|long)، `input_language`/`output_language` (**turkish و english پشتیبانی می‌شوند؛ فارسی خیر**)، `n_posts` (۱–۱۰)، `headlines` (بازنویسی متن اسلایدها با محتوای خودمان — عنوان مسابقه، تاریخ، قیمت!)، `media_urls` (تصاویر خود سایت!)، `brand_details` (لوگو/پالت رنگ بازینو)، `template_ids`، `model_version` (۴ فقط single_image+carousel)
+- پاسخ async: `{post_id, status: inProgress}` → نتیجه با `GET /predis_api/v1/get_posts/` → `{posts: [{post_id, urls[], caption, media_type}]}` (الگوی polling — هم‌راستا با الگوی فعلی pollPublications)
+- خروجی: URL فایل‌های تولیدشده + کپشن — JSON ساختاریافته، بدون نیاز به داشبورد
+
+## ۳. تصحیح هزینه‌ها (مهم — با سند مغایرت دارد)
+
+| ادعای سند | واقعیت منابع |
+|---|---|
+| «پلن رایگان ۱۵ پست + API» | ۱۵ پست/ماه ✓ اما **با واترمارک**؛ و **API روی پلن Free/Lite نیست** — Lite صراحتاً «No API Access»، API روی پلن‌های بالاتر (addon یا Core $32) |
+| «از $32/ماه با API گسترده» | Core ≈ $32/ماه = ۱٬۳۰۰ کردیت (~۴۰ پست یا ~۱۰ ویدیو)؛ یک منبع API را جزو Core می‌داند، دو منبع addon جدا — **باید قبل از ساخت با support پریدیس تأیید شود** |
+| Zernio رایگان برای ۲ اکانت اول | بی‌ربط به کار ما — یکپارچه‌سازی Zernio از قبل انجام و پرداخت شده است (اکانت bazinopro) |
+
+نتیجه: بودجهٔ واقعیِ شروع = تأیید دسترسی API با support پریدیس + احتمالاً $32/ماه. پلن رایگان فقط برای ارزیابی کیفی خروجی در داشبورد خودشان.
+
+## ۴. معماری پیشنهادی (الگوی سازگار با کد موجود)
+
+### فایل جدید: `server/publishing/predis.ts`
+- `PredisClient` — constructor(core, fetcher) مثل ManusClient؛ متدهای `createContent()` / `getPosts()` با timeout/redirect:error و `ProviderFailure` (کدهای `PREDIS_HTTP_*`, `PREDIS_NOT_CONFIGURED`)
+- `PredisService` — مدیریت `pub-predis-task` با همان الگوی CAS/lease پاب‌agent-task:
+  - `generate(actor, body)` — {kind: tournament|promo|custom, tournamentId?, text, mediaType, language: tr|en, nPosts?} + `confirmedCost:true` → چک سهمیه → رکورد queued
+  - `work()` — در همان حلقهٔ ۴ ثانیه‌ای publicationRoutes: submit برای queued، poll برای submitted (تطبیق post_id)، ذخیرهٔ urls+caption
+  - `importToDraft(actor, taskId, {confirmed:true})` — دانلود URLها سمت سرور → AssetLibrary (ffprobe/aspect) → ساخت pub-draft تازه با نگاشت فرمت (single_image→image، carousel→carousel، video→reel) + کپشن (≤۲۲۰۰، فیلتر لینک خصوصی) + executionMode:'manual' (provider=zernio) → **رفتن به جریان تأیید انسانی موجود** — هرگز auto-approve نمی‌شود
+
+### تغییرات جرئی در فایل‌های موجود
+- `settings.ts`: افزودن `'predis_api_key'` به SECRET_NAMES (vault + fallback محیطی `PREDIS_API_KEY`)؛ فیلدهای کانفیگ: `predisBrandId`, `predisEnabled`, `predisMonthlyLimit` (پیش‌فرض ۱۵), `predisAutoTournament` (پیش‌فرض false)
+- `routes.ts`: اندپوینت‌های `POST /predis/generate`، `GET /predis/tasks`، `POST /predis/tasks/:id/cancel`، `POST /predis/tasks/:id/import`، `GET /predis/quota` (guard content/publish)
+- `publicationRoutes.ts`: فراخوانی predis.work() در تایمر موجود
+- ترینگر (فاز ۲، config-gated): بعد از موفقیت `POST /api/admin/tournaments` → اگر predisAutoTournament → enqueue تولید با متن قالب‌بندی‌شده (عنوان/بازی/تاریخ/شهریه به tr یا en) — فقط draft، بدون انتشار خودکار
+
+### UI (فقط پنل وب)
+- تب «Predis» در Studio: نشان سهمیهٔ ماه، فرم تولید (نوع/رسانه/زبان)، لیست taskها با پیش‌نمایش، دکمهٔ Import→Draft
+- سکرت predis_api_key فقط از پنل وب (`PUT /secrets/predis_api_key`) — طبق قانون حذف بخش‌های امنیتی، در اپ فلاتر ادمین نمی‌آید
+
+### تست‌ها (الگوی tests/publishing.test.mts با fetcher ماک)
+create→poll→import کامل، سهمیه/QUOTA_EXCEEDED، gating سکرت (409 PREDIS_NOT_CONFIGURED)، اعتبارسنجی کپشن/aspect (ریلز غیر 9:16 رد شود)، CAS/lease، ترینگر مسابقه (فعال/غیرفعال)، عدم auto-approve
+
+## ۵. فازها
+1. **فاز ۱ (هسته):** PredisClient + tasks + quota + import→draft + تست‌ها — بدون UI؛ قابل تست با curl
+2. **فاز ۲ (UI + ترینگر):** تب Studio + ترینگر مسابقه
+3. **فاز ۳ (اختیاری):** وب‌هوک ورودی پریدیس به‌جای polling، template_ids اختصاصی برند، کاروسل ۴اسلایدی افیلیت ترکی (headlines قطعی)
+
+## ۶. گزینه‌های طراحی که رد شدند
+- adapterId 'predis' در رجیستری agents — رجیستری agent = «ناشر» است (Manus منتشر می‌کند)؛ پریدیس «مولد رسانه» است؛ قاطی کردن دو نقض، audit/approval را پیچیده می‌کند. الگوی پیشنهادی: پریدیس فقط به pub-draft با provider=zernio خوراک می‌دهد.
+- استفاده از Zernio MCP — یکپارچه‌سازی REST+HMAC موجود قوی‌تر و تست‌شده است.
+
+## ۷. بررسی جایگزین‌ها با API روی پلن رایگان (۲۰۲۶-۰۹-۱۳)
+
+### نتیجهٔ مقایسه (راستی‌آزمایی‌شده از صفحات قیمت رسمی)
+
+**قالب‌محور (تصویر با متن برند به هر زبانی — از جمله فارسی):**
+
+| سرویس | API رایگان | تکرارشونده؟ | واترمارک | ویدیو | نکته |
+|---|---|---|---|---|---|
+| **Imejis.io** 🏆 | **۱۰۰ رندر/ماه** | ✓ دائمی | ✗ | ✗ | API سینکرون (جواب مستقیم در همان پاسخ)، ۵۰ دیزاین، ادیتور Canva-like، MCP، Unsplash داخلی |
+| APITemplate.io | ۵۰ تصویر/ماه | ✓ دائمی | — | ✗ | فقط ۳ قالب؛ قالب HTML/CSS (دوست-توسعه‌دهنده) |
+| Templated.io | ۵۰ کردیت | ✗ تریال یک‌باره | ✗ | ✓ MP4 | بعدش $29/ماه؛ ایمپورت Canva؛ ویدیو ۱۰ثانیه ≈ ۱۳ کردیت |
+| Placid / Bannerbear / Contentdrips | تریال ۱۴-۳۰ روزه / ۱۰تایی | ✗ | Placid ✓ | ✓ (جدا) | گران ($19-49/ماه) |
+
+**تولید خام AI:**
+
+| سرویس | API رایگان | حجم | نکته |
+|---|---|---|---|
+| **Cloudflare Workers AI (FLUX.1-schnell)** 🏆 | ۱۰٬۰۰۰ neuron/روز | **~۱۷۰ تصویر/روز** | دائمی، بدون کارت، REST ساده، بدون واترمارک؛ زیرساخت مطمئن کلادفلر |
+| Gemini image API | نامطمئن | — | طبق مارس ۲۰۲۶ مدل‌های تصویری جدید «Free Tier: Not available»؛ مدل قدیمی ۲.۵ بسته شد — اتکا نشود |
+
+**ویدیو/ریلز رایگان واقعی وجود ندارد** — JSON2Video (۶۰۰ کردیت یک‌باره + واترمارک)، Shotstack (sandbox واترمارک‌دار)، Templated تریال (~۳-۴ ویدیو). مسیر واقعاً رایگان: **ffmpeg خود پرتال** (اسلایدشو/زوم از اسلایدهای تولیدی) — ابزارش از قبل هست.
+
+**کپشن:** تولید متن از قبل در پرتال هست (عامل Manus `drafts/:id/generate`) — هزینهٔ جدید صفر.
+
+### نتیجه‌گیری: معماری پیشنهادی به‌روزشده — «Imejis + Cloudflare FLUX» به‌جای Predis
+
+- **پس‌زمینهٔ هنری گیمینگ:** FLUX کلادفلر (رایگانِ روزانه) → تصویر AI حماسی
+- **اسلایدهای برند‌دار با متن واقعی:** قالب‌های Imejis (۱۰۰ رندر/ماه رایگان، بدون واترمارک) — متن فارسی/ترکی/انگلیسی دقیق (برتری نسبت به Predis که فارسی ندارد!)
+- **کپشن:** عامل Manus موجود
+- **خروجی → همان خط‌لولهٔ pub-draft → تأیید انسانی → Zernio**
+- پیاده‌سازی باید **provider-agnostic** باشد (اینترفیس `TemplateImageProvider` با دو پیاده‌سازی اولیه: imejis / apitemplate) تا اگر Imejis (تأمین‌کنندهٔ جوان) شرایطش را عوض کرد، سوییچ کند.
+- Predis همچنان گزینهٔ «همه‌کارهٔ پرمیوم» می‌ماند اگر بعداً $32+API پرداخت شد — همان PredisService قبلی به‌عنوان سومین provider.
+
+### مقایسهٔ نهایی با Predis (چرا این ترکیب برای بازینو بهتر است)
+
+| معیار | Predis (پولی) | Imejis+FLUX (رایگان) |
+|---|---|---|
+| هزینهٔ تست | ~$32+ | $0 |
+| متن روی تصویر فارسی | ✗ (فقط زبان‌های لیست‌شده، fa نیست) | ✓ (متن قالب دست خودمان) |
+| ثبات برند | متغیر (AI آزاد) | ✓ عالی (قالب ثابت) |
+| ویدیو/ریلز | ✓ | ✗ (بعداً ffmpeg/پولی) |
+| «آفرینش کامل از صفر» (کپی+طرح+استاک) | ✓ | نیمه (قالب‌ها یک‌بار طراحی می‌شوند) |
+
+## ۸. پیش‌نیازهای کاربر (به‌روزشده)
+1. **بدون نیاز به پرداخت** — برای تست: اکانت رایگان Imejis.io + اکانت رایگان Cloudflare (Workers AI token)
+2. تأیید پلن برای شروع فاز ۱ (الان با معماری provider-agnostic و Imejis به‌عنوان provider اول)
+
+## ۹. فاز ۱ — پیاده‌سازی شد (۲۰۲۶-۰۹-۱۳)
+
+**کامیت‌شده در برنچ arena:** هستهٔ mediagen با معماری نهایی (Imejis + Cloudflare FLUX، provider-agnostic از روز اول).
+
+| قطعه | فایل | شرح |
+|---|---|---|
+| تایپ‌ها | `shared/publishing/types.ts` | `MediaGenProvider` ('imejis'\|'flux')، `MediaGenTask` (queued→rendering→completed/failed→imported، lease برای worker) |
+| کانفیگ | `server/publishing/settings.ts` | ۴ سکرت جدید (`imejis_api_key`، `cloudflare_api_token`، `cloudflare_account_id`، `cloudflare_zone_id`) + فیلدهای `mediagenEnabled/Designs/ImejisLimit/FluxLimit` + حفاظت و اعتبارسنجی |
+| سرویس | `server/publishing/mediagen.ts` | `MediaGenService`: enqueue با idempotency (fingerprint)، worker با lease، quota ماهانهٔ UTC، ImejisProvider (POST `render.imejis.io/v1/{designId}`، هدر `dma-api-key`، پاسخ باینری)، FluxProvider (Workers AI REST، هر دو شکل پاسخ باینری/JSON-base64)، استخراج account-id از zone-id، import خروجی از طریق همان مسیر chunk/finalize کتابخانهٔ رسانه (اعتبارسنجی sharp بازاستفاده می‌شود) |
+| روت‌ها | `server/publishing/routes.ts` | GET `mediagen/quota`، GET `mediagen/tasks`، POST `mediagen/generate`، POST `tasks/:id/cancel`، POST `tasks/:id/import` — همه پشت guard('content')/guard('publish') |
+| worker | `server/publishing/publicationRoutes.ts` | `mediagen.work()` در همان حلقهٔ ۴ ثانیه‌ای موجود |
+
+**ضمانت‌های حفظ‌شده:** `confirmedCost` اجباری روی هر generate؛ `confirmed` اجباری روی cancel/import؛ خروجی فقط pub-draft با `executionMode:'manual'` — خط تأیید انسانی (approve→schedule) دست‌نخورده؛ هرگز auto-publish نمی‌شود؛ quota ماهانه جدا برای هر provider.
+
+**تست‌ها:** ۶ تست ماک‌شدهٔ جدید در `tests/publishing.test.mts` (قرارداد دقیق درخواست Imejis، idempotency، quota، خطای provider، import→draft فقط دستی، cancel/مالکیت) — مجموعهٔ کامل **652/652 سبز** + smoke-test زندهٔ سرور بیلدشده (بوت واقعی، فعال‌سازی از پنل، صف→worker→خطای اتصال ثبت‌شده، cancel، duplicate). تست لایو سرویس‌های خارجی در سندباکس ممکن نیست (شبکه به api.cloudflare.com/render.imejis.io بلاک) — پس از ست‌شدن سکرت‌ها روی Railway با یک دیزاین واقعی تست می‌شود.
+
+**مرحلهٔ بعد (فاز ۲):** UI پنل (تب mediagen در بخش انتشار)، انتخاب دیزاین از allowlist، پیش‌نمایش خروجی قبل از import. سکرت‌های لازم: `IMEJIS_API_KEY` (کاربر در حال ساخت)، `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ZONE_ID` (موجود)، `CLOUDFLARE_ACCOUNT_ID` (اختیاری — خودکار از zone مشتق می‌شود).
+
+## ۱۰. بررسی‌های تکمیلی و تصمیم نهایی معماری (۲۰۲۶-۰۹-۱۳ — نوبت‌های بعد)
+
+### ۱۰.۱ Creatify AI — بررسی و رد (تصمیم کاربر)
+- قوت واقعی: «ویدئوی UGC وایرال + طراحی کمپین» (URL-to-Video، ۱۵۰۰+ آواتار لیپ‌سینک، AdMax) — ولی: API فقط با اشتراک ($99/ماه Starter، $299 Pro؛ quickstart رسمی: «API access requires an active subscription») و فارسی در فهرست رسمی ۲۹ زبان نیست. پلن رایگان وب: ۱۰ کریدیت/ماه با واترمارک. HeyGen هم رد (پلن API رایگان از فوریه ۲۰۲۶ حذف؛ PAYG از $1/دقیقه).
+
+### ۱۰.۲ طرح «Apiframe + Shotstack + Kie» — راستی‌آزمایی
+- Apiframe: ۱۰۰ کریدیت **یک‌باره** (تأیید تلفنی/$1) نه ماهانه — «a one-time unlock, not a monthly free plan» (pricing رسمی)؛ 1c=$0.01، کلیپ ۶ث Hailuo=48c.
+- Shotstack: ادعای «۲۰ دقیقه رایگان ماهانه» غلط — رسمی: ۱۰ کریدیت یک‌بارهٔ ۳۰ روزه، بعد $39/ماه یا $0.30/دقیقه. (فونت TTF فارسی/RTL واقعی است ولی پولی.)
+- Kie.ai: اعتبار تست یک‌باره، PAYG از $5 بدون اشتراک — گزینهٔ فاز ۳.
+- Google Trends API: آلفای درخواستی (تیر ۲۰۲۵). Apify Trend Aggregator: pay-per-event، ۶ کاربر، خبرمحور — رد.
+- «Kling/Hailuo متن فارسی را بی‌نقص رندر می‌کنند»: مستند رسمی فقط zh/en؛ متن فارسی باید جدا رندر شود.
+- خطای ساختاری طرح (رد): انتشار خودکار بدون تأیید انسانی — مغایر خط قرمز پروژه.
+
+### ۱۰.۳ مقایسه با خرید Predis — کاربر پلن $0 را انتخاب کرد
+Predis (~$32+/ماه) فارسی ندارد ⇒ خط لولهٔ فارسی به‌هرحال لازم است؛ Predis/Kie می‌توانند provider آیندهٔ پولی روی معماری provider-agnostic باشند.
+
+## ۱۱. لایهٔ مغز کمپین (تأیید کاربر)
+- **معماری:** دایجست ترند رایگان (YouTube mostPopular 1-unit، Twitch getTopGames، analytics زرنیو) → مغز (Groq موجود در پرتال + Manus؛ کتابخانهٔ هوک فارسی/ترکی) → بریف `pub-brief` با تأیید انسانی → mediagen (imejis/flux/compose) → AssetLibrary → pub-draft → approve → schedule.
+- **compose:** ElevenLabs v3 (فارسی fas، ۱۰k کاراکتر/ماه رایگان؛ تجاری از $22) + ffmpeg پرتال (static با libfribidi+libass — تست‌شده).
+- **Pomelli (Google Labs):** بتای عمومی از ۲۸ اکتبر ۲۰۲۵، رایگان در بتا؛ Business DNA (تحلیل bazino.pro → رنگ/فونت/لحن/سبک) + ایدهٔ کمپین + کریتیو هم‌برند + Photoshoot. **API ندارد و آزمایشی است** ⇒ فقط میز کار دستی کاربر + الگوی مدل pub-brief.
+- ابزارهای تأییدشده: YouTube Data API v3 (۱۰k unit/روز)، Twitch Helix (رایگان، OAuth، ~800 req/min)، Groq (~30rpm/1k+rpd، از قبل در پرتال)، Pexels/Pixabay (رایگان تجاری 200/hr و 100/min)، TikTok Creative Center و Meta Ad Library (دستی/رایگان). رد: Reddit (ثبت‌نام دستی/غیرتجاری).
+- **تقسیم کار مرورگر (پل CDP):** من ناوبری/فرم/کلیک و بررسی‌های فقط‌خواندنی را از مرورگر کاربر انجام می‌دهم؛ کد تأیید ایمیل/SMS، دکمهٔ نهایی ساخت کلید، کپی مقدار سکرت به سکرت‌ریپو و تصمیم‌های برند (قالب‌های Imejis) دست کاربر — دلایل: امنیت سکرت (مقدار کلید نباید از کانال/لاگ عبور کند)، پذیرش ToS و مالکیت اکانت، ریسک فلگ‌شدن اکانت‌های واقعی توسط ضد-اتوماسیون.
+
+## ۱۲. فاز ۲ — محدوده و چک‌لیست کاربر
+- **محدوده:** provider `compose` (ElevenLabs TTS + مونتاژ ffmpeg + زیرنویس RTL)، مدل `pub-brief` + روت‌ها، worker دایجست ترند (YT+Twitch)، کتابخانهٔ هوک seed، تست ماک. UI بعد از هسته.
+- **سکرت‌ها:** IMEJIS_API_KEY، ELEVENLABS_API_KEY، GROQ_API_KEY (اگر موجود نیست)، YOUTUBE_API_KEY، TWITCH_CLIENT_ID/SECRET، CLOUDFLARE_API_TOKEN (بررسی مجوز Workers AI)، CLOUDFLARE_ACCOUNT_ID (اختیاری).
+- اختیاری/دستی: درخواست Google Trends alpha، Pomelli Business DNA، مرور TikTok Creative Center/Meta Ad Library.
+
+## ۱۳. پلن نهایی فاز ۲ — به زبان ساده (ارائه برای تأیید کاربر — ۲۰۲۶-۰۹-۱۳)
+
+> این پلن همان معماری لایه‌ای تأییدشده (بخش ۱۱) است، مرتب‌شده به ۴ گام اجرایی.
+> همه‌چیز $0/ماه است و توسعه با تست ماک انجام می‌شود (پل مرورگر و سکرت‌ها فقط برای «لایو شدن» لازم‌اند).
+
+### گام ۱ — چشم سیستم: دایجست ترند روزانه (لایهٔ الف)
+**چه چیزی به شما می‌دهد:** هر صبح سیستم خودش می‌داند امروز چه بازی‌ها و موضوع‌های گیمینگی داغ است (قبرس/ترکیه) — بدون اینکه کسی چیزی سرچ کند.
+- YouTube (دستهٔ گیمینگ، ترندهای قبرس و ترکیه) + Twitch (پر بیننده‌ترین بازی‌های الان) → یک «دایجست ترند» روزانه ذخیره می‌شود
+- بدون کلید API: سیستم ساکت می‌ماند و بقیه کار می‌کند — گام‌ها به هم وابسته نیستند
+- دستی و رایگان برای شما: TikTok Creative Center و Meta Ad Library (راهنمای استفاده می‌سازم)
+
+### گام ۲ — مغز سیستم: بریف کمپین + کتابخانهٔ هوک (لایهٔ ب)
+**چه چیزی به شما می‌دهد:** به‌جای پرامپت خام، سیستم «بریف کمپین» می‌سازد — هدف، مخاطب، پیشنهاد، ۳-۴ هوک وایرال، متن کپشن، CTA — و **شما قبل از هر تولیدی آن را تأیید می‌کنید.**
+- موتور تولید: Groq (همان جارویس موجود پرتال — $0) + سناریوهای پیچیده با Manus
+- ~۲۴ الگوی هوک اثبات‌شدهٔ فارسی/ترکی/انگلیسی از روز اول داخل سیستم هست (کنجکاوی، FOMO، چالش، اعداد، سؤال، اعلامیه)
+- ورودی بریف = دایجست ترند گام ۱ (اگر موجود باشد) + هوک‌های کتابخانه
+- Pomelli گوگل: میز کار دستیِ رایگان برای ایده‌پردازی شما (API ندارد، وارد سیستم نمی‌شود)
+
+### گام ۳ — دست سیستم: ریلز فارسی $0 (لایهٔ پ + ت)
+**چه چیزی به شما می‌دهد:** ویدئوی عمودی اینستاگرام با صدای فارسی طبیعی، متن روی تصویر و زیرنویس درست — از یک تصویر و یک متن.
+- تصویر: Imejis (متن دقیق برند) یا FLUX (پس‌زمینهٔ خام) — هر دو از فاز ۱ موجودند
+- صدا: ElevenLabs v3 فارسی — ۱۰هزار کاراکتر/ماه رایگان (≈۱۰ دقیقه صدا)
+- مونتاژ: ffmpeg خود پرتال — حرکت آرام روی تصویر + زیرنویس فارسی راست‌به‌چپ با فونت وزیرمتن + موسیقی از کتابخانهٔ مجوزدار
+- خروجی: mp4 عمودی ≤۶۰ ثانیه → همان کتابخانهٔ رسانه → **pub-draft با تأیید انسانی** (خط قرمز دست‌نخورده)
+
+### گام ۴ — زنجیرهٔ کامل: ترند → بریف → ویدئو → انتشاـر با تأیید شما
+اتصال گام‌ها به هم: دایجست ترند پیشنهاد بریف می‌دهد → شما تأیید می‌کنید → ویدئو ساخته می‌شود → پیش‌نویس پست → شما تأیید نهایی → انتشار با Zernio. **هیچ مرحله‌ای خودکار منتشر نمی‌شود.**
+
+### گام ۵ — تست و تحویل (شرط تمام‌شدن)
+همهٔ گام‌ها با تست ماک + ffmpeg واقعی روی نمونه تستی؛ معیار پذیرش: کل تست‌ها سبز (توسعه)، بیلد، پوش، CI سبز.
+
+### فاز ۳ (بعد از این تأیید، جداگانه): حلقهٔ بازخورد + UI پنل
+- اتصال آمار واقعی اینستاگرام (analytics زرنیو) → گزارش «کدام هوک جواب داد» → اولویت بریف‌های بعدی
+- تب UI پنل برای همهٔ این‌ها
+
+### فاز ۴ (اختیاری، فقط با تصمیم و پرداخت شما): ویدئوی سینمایی
+ارزیابی Kling/Hailuo از طریق Kie.ai با PAYG از $5 — فقط برای tr/en (فارسی ندارد) — پشت دروازهٔ confirmedCost.
+
+### کلیدهای لازم برای لایو شدن (توسعه را بلاک نمی‌کنند)
+| کلید | برای | وضعیت |
+|---|---|---|
+| CLOUDFLARE_API_TOKEN (Workers AI) | FLUX | ✅ شما انجام دادید |
+| IMEJIS_API_KEY + دیزاین‌ها | پوستر برند | ⏳ شما |
+| ELEVENLABS_API_KEY | صدای فارسی | ⏳ شما |
+| GROQ_API_KEY | مغز هوک/کپشن | بررسی شود (جارویس) |
+| YOUTUBE_API_KEY | دایجست ترند | ⏳ شما |
+| TWITCH_CLIENT_ID/SECRET | دایجست ترند | ⏳ شما |
+
+### صریحاً ممنوع / خارج از محدوده
+انتشار خودکار بدون تأیید انسانی (هرگز) · هیچ سرویس پولی بدون تصمیم مجدد شما · ToS هیچ سرویسی زیر پا گذاشته نمی‌شود.

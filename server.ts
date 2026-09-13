@@ -49,6 +49,13 @@ import {
   cleanupStaleThemeDirs,
   THEMES_DIR
 } from "./server/themeStore";
+import {
+  createThemeInstallJob,
+  getThemeInstallJob,
+  recoverThemeInstallJobs,
+  quickValidateThemeZip,
+  MAX_ZIP_BYTES as THEME_ZIP_MAX_BYTES
+} from "./server/themeInstallJobs";
 import { GoogleGenAI, Type } from "@google/genai";
 import jwt from "jsonwebtoken";
 import { apiError, apiMessage, requestLang, t } from "./server/apiMessages";
@@ -73,11 +80,13 @@ import { seedAffiliateSettings } from "./server/affiliate/settings";
 import { registerPublishing } from './server/publishing/routes';
 import { protectedIntegrationSetting } from './server/publishing/settings';
 import { registerIgRoutes } from "./server/affiliate/igRoutes";
-import { registerManusRoutes } from "./server/manus/routes";
+import { listApiTokens, createApiToken, deleteApiToken } from "./server/affiliate/igSettings";import { registerManusRoutes } from "./server/manus/routes";
+import { registerManusBlogRoutes } from "./server/manus/blog";
+import { registerJarvis } from "./server/jarvis/routes";
 import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
 import { onReservationAttended } from "./server/affiliate/engine";
 import { isOnlinePaymentEnabled } from "./server/payments/paytr";
-import { registerAccountRoutes, publicUser } from "./server/accountRoutes";
+import { registerAccountRoutes, publicUser, autoCloseStaleTickets } from "./server/accountRoutes";
 import { DATA_DIR, IS_PERSISTENT_DATA_DIR, dataPath, installConfigPath as installConfigFile, isDataDirWritable } from "./server/paths";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -604,7 +613,8 @@ async function startServer() {
       signedPaths.has(req.path) ||
       req.path === "/api/admin/mobile-app/upload-apk" ||
       req.path === "/api/admin/mobile-app/upload-apk/chunk" ||
-      req.path === "/api/admin/themes/install"
+      req.path === "/api/admin/themes/install" ||
+      req.path === "/api/sync/themes/install"
     ) return next();
     return jsonParser(req, res, next);
   });
@@ -717,6 +727,8 @@ async function startServer() {
   await initializeActiveProvider();
   ensureThemesDir();
   cleanupStaleThemeDirs();
+  // بازیابی jobهای نصب قالب که سرور وسطشان ری‌استارت شده → failed واضح + پاک‌سازی staging
+  recoverThemeInstallJobs();
   console.log(`[Storage] data dir: ${DATA_DIR}${IS_PERSISTENT_DATA_DIR ? " (persistent, BAZINO_DATA_DIR)" : " (cwd — set BAZINO_DATA_DIR for persistence on ephemeral hosts)"}`);
   const bootStore = getActiveDataProvider();
 
@@ -872,6 +884,8 @@ async function startServer() {
   registerMessagingRoutes(app,messagingOps);
   const contentOps = new ContentService(management);
   registerContent(app,contentOps);
+  // Jarvis — admin AI assistant (Groq). Management mount + site-admin mount.
+  registerJarvis(app,{core:management,getStore:getActiveDataProvider});
   registerReports(app,management);
   // Old mutable endpoints must not bypass the new receipt/handover and staff rules.
   for (const route of ['/api/sync/wallet/topup','/api/admin/wallet/adjust']) app.post(route,management.guard('wallet'),async(req,res)=>{
@@ -1564,6 +1578,12 @@ async function startServer() {
   // =========================================================================
   function heuristicJarvisIntent(command: string) {
     const cmd = command.toLowerCase();
+    // ناوبری باید قبل از بقیه چک شود: قبلاً «برو به کافه» به‌جای باز کردن بخش کافه،
+    // سفارش آیتم کافه می‌شد (الگوی «کافه» زودتر می‌چسبید) و «برو به چت» پیام چت
+    // می‌فرستاد. هر دستوری که با «برو به/باز کن/نمایش بده» شروع می‌شود ناوبری است.
+    if (/(برو به|باز کن|نمایش بده|نشان بده).*(کافه|بوفه|فروشگاه|تورنمنت|مسابق|چت|بلاگ|مجله|پیام|رزرو|باشگاه|امتیاز|خانه|خونه)/.test(cmd)) {
+      return { action: "open_app_section", params: { section: command }, aiReply: "" };
+    }
     if (/(سفارش|کافه|بوفه|پیتزا|همبرگر|نوشیدنی|ردبول)/.test(cmd)) {
       const itemName = cmd.includes("همبرگر") ? "همبرگر" : (cmd.includes("ردبول") || cmd.includes("نوشیدنی")) ? "ردبول" : "پیتزا";
       return { action: "order_cafe_item", params: { itemName }, aiReply: "" };
@@ -1572,17 +1592,49 @@ async function startServer() {
     if (/(ادمین|پشتیبان|خراب|کمک)/.test(cmd)) return { action: "contact_admin", params: { message: command }, aiReply: "" };
     if (/(چت|ارسال پیام|پیام بفرست)/.test(cmd)) return { action: "send_chat_message", params: { room: "", message: command }, aiReply: "" };
     if (/(رزرو کن|رزرو سیستم|سیستم بگیر|کامپیوتر بگیر)/.test(cmd)) return { action: "reserve_system", params: { hours: 1 }, aiReply: "" };
-    if (/(لغو رزرو|کنسل رزرو|رزرو را لغو)/.test(cmd)) return { action: "cancel_reservation", params: {}, aiReply: "" };
+    if (/(لغو|کنسل|cancel)/.test(cmd) && /رزرو/.test(cmd)) return { action: "cancel_reservation", params: {}, aiReply: "" };
     if (/(کیف پول|امتیاز|کوپن|کد تخفیف)/.test(cmd)) return { action: "show_wallet", params: {}, aiReply: "" };
     if (/(بهترین سیستم|سیستم آزاد|پیشنهاد سیستم)/.test(cmd)) return { action: "suggest_best_system", params: {}, aiReply: "" };
     if (/(تورنمنت|مسابقه)/.test(cmd) && /(لیست|چی|نمایش)/.test(cmd)) return { action: "list_tournaments", params: {}, aiReply: "" };
     if (/(ثبت.?نام).*(تورنمنت|مسابقه)/.test(cmd)) return { action: "register_tournament", params: { tournamentName: command }, aiReply: "" };
-    if (/(جستجو|پیدا کن).*(فروشگاه|کالا|موس|کیبورد|هدست)/.test(cmd)) return { action: "search_shop", params: { query: command }, aiReply: "" };
-    if (/(بخر|خرید).*(موس|کیبورد|هدست|دسته|ماوس)/.test(cmd)) return { action: "purchase_shop_item", params: { query: command }, aiReply: "" };
+    // جستجو/خرید فروشگاه: ترتیب کلمات مهم نیست («توی فروشگاه هدست پیدا کن» هم باید
+    // جستجو شود، نه chitchat). جستجو قبل از خرید چک می‌شود تا «سرچ کن و بعد بخر» جستجو بماند.
+    if (/(جستجو|پیدا کن|سرچ)/.test(cmd) && /(فروشگاه|کالا|موس|ماوس|کیبورد|هدست|دسته)/.test(cmd)) return { action: "search_shop", params: { query: command }, aiReply: "" };
+    if (/(بخر|خرید)/.test(cmd) && /(موس|ماوس|کیبورد|هدست|دسته)/.test(cmd)) return { action: "purchase_shop_item", params: { query: command }, aiReply: "" };
     if (/(پیام‌ها|پیام ها|نوتیفیکیشن|اعلان)/.test(cmd)) return { action: "read_messages", params: {}, aiReply: "" };
     if (/(زبان|language)/.test(cmd)) return { action: "change_language", params: { language: cmd.includes('english') || cmd.includes('انگلیسی') ? 'en' : cmd.includes('روسی') ? 'ru' : cmd.includes('ترکی') ? 'tr' : 'fa' }, aiReply: "" };
     if (/(برو به|باز کن|نشان بده)/.test(cmd)) return { action: "open_app_section", params: { section: command }, aiReply: "" };
     return null;
+  }
+
+  // تطبیق کالای فروشگاه با کلمات کلیدی دستور. قبلاً کلِ جمله باید زیررشتهٔ دقیق نام
+  // کالا می‌بود؛ نتیجه: «توی فروشگاه هدست پیدا کن» هیچ‌وقت چیزی پیدا نمی‌کرد و
+  // «یک ماوس گیمینگ بخر» بی‌صدا کالای اول لیست (کیبورد!) را می‌خرید. حالا جمله به
+  // واژه شکسته می‌شود (نیم‌فاصله حذف و «ماوس/موس» یکسان‌سازی می‌شود) و تطبیق واژهٔ
+  // کامل (۱۵ امتیاز) از زیررشته (۱۰ امتیاز) جلو می‌زند تا «موس گیمینگ» از «ماوس‌پد»
+  // قابل تفکیک باشد؛ بدون هیچ هم‌پوشانی، صادقانه «نیست» می‌گوید.
+  function normalizeAccessoryText(s: string) {
+    return s.toLowerCase().replace(/\u200c/g, "").replace(/ماوس/g, "موس");
+  }
+  function matchAccessoriesByQuery(items: any[], query: string) {
+    const q = normalizeAccessoryText(query.trim());
+    if (!q) return items;
+    const tokens = q.split(/[\s،,.!?؟:;()]+/).filter((t) => t.length > 2);
+    const scored = items
+      .map((item) => {
+        const hay = normalizeAccessoryText(`${item.name} ${item.description ?? ""} ${item.category ?? ""}`);
+        if (hay.includes(q)) return { item, score: 100 };
+        const words = hay.split(/[\s،,.!?؟:;()]+/).filter(Boolean);
+        let score = 0;
+        for (const t of tokens) {
+          if (words.includes(t)) score += 15;
+          else if (hay.includes(t)) score += 10;
+        }
+        return { item, score };
+      })
+      .filter((s) => s.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.item);
   }
 
   const jarvisActionNames = [
@@ -1641,7 +1693,7 @@ async function startServer() {
     return response.text || "";
   }
 
-  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any; language?: string }) {
+  async function resolveAssistantIntent(command: string, context: { user: any; activeReservation?: any; language?: string; history?: Array<{ role: string; content: string }> }) {
     // Cost saver + safety: clear app commands are routed deterministically without any LLM call.
     const deterministic = heuristicJarvisIntent(command);
     if (deterministic) return deterministic;
@@ -1650,15 +1702,32 @@ async function startServer() {
     const systemPrompt = `You are Jarvis, the in-app assistant for BAZINO gaming lounge. Current user: ${context.user.username === "Guest" ? "guest" : context.user.username}. ${context.activeReservation ? `Active reservation: ${context.activeReservation.systemName}.` : "No active reservation."}
 Return ONLY valid JSON: {"action":"one_of_allowed_actions","params":{},"reply":"short natural reply in ${replyLanguage}"}.
 Allowed actions: ${jarvisActionNames.join(", ")}.
-Use chitchat for normal conversation or unclear requests. For app tasks, choose the closest action and fill params. Never invent prices or claim an action happened; server executes actions after you classify.`;
+Use chitchat for normal conversation or unclear requests. For app tasks, choose the closest action and fill params. Never invent prices or claim an action happened; server executes actions after you classify. Earlier conversation turns may be provided; use them to resolve follow-up references like "the same one" or "again".`;
     const userPrompt = `User said: ${command}`;
-    const messages = [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }];
+    // Conversation memory (ChatGPT-style follow-ups): the app sends its recent chat
+    // turns with each command, so the model can resolve follow-up requests without
+    // any server-side session store. Sanitised hard: roles whitelisted, capped at
+    // 12 turns / 600 chars each — the client can never inject a system turn.
+    const history = (Array.isArray(context.history) ? context.history : [])
+      .filter((h: any) => h && (h.role === "user" || h.role === "assistant") && typeof h.content === "string" && h.content.trim())
+      .slice(-12)
+      .map((h: any) => ({ role: h.role as string, content: h.content.slice(0, 600) }));
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...history,
+      { role: "user", content: userPrompt },
+    ];
     const providers = await getJarvisAiProviders(true);
 
     for (const provider of providers) {
       try {
         let text = "";
-        if (provider.provider === "gemini") text = await callGeminiJarvis(provider, `${systemPrompt}\n\n${userPrompt}`);
+        if (provider.provider === "gemini") {
+          const transcript = history.length
+            ? `Conversation so far:\n${history.map((h: any) => `${h.role === "user" ? "User" : "Jarvis"}: ${h.content}`).join("\n")}\n\n`
+            : "";
+          text = await callGeminiJarvis(provider, `${systemPrompt}\n\n${transcript}${userPrompt}`);
+        }
         else if (provider.provider === "ollama") text = await callOllamaJarvis(provider, messages);
         else text = await callOpenAiCompatibleJarvis(provider, messages);
         const parsed = parseJarvisAiJson(text);
@@ -1854,15 +1923,13 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
       case "search_shop": {
         const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
-        const q = String(intent.params.query || "").toLowerCase();
-        const matches = items.filter(i => i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())).slice(0, 5);
+        const matches = matchAccessoriesByQuery(items, String(intent.params.query || "")).slice(0, 5);
         return { reply: matches.length ? `این کالاها را پیدا کردم: ${matches.map(i => `${i.name} (${i.price.toLocaleString()} لیر)`).join("، ")}` : "کالایی با این مشخصات پیدا نکردم." };
       }
 
       case "purchase_shop_item": {
         const items = await resolveSampleList(await store.listAccessories(), SAMPLE_ACCESSORIES);
-        const q = String(intent.params.query || "").toLowerCase();
-        const item = items.find(i => i.name.toLowerCase().includes(q) || q.includes(i.category.toLowerCase())) || items[0];
+        const item = matchAccessoriesByQuery(items, String(intent.params.query || ""))[0];
         if (!item || item.stock < 1) return { reply: "این کالا موجود نیست." };
         const { discountAmount, coupon } = await validateCouponServerSide(item.price, intent.params.couponCode, user.username);
         await store.decrementAccessoryStock(item.id, 1);
@@ -1896,7 +1963,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   app.post("/api/assistant/command", async (req, res) => {
     try {
-      const { command, language } = req.body;
+      const { command, language, history } = req.body;
       if (!command || !String(command).trim()) {
         return res.status(400).json(apiError(req, "COMMAND_EMPTY"));
       }
@@ -1905,7 +1972,7 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
       const user = await getCurrentUser(req);
       const activeReservation = user.username !== "Guest" ? await store.getActiveReservationForUser(user.username) : undefined;
 
-      const intent = await resolveAssistantIntent(String(command), { user, activeReservation, language });
+      const intent = await resolveAssistantIntent(String(command), { user, activeReservation, language, history });
       const result = await executeAssistantIntent(intent, { user, activeReservation });
 
       // Real-time side effects: broadcast to WebSocket clients exactly like the normal endpoints do
@@ -1998,6 +2065,33 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     }
   }
 
+  // نوشتن تنظیمات و داده‌های سایت از نرم‌افزار مدیریت: یا توکن کارمند با مجوز «configure»،
+  // یا همان کلید sync که ادمین در تنظیمات سایت (gamenet_sync_api_key) تعیین کرده.
+  // (کلید سادهٔ sync فقط خواندن را باز نمی‌کند برای نوشتن — اینجا صریحاً اجازه می‌دهیم
+  // چون دارندهٔ کلید، اپراتور خود سایت است؛ مسیرها همه پشت requireSyncApiKey هستند.)
+  // این گارد علاوه بر قالب‌ها، همهٔ سرویس‌های نوشتاری «ابزارهای سایت» (تیکت، پیام،
+  // گفتگو، پیامک گروهی، تنظیمات، اسلایدر، توکن) را هم پوشش می‌دهد.
+  async function requireSyncSiteWrite(req: express.Request, res: express.Response, next: express.NextFunction) {
+    try {
+      if ((req as any).authUsername) {
+        const staff = await management.staff((req as any).authUsername);
+        if (!staff.permissions.includes("configure")) {
+          return res.status(403).json({ success: false, error: "FORBIDDEN" });
+        }
+        return next();
+      }
+      const expectedKey = await getActiveDataProvider().getSetting(SYNC_API_KEY_SETTING);
+      const header = req.headers.authorization || "";
+      if (expectedKey && header.startsWith("Bearer ") && header.slice(7) === expectedKey) {
+        return next();
+      }
+      return res.status(403).json({ success: false, error: "FORBIDDEN" });
+    } catch (err) {
+      console.error("[Sync Theme Auth]", err);
+      res.status(500).json({ success: false, error: "Failed to verify theme write permission" });
+    }
+  }
+
   app.post("/api/sync/webservice", requireSyncApiKey, async (req, res) => {
     try {
       const { action, station_id, stations, active_stations_count, total_revenue_today } = req.body || {};
@@ -2072,6 +2166,533 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
   app.get("/api/sync/logs", requireSyncApiKey, (req, res) => {
     res.json({ success: true, logs: syncActivityLogs });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // مدیریت قالب‌های سایت از نرم‌افزار مدیریت گیم‌نت (Management App)
+  // همان امکانات پنل ادمین وب (لیست/نصب ZIP/فعال‌سازی/تصاویر سفارشی)،
+  // با احراز sync: کلید API + مجوز «configure» برای عملیات نوشتاری.
+  // GET  /api/sync/themes                 → لیست قالب‌ها + قالب فعال + theme_img.*
+  // POST /api/sync/themes/install         → نصب ZIP خام (name/replace/activate مثل ادمین)
+  // POST /api/sync/themes/activate        → فعال‌سازی سراسری {themeId}
+  // POST /api/sync/themes/image?slot=     → تصویر سفارشی اسلات (WebP) + ثبت theme_img.<slot>
+  // POST /api/sync/themes/image-reset     → بازگردانی پیش‌فرض اسلات {slot}
+  // ═══════════════════════════════════════════════════════════════════
+  const SYNC_THEME_IMG_SLOTS = ["hero_main", "hero_tournament", "hero_live"] as const;
+  app.get("/api/sync/themes", requireSyncApiKey, async (_req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const themes = await store.listThemes();
+      const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+      const themeImg: Record<string, string> = {};
+      for (const slot of SYNC_THEME_IMG_SLOTS) {
+        themeImg[slot] = (await store.getSetting(`theme_img.${slot}`)) || "";
+      }
+      res.json({ success: true, themes, serverThemes: listInstalledThemes(), activeThemeId, themeImg });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post(
+    "/api/sync/themes/install",
+    requireSyncApiKey,
+    requireSyncSiteWrite,
+    express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
+    async (req, res) => {
+      try {
+        const buffer = req.body as Buffer | undefined;
+        if (!buffer || buffer.length === 0) {
+          return res.status(400).json({ error: "ZIP_MISSING", code: "ZIP_MISSING" });
+        }
+        const fallbackName = (req.query.name as string) || undefined;
+        const replace = String(req.query.replace || "") === "1";
+        const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
+        if ("error" in result) {
+          return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
+        }
+        const store = getActiveDataProvider();
+        logDbQuery(store.name, "SYSTEM", `[sync] Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} via Management App`);
+        const activate = String(req.query.activate || "1") !== "0";
+        if (activate) await store.setSetting("activeThemeId", result.theme.id);
+        const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+        res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
+      } catch (e) {
+        console.error("[sync] Theme install error:", e);
+        res.status(500).json({ error: String(e) });
+      }
+    }
+  );
+
+  app.post("/api/sync/themes/activate", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const { themeId } = req.body || {};
+      const store = getActiveDataProvider();
+      const themes = await store.listThemes();
+      const themeExists =
+        themes.some((t: any) => t.id === themeId) ||
+        listInstalledThemes().some((t: any) => t.id === themeId);
+      if (!themeExists) {
+        return res.status(404).json({ error: "THEME_NOT_FOUND" });
+      }
+      await store.setSetting("activeThemeId", themeId);
+      res.json({ success: true, themes, activeThemeId: themeId });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post(
+    "/api/sync/themes/image",
+    requireSyncApiKey,
+    requireSyncSiteWrite,
+    express.raw({ type: ["image/jpeg", "image/png", "image/webp", "image/gif"], limit: "8mb" }),
+    async (req, res) => {
+      try {
+        const slot = String(req.query.slot || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || "image";
+        const buf: Buffer | undefined = Buffer.isBuffer(req.body) ? req.body : undefined;
+        if (!buf || buf.length < 100) {
+          return res.status(400).json({ error: "Invalid or empty image", code: "INVALID_IMAGE" });
+        }
+        let out: Buffer;
+        try {
+          const sharp = (await import("sharp")).default;
+          out = await sharp(buf)
+            .rotate()
+            .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+        } catch (e) {
+          console.error("[sync theme-image] sharp failed:", e);
+          return res.status(400).json({ error: "Unsupported image format", code: "INVALID_IMAGE" });
+        }
+        fs.mkdirSync(themeImgDir, { recursive: true });
+        const fileName = `${slot}.webp`;
+        fs.writeFileSync(path.join(themeImgDir, fileName), out);
+        const url = `/uploads/theme/${fileName}?v=${Date.now().toString(36)}`;
+        // در پنل وب، کلاینت بعد از آپلود تنظیم را جدا ذخیره می‌کند؛ اینجا برای سادگیِ
+        // نرم‌افزار مدیریت، همان‌جا ثبت می‌شود تا قالب بی‌درنگ تصویر جدید را بخواند.
+        await getActiveDataProvider().setSetting(`theme_img.${slot}`, url);
+        console.info(`[sync theme-image] slot «${slot}» updated (${out.length} bytes webp)`);
+        res.json({ success: true, url, slot });
+      } catch (err) {
+        console.error("[sync theme-image] Error:", err);
+        res.status(500).json({ error: "Failed to store theme image" });
+      }
+    }
+  );
+
+  app.post("/api/sync/themes/image-reset", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const slot = String((req.body || {}).slot || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+      if (!slot) return res.status(400).json({ error: "SLOT_REQUIRED" });
+      await getActiveDataProvider().setSetting(`theme_img.${slot}`, "");
+      res.json({ success: true, slot });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ابزارهای پنل سایت در نرم‌افزار مدیریت (WebSyncModal → تب‌های جدید)
+  // برابری کامل با امکانات پنل ادمین وب: تیکت پشتیبانی، پیام/نوتیفیکیشن،
+  // اتاق‌های گفتگو، پیامک گروهی (مساجیو)، سفارشی‌سازی سایت (تنظیمات،
+  // بخش‌های صفحه اصلی، شبکه‌های اجتماعی، مشخصات قانونی)، اسلایدر سایت/اپ،
+  // منبع داده، ریست/پاک‌سازی دیتابیس، کردیت دستی، لاگ دیتابیس و توکن‌های API.
+  // خواندن: requireSyncApiKey — نوشتن: requireSyncSiteWrite (configure یا کلید sync).
+  // منطق هر مسیر عیناً همان منطق مسیر /api/admin/* مربوطه است (بدون تغییر رفتار).
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ── تیکت‌های پشتیبانی (مانند /api/admin/tickets*) ──
+  app.get("/api/sync/tickets", requireSyncApiKey, async (req, res) => {
+    try {
+      await autoCloseStaleTickets(getActiveDataProvider()).catch(() => 0);
+      const status = String(req.query.status || "");
+      const valid = ["open", "answered", "customer_reply", "closed"].includes(status);
+      const store = getActiveDataProvider();
+      res.json({
+        success: true,
+        tickets: await store.listTickets(valid ? status : undefined),
+        openCount: await store.countOpenTickets(),
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.get("/api/sync/tickets/:id", requireSyncApiKey, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const t = await store.getTicketById(req.params.id);
+      if (!t) return res.status(404).json({ error: "TICKET_NOT_FOUND" });
+      const user = await store.getUserByUsername(t.username);
+      res.json({ success: true, ticket: t, messages: await store.listTicketMessages(t.id), user: user ? publicUser(user) : null });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/tickets/:id/reply", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const t = await store.getTicketById(req.params.id);
+      if (!t) return res.status(404).json({ error: "TICKET_NOT_FOUND" });
+      const body = String((req.body || {}).message || "").trim().slice(0, 4000);
+      if (!body) return res.status(400).json({ error: "MESSAGE_REQUIRED" });
+      const author = (req as any).authUsername || "support";
+      const now = new Date().toISOString();
+      await store.addTicketMessage({ id: randomUUID(), ticketId: t.id, author, isStaff: 1, body, createdAt: now });
+      await store.updateTicket(t.id, { status: "answered", updatedAt: now, lastStaffReplyAt: now });
+      logDbQuery(store.name, "SYSTEM", `[sync] Ticket "${t.id}" answered from Management App`);
+      res.json({ success: true, ticket: await store.getTicketById(t.id), messages: await store.listTicketMessages(t.id) });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/tickets/:id/status", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const t = await store.getTicketById(req.params.id);
+      if (!t) return res.status(404).json({ error: "TICKET_NOT_FOUND" });
+      const status = String((req.body || {}).status || "");
+      if (!["open", "answered", "customer_reply", "closed"].includes(status)) {
+        return res.status(400).json({ error: "INVALID_STATUS" });
+      }
+      await store.updateTicket(t.id, { status, updatedAt: new Date().toISOString() });
+      res.json({ success: true, ticket: await store.getTicketById(t.id) });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── پیام و نوتیفیکیشن به کاربران سایت (مانند /api/admin/messages) ──
+  app.get("/api/sync/messages", requireSyncApiKey, async (_req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const users = (await store.listUsers()).map(({ passwordHash, ...safe }: any) => safe);
+      res.json({ success: true, messages: await store.listUserMessages(), users });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/messages", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const { recipient, title, body, sendAsNotification } = req.body || {};
+      if (!recipient || !title || !body) return res.status(400).json({ error: "MESSAGE_INCOMPLETE" });
+      const newMsg = {
+        id: "msg-" + Math.random().toString(36).substring(2, 9),
+        sender: "مدیریت سالن",
+        recipient,
+        title,
+        body,
+        date: "امروز",
+        isRead: false,
+        type: sendAsNotification ? "notification" : "message",
+      };
+      await getActiveDataProvider().addUserMessage(newMsg);
+      // ارسال زندهٔ نوتیفیکیشن — دقیقاً مثل پنل ادمین وب
+      const payload = JSON.stringify({ event: "notification", data: newMsg });
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) client.send(payload);
+      });
+      const list = await getActiveDataProvider().listUserMessages();
+      res.json({ success: true, message: newMsg, messages: list });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── اتاق‌های گفتگوی زنده سایت (مانند /api/chat/rooms و /api/admin/chat-rooms) ──
+  app.get("/api/sync/chat-rooms", requireSyncApiKey, async (_req, res) => {
+    try {
+      res.json({ success: true, rooms: await getActiveDataProvider().listChatRooms() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.get("/api/sync/chat-rooms/:name/messages", requireSyncApiKey, async (req, res) => {
+    try {
+      res.json({ success: true, messages: await getActiveDataProvider().listChatMessages(decodeURIComponent(req.params.name)) });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/chat-rooms", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const name = String((req.body || {}).name || "").trim();
+      if (!name) return res.status(400).json({ error: "ROOM_NAME_REQUIRED" });
+      const store = getActiveDataProvider();
+      await store.createChatRoom(name);
+      res.json({ success: true, rooms: await store.listChatRooms() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete("/api/sync/chat-rooms/:name", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      await store.deleteChatRoom(decodeURIComponent(req.params.name));
+      res.json({ success: true, rooms: await store.listChatRooms() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── پیامک گروهی مساجیو (SMS/Viber/WhatsApp — همان /api/management/messaging/*) ──
+  app.get("/api/sync/messaging/overview", requireSyncApiKey, async (_req, res) => {
+    try {
+      res.json({
+        success: true,
+        config: await messagingOps.config(),
+        audience: await messagingOps.audiencePreview(),
+        campaigns: await messagingOps.listCampaigns(),
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/messaging/send", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const actor = (req as any).authUsername || "management-app";
+      res.json(await messagingOps.sendCampaign(actor, req.body || {}));
+    } catch (e: any) {
+      res.status(e?.statusCode || 500).json({ error: e?.code || String(e) });
+    }
+  });
+
+  // ── تنظیمات سایت (سفارشی‌سازی کلوپ) — لیست سفید کلیدها؛ بدون هیچ سکرت ──
+  const SYNC_SITE_SETTING_KEYS = new Set([
+    "club_phone", "club_hours", "club_address", "club_map_url", "club_map_lat", "club_map_lng",
+    "chat_enabled", "food_coming_soon", "shop_coming_soon",
+    "extra_controller_hourly", "gaming_credits_per_hour", "extra_controller_credits_per_hour",
+    "social_media_links",
+  ]);
+  const SYNC_SITE_SETTING_PREFIXES = ["section_", "company_", "legal_", "theme_img."];
+  const syncSiteSettingAllowed = (key: string) =>
+    SYNC_SITE_SETTING_KEYS.has(key) || SYNC_SITE_SETTING_PREFIXES.some((p) => key.startsWith(p));
+
+  app.get("/api/sync/site-settings", requireSyncApiKey, async (_req, res) => {
+    try {
+      const rows = await getActiveDataProvider().listSettings();
+      const settings: Record<string, string> = {};
+      for (const r of rows) {
+        if (syncSiteSettingAllowed(r.key) && !SECRET_SETTING_KEYS.has(r.key) && !protectedIntegrationSetting(r.key)) {
+          settings[r.key] = r.value;
+        }
+      }
+      res.json({ success: true, settings, dataSource: await getDataSourceMode() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/site-settings", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const { updates, key, value } = req.body || {};
+      const pairs: Record<string, string> = updates && typeof updates === "object" ? updates : key ? { [key]: value } : {};
+      const keys = Object.keys(pairs).filter(syncSiteSettingAllowed);
+      if (!keys.length) return res.status(400).json({ error: "NO_VALID_KEYS" });
+      const store = getActiveDataProvider();
+      for (const k of keys) {
+        if (SECRET_SETTING_KEYS.has(k) || protectedIntegrationSetting(k)) continue;
+        await store.setSetting(k, String(pairs[k] ?? ""));
+      }
+      logDbQuery(store.name, "SYSTEM", `[sync] ${keys.length} site setting(s) updated from Management App`);
+      res.json({ success: true, saved: keys.length });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── منبع داده سایت (نمونه ⇄ دیتابیس) — مانند /api/admin/data-source ──
+  app.post("/api/sync/data-source", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const mode = String((req.body || {}).mode || "");
+      if (mode !== "sample" && mode !== "database") {
+        return res.status(400).json({ error: "mode must be 'sample' or 'database'" });
+      }
+      await setDataSourceMode(mode);
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", `Data source switched to "${mode}" (Management App)`);
+      res.json({ success: true, mode });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── شارژ/کسر دستی کردیت بازینو — مانند /api/admin/credits/adjust ──
+  app.post("/api/sync/credits/adjust", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const username = String((req.body || {}).username || "").trim();
+      const delta = Number((req.body || {}).delta);
+      const note = String((req.body || {}).note || "").slice(0, 200);
+      if (!username) return res.status(400).json({ error: "USERNAME_REQUIRED" });
+      if (!Number.isSafeInteger(delta) || delta === 0 || Math.abs(delta) > 1_000_000) {
+        return res.status(400).json({ error: "INVALID_DELTA" });
+      }
+      const store = getActiveDataProvider();
+      const user = await store.getUserByUsername(username);
+      if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+      const before = Number(user.credits) || 0;
+      if (before + delta < 0) return res.status(400).json({ error: "INSUFFICIENT_CREDITS" });
+      await store.addCreditsToUser(username, delta);
+      await store.addTransaction({
+        id: Math.random().toString(36).substring(2, 9),
+        points: delta,
+        description: delta > 0 ? `شارژ ${delta} کردیت (BC) توسط ادمین${note ? ` — ${note}` : ""}` : `کسر ${Math.abs(delta)} کردیت (BC) توسط ادمین${note ? ` — ${note}` : ""}`,
+        type: "Credits",
+        date: "امروز",
+        username,
+      });
+      res.json({ success: true, username, delta, credits: before + delta });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── بازنشانی/پاک‌سازی داده‌های سایت — مانند /api/admin/reset-database و clear-database ──
+  app.post("/api/sync/reset-database", requireSyncApiKey, requireSyncSiteWrite, async (_req, res) => {
+    try {
+      await getActiveDataProvider().seedSampleData();
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", "Sample data reseeded from Management App");
+      res.json({ success: true, message: "SAMPLE_LOADED" });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load sample data" });
+    }
+  });
+
+  app.post("/api/sync/clear-database", requireSyncApiKey, requireSyncSiteWrite, async (_req, res) => {
+    try {
+      await getActiveDataProvider().purgeSampleData();
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", "Sample data purged from Management App");
+      res.json({ success: true, message: "SAMPLE_REMOVED" });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to purge sample data" });
+    }
+  });
+
+  // ── اسلایدر سایت/اپ (مانند /api/admin/app-sliders*) ──
+  app.get("/api/sync/app-sliders", requireSyncApiKey, async (_req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      // مثل پنل ادمین: نمایش لیست ادغام‌شده با داده نمونه (حالت sample)
+      res.json({
+        success: true,
+        sliders: await resolveMergedList(await store.listSliders(), SAMPLE_SLIDERS),
+        dataSource: await getDataSourceMode(),
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/app-sliders", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const { imageUrl, target, titleFa, titleEn, titleRu, titleTr, descFa, descEn, descRu, descTr } = req.body || {};
+      if (!imageUrl || !target) return res.status(400).json({ error: "SLIDE_FIELDS_REQUIRED" });
+      const store = getActiveDataProvider();
+      const newSlide = {
+        id: "slide-" + Math.random().toString(36).substring(2, 9),
+        imageUrl,
+        mobileImageUrl: imageUrl, // نسخهٔ موبایل: بدون تولید خودکار (فقط آدرس) — اپ فقط آدرس می‌فرستد
+        target,
+        titleFa: titleFa || "",
+        titleEn: titleEn || "",
+        titleRu: titleRu || "",
+        titleTr: titleTr || "",
+        descFa: typeof descFa === "string" ? descFa : "",
+        descEn: typeof descEn === "string" ? descEn : "",
+        descRu: typeof descRu === "string" ? descRu : "",
+        descTr: typeof descTr === "string" ? descTr : "",
+      };
+      await store.createSlider(newSlide);
+      res.json({ success: true, sliders: await store.listSliders() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.put("/api/sync/app-sliders/:id", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      const slide = await store.getSliderById(req.params.id);
+      if (!slide) return res.status(404).json({ error: "SLIDE_NOT_FOUND" });
+      const b = req.body || {};
+      await store.updateSlider(req.params.id, {
+        ...(b.imageUrl !== undefined ? { imageUrl: b.imageUrl } : {}),
+        ...(b.mobileImageUrl !== undefined ? { mobileImageUrl: b.mobileImageUrl } : {}),
+        ...(b.target !== undefined ? { target: b.target } : {}),
+        ...(b.titleFa !== undefined ? { titleFa: b.titleFa } : {}),
+        ...(b.titleEn !== undefined ? { titleEn: b.titleEn } : {}),
+        ...(b.titleRu !== undefined ? { titleRu: b.titleRu } : {}),
+        ...(b.titleTr !== undefined ? { titleTr: b.titleTr } : {}),
+        ...(b.descFa !== undefined ? { descFa: b.descFa } : {}),
+        ...(b.descEn !== undefined ? { descEn: b.descEn } : {}),
+        ...(b.descRu !== undefined ? { descRu: b.descRu } : {}),
+        ...(b.descTr !== undefined ? { descTr: b.descTr } : {}),
+      });
+      res.json({ success: true, sliders: await store.listSliders() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete("/api/sync/app-sliders/:id", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const store = getActiveDataProvider();
+      await store.deleteSlider(req.params.id);
+      res.json({ success: true, sliders: await store.listSliders() });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── لاگ دیتابیس (مانند /api/admin/db-logs) ──
+  app.get("/api/sync/db-logs", requireSyncApiKey, (_req, res) => {
+    try {
+      res.json({ success: true, logs: dbQueryLogs });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ── توکن‌های اتصال (Manus/Zernio — مانند /api/admin/api-tokens) ──
+  const SYNC_API_TOKEN_SCOPES = ["instagram:ingest", "manus:telegram", "manus:blog"] as const;
+  app.get("/api/sync/api-tokens", requireSyncApiKey, async (_req, res) => {
+    try {
+      res.json({ success: true, tokens: await listApiTokens(getActiveDataProvider()), scopes: SYNC_API_TOKEN_SCOPES });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/sync/api-tokens", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const name = String((req.body || {}).name || "").trim() || "API token";
+      const requested = Array.isArray((req.body || {}).scopes) ? (req.body || {}).scopes : [];
+      const scopes = requested.map(String).filter((s) => (SYNC_API_TOKEN_SCOPES as readonly string[]).includes(s));
+      const row = await createApiToken(getActiveDataProvider(), name, scopes.length ? scopes : undefined);
+      logDbQuery(getActiveDataProvider().name, "SYSTEM", `[sync] API token "${name}" created from Management App`);
+      res.json({ success: true, token: row });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete("/api/sync/api-tokens/:id", requireSyncApiKey, requireSyncSiteWrite, async (req, res) => {
+    try {
+      const ok = await deleteApiToken(getActiveDataProvider(), String(req.params.id));
+      if (!ok) return res.status(404).json({ error: "NOT_FOUND" });
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
 
   // Cafe Buffet Catalog & Orders
   app.get("/api/cafe", async (req, res) => {
@@ -2596,6 +3217,10 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     authUsername: (req) => (req as any).authUsername || undefined,
   });
   registerManusRoutes({
+    app,
+    getStore: getActiveDataProvider,
+  });
+  registerManusBlogRoutes({
     app,
     getStore: getActiveDataProvider,
   });
@@ -3280,6 +3905,14 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
 
   // نصب قالب از فایل ZIP (body خام با Content-Type: application/zip)
   // ساختار: theme.json + theme.css + assets/
+  //
+  // ── معماری 202 (۲۰۲۶-۰۹-۱۲، رفع 524 قالب‌های پر-asset مثل bazino-arena3d):
+  // نصب‌های حجیم روی volume شبکه‌ای Railway از ~۱۰۰ ثانیهٔ Cloudflare بلندتر
+  // می‌شدند و کلادفلر پاسخ ۵۲۴ می‌بُرید. حالا این route فقط preflight سبک
+  // می‌کند (بدون decompress کل ZIP)، job پس‌زمینه‌ای می‌سازد و 202 + jobId
+  // برمی‌گرداند؛ نصب واقعی در background انجام می‌شود و وضعیتش از
+  // GET /api/admin/themes/install-jobs/:jobId poll می‌شود.
+  // ?async=0 → مسیر sync قدیمی (همان‌جا جواب نهایی) برای قالب‌های سبک/سازگاری.
   app.post(
     "/api/admin/themes/install",
     express.raw({ type: ["application/zip", "application/octet-stream"], limit: "30mb" }),
@@ -3289,27 +3922,77 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
         if (!buffer || buffer.length === 0) {
           return res.status(400).json(apiError(req, "ZIP_MISSING"));
         }
+        if (buffer.length > THEME_ZIP_MAX_BYTES) {
+          return res.status(413).json(apiError(req, "THEME_ZIP_TOO_LARGE", { size: Math.round(THEME_ZIP_MAX_BYTES / 1024 / 1024) }));
+        }
         const fallbackName = (req.query.name as string) || undefined;
         // replace=1 → نصب نسخه‌ی جدید روی همان شناسه (جایگزینی اتمیک پوشه)
         const replace = String(req.query.replace || "") === "1";
-        const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
-        if ("error" in result) {
-          return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
-        }
-        const store = getActiveDataProvider();
-        logDbQuery(store.name, "SYSTEM", `Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
-        // فعال‌سازی سراسری همین‌جا (اتمیک با نصب) — قبلاً کلاینت جداگانه صدا می‌زد و در صورت
-        // خطا، قالب نصب می‌شد ولی پیش‌فرض سایت عوض نمی‌شد.
         const activate = String(req.query.activate || "1") !== "0";
-        if (activate) await store.setSetting("activeThemeId", result.theme.id);
-        const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
-        res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
-      } catch (e) {
+        const forceSync = String(req.query.async || "1") === "0";
+
+        if (forceSync) {
+          // مسیر قدیمی — همان‌جا جواب نهایی می‌دهد (قالب‌های سبک؛ بدون timeout کلادفلر)
+          const result = await installThemeZip(new Uint8Array(buffer), fallbackName, { replace });
+          if ("error" in result) {
+            return res.status(result.code === "THEME_EXISTS" ? 409 : 400).json({ error: result.error, code: result.code, performance: result.performance });
+          }
+          const store = getActiveDataProvider();
+          logDbQuery(store.name, "SYSTEM", `Theme "${result.theme.id}" ${result.replaced ? "updated" : "installed"} (${result.parsed.assets ? Object.keys(result.parsed.assets).length : 0} assets)`);
+          if (activate) await store.setSetting("activeThemeId", result.theme.id);
+          const activeThemeId = (await store.getSetting("activeThemeId")) || "dark-gold";
+          return res.json({ success: true, theme: result.theme, replaced: !!result.replaced, activeThemeId, serverThemes: listInstalledThemes(), performance: result.performance });
+        }
+
+        // ── مسیر async (پیش‌فرض) ──
+        const store = getActiveDataProvider();
+        const pre = quickValidateThemeZip(new Uint8Array(buffer), fallbackName);
+        if (!pre.ok) {
+          return res.status(400).json({ error: pre.error, code: pre.code });
+        }
+        // قالب موجود بدون replace → همان 409 قبلی، قبل از اینکه job ساخته شود
+        const existing = listInstalledThemes().find((t: any) => t.id === pre.themeId);
+        if (existing && !replace) {
+          return res.status(409).json(apiError(req, "THEME_EXISTS_ID", { id: pre.themeId }));
+        }
+        const job = await createThemeInstallJob(new Uint8Array(buffer), {
+          replace,
+          activate,
+          fallbackName,
+          activateTheme: (themeId) => store.setSetting("activeThemeId", themeId),
+          readActiveThemeId: () => store.getSetting("activeThemeId"),
+        });
+        logDbQuery(store.name, "SYSTEM", `Theme install job ${job.jobId} queued for "${job.themeId}" v${job.version}`);
+        res.status(202).json({
+          success: true,
+          status: "processing",
+          jobId: job.jobId,
+          themeId: job.themeId,
+          version: job.version,
+          progress: job.progress,
+          pollUrl: `/api/admin/themes/install-jobs/${job.jobId}`,
+        });
+      } catch (e: any) {
+        if (e?.code && e?.message) {
+          return res.status(400).json({ error: e.message, code: e.code });
+        }
         console.error("Theme install error:", e);
         res.status(500).json({ error: String(e) });
       }
     }
   );
+
+  // وضعیت job نصب قالب — queued/validating/extracting/installing/completed/failed
+  // (requireAdmin از middleware سراسری /api/admin می‌آید)
+  app.get("/api/admin/themes/install-jobs/:jobId", (req, res) => {
+    try {
+      const job = getThemeInstallJob(String(req.params.jobId || ""));
+      if (!job) return res.status(404).json({ error: "JOB_NOT_FOUND", code: "JOB_NOT_FOUND" });
+      res.json({ success: true, ...job });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
 
   // سرو فایل CSS قالب (با بازنویسی مسیرهای assets)
   app.get("/api/themes/:id/theme.css", (req, res) => {
@@ -3617,6 +4300,309 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     } catch (e) {
       console.error("Mobile app QR generation failed:", e);
       res.status(502).json(apiError(req, "QR_FAILED"));
+    }
+  });
+
+  // =========================================================================
+  // APP LAB — امولاتور وب (Appetize.io): نصب APK و تست زندهٔ آن در مرورگر
+  // =========================================================================
+  // جریان: ادمین یک‌بار توکن API Appetize را (از appetize.io) ذخیره می‌کند؛
+  // سپس APK — یا فایل همین سایت یا فایل دلخواه — با «متد URL» به Appetize
+  // سپرده می‌شود: یعنی خودِ Appetize فایل را مستقیم از همین سایت دانلود
+  // می‌کند و بایت‌ها دوباره از سرور ما آپلود نمی‌شوند. کلید عمومی
+  // (publicKey) برگشتی ذخیره می‌شود و صفحهٔ عمومی /app-download امولاتور
+  // را با iframe embed می‌کند — تجربه‌ای شبیه خود appetize.io روی دامنهٔ خودمان.
+  // توکن هرگز به کلاینت برگردانده نمی‌شود (فقط چهار کاراکتر آخرش).
+  const APPETIZE_TOKEN_SETTING = "appetize_api_token";
+  const APPETIZE_APP_SETTING = "appetize_app";
+  const APPETIZE_API_BASE = (process.env.BAZINO_APPETIZE_API_BASE || "https://api.appetize.io/v1").replace(/\/+$/, "");
+  // فایل‌های APK موقتی که Appetize باید از ما دانلود کند: توکن تصادفی → مسیر+انقضا
+  const APPETIZE_UPLOAD_TTL_MS = 30 * 60 * 1000;
+  const appetizeTempFiles = new Map<string, { path: string; expiresAt: number }>();
+
+  const getAppetizeToken = async (): Promise<string> => {
+    const raw = await getActiveDataProvider().getSetting(APPETIZE_TOKEN_SETTING);
+    const stored = typeof raw === "string" ? raw.trim() : "";
+    return stored || (process.env.BAZINO_APPETIZE_TOKEN || "").trim();
+  };
+
+  const getAppetizeApp = async (): Promise<any> => {
+    try {
+      const raw = await getActiveDataProvider().getSetting(APPETIZE_APP_SETTING);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" && typeof parsed.publicKey === "string" && parsed.publicKey ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getAppetizePublicOrigin = (req: express.Request): string => {
+    const envUrl = (process.env.PUBLIC_URL || process.env.BAZINO_PUBLIC_URL || "").replace(/\/+$/, "");
+    if (envUrl) return envUrl;
+    const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+    const proto = forwardedProto || req.protocol || "https";
+    return `${proto}://${req.get("host") || "localhost"}`;
+  };
+
+  const sweepStaleAppetizeFiles = async () => {
+    const now = Date.now();
+    for (const [token, entry] of appetizeTempFiles) {
+      if (entry.expiresAt <= now) {
+        appetizeTempFiles.delete(token);
+        await fs.promises.rm(entry.path, { force: true }).catch(() => {});
+      }
+    }
+  };
+
+  // فراخوانی API Appetize (هدر X-API-KEY + تایم‌اوت). خطاها کد و وضعیت HTTP
+  // شفاف برمی‌گردانند تا پنل ادمین پیام دقیق سرویس بیرونی را نشان بدهد.
+  const appetizeApi = async (apiPath: string, init: RequestInit = {}, timeoutMs = 5 * 60 * 1000): Promise<any> => {
+    const token = await getAppetizeToken();
+    if (!token) {
+      const err: any = new Error("APPETIZE_NOT_CONFIGURED");
+      err.appCode = "APPETIZE_NOT_CONFIGURED";
+      err.appStatus = 503;
+      throw err;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${APPETIZE_API_BASE}${apiPath}`, {
+        ...init,
+        headers: { "X-API-KEY": token, ...init.headers },
+        signal: controller.signal,
+      });
+      const text = await res.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+      if (!res.ok) {
+        const err: any = new Error((data && (data.message || data.error)) || `Appetize API HTTP ${res.status}`);
+        err.appCode = (data && (data.code || data.error)) || "APPETIZE_API_ERROR";
+        err.appStatus = 502;
+        err.appData = data;
+        throw err;
+      }
+      return data;
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        const err: any = new Error("Appetize API timeout");
+        err.appCode = "APPETIZE_TIMEOUT";
+        err.appStatus = 504;
+        throw err;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const sendAppetizeError = (res: express.Response, req: express.Request, error: any) => {
+    const code = String(error?.appCode || "APPETIZE_ERROR");
+    if (code === "APPETIZE_NOT_CONFIGURED") {
+      return res.status(503).json(apiError(req, "APPETIZE_NOT_CONFIGURED"));
+    }
+    console.error("[App Lab] Appetize request failed:", { code, message: error?.message });
+    return res.status(Number(error?.appStatus) || 500).json({
+      error: error?.message || "Appetize request failed",
+      code,
+      status: Number(error?.appStatus) || 500,
+      details: error?.appData ?? undefined,
+    });
+  };
+
+  const appetizeAppSummary = (app: any) => ({
+    publicKey: String(app.publicKey),
+    platform: app.platform || "android",
+    note: app.note || "",
+    source: app.source || "",
+    updatedAt: app.updatedAt || "",
+    embedUrl: `https://appetize.io/embed/${app.publicKey}`,
+  });
+
+  // هستهٔ مشترکِ «ارسال به امولاتور»: ساخت/به‌روزرسانی اپ با متد URL
+  const pushUrlToAppetize = async (req: express.Request, url: string, forceNew: boolean) => {
+    const existing = forceNew ? null : await getAppetizeApp();
+    const apiPath = existing ? `/apps/${encodeURIComponent(String(existing.publicKey))}` : "/apps";
+    const data = await appetizeApi(apiPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        platform: "android",
+        note: "BAZINO PRO — App Lab",
+        // بدون run:public مرورگر بازدیدکننده اجازهٔ اجرای نشست را نمی‌گرفت
+        appPermissions: { run: "public" },
+      }),
+    });
+    const publicKey = String(data?.publicKey || existing?.publicKey || "").trim();
+    if (!publicKey) {
+      const err: any = new Error("Appetize did not return a publicKey");
+      err.appCode = "APPETIZE_NO_PUBLIC_KEY";
+      err.appStatus = 502;
+      throw err;
+    }
+    const app = {
+      publicKey,
+      platform: "android",
+      note: data?.note || "BAZINO PRO — App Lab",
+      source: url,
+      updatedAt: new Date().toISOString(),
+    };
+    await getActiveDataProvider().setSetting(APPETIZE_APP_SETTING, JSON.stringify(app));
+    return { data, app, updatedExisting: !!existing };
+  };
+
+  // ---- عمومی: اپ فعالِ قابل‌تست در مرورگر (فقط publicKey؛ بدون هیچ راز) ----
+  app.get("/api/appetize/active", async (_req, res) => {
+    try {
+      const app = await getAppetizeApp();
+      res.json({
+        active: !!app,
+        app: app ? appetizeAppSummary(app) : null,
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ---- دانلود موقتیِ APK برای Appetize (توکن تصادفی + انقضای ۳۰ دقیقه) ----
+  app.get("/api/appetize/file/:token", async (req, res) => {
+    const token = String(req.params.token || "");
+    const entry = appetizeTempFiles.get(token);
+    if (!entry || entry.expiresAt <= Date.now() || !fs.existsSync(entry.path)) {
+      appetizeTempFiles.delete(token);
+      return res.status(404).json({ error: "APK link expired or not found", code: "APPETIZE_FILE_NOT_FOUND", status: 404 });
+    }
+    res.download(entry.path, "bazino-app-lab.apk", (err) => {
+      if (err) {
+        console.error("[App Lab] temp file download failed:", { code: (err as any)?.code, message: err.message, path: entry.path });
+        if (!res.headersSent) res.status(500).json({ error: "Download failed" });
+      }
+    });
+  });
+
+  // ---- ادمین: وضعیت آزمایشگاه ----
+  app.get("/api/admin/appetize/status", async (req, res) => {
+    try {
+      const token = await getAppetizeToken();
+      const app = await getAppetizeApp();
+      const cfg = await getMobileAppConfig();
+      res.json({
+        configured: !!token,
+        tokenHint: token ? `••••${token.slice(-4)}` : "",
+        app: app ? appetizeAppSummary(app) : null,
+        apkAvailable: !!cfg.apkAvailable,
+        apkSize: cfg.apkSize || 0,
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // ---- ادمین: ذخیره/حذف توکن Appetize ----
+  app.put("/api/admin/appetize/token", async (req, res) => {
+    const token = String((req.body as any)?.token ?? "").trim();
+    if (token.length < 8) return res.status(400).json(apiError(req, "APPETIZE_TOKEN_INVALID"));
+    await getActiveDataProvider().setSetting(APPETIZE_TOKEN_SETTING, token);
+    console.info("[App Lab] Appetize API token saved");
+    res.json({ success: true });
+  });
+
+  app.delete("/api/admin/appetize/token", async (_req, res) => {
+    await getActiveDataProvider().setSetting(APPETIZE_TOKEN_SETTING, "");
+    res.json({ success: true });
+  });
+
+  // ---- ادمین: ارسال APK به امولاتور (فایل سایت یا هر URL عمومی دیگر) ----
+  app.post("/api/admin/appetize/push", async (req, res) => {
+    try {
+      // بدون توکن، هیچ منبعی معنا ندارد — این خطای بنیادی اول برگردد
+      if (!(await getAppetizeToken())) {
+        return res.status(503).json(apiError(req, "APPETIZE_NOT_CONFIGURED"));
+      }
+      const source = String((req.body as any)?.source ?? "site-apk");
+      const forceNew = (req.body as any)?.forceNew === true;
+      let url = "";
+      if (source === "site-apk") {
+        const cfg = await getMobileAppConfig();
+        if (!cfg.apkAvailable) return res.status(400).json(apiError(req, "APK_NOT_UPLOADED"));
+        url = `${getAppetizePublicOrigin(req)}/api/mobile-app/download`;
+      } else if (source === "url") {
+        url = String((req.body as any)?.url ?? "").trim();
+        if (!/^https?:\/\//i.test(url)) return res.status(400).json(apiError(req, "APPETIZE_URL_INVALID"));
+      } else {
+        return res.status(400).json(apiError(req, "APPETIZE_SOURCE_INVALID"));
+      }
+      const { data, app, updatedExisting } = await pushUrlToAppetize(req, url, forceNew);
+      console.info("[App Lab] APK pushed to Appetize", { publicKey: app.publicKey, updatedExisting, source });
+      res.json({ success: true, app: appetizeAppSummary(app), updatedExisting, appetize: data ?? null });
+    } catch (e: any) {
+      sendAppetizeError(res, req, e);
+    }
+  });
+
+  // ---- ادمین: آپلود APK دلخواه و ارسال مستقیم همان به امولاتور ----
+  // فایل با formidable روی دیسک موقت می‌نشیند (بدون بافر حافظه)؛ سپس با متد
+  // URL از مسیر موقتِ عمومی به Appetize سپرده می‌شود. بعد از موفقیت، فایل تا
+  // پایان TTL (۳۰ دقیقه) می‌ماند تا اگر Appetize دوباره آن را fetch کرد شکست
+  // نخورد؛ پاک‌سازی نهایی را sweeper انجام می‌دهد. فقط مسیر خطا فوراً پاک می‌شود.
+  app.post("/api/admin/appetize/upload", async (req, res) => {
+    let fileToken: string | null = null;
+    let filePath: string | null = null;
+    let keepFile = false;
+    try {
+      if (!isMultipartApkUpload(req)) {
+        return res.status(400).json({ error: "Expected a multipart/form-data upload", code: "INVALID_APPETIZE_FORM", status: 400 });
+      }
+      await sweepStaleAppetizeFiles();
+      await fs.promises.mkdir(getMobileAppDownloadDir(), { recursive: true });
+      const form = formidable({
+        uploadDir: getMobileAppDownloadDir(),
+        filename: () => `appetize-tmp-${randomUUID()}.apk`,
+        maxFiles: 1,
+        maxFileSize: MAX_APK_BYTES,
+        maxTotalFileSize: MAX_APK_BYTES,
+        minFileSize: 1,
+        allowEmptyFiles: false,
+        multiples: false,
+      });
+      const [, files] = await form.parse(req);
+      const uploaded = (files.file || [])[0];
+      if (!uploaded) return res.status(400).json(apiError(req, "APPETIZE_APK_REQUIRED"));
+      const originalName = String(uploaded.originalFilename || "").trim();
+      if (!originalName.toLowerCase().endsWith(".apk")) {
+        return res.status(400).json({ error: "Only .apk files are allowed", code: "INVALID_APPETIZE_FILE", status: 400 });
+      }
+      filePath = uploaded.filepath;
+      fileToken = randomUUID();
+      appetizeTempFiles.set(fileToken, { path: filePath, expiresAt: Date.now() + APPETIZE_UPLOAD_TTL_MS });
+      const publicUrl = `${getAppetizePublicOrigin(req)}/api/appetize/file/${fileToken}`;
+      const { data, app, updatedExisting } = await pushUrlToAppetize(req, publicUrl, req.query.forceNew === "1" || req.query.forceNew === "true");
+      keepFile = true;
+      console.info("[App Lab] Custom APK uploaded to Appetize", { publicKey: app.publicKey, updatedExisting, originalName, size: uploaded.size });
+      res.json({ success: true, app: appetizeAppSummary(app), updatedExisting, appetize: data ?? null });
+    } catch (e: any) {
+      sendAppetizeError(res, req, e);
+    } finally {
+      if (filePath && !keepFile) {
+        if (fileToken) appetizeTempFiles.delete(fileToken);
+        await fs.promises.rm(filePath, { force: true }).catch(() => {});
+      }
+    }
+  });
+
+  // ---- ادمین: حذف اپ از امولاتور ----
+  app.delete("/api/admin/appetize/app", async (req, res) => {
+    try {
+      const app = await getAppetizeApp();
+      if (app) {
+        await appetizeApi(`/apps/${encodeURIComponent(String(app.publicKey))}`, { method: "DELETE" }, 60_000);
+        console.info("[App Lab] Appetize app deleted", { publicKey: app.publicKey });
+      }
+      await getActiveDataProvider().setSetting(APPETIZE_APP_SETTING, "");
+      res.json({ success: true });
+    } catch (e: any) {
+      sendAppetizeError(res, req, e);
     }
   });
 
@@ -4110,6 +5096,50 @@ namespace GameNet.Infrastructure.Migrations
     }
   });
 
+  // ═══ تصاویر سفارشی قالب‌ها (استاتیک/تزئینی) — آپلود ادمین ═══
+  // ادمین از پنل شخصی‌سازی، برای هر «اسلات» تصویر (مثل هرو مرکزی/کارت تورنمنت/
+  // کارت مسابقه زنده) فایل آپلود می‌کند؛ خروجی WebP بهینه در DATA_DIR/uploads/theme
+  // سرو می‌شود و URL آن در تنظیمات `theme_img.<slot>` ذخیره می‌شود تا قالب از
+  // props.settings بخواند و در نبودِ آن به تصویر پیش‌فرضِ خودِ قالب برگردد.
+  // نام فایل = نام اسلات (بازنویسی جایگزین) + پارامتر ?v= برای کش‌باست مرورگر.
+  const themeImgDir = path.join(DATA_DIR, "uploads", "theme");
+  app.use("/uploads/theme", express.static(themeImgDir, { maxAge: "30d" }));
+  const rawThemeImage = express.raw({
+    type: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    limit: "8mb",
+  });
+  app.post("/api/admin/theme-image", rawThemeImage, async (req, res) => {
+    try {
+      const slot = String(req.query.slot || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || "image";
+      const buf: Buffer | undefined = Buffer.isBuffer(req.body) ? req.body : undefined;
+      if (!buf || buf.length < 100) {
+        return res.status(400).json({ error: "Invalid or empty image", code: "INVALID_IMAGE" });
+      }
+      let out: Buffer;
+      try {
+        const sharp = (await import("sharp")).default;
+        out = await sharp(buf)
+          .rotate()
+          .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+      } catch (e) {
+        console.error("[theme-image] sharp failed:", e);
+        return res.status(400).json({ error: "Unsupported image format", code: "INVALID_IMAGE" });
+      }
+      fs.mkdirSync(themeImgDir, { recursive: true });
+      const fileName = `${slot}.webp`;
+      fs.writeFileSync(path.join(themeImgDir, fileName), out);
+      const url = `/uploads/theme/${fileName}?v=${Date.now().toString(36)}`;
+      console.info(`[theme-image] slot «${slot}» updated (${out.length} bytes webp)`);
+      res.json({ success: true, url, slot });
+    } catch (err) {
+      console.error("Error uploading theme image:", err);
+      res.status(500).json({ error: "Failed to store theme image" });
+    }
+  });
+
+
   // شارژ/کسر دستی کردیت بازینو (BC) توسط ادمین — تا وقتی روش‌های کسب کردیت نهایی نشده،
   // این مسیر رسمی شارژ حساب کاربر است. هر حرکت در تراکنش‌ها با نوع Credits ثبت می‌شود.
   app.post("/api/admin/credits/adjust", async (req, res) => {
@@ -4590,57 +5620,161 @@ Example format:
   // =========================================================================
   // DESKTOP APP DOWNLOADS (Management App → Settings → "دانلود نسخه دسکتاپ")
   // =========================================================================
-  // Real installers are NOT built by this server — they're produced separately by running
-  // `npm run dist:win` / `dist:mac` / `dist:linux` inside /desktop-app on a real machine of
-  // each target OS (native modules can't be reliably cross-compiled — see
-  // desktop-app/README.md). Whatever ends up in /desktop-builds/<platform>/ after that gets
-  // served here. Until a real build is placed there, this responds with 404 + a clear
-  // message instead of pretending a download exists.
+  // Real installers are NOT built by this server — they're built by GitHub Actions
+  // (.github/workflows/desktop-installers.yml, matrix over windows/macos/linux) and
+  // published to the GitHub Releases of this (public) repository: tag «desktop-v*» =
+  // انتشار پایدار، «desktop-dev-*» = بیلد آزمایشی. فایل‌های نصاب ۱۰۰MB+ هستند و در
+  // گیت جا نمی‌شوند؛ به همین دلیل سرور فقط به فایل ریلیز redirect می‌کند و خودش
+  // فایل را نگه نمی‌دارد. اگر ادمین خروجی محلی در /desktop-builds/<platform>/ گذاشته
+  // باشد، آن فایل (مثل قبل) اولویت دارد.
   const desktopBuildsDir = path.join(process.env.BAZINO_STATIC_ROOT || process.cwd(), "desktop-builds");
   const desktopPlatforms: Record<string, { dir: string; label: string }> = {
     windows: { dir: "windows", label: "ویندوز (.exe)" },
     mac: { dir: "mac", label: "مک (.dmg)" },
     linux: { dir: "linux", label: "لینوکس (.AppImage)" },
   };
+  const GITHUB_REPO = process.env.BAZINO_GITHUB_REPO || "paymanshafayan/bazino-gamenet-portal";
+  /** پسوند فایل نصاب هر پلتفرم در ریلیز گیت‌هاب. */
+  const DESKTOP_ASSET_EXTS: Record<string, string[]> = {
+    windows: [".exe"],
+    mac: [".dmg"],
+    linux: [".AppImage", ".deb"],
+  };
+  interface DesktopGhAsset { name: string; url: string; size: number; }
+  interface DesktopGhRelease { tag: string; name: string; prerelease: boolean; assets: DesktopGhAsset[]; }
+  let desktopGhCache: { at: number; ok: boolean; release: DesktopGhRelease | null } = { at: 0, ok: false, release: null };
+
+  // فالبک «آخرین ریلیز شناخته‌شده» — اگر GitHub API از دسترس خارج شود (مثل
+  // rate-limit سهمیهٔ ۶۰ درخواست/ساعتهٔ IPهای خروجی اشتراکی Railway، که بعد از هر
+  // ری‌استارت نمونه می‌تواند رخ دهد)، دکمه‌های دانلود پنل مدیریت نباید بمیرند.
+  // آدرس دانلود مستقیم ریلیزِ ریپوی عمومی قطعی است: /releases/download/{tag}/{asset}.
+  // این مقدار فقط هنگام کشِ خالی + شکست API مصرف می‌شود؛ تا وقتی API زنده است
+  // همیشه اطلاعات واقعی لحظه‌ای برمی‌گردد.
+  const DESKTOP_FALLBACK_RELEASE: DesktopGhRelease = {
+    tag: "desktop-dev-9",
+    name: "BAZINO PRO Desktop v1.1.0 (build 9)",
+    prerelease: true,
+    assets: [
+      "BAZINO.PRO.Setup.1.1.0.exe",
+      "BAZINO.PRO.1.1.0.exe",
+      "BAZINO.PRO-1.1.0-arm64.dmg",
+      "BAZINO.PRO.1.1.0.AppImage",
+      "bazino-pro-desktop_1.1.0_amd64.deb",
+    ].map((name) => ({
+      name,
+      url: `https://github.com/${GITHUB_REPO}/releases/download/desktop-dev-9/${encodeURIComponent(name)}`,
+      size: 0,
+    })),
+  };
+
+  /** آخرین ریلیز دسکتاپ از GitHub — پایدار (desktop-v*) مقدم بر آزمایشی (desktop-dev-). کش ۶۰ ثانیه. */
+  async function latestDesktopGithubRelease(): Promise<DesktopGhRelease | null> {
+    // موفق: ۱۵ دقیقه کش (اطلاعات ریلیز به‌ندرت تغییر می‌کند و فراخوانی کمتر = خطر
+    // کمترِ خوردن rate-limit). ناموفق: فقط ۶۰ ثانیه صبر و بعد تلاش مجدد.
+    const ttl = desktopGhCache.ok ? 15 * 60_000 : 60_000;
+    if (Date.now() - desktopGhCache.at < ttl) return desktopGhCache.release;
+    try {
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=50`, {
+        headers: { "User-Agent": "bazino-portal-desktop-download", Accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) throw new Error(`GitHub HTTP ${r.status}`);
+      const list = (await r.json()) as any[];
+      const pick =
+        list.find((x) => /^desktop-v\d/i.test(String(x?.tag_name || ""))) ||
+        list.find((x) => /^desktop-dev-/i.test(String(x?.tag_name || ""))) ||
+        null;
+      const release: DesktopGhRelease | null = pick
+        ? {
+            tag: pick.tag_name,
+            name: String(pick.name || pick.tag_name),
+            prerelease: !!pick.prerelease,
+            assets: (pick.assets || [])
+              .map((a: any) => ({ name: String(a.name || ""), url: String(a.browser_download_url || ""), size: Number(a.size) || 0 }))
+              .filter((a: DesktopGhAsset) => a.name && a.url),
+          }
+        : null;
+      desktopGhCache = { at: Date.now(), ok: true, release };
+      return release;
+    } catch (e) {
+      // گیت‌هاب در دسترس نبود — آخرین دادهٔ کش‌شده (حتی کهنه) برگردد تا دکمه‌ها نچسبند؛
+      // اگر نمونهٔ تازه‌بالا‌آمده هنوز هیچ کشی ندارد، فالبکِ آخرین ریلیز شناخته‌شده
+      // خودش کش می‌شود تا در بازهٔ انتظارِ (۶۰ ثانیه) تلاش مجدد هم دانلود زنده بماند.
+      console.warn("[desktop] GitHub release lookup failed:", e);
+      if (!desktopGhCache.release) {
+        console.warn("[desktop] Serving last-known desktop release fallback:", DESKTOP_FALLBACK_RELEASE.tag);
+      }
+      const release = desktopGhCache.release ?? DESKTOP_FALLBACK_RELEASE;
+      desktopGhCache = { at: Date.now(), ok: false, release };
+      return release;
+    }
+  }
+
+  function desktopLocalFiles(platform: { dir: string }): string[] {
+    const platformDir = path.join(desktopBuildsDir, platform.dir);
+    try {
+      return fs.readdirSync(platformDir).filter((f) => !f.startsWith("."));
+    } catch {
+      return [];
+    }
+  }
 
   // Tells the UI which platforms actually have a real installer available right now, so it
   // can show working download buttons instead of dead links for platforms not built yet.
-  app.get("/api/desktop/availability", (req, res) => {
+  // منبع: فایل محلی desktop-builds/ یا آخرین ریلیز دسکتاپ GitHub.
+  app.get("/api/desktop/availability", async (req, res) => {
     const availability: Record<string, boolean> = {};
-    for (const [platform, { dir }] of Object.entries(desktopPlatforms)) {
-      const platformDir = path.join(desktopBuildsDir, dir);
-      try {
-        availability[platform] = fs.existsSync(platformDir) && fs.readdirSync(platformDir).length > 0;
-      } catch {
-        availability[platform] = false;
+    let source: "local" | "github" | "none" = "none";
+    for (const platform of Object.keys(desktopPlatforms)) {
+      availability[platform] = desktopLocalFiles(desktopPlatforms[platform]).length > 0;
+      if (availability[platform]) source = "local";
+    }
+    let release: DesktopGhRelease | null = null;
+    if (source === "none") {
+      release = await latestDesktopGithubRelease();
+      if (release) {
+        source = "github";
+        for (const [platform, exts] of Object.entries(DESKTOP_ASSET_EXTS)) {
+          availability[platform] = release.assets.some((a) => exts.some((ext) => a.name.toLowerCase().endsWith(ext.toLowerCase())));
+        }
       }
     }
-    res.json({ availability });
+    res.json({ availability, source, release: release ? { tag: release.tag, name: release.name, prerelease: release.prerelease } : null });
   });
 
-  app.get("/api/desktop/download/:platform", (req, res) => {
+  app.get("/api/desktop/download/:platform", async (req, res) => {
     const platform = desktopPlatforms[req.params.platform];
     if (!platform) {
       return res.status(400).json(apiError(req, "INVALID_PLATFORM"));
     }
-    const platformDir = path.join(desktopBuildsDir, platform.dir);
-    if (!fs.existsSync(platformDir)) {
-      return res.status(404).json({
-        ...apiError(req, "DESKTOP_NOT_BUILT", { platform: platform.label }),
-        hint: "راهنما: desktop-app/README.md — دستور 'npm run dist' را روی یک دستگاه واقعی همان سیستم‌عامل اجرا کنید و خروجی را در desktop-builds/" + platform.dir + "/ قرار دهید."
+    // ۱) فایل محلی (خروجی dist روی خودِ سرور) — مثل قبل
+    const localFiles = desktopLocalFiles(platform);
+    if (localFiles.length > 0) {
+      // If multiple files exist (e.g. both nsis installer + portable exe), prefer the first one alphabetically.
+      const fileName = localFiles.sort()[0];
+      return res.download(path.join(desktopBuildsDir, platform.dir, fileName), fileName, (err) => {
+        if (err) {
+          console.error("Error downloading desktop build:", err);
+          if (!res.headersSent) res.status(500).json(apiError(req, "FILE_DOWNLOAD_FAILED"));
+        }
       });
     }
-    const files = fs.readdirSync(platformDir).filter(f => !f.startsWith("."));
-    if (files.length === 0) {
-      return res.status(404).json(apiError(req, "DESKTOP_FILE_NOT_FOUND", { platform: platform.label }));
-    }
-    // If multiple files exist (e.g. both nsis installer + portable exe), prefer the first one alphabetically.
-    const fileName = files.sort()[0];
-    res.download(path.join(platformDir, fileName), fileName, (err) => {
-      if (err) {
-        console.error("Error downloading desktop build:", err);
-        if (!res.headersSent) res.status(500).json(apiError(req, "FILE_DOWNLOAD_FAILED"));
+    // ۲) آخرین ریلیز دسکتاپ GitHub — دانلود مستقیم از CDN گیت‌هاب (ریپو عمومی)
+    const release = await latestDesktopGithubRelease();
+    if (release) {
+      const exts = DESKTOP_ASSET_EXTS[req.params.platform] || [];
+      // Setup.exe (نصبی کامل) بر portable exe ترجیح دارد؛ AppImage بر deb.
+      const asset =
+        release.assets.find((a) => exts.some((ext) => a.name.toLowerCase().endsWith(ext.toLowerCase())) && /setup|appimage/i.test(a.name)) ||
+        release.assets.find((a) => exts.some((ext) => a.name.toLowerCase().endsWith(ext.toLowerCase())));
+      if (asset) {
+        console.info(`[desktop] download ${req.params.platform} → GitHub ${release.tag}/${asset.name}`);
+        return res.redirect(302, asset.url);
       }
+    }
+    return res.status(404).json({
+      ...apiError(req, "DESKTOP_NOT_BUILT", { platform: platform.label }),
+      hint: "راهنما: بیلد نصاب‌ها با GitHub Actions (desktop-installers.yml) انجام و در Releases ریپو منتشر می‌شود؛ خروجی دستی نیز می‌تواند در desktop-builds/" + platform.dir + "/ قرار گیرد."
     });
   });
 

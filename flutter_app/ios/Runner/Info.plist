@@ -31,6 +31,10 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>GameNet Jarvis requires Speech Recognition permission to transcribe your voice commands into cyber-actions.</string>
 
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>برای انتخاب عکس پروفایل به دسترسی گالری نیاز است.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>برای عکس پروفایل می‌توانید از دوربین استفاده کنید.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

@@ -1,13 +1,14 @@
 import React,{useState,useEffect,useCallback} from 'react';
-import {Send,Layers,ShieldCheck,Bot,Settings2,Activity,ImagePlus,ArrowUpRight,RefreshCw,Plus,Hand,Sparkles,Link2,KeyRound,Users,Eye,Clock,ChevronRight,Copy,MessageCircle} from 'lucide-react';
+import {Send,Layers,ShieldCheck,Bot,Settings2,Activity,ImagePlus,ArrowUpRight,RefreshCw,Plus,Hand,Sparkles,Link2,KeyRound,Users,Eye,Clock,ChevronRight,Copy,MessageCircle,Inbox} from 'lucide-react';
 import {PostManager} from './PostManager';
 import {TelegramTab} from './Telegram';
+import {IgInboxTab} from './IgInbox';
 import {LegacyContentConsole} from '../management/LegacyContent';
 import {CAMPAIGN_MESSAGES} from './messages';
 import {useCopy,COPY,Field,Toggle,PubModal,StateBadge,ErrorNotice} from './ui';
 import './studio.css';
 
-type Tab='overview'|'posts'|'campaigns'|'media'|'agents'|'settings'|'events'|'telegram'|'legacy';
+type Tab='overview'|'posts'|'campaigns'|'media'|'agents'|'settings'|'events'|'telegram'|'inbox'|'legacy';
 export function PublishingStudio({initialTab='overview'}:{initialTab?:Tab}){
  const {api,c,tr,staff,language,can}=useCopy();
  const [period,setPeriod]=useState(''),[settlement,setSettlement]=useState<any>(null);
@@ -25,7 +26,7 @@ export function PublishingStudio({initialTab='overview'}:{initialTab?:Tab}){
  const mode=cfg?.config?.data.selectedMode;
  const totals=(key:string)=>(report?.campaigns||[]).reduce((n:number,r:any)=>n+Number(r[key]||0),0);
  const count=(n:number)=>new Intl.NumberFormat(language==='fa'?'fa-IR':language).format(n||0);
- const tabs:Array<[Tab,any]>= [['overview',Layers],['posts',Send],['campaigns',Users],['media',ImagePlus],['events',Activity],...(admin?[['agents',Bot],['settings',Settings2],['telegram',MessageCircle]]:[]) as any,['legacy',Clock]];
+ const tabs:Array<[Tab,any]>= [['overview',Layers],['posts',Send],['campaigns',Users],['media',ImagePlus],['events',Activity],...(admin?[['agents',Bot],['settings',Settings2],['telegram',MessageCircle],['inbox',Inbox]]:[]) as any,['legacy',Clock]];
  return <section className="pub-app" dir={language==='fa'?'rtl':'ltr'} data-publishing-studio>
   <header className="pub-heading"><div><span className="pub-eyebrow">BAZINO · CONTENT STUDIO</span><h1>{c('title')} <span className="pub-version">V4</span></h1><p>{tr(['از محتوای مصوب تا انتشار و دعوت دوست؛ یک جریان قابل پیگیری.','From approved content to publication and friend invitations.','Onaylı içerikten yayına ve arkadaş davetine.','От одобренного контента до публикации и приглашений.'])}</p></div><button className="pub-secondary" onClick={()=>reload()} aria-label={c('refresh')}><RefreshCw size={15}/><span>{c('refresh')}</span></button></header>
   <div className="pub-control-bar"><div className="pub-mode" aria-label={tr(['حالت انتشار','Publishing mode','Yayın modu','Режим публикации'])}>{(['manual','agent'] as const).map(m=><button key={m} type="button" data-publishing-mode={m} className={mode===m?'selected':''} disabled={!admin||busy||!cfg} onClick={()=>act(()=>api('/publishing/config','PUT',{...cfg.config.data,selectedMode:m,version:cfg.config.version}),false)}>{m==='manual'?<Hand size={15}/>:<Sparkles size={15}/>} {c(m)}</button>)}</div>
@@ -58,6 +59,7 @@ export function PublishingStudio({initialTab='overview'}:{initialTab?:Tab}){
   {tab==='settings'&&admin&&<SettingsPane cfg={cfg} agents={agents} campaigns={campaigns} busy={busy} act={act} setModal={setModal}/>}
   {tab==='events'&&<><div className="pub-section-title"><h2>{c('events')}</h2><span className="pub-muted">{tr(['بدون بدنهٔ خصوصی و سکرت','No private payloads or credentials','Özel yük/anahtar gösterilmez','Без личных данных и ключей'])}</span></div>{[['inbox',tr(['دریافت‌ها','Inbox','Gelen olaylar','Входящие'])],['outbox',tr(['ارسال‌ها','Outbox','Giden olaylar','Исходящие'])]].map(([key,title])=><section className="pub-card" key={key}><h2>{title}</h2><div className="pub-table-scroll"><table><thead><tr><th>{tr(['رویداد','Event','Olay','Событие'])}</th><th>{c('status')}</th><th>{tr(['زمان','Time','Zaman','Время'])}</th><th>{tr(['خطا / رسیدگی','Error / review','Hata / inceleme','Ошибка / проверка'])}</th></tr></thead><tbody>{(events?.[key]||[]).map((e:any)=><tr key={e.id}><td dir="ltr">{e.type||e.stage}</td><td><StateBadge value={e.status}/></td><td>{e.at?new Date(e.at).toLocaleString(language):'—'}</td><td><code>{e.error||'—'}</code>{e.evidence==='operator_confirmed'&&<small className="pub-block">{tr(['تأیید اپراتور، نه رسید خودکار','Operator confirmation, not an automatic receipt','Operatör onayı; otomatik makbuz değil','Подтверждение оператора, не автоквитанция'])}</small>}{key==='outbox'&&admin&&e.status==='failed'&&<button className="pub-secondary" disabled={busy} onClick={()=>{if(confirm(tr(['پس از رفع علت، درخواست قطعاً ناموفق دوباره ارسال شود؟','Retry this definitively failed request after fixing its cause?','Nedeni giderdikten sonra başarısız istek tekrarlansın mı?','Повторить явно неудачную попытку после исправления причины?'])))void act(()=>api('/publishing/outbox/'+e.id+'/retry','POST',{confirmed:true}),false);}}>{tr(['تلاش مجدد','Retry','Tekrar dene','Повторить'])}</button>}{key==='outbox'&&admin&&e.status==='delivery_unknown'&&<button className="pub-secondary" onClick={()=>setModal({type:'outbox',id:e.id})}>{tr(['ثبت مشاهدهٔ پیام','Record observed message','Gözlenen mesajı kaydet','Записать найденное сообщение'])}</button>}</td></tr>)}</tbody></table>{!events?.[key]?.length&&<div className="pub-empty small">{c('empty')}</div>}</div></section>)}</>}
   {tab==='telegram'&&admin&&<TelegramTab/>}
+  {tab==='inbox'&&admin&&<IgInboxTab/>}
   {tab==='legacy'&&<LegacyContentConsole/>}
   </>}
   {modal&&<PubModal title={modal.type==='campaign'?c('campaigns'):modal.type==='agent'?c('agents'):modal.type==='secret'?tr(['ثبت امن کلید','Secure credential','Güvenli anahtar','Безопасное сохранение ключа']):c('media')} onClose={()=>{setModal(null);setError('');}}><ErrorNotice error={error}/>

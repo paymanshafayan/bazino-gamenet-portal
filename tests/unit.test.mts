@@ -26,7 +26,7 @@ const { sanitizeThemeId, stripCssComments, extractIdFromCss, hasNewFormat, extra
   await import('../src/themes/themeCssUtils.ts');
 const { parseThemeZip, buildSampleThemeZip, buildThemeZip, rewriteCssAssetUrls, isZipParseError, normalizeThemeStrings } =
   await import('../src/themes/themeZipCore.ts');
-const { detectRegisteredRegions, KNOWN_REGIONS } = await import('../server/themeStore.ts');
+const { detectRegisteredRegions, KNOWN_REGIONS, validateThemeComponentJs, listFilesRecursive } = await import('../server/themeStore.ts');
 const { makeThemeStrings, THEME_REGIONS } = await import('../src/themeSdk/sdk.ts');
 const { translations } = await import('../src/utils/translations.ts');
 const routes = await import('../src/utils/routes.ts');
@@ -512,6 +512,84 @@ test('rewriteCssAssetUrls leaves absolute and data urls alone', () => {
   assert.ok(out.includes('data:image/png'), 'data url was rewritten');
 });
 
+/* ─── سخت‌گیری حادثهٔ «Bazino 3D Dimension» (۲۰۲۶-۰۹-۱۱) ─── */
+
+test('validateThemeComponentJs rejects React hooks (useState etc.) with a clear error', () => {
+  const hookJs = 'window.BazinoThemeSDK.registerComponent("home", function(){ var s = window.BazinoThemeSDK.React.useState(0); });';
+  const err = validateThemeComponentJs(hookJs);
+  assert.ok(err, 'hook usage must be rejected');
+  assert.ok(err!.includes('هوک'), 'error must explain the hook rule in Persian');
+  const bare = 'var x = useState(0); window.BazinoThemeSDK.registerComponent("home", {});';
+  assert.ok(validateThemeComponentJs(bare), 'bare destructured hook call must be rejected too');
+});
+
+test('validateThemeComponentJs ignores hook names inside comments and accepts ref+DOM themes', () => {
+  const commented = '// useState(0) is not allowed here\n/* useEffect(() => {}) */\nwindow.BazinoThemeSDK.registerComponent("home", { render: function(p){ return p; } });';
+  assert.equal(validateThemeComponentJs(commented), null, 'comment mention must not reject');
+  const refTheme = '(function(){var S=window.BazinoThemeSDK,R=S.React;S.registerComponent("home",{render:function(p){return R.createElement("div",{ref:function(el){el&&el.addEventListener("click",function(){})}},"x");}});})();';
+  assert.equal(validateThemeComponentJs(refTheme), null, 'ref+DOM interaction pattern must be accepted');
+});
+
+test('validateThemeComponentJs still rejects syntax errors / missing SDK / unknown regions', () => {
+  assert.ok(validateThemeComponentJs('var (((('), 'syntax error must be rejected');
+  assert.ok(validateThemeComponentJs('console.log("no sdk")'), 'missing BazinoThemeSDK must be rejected');
+  assert.ok(validateThemeComponentJs('window.BazinoThemeSDK.registerComponent("bogus.region", {});'), 'unknown region must be rejected');
+});
+
+/* ─── رفع بنِ هوک (۲۰۲۶-۰۹-۱۲، قالب bazino-arena3d): کامپوننت React واقعی مجاز ─── */
+
+test('validateThemeComponentJs accepts real React components that are returned as elements (arena3d pattern)', () => {
+  // الگوی واقعی قالب bazino-arena3d: hooks داخل function Home، خروجی h(Home, p)
+  const arenaJs = '(function(){var S=window.BazinoThemeSDK,R=S.React,h=R.createElement;' +
+    'function Home(p){var c=R.useRef(null);R.useEffect(function(){},[]);var v=R.useState(0);return h("div",null,"x");}' +
+    'S.registerComponent("home",{apiVersion:2,render:function(p){return h(Home,p);}});})();';
+  assert.equal(validateThemeComponentJs(arenaJs), null, 'arena3d component pattern must be accepted');
+});
+
+test('validateThemeComponentJs accepts arrow-function components assigned to variables', () => {
+  const arrowJs = '(function(){var S=window.BazinoThemeSDK,R=S.React,h=R.createElement;' +
+    'var Home=function(p){R.useRef(null);return h("div",null,"x");};' +
+    'S.registerComponent("home",{apiVersion:2,render:function(p){return h(Home,p);}});})();';
+  assert.equal(validateThemeComponentJs(arrowJs), null, 'var-named component with hooks must be accepted');
+  const arrow2 = arrowJs.replace('var Home=function(p)', 'var Home=(p)=>');
+  assert.equal(validateThemeComponentJs(arrow2), null, 'arrow component with hooks must be accepted');
+});
+
+test('validateThemeComponentJs rejects hooks in functions that are called directly (not mounted as components)', () => {
+  // تابع hookدار که مستقیم فراخوانی می‌شود و هرگز به‌عنوان element برگردانده نمی‌شود
+  const direct = '(function(){var S=window.BazinoThemeSDK,R=S.React,h=R.createElement;' +
+    'function Home(p){R.useState(0);return h("div",null,"x");}' +
+    'S.registerComponent("home",{render:function(p){return Home(p);}});})();';
+  const err = validateThemeComponentJs(direct);
+  assert.ok(err, 'directly-called hook function must be rejected');
+  assert.ok(err!.includes('هوک'), 'error must explain the hook rule');
+});
+
+test('validateThemeComponentJs still rejects the 2026-09-11 incident pattern (hook directly in render)', () => {
+  const incident = '(function(){var S=window.BazinoThemeSDK,R=S.React,h=R.createElement;' +
+    'S.registerComponent("home",{render:function(p){var s=R.useState(0);return h("div",null,"x");}});})();';
+  const err = validateThemeComponentJs(incident);
+  assert.ok(err, 'hook directly inside render body must still be rejected');
+  assert.ok(err!.includes('هوک'), 'error must mention hooks');
+});
+
+test('listFilesRecursive keeps nested asset subfolder paths (3D-theme export bug)', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(path.join(tmpdir(), 'bz-themes-'));
+  try {
+    writeFileSync(path.join(dir, 'a.webp'), 'a');
+    mkdirSync(path.join(dir, 'tour'), { recursive: true });
+    writeFileSync(path.join(dir, 'tour', 'tour-01-grid.webp'), 'b');
+    mkdirSync(path.join(dir, 'tour', 'deep'), { recursive: true });
+    writeFileSync(path.join(dir, 'tour', 'deep', 'c.webp'), 'c');
+    const files = listFilesRecursive(dir).sort();
+    assert.deepEqual(files, ['a.webp', 'tour/deep/c.webp', 'tour/tour-01-grid.webp'], 'nested paths must survive');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 /* ═══════════════════════════════════════════════════════════════════════
    7. i18n
    ═══════════════════════════════════════════════════════════════════════ */
@@ -555,7 +633,7 @@ test('API messages: every code covers all four languages and interpolates', asyn
   const known = ['BAD_CREDENTIALS', 'OUT_OF_STOCK', 'SLOT_TAKEN', 'MIN_REDEEM_POINTS', 'ADMIN_ONLY'] as const;
   for (const key of keys.length ? keys : known) {
     for (const lang of LANGS) {
-      const txt = apiMessage(lang, key as any, { min: 100, name: 'X', id: '1', hours: 2, points: 40, platform: 'P', detail: 'D', sec: 30, left: 4 });
+      const txt = apiMessage(lang, key as any, { min: 100, name: 'X', id: '1', hours: 2, points: 40, platform: 'P', detail: 'D', sec: 30, left: 4, size: 30 });
       assert.ok(txt && txt.trim(), `${key}.${lang} empty`);
       assert.ok(!/\{\w+\}/.test(txt), `${key}.${lang} left a placeholder: ${txt}`);
       if (lang !== 'fa') assert.ok(!/[\u0600-\u06FF]/.test(txt), `${key}.${lang} contains Persian: ${txt}`);

@@ -114,7 +114,16 @@ class ShopScreen extends StatelessWidget {
                                 icon: Icons.shopping_cart,
                                 onPressed: item.stock > 0
                                     ? () async {
-                                        final error = await appState.purchaseAccessory(item.id, null);
+                                        // خرید روی زنجیرهٔ اقتصادی جدید سرور (پرداخت در محل)
+                                        final error = await appState.checkoutOrder(
+                                          kind: 'shop',
+                                          method: 'onsite',
+                                          params: {
+                                            'cart': [
+                                              {'item': {'id': item.id}, 'quantity': 1},
+                                            ],
+                                          },
+                                        );
                                         if (!context.mounted) return;
                                         if (error != null) {
                                           ScaffoldMessenger.of(context).showSnackBar(
@@ -122,12 +131,13 @@ class ShopScreen extends StatelessWidget {
                                           );
                                           return;
                                         }
+                                        final oid = appState.lastCheckout?.orderId ?? '';
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               isFa
-                                                  ? 'خرید با موفقیت انجام شد! فاکتور به ایمیل شما ارسال گردید.'
-                                                  : 'Purchase successful! Invoice has been mailed.',
+                                                  ? 'خرید ثبت شد ($oid) — پرداخت حضوری هنگام تحویل.'
+                                                  : 'Purchase placed ($oid) — pay on-site at delivery.',
                                             ),
                                             backgroundColor: Colors.green,
                                           ),

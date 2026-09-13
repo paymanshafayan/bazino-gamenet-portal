@@ -1,9 +1,9 @@
 # Flutter CI report — flutter_app
 
-- commit: `08340c50b924971964223935163e1228780a39d5`
+- commit: `21f7f5fca729c5895f1ed7991ccd08779e2aeb56`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34741423525
-- date:   2026-09-13 05:54 UTC
+- run:    34741804128
+- date:   2026-09-13 06:03 UTC
 
 ## flutter --version
 ```
@@ -128,7 +128,7 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 9.4s)
+No issues found! (ran in 8.0s)
 ```
 **exit 0 — OK**
 
@@ -187,7 +187,7 @@ Consider addressing these issues to enable wasm builds. See docs for more info: 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 19428 bytes (98.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             44.9s
+Compiling lib/main.dart for the Web...                             37.9s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -224,7 +224,7 @@ Installing CMake 3.22.1 in /usr/local/lib/android/sdk/cmake/3.22.1
 "Install CMake 3.22.1 v.3.22.1" complete.
 "Install CMake 3.22.1 v.3.22.1" finished.
 Caught exception: Already watching path: /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/android
-Running Gradle task 'assembleRelease'...                          327.4s
+Running Gradle task 'assembleRelease'...                          306.8s
 ✓ Built build/app/outputs/flutter-apk/app-release.apk (61.5MB)
 ```
 **exit 0 — OK**

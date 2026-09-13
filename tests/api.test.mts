@@ -19,6 +19,7 @@ const PORT = Number(process.env.TEST_PORT ?? 3457);
 const BASE = `http://127.0.0.1:${PORT}`;
 
 const sample = await import('../server/sampleData.ts');
+const timeMod = await import('../server/management/time.ts');
 
 /* ── boot ─────────────────────────────────────────────────────────────── */
 
@@ -2057,9 +2058,12 @@ test('reservation on-site: dueAt = session start − 10 min; too-late session re
   const ok = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: '10:00', endTime: '11:00', date: 'فردا' } }, wAuth());
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(Date.parse(ok.body.startsAt) - Date.parse(ok.body.dueAt), 10 * 60 * 1000);
-  const past = new Date(Date.now() - 3600 * 1000);
-  const hh = String(past.getHours()).padStart(2, '0');
-  const late = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: `${hh}:00`, endTime: `${hh}:30`, date: 'امروز' } }, wAuth());
+  // اسلات «گذشته» را به وقت منطقهٔ مجموعه (DEFAULT_TIMEZONE سرور) و با تاریخ صریح بساز تا در هر TZ رانر و هر ساعتی deterministic باشد.
+  // قبلاً getHours() محلی + «امروز» بود: در رانر UTC بین ۰۰ تا ۰۳ به وقت مجموعه (Asia/Famagusta، UTC+3)
+  // تاریخ محلی از تاریخ مجموعه یک روز عقب بود و اسلاتِ گذشته از دید سرور در «فردا» می‌افتاد → 200 به‌جای 400.
+  const zp = timeMod.zonedParts(Date.now() - 3600 * 1000, timeMod.DEFAULT_TIMEZONE);
+  const zonedDate = `${zp.year}-${String(zp.month).padStart(2, '0')}-${String(zp.day).padStart(2, '0')}`;
+  const late = await postJson(`${BASE}/api/checkout/onsite`, { kind: 'reservation', params: { systemId: sys.id, startTime: `${zp.hour}:00`, endTime: `${zp.hour}:30`, date: zonedDate } }, wAuth());
   assert.equal(late.status, 400);
   assert.equal(late.body.code, 'PAST_RESERVATION');
 });

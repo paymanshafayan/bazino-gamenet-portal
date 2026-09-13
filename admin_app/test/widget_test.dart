@@ -143,7 +143,7 @@ void main() {
     auth.isLoggedIn = true;
     auth.username = 'admin';
 
-    auth.logout();
+    await auth.logout();
 
     expect(auth.isLoggedIn, isFalse);
     expect(Prefs.token, isEmpty);

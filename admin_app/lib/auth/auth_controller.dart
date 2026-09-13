@@ -20,8 +20,8 @@ class AuthController extends ChangeNotifier {
   String? username;
   String serverUrl = '';
 
-  void _clearSession() {
-    Prefs.clearSession();
+  Future<void> _clearSession() async {
+    await Prefs.clearSession();
     isLoggedIn = false;
     username = null;
   }
@@ -41,10 +41,10 @@ class AuthController extends ChangeNotifier {
           username = user['username']?.toString() ?? Prefs.username;
           isLoggedIn = true;
         } else {
-          _clearSession();
+          await _clearSession();
         }
       } catch (_) {
-        _clearSession();
+        await _clearSession();
       }
     }
     isReady = true;
@@ -81,9 +81,9 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     if (!isLoggedIn) return;
-    _clearSession();
+    await _clearSession();
     serverUrl = Prefs.serverUrl;
     notifyListeners();
   }

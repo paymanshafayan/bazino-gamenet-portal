@@ -1,9 +1,9 @@
 # Flutter CI report — admin_app
 
-- commit: `9993931448f0fdaf78770e81d78d834349821741`
+- commit: `687567463f9235e8d847a452cd32e763e0504710`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34742152222
-- date:   2026-09-13 06:12 UTC
+- run:    34742528639
+- date:   2026-09-13 06:21 UTC
 
 ## flutter --version
 ```
@@ -104,34 +104,7 @@ No issues found! (ran in 8.9s)
 ✅ 401 از API (انقضای توکن) → خروج خودکار به صفحهٔ لاگین
 ✅ خروج دستی → برگشت به صفحهٔ لاگین
 ✅ فرم ورود خالی → پیام خطا بدون ارسال
-::endgroup::
-::group::❌ بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند (failed)
-══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
-The following TestFailure was thrown running a test:
-Expected: at least one matching candidate
-  Actual: _TextWidgetFinder:<Found 0 widgets with text "Themes": []>
-   Which: means none were found but some were expected
-
-When the exception was thrown, this was the stack:
-#4      main.<anonymous closure> (file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart:108:5)
-<asynchronous suspension>
-#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
-<asynchronous suspension>
-#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
-<asynchronous suspension>
-<asynchronous suspension>
-(elided one frame from package:stack_trace)
-
-This was caught by the test expectation on the following line:
-  file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart line 108
-The test description was:
-  بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند
-════════════════════════════════════════════════════════════════════════════════════════════════════
-Test failed. See exception logs above.
-The test description was: بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند
-
-::endgroup::
-::group::✅ Passing tests
+✅ بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند
 ✅ فهرست بخش‌ها: هر ۲۳ بخش عملیاتی موجودند و apiKeys نیست
 ::endgroup::
 ::group::❌ AuthController: خروج، توکن و نام کاربری ذخیره‌شده را پاک می‌کند (failed)
@@ -140,13 +113,13 @@ Expected: empty
 
 package:matcher                                     expect
 package:flutter_test/src/widget_tester.dart 473:18  expect
-test/widget_test.dart 146:5                         main.<fn>
+test/widget_test.dart 150:5                         main.<fn>
 ::endgroup::
 ::group::✅ Passing tests
 ✅ AppLang: فارسی پیش‌فرض، تغییر زبان ذخیره می‌شود
 ::endgroup::
 
-::error::7 tests passed, 2 failed.
+::error::8 tests passed, 1 failed.
 ```
 **exit 1 — FAILED**
 
@@ -157,7 +130,7 @@ Wasm dry run succeeded. Consider building and testing your application with the 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 17744 bytes (98.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             39.0s
+Compiling lib/main.dart for the Web...                             39.9s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -187,7 +160,7 @@ If you don't see a plugins block, your project was likely created with an older 
 
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 11972 bytes (99.3% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Caught exception: Already watching path: /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/android
-Running Gradle task 'assembleRelease'...                          259.0s
+Running Gradle task 'assembleRelease'...                          250.0s
 ✓ Built build/app/outputs/flutter-apk/app-release.apk (55.7MB)
 ```
 **exit 0 — OK**

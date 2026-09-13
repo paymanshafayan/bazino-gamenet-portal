@@ -1,9 +1,9 @@
 # Flutter CI report — admin_app
 
-- commit: `687567463f9235e8d847a452cd32e763e0504710`
+- commit: `c12924d42f7bb64b149e6751de6ec9403e6e352d`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34742528639
-- date:   2026-09-13 06:21 UTC
+- run:    34742874085
+- date:   2026-09-13 06:30 UTC
 
 ## flutter --version
 ```
@@ -91,7 +91,7 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing admin_app...                                          
-No issues found! (ran in 8.9s)
+No issues found! (ran in 9.3s)
 ```
 **exit 0 — OK**
 
@@ -106,22 +106,13 @@ No issues found! (ran in 8.9s)
 ✅ فرم ورود خالی → پیام خطا بدون ارسال
 ✅ بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند
 ✅ فهرست بخش‌ها: هر ۲۳ بخش عملیاتی موجودند و apiKeys نیست
-::endgroup::
-::group::❌ AuthController: خروج، توکن و نام کاربری ذخیره‌شده را پاک می‌کند (failed)
-Expected: empty
-  Actual: 'admin'
-
-package:matcher                                     expect
-package:flutter_test/src/widget_tester.dart 473:18  expect
-test/widget_test.dart 150:5                         main.<fn>
-::endgroup::
-::group::✅ Passing tests
+✅ AuthController: خروج، توکن و نام کاربری ذخیره‌شده را پاک می‌کند
 ✅ AppLang: فارسی پیش‌فرض، تغییر زبان ذخیره می‌شود
 ::endgroup::
 
-::error::8 tests passed, 1 failed.
+🎉 9 tests passed.
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter build web
 ```
@@ -130,7 +121,7 @@ Wasm dry run succeeded. Consider building and testing your application with the 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 17744 bytes (98.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             39.9s
+Compiling lib/main.dart for the Web...                             39.3s
 ✓ Built build/web
 ```
 **exit 0 — OK**
@@ -160,7 +151,7 @@ If you don't see a plugins block, your project was likely created with an older 
 
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 11972 bytes (99.3% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Caught exception: Already watching path: /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/android
-Running Gradle task 'assembleRelease'...                          250.0s
+Running Gradle task 'assembleRelease'...                          254.9s
 ✓ Built build/app/outputs/flutter-apk/app-release.apk (55.7MB)
 ```
 **exit 0 — OK**
@@ -170,7 +161,7 @@ Running Gradle task 'assembleRelease'...                          250.0s
 flutter --version=0
 flutter pub get=0
 flutter analyze=0
-flutter test=1
+flutter test=0
 flutter build web=0
 flutter build apk=0
 ```

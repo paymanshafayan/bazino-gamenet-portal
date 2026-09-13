@@ -57,5 +57,5 @@ flutter build ipa --release
 
 ## CI
 
-`.github/workflows/admin-app.yml` — روی هر push به `admin_app/**`:
-`flutter pub get` → `flutter analyze` → `flutter test` → `flutter build web --release` + آپلود artifact + گزارش `ADMIN_APP_CI_REPORT.md`.
+`.github/workflows/flutter-test.yml` — ورک‌فلوی واحد همهٔ اپ‌های فلاتر ریپو (کشف خودکار هر پوشهٔ سطح‌یک با `pubspec.yaml`؛ اپ جدید فقط با اضافه‌شدن پوشه‌اش وارد می‌شود). روی هر push به `admin_app/**` برای این اپ:
+`flutter pub get` → `flutter analyze` → `flutter test` → `flutter build web` → `flutter build apk` + artifactهای وب/APK + **پوش APK به امولاتور Appetize** (با سکرت `APPETIZE_TOKEN`؛ ریلیز چرخشی `admin_app-latest` و publicKey پین‌شده در `admin_app/.appetize.json`) + گزارش `FLUTTER_CI_REPORT-admin_app.md` که خودکار روی برنچ کامیت می‌شود.

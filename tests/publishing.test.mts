@@ -13,7 +13,7 @@ test('Manus and default reference are persisted once without a fake credential',
 test('vault refuses plaintext storage without a master key',async()=>{delete process.env.BAZINO_SECRETS_KEY;await assert.rejects(()=>settings.vault.set('test','secret','admin'),{code:'SECRETS_KEY_REQUIRED'});assert.equal(await core.read('pub-vault','test'),undefined);});
 test('vault ciphertext is bound to its reference and explicit clear is durable',async()=>{process.env.BAZINO_SECRETS_KEY='ab'.repeat(32);await settings.vault.set('test','sensitive-test-value','admin');const r=await core.read('pub-vault','test');assert.ok(!JSON.stringify(r).includes('sensitive-test-value'));assert.equal(await settings.vault.read('test'),'sensitive-test-value');await core.save('pub-vault','copied',r!.data,0);await assert.rejects(()=>settings.vault.read('copied'),{code:'CREDENTIAL_UNAVAILABLE'});await settings.vault.set('test','','admin');assert.equal(await settings.vault.read('test'),'');});
 test('Manus legacy setting precedence and revoked credential never falls back',async()=>{await store.setSetting('manus_api_key','legacy');process.env.MANUS_API_KEY='host';const a=(await core.read('pub-agent','builtin-manus'))!;assert.equal(await settings.vault.agentKey(a.data),'legacy');await settings.vault.set('agent:manus','','admin');assert.equal(await settings.vault.agentKey(a.data),'');});
-test('all integration settings and secret aliases are blocked from generic/public APIs',()=>{for(const key of ['zernio_webhook_secret','manus_api_key','publishing_agents','ig_ingest_token','imejis_api_key','cloudflare_api_token','cloudflare_account_id','ZERNIO_API_KEY','MANUS_API_KEY','IMEJIS_API_KEY','CLOUDFLARE_API_TOKEN'])assert.equal(protectedIntegrationSetting(key),true);assert.equal(protectedIntegrationSetting('site_title'),false);});
+test('all integration settings and secret aliases are blocked from generic/public APIs',()=>{for(const key of ['zernio_webhook_secret','manus_api_key','publishing_agents','ig_ingest_token','imejis_api_key','cloudflare_api_token','cloudflare_account_id','elevenlabs_api_key','youtube_api_key','twitch_client_id','twitch_client_secret','ZERNIO_API_KEY','MANUS_API_KEY','IMEJIS_API_KEY','CLOUDFLARE_API_TOKEN','ELEVENLABS_API_KEY','YOUTUBE_API_KEY','TWITCH_CLIENT_SECRET'])assert.equal(protectedIntegrationSetting(key),true);assert.equal(protectedIntegrationSetting('site_title'),false);});
 test('registry requires exact native IDs and type validation',async()=>{await assert.rejects(()=>registry.register('x',{media_id:'post-123',accountId:'acc'}),{code:'INVALID_MEDIA_ID'});await assert.rejects(()=>registry.register('x',{media_id:'123',media_type:'story',accountId:'acc'}),{code:'INVALID_MEDIA_TYPE'});});
 test('media-only ingestion is durable and cannot activate an unapproved campaign',async()=>{const r=await registry.register('ingest',{media_id:'18109137383324992',accountId:'acc'});assert.equal(r.status,'needs_review');assert.equal((await registry.list()).length,1);assert.equal(await registry.eligible('acc','18109137383324992'),null);const a=await registry.register('ingest',{media_id:'18109137383324992',accountId:'acc'});assert.equal(a.duplicate,true);assert.equal((await store.listIgMedia()).length,1);});
 test('campaign confirmation, financial policy, and partner-link guards',async()=>{const c=defaultCampaign();await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,active:true,accountId:'acc',version:0,idempotencyKey:'policy1'}),{code:'POLICY_CONFIRMATION_REQUIRED'});await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,financialApproved:true,version:0,idempotencyKey:'policy2'}),{code:'FINANCIAL_POLICY_REQUIRED'});c.messages.fa.partner2+=' {{invite_url}}';await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,version:0,idempotencyKey:'policy3'}),{code:'PRIVATE_LINK_FORBIDDEN'});});
@@ -383,6 +383,119 @@ test('cancel removes queued work from processing and frees nothing from quota',a
  assert.match(q.month,/^\d{4}-\d{2}$/);
  assert.equal(q.imejis.used,2);assert.equal(q.flux.used,2); // ۱ موفق + ۱ ناموفق؛ کنسل‌شده نمی‌شمارد
  assert.equal((await mg.tasks('staff2')).length,0); // مالکیت: دیگران چیزی نمی‌بینند
+});
+
+
+suite('Campaign brain + $0 reels (phase 2)');
+const {TrendService}=await import('../server/publishing/trends');
+const {BriefService}=await import('../server/publishing/briefs');
+const {HOOK_PATTERNS,hooksFor}=await import('../server/publishing/hooks');
+const {execFile}=await import('node:child_process');const {promisify:promisify2}=await import('node:util');const execT=promisify2(execFile);
+const ffmpegPath=(await import('@ffmpeg-installer/ffmpeg')).default.path;
+// صدای تستی واقعی (۴ ثانیه سکوت WAV) برای ماک ElevenLabs
+const ttsWav=Buffer.from((await execT(ffmpegPath,['-y','-f','lavfi','-i','anullsrc=r=44100:cl=mono','-t','4','-c:a','pcm_s16le','-f','wav','-'],{encoding:'buffer',maxBuffer:16*1024*1024})).stdout);
+assert.ok(ttsWav.length>1000,'test audio generated');
+const brainCalls:any[]=[];
+const brainFetch=async(url:string,init:any={})=>{brainCalls.push({url,init});
+ if(url.startsWith('https://api.groq.com/'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({goal:'تورنمنت کانتر آخر هفته',audience:'گیمرهای فارسی‌زبان قبرس',offer:'پکیج شبانه با ۲۰٪ تخفیف',hooks:['چالش جدید کانتر که فقط ۵٪ گیمرها ردش می‌کنند!','اگر این پکیج را امتحان نکرده‌ای پولت را دور ریخته‌ای!','۳ دلیل که این هفته کلاب داغ‌ترین جای شهر است'],caption:'آماده‌ی چالش باش! #بازینو #گیمنت',cta:'همین حالا از سایت رزرو کن'})}}]}),{headers:{'content-type':'application/json'}});
+ if(url.includes('elevenlabs.io/'))return new Response(new Uint8Array(ttsWav),{headers:{'content-type':'audio/wav'}});
+ if(url.startsWith('https://www.googleapis.com/youtube/v3/videos')){const region=/regionCode=([A-Z]{2})/.exec(url)?.[1]||'';
+   if(url.includes('videoCategoryId=20')&&region==='CY')return new Response(JSON.stringify({items:[]}),{headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify({items:[{snippet:{title:`hot ${region} gaming video`,channelTitle:'GamerCh'},statistics:{viewCount:'98765'}}]}),{headers:{'content-type':'application/json'}});}
+ if(url.startsWith('https://id.twitch.tv/oauth2/token'))return new Response(JSON.stringify({access_token:'tw-token'}),{headers:{'content-type':'application/json'}});
+ if(url.startsWith('https://api.twitch.tv/helix/games/top'))return new Response(JSON.stringify({data:[{name:'Counter-Strike 2',viewers:'51234'},{name:'VALORANT',viewers:'41000'}]}),{headers:{'content-type':'application/json'}});
+ return new Response('not found',{status:404});};
+const today=new Date().toISOString().slice(0,10);
+
+test('trend digest: silent without keys, daily record once, both sources merged',async()=>{
+ delete process.env.YOUTUBE_API_KEY;delete process.env.TWITCH_CLIENT_ID;delete process.env.TWITCH_CLIENT_SECRET;
+ const t0=new TrendService(core,brainFetch as any);await t0.work();
+ assert.equal(await core.read('pub-trend-digest',today),undefined); // بدون کلید ساکت
+ assert.equal(brainCalls.filter(c=>c.url.includes('googleapis')||c.url.includes('twitch')).length,0);
+ process.env.YOUTUBE_API_KEY='yt-test-key';process.env.TWITCH_CLIENT_ID='tw-id';process.env.TWITCH_CLIENT_SECRET='tw-secret';
+ const t1=new TrendService(core,brainFetch as any);await t1.work();
+ const d=await core.read('pub-trend-digest',today);
+ assert.ok(d,'digest saved');
+ assert.equal(d!.data.youtube.length,2); // CY (fallback بدون دسته) + TR
+ assert.equal(d!.data.twitch.length,2);
+ assert.ok(d!.data.twitch[0].name==='Counter-Strike 2');
+ const callsBefore=brainCalls.length;await t1.work();
+ assert.equal(brainCalls.length,callsBefore); // idempotent روزانه
+ assert.equal((await t1.latest())!.date,today);
+ assert.ok(HOOK_PATTERNS.length>=24&&hooksFor('fa').length>=8,'hook library seeded');
+});
+
+test('brief lifecycle: validation, human approval gate, ownership, groq suggestion',async()=>{
+ const br=new BriefService(core,brainFetch as any);
+ const bad={language:'fa',goal:'تست',audience:'',offer:'',hooks:[],caption:'x',cta:''};
+ await assert.rejects(()=>br.save('admin',undefined,bad),{code:'BRIEF_HOOKS_REQUIRED'});
+ await assert.rejects(()=>br.save('admin',undefined,{...bad,hooks:['a'],caption:'لینک /ig/invite/x',cta:'برو'}),{code:'PRIVATE_LINK_FORBIDDEN'});
+ const d=await br.save('admin',undefined,{language:'fa',goal:'تورنمنت شب یلدا',audience:'گیمرها',offer:'پکیج ویژه',hooks:['هوک ۱','هوک ۲'],caption:'کپشن تستی',cta:'رزرو کن'});
+ assert.equal(d.data.status,'draft');assert.equal(d.data.source,'manual');
+ await assert.rejects(()=>br.approve('admin',d.id,{}),{code:'BRIEF_CONFIRMATION_REQUIRED'});
+ await assert.rejects(()=>br.approve('staff2',d.id,{confirmed:true}),{code:'FORBIDDEN'});
+ const ap=await br.approve('admin',d.id,{confirmed:true,version:d.version});
+ assert.equal(ap.data.status,'approved');assert.equal(ap.data.approvedBy,'admin');
+ await assert.rejects(()=>br.approve('admin',d.id,{confirmed:true,version:ap.version}),{code:'BRIEF_NOT_DRAFT'});
+ await assert.rejects(()=>br.save('admin',d.id,{language:'fa',goal:'ویرایش بعد از تأیید',hooks:['x'],caption:'c',cta:'c'}),{code:'BRIEF_NOT_EDITABLE'});
+ assert.equal((await br.list('staff2')).length,0);
+ // پیشنهاد با Groq
+ delete process.env.GROQ_API_KEY;
+ await assert.rejects(()=>br.suggest('admin',{language:'fa'}),{code:'GROQ_NOT_CONFIGURED'});
+ process.env.GROQ_API_KEY='groq-test-key';
+ const sug=await br.suggest('admin',{language:'fa',goalHint:'تورنمنت کانتر'});
+ assert.equal(sug.data.status,'draft');assert.equal(sug.data.source,'groq');
+ assert.equal(sug.data.hooks.length,3);assert.equal(sug.data.trendRef,today);
+ const groqCall=brainCalls.find(c=>c.url.includes('api.groq.com'));
+ assert.ok(groqCall,'groq called');
+ assert.equal((groqCall.init.headers as any).Authorization,'Bearer groq-test-key');
+});
+
+test('compose provider: full chain brief→reel mp4 via real ffmpeg, quota, guards',async()=>{
+ process.env.ELEVENLABS_API_KEY='eleven-test-key';
+ // سرویس compose با fetcher ترکیبی (مسیرهای فاز ۱ + مغز/صدای فاز ۲)
+ const combinedFetch=async(url:string,init:any={})=>(url.includes('elevenlabs.io/')||url.includes('api.groq.com')||url.includes('googleapis.com')||url.includes('twitch.tv'))?brainFetch(url,init):mgFetch(url,init);
+ const mgc=new MediaGenService(core,combinedFetch as any,mgPub.assets,mgPub);
+ // تصویر منبع ۹:۱۶ در کتابخانهٔ رسانه
+ const poster=await sharp({create:{width:1080,height:1920,channels:3,background:{r:10,g:30,b:60}}}).png().toBuffer();
+ const src=await mgPub.assets.create('admin',{mime:'image/png',size:poster.length,name:'poster.png',idempotencyKey:'compose-src-'+Date.now()});
+ await mgPub.assets.chunk('admin',src.id,0,poster,true);await mgPub.assets.finalize('admin',src.id,true);
+ // بریف‌ها: یکی draft (برای تست نگه) و یکی approved (برای زنجیرهٔ کامل)
+ const br=new BriefService(core,brainFetch as any);
+ const draftBrief=await br.save('admin',undefined,{language:'fa',goal:'بریف تأییدنشده',audience:'گیمرها',offer:'میز آزاد',hooks:['هوک'],caption:'کپشن',cta:'رزرو'});
+ const brief=await br.save('admin',undefined,{language:'fa',goal:'ریلز بازی داغ امروز',audience:'گیمرها',offer:'میز آزاد',hooks:['هوک'],caption:'کپشن',cta:'رزرو'});
+ const approved=await br.approve('admin',brief.id,{confirmed:true,version:brief.version});
+ // نگه‌ها
+ await assert.rejects(()=>mgc.generate('admin',{provider:'compose',sourceAssetId:src.id,script:'کوتاه',title:'t',language:'fa',confirmedCost:true}),{code:'INVALID_SCRIPT'});
+ await assert.rejects(()=>mgc.generate('admin',{provider:'compose',sourceAssetId:src.id,script:'اسکریپت بدون بریف تأییدشده اینجا',title:'t',language:'fa',briefId:draftBrief.id,confirmedCost:true}),{code:'BRIEF_NOT_APPROVED'});
+ delete process.env.ELEVENLABS_API_KEY;
+ await assert.rejects(()=>mgc.generate('admin',{provider:'compose',sourceAssetId:src.id,script:'بدون کلید الونلَبز تست می‌شود',title:'t',language:'fa',confirmedCost:true}),{code:'ELEVENLABS_NOT_CONFIGURED'});
+ process.env.ELEVENLABS_API_KEY='eleven-test-key';
+ // تولید کامل
+ const g=await mgc.generate('admin',{provider:'compose',sourceAssetId:src.id,briefId:approved.id,title:'ریلز بازی داغ',language:'fa',
+   script:'سلام به همهٔ گیمرهای بازینو؛ امشب میزهای شطرنج و کانتر آمادهٔ چالش شماست.',subtitle:'بازی داغ امشب\nمیز آزاد منتظر شماست',confirmedCost:true});
+ assert.equal(g.status,'queued');
+ await mgc.work();await mgc.work();
+ const t=(await core.read('pub-mediagen-task',g.id))!;
+ assert.ok(t.data.status==='completed','compose render failed: '+JSON.stringify({error:t.data.error,callUrls:brainCalls.filter(c=>c.url.includes('elevenlabs')).map(c=>c.url)}));
+ const reel=await mgPub.assets.ready(t.data.assetId!);
+ assert.equal(reel.data.mime,'video/mp4');assert.equal(reel.data.width,1080);assert.equal(reel.data.height,1920);
+ assert.ok(reel.data.duration!>=3&&reel.data.duration!<=10,'duration ~4s');
+ const elCall=brainCalls.find(c=>c.url.startsWith('https://api.elevenlabs.io/'));
+ assert.ok(elCall,'elevenlabs called');
+ assert.equal((elCall.init.headers as any)['xi-api-key'],'eleven-test-key');
+ assert.equal(JSON.parse(elCall.init.body).model_id,'eleven_v3');
+ // ورود به جریان انتشار به‌عنوان ریلز — فقط draft
+ const imp=await mgc.import('admin',g.id,{confirmed:true,caption:'چالش امشب! #بازینو',format:'reel'});
+ const draft=(await core.read('pub-draft',imp.draftId))!;
+ assert.equal(draft.data.format,'reel');assert.equal(draft.data.executionMode,'manual');
+ assert.equal(draft.data.assetIds.length,1);
+ assert.equal((await core.list('pub-publication')).length,0);
+ // سهمیهٔ ماهانهٔ compose
+ const q=await mgc.quota();assert.equal(q.compose.used,1);assert.ok(q.compose.limit>=1);
+ const g2=await mgc.generate('admin',{provider:'compose',sourceAssetId:src.id,title:'ریلز دوم',language:'fa',script:'اسکریپت دوم برای تست سهمیهٔ ماهانهٔ ساخت ریلز فارسی',confirmedCost:true});
+ await mgc.work();await mgc.work();
+ assert.equal((await core.read('pub-mediagen-task',g2.id))!.data.status,'completed');
 });
 
 await run({title:'Publishing / Instagram v4',jsonOut:'tests/reports/publishing.json'});

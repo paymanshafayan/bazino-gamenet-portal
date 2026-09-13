@@ -5,7 +5,8 @@ import {PublishingService} from './publish';
 import {registerAssets} from './assets';
 import {verifyManusRsa} from './manus';
 import type { MediaGenService } from './mediagen';
-export function registerPublicationRoutes(app:express.Express,service:PublishingService,mediagen?:MediaGenService){
+import type { TrendService } from './trends';
+export function registerPublicationRoutes(app:express.Express,service:PublishingService,mediagen?:MediaGenService,trends?:TrendService){
  const core=service.core,base='/api/management/publishing',read=core.guard('content'),publish=core.guard('publish');
  registerAssets(app,service.assets);
  app.post(`${base}/batches/schedule`,publish,endpoint(async(req,res)=>res.json(await service.scheduleBatch((req as any).staff.username,req.body||{},(req as any).staff.admin))));
@@ -57,5 +58,5 @@ export function registerPublicationRoutes(app:express.Express,service:Publishing
    res.json({ok:true,accepted:true});
  }));
  let busy=false,lastCleanup=0;
- const timer=setInterval(()=>{if(Date.now()-lastCleanup>3600000){lastCleanup=Date.now();service.assets.cleanupExpired().catch(()=>{});}if(busy)return;busy=true;service.work().catch(()=>{}).then(()=>mediagen?mediagen.work():undefined).catch(()=>{}).finally(()=>{busy=false;});},4000);timer.unref();
+ const timer=setInterval(()=>{if(Date.now()-lastCleanup>3600000){lastCleanup=Date.now();service.assets.cleanupExpired().catch(()=>{});}if(busy)return;busy=true;service.work().catch(()=>{}).then(()=>mediagen?mediagen.work():undefined).then(()=>trends?trends.work():undefined).catch(()=>{}).finally(()=>{busy=false;});},4000);timer.unref();
 }

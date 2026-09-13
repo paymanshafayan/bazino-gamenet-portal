@@ -13,7 +13,7 @@ export interface PublishingConfig {
   zernioAccountId: string; zernioProfileId: string; outboundEnabled: boolean;
   baseUrl: string; timezone: string;
   mediagenEnabled: boolean; mediagenDesigns: string[];
-  mediagenImejisLimit: number; mediagenFluxLimit: number;
+  mediagenImejisLimit: number; mediagenFluxLimit: number; mediagenComposeLimit: number;
 }
 export interface CampaignPolicy {
   name: string; active: boolean; accountId: string; languages: SocialLanguage[];
@@ -53,11 +53,30 @@ export interface Publication {
   platformResults?: Record<string, { status: string; nativeId?: string; url?: string }>;
 }
 
-export type MediaGenProvider = 'imejis' | 'flux';
+export type MediaGenProvider = 'imejis' | 'flux' | 'compose';
 export interface MediaGenTask {
   provider: MediaGenProvider; designId: string; fields: Record<string, string>;
   prompt: string; title: string; language: SocialLanguage; owner: string;
+  // provider 'compose' (ریلز $0): تصویر منبع + متن صدا + زیرنویس + بریف مرجع
+  sourceAssetId?: string; script?: string; voiceId?: string; subtitle?: string; briefId?: string;
   status: 'queued' | 'rendering' | 'completed' | 'failed' | 'imported' | 'cancelled';
   assetId?: string; draftId?: string; error?: string;
   leaseUntil?: string; leaseToken?: string; createdAt: string; completedAt?: string;
+}
+
+// ─── لایهٔ مغز کمپین (فاز ۲) ───
+export interface TrendDigest {
+  date: string; // YYYY-MM-DD (UTC)
+  youtube: { title: string; channel: string; views: number }[];
+  twitch: { name: string; viewers: number }[];
+  createdAt: string;
+}
+export type BriefStatus = 'draft' | 'approved' | 'archived';
+export interface CampaignBrief {
+  goal: string; audience: string; offer: string;
+  hooks: string[]; caption: string; cta: string;
+  language: SocialLanguage; trendRef?: string;
+  status: BriefStatus; source: 'groq' | 'manus' | 'manual';
+  owner: string; createdAt: string;
+  approvedBy?: string; approvedAt?: string;
 }

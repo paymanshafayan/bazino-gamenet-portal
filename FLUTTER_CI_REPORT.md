@@ -1,9 +1,9 @@
-# Flutter CI report
+# Flutter CI report — flutter_app
 
-- commit: `8f61e882c768ab734dcbb5938c4f9ed4c1853b64`
+- commit: `08340c50b924971964223935163e1228780a39d5`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34704068236
-- date:   2026-09-12 16:03 UTC
+- run:    34741423525
+- date:   2026-09-13 05:54 UTC
 
 ## flutter --version
 ```
@@ -128,7 +128,7 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 9.9s)
+No issues found! (ran in 9.4s)
 ```
 **exit 0 — OK**
 
@@ -187,8 +187,45 @@ Consider addressing these issues to enable wasm builds. See docs for more info: 
 Use --no-wasm-dry-run to disable these warnings.
 Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 19428 bytes (98.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             46.2s
+Compiling lib/main.dart for the Web...                             44.9s
 ✓ Built build/web
+```
+**exit 0 — OK**
+
+## flutter build apk
+```
+Upgrading gradle.properties
+Upgrading gradle.properties
+Running Gradle task 'assembleRelease'...                        
+Warning: Flutter support for your project's Gradle version (8.14.3) will soon be dropped. Please upgrade your Gradle version to a version of at least 9.1.0 soon.
+Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+
+Potential fix: Your project's gradle version is typically defined in the gradle wrapper file. By default, this can be found at /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/android/gradle/wrapper/gradle-wrapper.properties. 
+For more information, see https://docs.gradle.org/current/userguide/gradle_wrapper.html.
+
+Warning: Flutter support for your project's Android Gradle Plugin version (Android Gradle Plugin version 8.11.1) will soon be dropped. Please upgrade your Android Gradle Plugin version to a version of at least Android Gradle Plugin version 9.0.1 soon.
+Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+
+Potential fix: Your project's AGP version is typically defined in the plugins block of the `settings.gradle` file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/android/settings.gradle), by a plugin with the id of com.android.application. 
+If you don't see a plugins block, your project was likely created with an older template version. In this case it is most likely defined in the top-level build.gradle file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/android/build.gradle) by the following line in the dependencies block of the buildscript: "classpath 'com.android.tools.build:gradle:<version>'".
+
+Warning: Flutter support for your project's Kotlin version (2.2.21) will soon be dropped. Please upgrade your Kotlin version to a version of at least 2.3.20 soon.
+Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+
+Potential fix: Your project's KGP version is typically defined in the plugins block of the `settings.gradle` file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/android/settings.gradle), by a plugin with the id of org.jetbrains.kotlin.android. 
+If you don't see a plugins block, your project was likely created with an older template version, in which case it is most likely defined in the top-level build.gradle file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/android/build.gradle) by the ext.kotlin_version property.
+
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 13604 bytes (99.2% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Checking the license for package CMake 3.22.1 in /usr/local/lib/android/sdk/licenses
+License for package CMake 3.22.1 accepted.
+Preparing "Install CMake 3.22.1 v.3.22.1".
+"Install CMake 3.22.1 v.3.22.1" ready.
+Installing CMake 3.22.1 in /usr/local/lib/android/sdk/cmake/3.22.1
+"Install CMake 3.22.1 v.3.22.1" complete.
+"Install CMake 3.22.1 v.3.22.1" finished.
+Caught exception: Already watching path: /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/android
+Running Gradle task 'assembleRelease'...                          327.4s
+✓ Built build/app/outputs/flutter-apk/app-release.apk (61.5MB)
 ```
 **exit 0 — OK**
 
@@ -199,6 +236,8 @@ flutter pub get=0
 flutter analyze=0
 flutter test=0
 flutter build web=0
+flutter build apk=0
 ```
 
-build/web size: 46M
+web size: 46M
+apk size: 59M

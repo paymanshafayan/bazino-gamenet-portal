@@ -1,9 +1,9 @@
 # Flutter CI report — admin_app
 
-- commit: `08340c50b924971964223935163e1228780a39d5`
+- commit: `21f7f5fca729c5895f1ed7991ccd08779e2aeb56`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34741423525
-- date:   2026-09-13 05:54 UTC
+- run:    34741804128
+- date:   2026-09-13 06:03 UTC
 
 ## flutter --version
 ```
@@ -92,43 +92,38 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ```
 Analyzing admin_app...                                          
 
-warning • The value of the local variable 'lang' isn't used. Try removing the variable or using it • lib/sections/jarvis_section.dart:213:11 • unused_local_variable
-warning • The value of the local variable 'pending' isn't used. Try removing the variable or using it • lib/sections/jarvis_section.dart:274:19 • unused_local_variable
-  error • A value of type 'Map<dynamic, dynamic>' can't be returned from the method '_load' because it has a return type of 'Future<Map<String, dynamic>>' • lib/sections/misc_sections.dart:15:12 • return_of_invalid_type
-   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement • lib/sections/misc_sections.dart:245:21 • deprecated_member_use
-  error • A value of type 'Map<dynamic, dynamic>' can't be returned from the method '_load' because it has a return type of 'Future<Map<String, dynamic>>' • lib/sections/systems_section.dart:90:12 • return_of_invalid_type
-   info • Unnecessary braces in a string interpolation. Try removing the braces • lib/sections/themes_section.dart:246:21 • unnecessary_brace_in_string_interps
-   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement • lib/widgets/crud.dart:329:17 • deprecated_member_use
+  error • Undefined name 'lang'. Try correcting the name to one that is defined, or defining the name • lib/sections/jarvis_section.dart:303:34 • undefined_identifier
+  error • Undefined name 'lang'. Try correcting the name to one that is defined, or defining the name • lib/sections/jarvis_section.dart:309:34 • undefined_identifier
 
-7 issues found. (ran in 8.6s)
+2 issues found. (ran in 9.0s)
 ```
 **exit 1 — FAILED**
 
 ## flutter test
 ```
 
-lib/sections/misc_sections.dart:15:22: Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return ds is Map ? ds : <String, dynamic>{};
-                     ^
-lib/sections/systems_section.dart:90:25: Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return floor is Map ? floor : <String, dynamic>{};
-                        ^
+lib/sections/jarvis_section.dart:303:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
+                          label: lang.t('approve'),
+                                 ^^^^
+lib/sections/jarvis_section.dart:309:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
+                          label: lang.t('reject'),
+                                 ^^^^
 ::group::❌ loading /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart (failed)
 Failed to load "/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart":
-Compilation failed for testPath=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart: lib/sections/misc_sections.dart:15:22: Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return ds is Map ? ds : <String, dynamic>{};
-                     ^
-lib/sections/systems_section.dart:90:25: Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return floor is Map ? floor : <String, dynamic>{};
-                        ^
+Compilation failed for testPath=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart: lib/sections/jarvis_section.dart:303:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
+                          label: lang.t('approve'),
+                                 ^^^^
+lib/sections/jarvis_section.dart:309:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
+                          label: lang.t('reject'),
+                                 ^^^^
 .
 
 ::endgroup::
@@ -143,18 +138,16 @@ Compiling lib/main.dart for the Web...
 Wasm dry run succeeded. Consider building and testing your application with the `--wasm` flag. See docs for more info: https://docs.flutter.dev/platform-integration/web/wasm
 Use --no-wasm-dry-run to disable these warnings.
 Target dart2js failed: ProcessException: Process exited abnormally with exit code 1:
-lib/sections/misc_sections.dart:15:22:
-Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return ds is Map ? ds : <String, dynamic>{};
-                     ^
-lib/sections/systems_section.dart:90:25:
-Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return floor is Map ? floor : <String, dynamic>{};
-                        ^
+lib/sections/jarvis_section.dart:303:34:
+Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+                          label: lang.t('approve'),
+                                 ^^^^
+lib/sections/jarvis_section.dart:309:34:
+Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+                          label: lang.t('reject'),
+                                 ^^^^
 Error: Compilation failed.
   Command: /opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/dart-sdk/bin/dart compile js --platform-binaries=/opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/flutter_web_sdk/kernel --invoker=flutter_tool -Ddart.vm.product=true -DFLUTTER_BUILD_NAME=1.0.0 -DFLUTTER_BUILD_NUMBER=1 -DFLUTTER_VERSION=3.47.4 -DFLUTTER_CHANNEL=stable -DFLUTTER_GIT_URL=https://github.com/flutter/flutter.git -DFLUTTER_FRAMEWORK_REVISION=9584c6713b -DFLUTTER_ENGINE_REVISION=06a2e2a110 -DFLUTTER_DART_VERSION=3.13.3 -DFLUTTER_WEB_USE_SKIA=true -DFLUTTER_WEB_USE_SKWASM=false -DFLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/ --write-resources --native-null-assertions --no-source-maps -O4 --minify -o /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/.dart_tool/flutter_build/b05189d13ea76cd9672b092c4b964d12/app.dill --packages=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/.dart_tool/package_config.json --cfe-only /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/.dart_tool/flutter_build/b05189d13ea76cd9672b092c4b964d12/main.dart
 #0      RunResult.throwException (package:flutter_tools/src/base/process.dart:153:5)
@@ -203,7 +196,7 @@ Error: Compilation failed.
 #22     main (package:flutter_tools/executable.dart:103:3)
 <asynchronous suspension>
 
-Compiling lib/main.dart for the Web...                             34.1s
+Compiling lib/main.dart for the Web...                             34.3s
 Error: Failed to compile application for the Web.
 ```
 **exit 1 — FAILED**
@@ -231,16 +224,16 @@ Alternatively, use the flag "--android-skip-build-dependency-validation" to bypa
 Potential fix: Your project's KGP version is typically defined in the plugins block of the `settings.gradle` file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/android/settings.gradle), by a plugin with the id of org.jetbrains.kotlin.android. 
 If you don't see a plugins block, your project was likely created with an older template version, in which case it is most likely defined in the top-level build.gradle file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/android/build.gradle) by the ext.kotlin_version property.
 
-lib/sections/misc_sections.dart:15:22: Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return ds is Map ? ds : <String, dynamic>{};
-                     ^
-lib/sections/systems_section.dart:90:25: Error: A value of type 'Map<dynamic, dynamic>' can't be returned from an async function with return type 'Future<Map<String, dynamic>>'.
- - 'Map' is from 'dart:core'.
- - 'Future' is from 'dart:async'.
-    return floor is Map ? floor : <String, dynamic>{};
-                        ^
+lib/sections/jarvis_section.dart:303:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
+                          label: lang.t('approve'),
+                                 ^^^^
+lib/sections/jarvis_section.dart:309:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
+ - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
+                          label: lang.t('reject'),
+                                 ^^^^
 Target kernel_snapshot_program failed: Exception
 
 
@@ -256,8 +249,8 @@ Execution failed for task ':app:compileFlutterBuildRelease'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 2m 4s
-Running Gradle task 'assembleRelease'...                          124.7s
+BUILD FAILED in 2m 5s
+Running Gradle task 'assembleRelease'...                          127.8s
 Gradle task assembleRelease failed with exit code 1
 ```
 **exit 1 — FAILED**

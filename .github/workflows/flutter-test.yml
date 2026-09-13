@@ -1,10 +1,28 @@
-name: Flutter Test & Web Build
+name: Flutter Apps CI
+
+# یک ورک‌فلو برای «همهٔ» اپ‌های فلاتر ریپو — کشف خودکار:
+# هر دایرکتوری سطح‌بالای ریپو که pubspec.yaml داشته باشد به‌عنوان یک اپ
+# ساخته می‌شود (فعلاً flutter_app و admin_app؛ اپ بعدی فقط با گذاشتن
+# پوشه‌اش اضافه می‌شود — فقط مسیرش را به paths: زیر اضافه کنید).
+#
+# برای هر اپ:
+#   flutter pub get → analyze → test → build web → build apk
+#   + artifact های وب و APK
+#   + گزارش FLUTTER_CI_REPORT-<app>.md (برای flutter_app همان فایل قدیمی
+#     FLUTTER_CI_REPORT.md حفظ شده) که روی برنچ کامیت می‌شود.
+#
+# Appetize: اپ‌های لیست‌شده در env APPETIZE_APPS بعد از بیلد، APK خود را به
+# امولاتور Appetize می‌فرستند (سکرت APPETIZE_TOKEN لازم است):
+#   ۱) APK روی ریلیز چرخشی «<app>-latest» منتشر می‌شود → URL عمومی پایدار
+#   ۲) اپ Appetize با publicKey پین‌شده در <app>/.appetize.json به‌روز می‌شود
+#      تا لینک امولاتور ثابت بماند (بار اول اپ ساخته و کلیدش کامیت می‌شود).
 
 on:
   push:
     branches: ['**']
     paths:
       - 'flutter_app/**'
+      - 'admin_app/**'
       - '.github/workflows/flutter-test.yml'
   workflow_dispatch: {}
 
@@ -12,13 +30,43 @@ concurrency:
   group: flutter-test-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # کدام اپ‌ها بعد از بیلد به Appetize فرستاده شوند (جدا با فاصله)
+  APPETIZE_APPS: admin_app
+
 jobs:
-  flutter:
+  # ── کشف خودکار اپ‌های فلاتر (هر پوشهٔ سطح‌یک با pubspec.yaml) ──
+  discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      apps: ${{ steps.find.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Find Flutter apps
+        id: find
+        run: |
+          apps=$(find . -maxdepth 2 -name pubspec.yaml | cut -d/ -f2 | grep -v '^$' | sort -u)
+          matrix=$(printf '%s\n' "$apps" | jq -Rsc 'split("\n")[:-1]')
+          echo "apps=$matrix" >> "$GITHUB_OUTPUT"
+          echo "discovered apps: $apps"
+
+  # ── بیلد و تست هر اپ (ماتریکس) ──
+  flutter:
+    needs: discover
+    if: ${{ needs.discover.outputs.apps != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       contents: write
-
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.discover.outputs.apps) }}
+    env:
+      APP: ${{ matrix.app }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,13 +78,19 @@ jobs:
           cache: true
 
       - name: Run the checks and build the report
-        working-directory: flutter_app
+        working-directory: ${{ matrix.app }}
         run: |
           set +e
-          R="$GITHUB_WORKSPACE/FLUTTER_CI_REPORT.md"
+          # گزارش flutter_app برای حفظ تداوم همان فایل قدیمی است
+          if [ "$APP" = "flutter_app" ]; then
+            R="$GITHUB_WORKSPACE/FLUTTER_CI_REPORT.md"
+          else
+            R="$GITHUB_WORKSPACE/FLUTTER_CI_REPORT-$APP.md"
+          fi
+          CODES="$GITHUB_WORKSPACE/codes-$APP.txt"
 
           {
-            echo "# Flutter CI report"
+            echo "# Flutter CI report — $APP"
             echo
             echo "- commit: \`${{ github.sha }}\`"
             echo "- branch: \`${{ github.ref_name }}\`"
@@ -58,55 +112,160 @@ jobs:
             else
               echo "**exit $code — FAILED**" >> "$R"
             fi
-            echo "$title=$code" >> "$GITHUB_WORKSPACE/codes.txt"
+            echo "$title=$code" >> "$CODES"
           }
 
-          : > "$GITHUB_WORKSPACE/codes.txt"
+          : > "$CODES"
           section "flutter --version" flutter --version
           section "flutter pub get"   flutter pub get
           section "flutter analyze"   flutter analyze
           section "flutter test"      flutter test
           section "flutter build web" flutter build web --release
+          section "flutter build apk" flutter build apk --release
 
           {
             echo
             echo "## Summary"
             echo '```'
-            cat "$GITHUB_WORKSPACE/codes.txt"
+            cat "$CODES"
             echo '```'
             echo
-            echo "build/web size: $(du -sh build/web 2>/dev/null | cut -f1 || echo 'not built')"
+            echo "web size: $(du -sh build/web 2>/dev/null | cut -f1 || echo 'not built')"
+            echo "apk size: $(du -sh build/app/outputs/flutter-apk/app-release.apk 2>/dev/null | cut -f1 || echo 'not built')"
           } >> "$R"
 
           cat "$R"
+
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-web
+          path: ${{ matrix.app }}/build/web
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-apk
+          path: ${{ matrix.app }}/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Commit the report back to the branch
         run: |
           git config user.name  "flutter-ci"
           git config user.email "flutter-ci@users.noreply.github.com"
-          git add FLUTTER_CI_REPORT.md
+          git add FLUTTER_CI_REPORT.md "FLUTTER_CI_REPORT-$APP.md" 2>/dev/null || git add "FLUTTER_CI_REPORT-$APP.md"
           if git diff --cached --quiet; then
             echo "report unchanged"
-          else
-            git commit -m "ci(flutter): report for ${{ github.sha }} [skip ci]"
-            pushed=no
-            for i in 1 2 3; do
-              git pull --rebase --autostash origin "${{ github.ref_name }}" || true
-              if git push origin "HEAD:${{ github.ref_name }}"; then pushed=yes; break; fi
-              sleep 5
-            done
-            [ "$pushed" = yes ] || echo "::warning::could not push the report"
+            exit 0
+          fi
+          git commit -m "ci(flutter): $APP report for ${{ github.sha }} [skip ci]"
+          pushed=no
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "${{ github.ref_name }}" || true
+            if git push origin "HEAD:${{ github.ref_name }}"; then pushed=yes; break; fi
+            sleep 5
+          done
+          [ "$pushed" = yes ] || echo "::warning::could not push the report"
+
+      # ── انتشار APK برای امولاتور Appetize (فقط اپ‌های APPETIZE_APPS) ──
+      - name: Publish APK to Appetize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPETIZE_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
+        run: |
+          set -e
+          if ! printf '%s\n' $APPETIZE_APPS | grep -qx "$APP"; then
+            echo "app '$APP' is not in APPETIZE_APPS — skipping Appetize publish"
+            exit 0
+          fi
+          APK="$APP/build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -s "$APK" ]; then
+            echo "::warning::APK not built — skipping Appetize publish"
+            exit 0
+          fi
+          if [ -z "$APPETIZE_TOKEN" ]; then
+            echo "::warning::APPETIZE_TOKEN secret is not set — skipping Appetize publish"
+            exit 0
           fi
 
-      - name: Fail the job if analyze or test failed
+          # 1) rotating release -> stable public URL for Appetize
+          cp "$APK" "$APP.apk"
+          TAG="$APP-latest"
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          gh release create "$TAG" "$APP.apk" \
+            --title "Bazino $APP (latest CI build)" \
+            --notes "Latest CI build of the $APP Flutter app — refreshed on every CI run." \
+            --prerelease
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APP.apk"
+          echo "public APK URL: $URL"
+
+          # 2) request body (same proven contract as the portal App Lab)
+          BODY=$(APPETIZE_URL="$URL" python3 -c 'import json,os; print(json.dumps({"url": os.environ["APPETIZE_URL"], "platform": "android", "note": "Bazino '"$APP"' — CI build", "appPermissions": {"run": "public"}}))')
+
+          # 3) update the pinned Appetize app if we have a key; otherwise create one
+          KEY=""
+          if [ -f "$APP/.appetize.json" ]; then
+            KEY=$(python3 -c 'import json; print(json.load(open("'$APP'/.appetize.json")).get("publicKey") or "")' 2>/dev/null || echo "")
+          fi
+          RES=""
+          NEWKEY=""
+          if [ -n "$KEY" ]; then
+            echo "updating existing Appetize app: $KEY"
+            RES=$(curl -sS -X PUT "https://api.appetize.io/v1/apps/$KEY" \
+              -H "X-API-KEY: $APPETIZE_TOKEN" -H "Content-Type: application/json" -d "$BODY") || RES=""
+            NEWKEY=$(printf '%s' "$RES" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("publicKey") or "")' 2>/dev/null || echo "")
+            if [ -z "$NEWKEY" ]; then
+              echo "PUT update failed — falling back to creating a new app"
+              echo "response: $RES"
+            fi
+          fi
+          if [ -z "$NEWKEY" ]; then
+            echo "creating new Appetize app"
+            RES=$(curl -sS -X POST "https://api.appetize.io/v1/apps" \
+              -H "X-API-KEY: $APPETIZE_TOKEN" -H "Content-Type: application/json" -d "$BODY")
+            echo "response: $RES"
+            NEWKEY=$(printf '%s' "$RES" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("publicKey") or "")' 2>/dev/null || echo "")
+          fi
+          if [ -z "$NEWKEY" ]; then
+            echo "::error::Appetize did not return a publicKey — see response above"
+            exit 1
+          fi
+
+          # 4) pin the publicKey so future runs update the same app (stable emulator link)
+          if [ "$NEWKEY" != "$KEY" ]; then
+            APPETIZE_KEY="$NEWKEY" APPETIZE_APP="$APP" python3 -c 'import json,os; a=os.environ["APPETIZE_APP"]; open(a+"/.appetize.json","w").write(json.dumps({"publicKey": os.environ["APPETIZE_KEY"], "platform": "android", "note": "Bazino "+a+" — CI build", "source": "github-release:"+a+"-latest"}, indent=2) + "\n")'
+            git config user.name  "flutter-ci"
+            git config user.email "flutter-ci@users.noreply.github.com"
+            git add "$APP/.appetize.json"
+            if git diff --cached --quiet; then
+              echo "appetize key unchanged"
+            else
+              git commit -m "ci(flutter): pin Appetize publicKey for $APP [skip ci]"
+              pushed=no
+              for i in 1 2 3 4 5; do
+                git pull --rebase --autostash origin "${{ github.ref_name }}" || true
+                if git push origin "HEAD:${{ github.ref_name }}"; then pushed=yes; break; fi
+                sleep 5
+              done
+              [ "$pushed" = yes ] || echo "::warning::could not push the appetize key file"
+            fi
+          fi
+          echo "Appetize app published: https://appetize.io/app/$NEWKEY (publicKey: $NEWKEY)"
+
+      - name: Fail the job if any check failed
         run: |
-          if [ ! -f codes.txt ]; then
-            echo "::error::codes.txt is missing — the checks step did not run"
+          CODES="codes-$APP.txt"
+          if [ ! -f "$CODES" ]; then
+            echo "::error::$CODES is missing — the checks step did not run"
             exit 1
           fi
-          bad=$(grep -E '^(flutter pub get|flutter analyze|flutter test|flutter build web)=' codes.txt | grep -v '=0$' || true)
+          bad=$(grep -E '^(flutter pub get|flutter analyze|flutter test|flutter build web|flutter build apk)=' "$CODES" | grep -v '=0$' || true)
           if [ -n "$bad" ]; then
-            echo "::error::$(echo "$bad" | tr '\n' ' ') — see FLUTTER_CI_REPORT.md"
+            echo "::error::$APP: $(echo "$bad" | tr '\n' ' ') — see the report file"
             exit 1
           fi
-          echo "all checks passed"
+          echo "$APP: all checks passed"

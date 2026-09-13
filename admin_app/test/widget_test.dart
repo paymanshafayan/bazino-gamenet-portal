@@ -92,6 +92,10 @@ void main() {
   });
 
   testWidgets('بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند', (tester) async {
+    // کشوی ناوبری ListView تنبل است؛ با ارتفاع پیش‌فرضِ تست (۶۰۰) آیتم‌های
+    // پایینی کشو رندر نمی‌شوند → سطح تست را بلند می‌کنیم تا همه دیده شوند.
+    await tester.binding.setSurfaceSize(const Size(480, 2600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final auth = AuthController.instance;
     auth.isReady = true;
     auth.isLoggedIn = true;

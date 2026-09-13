@@ -259,6 +259,7 @@ class _ApprovalsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<AppLang>();
     return RefreshIndicator(
       onRefresh: () async => (context as Element).markNeedsBuild(),
       child: FutureView<List<Map<String, dynamic>>>(

@@ -127,3 +127,31 @@ create→poll→import کامل، سهمیه/QUOTA_EXCEEDED، gating سکرت (4
 **تست‌ها:** ۶ تست ماک‌شدهٔ جدید در `tests/publishing.test.mts` (قرارداد دقیق درخواست Imejis، idempotency، quota، خطای provider، import→draft فقط دستی، cancel/مالکیت) — مجموعهٔ کامل **652/652 سبز** + smoke-test زندهٔ سرور بیلدشده (بوت واقعی، فعال‌سازی از پنل، صف→worker→خطای اتصال ثبت‌شده، cancel، duplicate). تست لایو سرویس‌های خارجی در سندباکس ممکن نیست (شبکه به api.cloudflare.com/render.imejis.io بلاک) — پس از ست‌شدن سکرت‌ها روی Railway با یک دیزاین واقعی تست می‌شود.
 
 **مرحلهٔ بعد (فاز ۲):** UI پنل (تب mediagen در بخش انتشار)، انتخاب دیزاین از allowlist، پیش‌نمایش خروجی قبل از import. سکرت‌های لازم: `IMEJIS_API_KEY` (کاربر در حال ساخت)، `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ZONE_ID` (موجود)، `CLOUDFLARE_ACCOUNT_ID` (اختیاری — خودکار از zone مشتق می‌شود).
+
+## ۱۰. بررسی‌های تکمیلی و تصمیم نهایی معماری (۲۰۲۶-۰۹-۱۳ — نوبت‌های بعد)
+
+### ۱۰.۱ Creatify AI — بررسی و رد (تصمیم کاربر)
+- قوت واقعی: «ویدئوی UGC وایرال + طراحی کمپین» (URL-to-Video، ۱۵۰۰+ آواتار لیپ‌سینک، AdMax) — ولی: API فقط با اشتراک ($99/ماه Starter، $299 Pro؛ quickstart رسمی: «API access requires an active subscription») و فارسی در فهرست رسمی ۲۹ زبان نیست. پلن رایگان وب: ۱۰ کریدیت/ماه با واترمارک. HeyGen هم رد (پلن API رایگان از فوریه ۲۰۲۶ حذف؛ PAYG از $1/دقیقه).
+
+### ۱۰.۲ طرح «Apiframe + Shotstack + Kie» — راستی‌آزمایی
+- Apiframe: ۱۰۰ کریدیت **یک‌باره** (تأیید تلفنی/$1) نه ماهانه — «a one-time unlock, not a monthly free plan» (pricing رسمی)؛ 1c=$0.01، کلیپ ۶ث Hailuo=48c.
+- Shotstack: ادعای «۲۰ دقیقه رایگان ماهانه» غلط — رسمی: ۱۰ کریدیت یک‌بارهٔ ۳۰ روزه، بعد $39/ماه یا $0.30/دقیقه. (فونت TTF فارسی/RTL واقعی است ولی پولی.)
+- Kie.ai: اعتبار تست یک‌باره، PAYG از $5 بدون اشتراک — گزینهٔ فاز ۳.
+- Google Trends API: آلفای درخواستی (تیر ۲۰۲۵). Apify Trend Aggregator: pay-per-event، ۶ کاربر، خبرمحور — رد.
+- «Kling/Hailuo متن فارسی را بی‌نقص رندر می‌کنند»: مستند رسمی فقط zh/en؛ متن فارسی باید جدا رندر شود.
+- خطای ساختاری طرح (رد): انتشار خودکار بدون تأیید انسانی — مغایر خط قرمز پروژه.
+
+### ۱۰.۳ مقایسه با خرید Predis — کاربر پلن $0 را انتخاب کرد
+Predis (~$32+/ماه) فارسی ندارد ⇒ خط لولهٔ فارسی به‌هرحال لازم است؛ Predis/Kie می‌توانند provider آیندهٔ پولی روی معماری provider-agnostic باشند.
+
+## ۱۱. لایهٔ مغز کمپین (تأیید کاربر)
+- **معماری:** دایجست ترند رایگان (YouTube mostPopular 1-unit، Twitch getTopGames، analytics زرنیو) → مغز (Groq موجود در پرتال + Manus؛ کتابخانهٔ هوک فارسی/ترکی) → بریف `pub-brief` با تأیید انسانی → mediagen (imejis/flux/compose) → AssetLibrary → pub-draft → approve → schedule.
+- **compose:** ElevenLabs v3 (فارسی fas، ۱۰k کاراکتر/ماه رایگان؛ تجاری از $22) + ffmpeg پرتال (static با libfribidi+libass — تست‌شده).
+- **Pomelli (Google Labs):** بتای عمومی از ۲۸ اکتبر ۲۰۲۵، رایگان در بتا؛ Business DNA (تحلیل bazino.pro → رنگ/فونت/لحن/سبک) + ایدهٔ کمپین + کریتیو هم‌برند + Photoshoot. **API ندارد و آزمایشی است** ⇒ فقط میز کار دستی کاربر + الگوی مدل pub-brief.
+- ابزارهای تأییدشده: YouTube Data API v3 (۱۰k unit/روز)، Twitch Helix (رایگان، OAuth، ~800 req/min)، Groq (~30rpm/1k+rpd، از قبل در پرتال)، Pexels/Pixabay (رایگان تجاری 200/hr و 100/min)، TikTok Creative Center و Meta Ad Library (دستی/رایگان). رد: Reddit (ثبت‌نام دستی/غیرتجاری).
+- **تقسیم کار مرورگر (پل CDP):** من ناوبری/فرم/کلیک و بررسی‌های فقط‌خواندنی را از مرورگر کاربر انجام می‌دهم؛ کد تأیید ایمیل/SMS، دکمهٔ نهایی ساخت کلید، کپی مقدار سکرت به سکرت‌ریپو و تصمیم‌های برند (قالب‌های Imejis) دست کاربر — دلایل: امنیت سکرت (مقدار کلید نباید از کانال/لاگ عبور کند)، پذیرش ToS و مالکیت اکانت، ریسک فلگ‌شدن اکانت‌های واقعی توسط ضد-اتوماسیون.
+
+## ۱۲. فاز ۲ — محدوده و چک‌لیست کاربر
+- **محدوده:** provider `compose` (ElevenLabs TTS + مونتاژ ffmpeg + زیرنویس RTL)، مدل `pub-brief` + روت‌ها، worker دایجست ترند (YT+Twitch)، کتابخانهٔ هوک seed، تست ماک. UI بعد از هسته.
+- **سکرت‌ها:** IMEJIS_API_KEY، ELEVENLABS_API_KEY، GROQ_API_KEY (اگر موجود نیست)، YOUTUBE_API_KEY، TWITCH_CLIENT_ID/SECRET، CLOUDFLARE_API_TOKEN (بررسی مجوز Workers AI)، CLOUDFLARE_ACCOUNT_ID (اختیاری).
+- اختیاری/دستی: درخواست Google Trends alpha، Pomelli Business DNA، مرور TikTok Creative Center/Meta Ad Library.

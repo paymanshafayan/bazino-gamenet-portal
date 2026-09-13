@@ -155,3 +155,48 @@ Predis (~$32+/ماه) فارسی ندارد ⇒ خط لولهٔ فارسی به�
 - **محدوده:** provider `compose` (ElevenLabs TTS + مونتاژ ffmpeg + زیرنویس RTL)، مدل `pub-brief` + روت‌ها، worker دایجست ترند (YT+Twitch)، کتابخانهٔ هوک seed، تست ماک. UI بعد از هسته.
 - **سکرت‌ها:** IMEJIS_API_KEY، ELEVENLABS_API_KEY، GROQ_API_KEY (اگر موجود نیست)، YOUTUBE_API_KEY، TWITCH_CLIENT_ID/SECRET، CLOUDFLARE_API_TOKEN (بررسی مجوز Workers AI)، CLOUDFLARE_ACCOUNT_ID (اختیاری).
 - اختیاری/دستی: درخواست Google Trends alpha، Pomelli Business DNA، مرور TikTok Creative Center/Meta Ad Library.
+
+## ۱۳. پلن اجرایی نهایی — «مغز کمپین + ریلز $0» (ارائه برای تأیید کاربر — ۲۰۲۶-۰۹-۱۳)
+
+> پایه: فاز ۱ mediagen (کامیت 4973b67 — سبز در CI). این پلن **مستقل از پل مرورگر** است؛
+> همهٔ بسته‌ها با تست ماک توسعه و راستی‌آزمایی می‌شوند. سکرت‌ها فقط برای «لایو شدن» لازم‌اند.
+
+### بستهٔ ۱ — مدل بریف کمپین `pub-brief` (الهام از Business DNA پوملی)
+- تایپ `CampaignBrief` در `shared/publishing/types.ts`: هدف (tournament/promotion/announcement/trend)، مخاطب، پیشنهاد، هوک‌ها، CTA، زبان، `trendRef?`، `assetIds`، وضعیت (`draft/approved/archived`)، منبع (`groq/manus/manual`)
+- سرویس `server/publishing/briefs.ts`: CRUD روی OpsCore (idempotency + version + مالکیت)؛ **تأیید انسانی اجباری** — `approved` فقط با کلیک صریح ادمین
+- تولید پیشنهاد بریف: دایجست ترند (بستهٔ ۲) + هوک‌های کتابخانه (بستهٔ ۳) + Groq (موتور موجود جارویس) → پرپرامپت فارسی؛ بدون کلید Groq = خطای `GROQ_NOT_CONFIGURED` (توسعه با ماک)
+- روت‌ها: `GET/POST /briefs`، `PUT /briefs/:id`، `POST /briefs/:id/approve`، `POST /briefs/suggest`
+
+### بستهٔ ۲ — دایجست ترند `pub-trend-digest` (لایهٔ الف)
+- سرویس `server/publishing/trends.ts`: روزی یک‌بار YouTube `videos.mostPopular` (region=CY و TR، videoCategoryId=20=Gaming) + Twitch `getTopGames` → رکورد دایجست با امتیاز سادهٔ محبوبیت
+- سکرت‌های جدید: `youtube_api_key`، `twitch_client_id`، `twitch_client_secret` (به SECRET_NAMES + رگکس حفاظت + seed)
+- اجرا در همان حلقهٔ ۴ ثانیه‌ای موجود (فقط اگر دایجست امروز نبود و کلیدها تنظیم بودند — بدون کلید، ساکت)
+- روت: `GET /trends/latest` (guard content)
+
+### بستهٔ ۳ — کتابخانهٔ هوک فارسی/ترکی (لایهٔ ب)
+- Seed ثابت ~۲۴ الگوی اثبات‌شده در ۶ دسته (کنجکاوی/FOMO/چالش/اعداد/سؤال/اعلامیه) در `server/publishing/hooks.ts` + CRUD
+- روت: `GET /hooks` (guard content) — منبع پرامپت بستهٔ ۱
+
+### بستهٔ ۴ — provider ترکیب `compose` (لایهٔ پ + ت: ریلز $0)
+- `MediaGenProvider += 'compose'`؛ ورودی: `briefId?`، `assetId` (تصویر Imejis/FLUX یا آپلود)، `script` (متن صدا)، `voiceId?`، `subtitle?`
+- رندر: ElevenLabs TTS (مدل `eleven_v3`، زبان fa پشتیبانی رسمی) → **ffmpeg پرتال**: تصویر + حرکت Ken Burns + زیرنویس RTL (drawtext + فونت Vazirmatn به‌صورت asset استاتیک داخل ریپو، مجوز OFL) + صدا → mp4 (h264/aac، ۹:۱۶، ≤۶۰ ثانیه)
+- سکرت: `elevenlabs_api_key`؛ خروجی از همان مسیر chunk/finalize وارد AssetLibrary می‌شود (اعتبارسنجی ffprobe بازاستفاده)
+- quota ماهانهٔ جدا (پیش‌فرض ۲۰/ماه ≈ سقف کاراکتر رایگان ElevenLabs)
+
+### بستهٔ ۵ — تست و CI (شرط تمام‌شدن)
+- ماک کامل: بریف (تأیید انسانی + مالکیت)، دایجست (ماک YouTube/Twitch)، compose (ماک ElevenLabs + اجرای واقعی ffmpeg روی تصویر/صدای تستی سنتزشده)، quota، حفاظت سکرت‌ها، زنجیرهٔ بریف→تسک→draft
+- معیار پذیرش: `npm test` کامل سبز + `npm run lint` پاک + بیلد + پوش (Railway روی برنچ arena دیپلوی می‌کند) + CI سبز
+
+### بستهٔ ۶ (فاز بعد — خارج از این تأیید) — حلقهٔ بازخورد و UI
+- گزارش «چه هوکی جواب داد» از analytics زرنیو (فعال‌سازی آن با کاربر) + تب UI پنل
+
+### ترتیب اجرا
+۱ → ۲ → ۳ → ۴ → تست/پوش (هر بسته جدا کامیت؛ اگر گسترش یابد: ۲ و ۳ موازی با ۱)
+
+### صریحاً خارج از محدودهٔ این پلن
+- انتشار خودکار بدون تأیید انسانی — **هرگز** (خط قرمز)
+- هیچ سرویس پولی (Predis/Kie/Apiframe/Creatify) — فقط با تصمیم مجدد کاربر از دروازهٔ `confirmedCost`
+- ثبت‌نام‌های مرورگری — تا وصل شدن پل، مسیر دستی چک‌لیست §۱۲ برقرار است
+
+### پیش‌نیاز کاربر (فقط برای لایو؛ توسعه را بلاک نمی‌کند)
+IMEJIS_API_KEY + دیزاین‌ها، ELEVENLABS_API_KEY، GROQ_API_KEY (بررسی)، YOUTUBE_API_KEY، TWITCH_CLIENT_ID/SECRET — **Cloudflare Workers AI ✓ (انجام شد)**

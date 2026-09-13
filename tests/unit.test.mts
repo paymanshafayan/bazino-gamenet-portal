@@ -573,6 +573,41 @@ test('validateThemeComponentJs still rejects the 2026-09-11 incident pattern (ho
   assert.ok(err!.includes('هوک'), 'error must mention hooks');
 });
 
+/* ─── الگوی کارخانهٔ کامپوننت (۲۰۲۶-۰۹-۱۳، قالب bazino-hub v2.0.0): wrap(Comp) ─── */
+
+test('validateThemeComponentJs accepts the component-factory pattern (bazino-hub wrap)', () => {
+  // الگوی واقعی قالب bazino-hub: wrap(Comp) داخل closure خودش h(Comp,…) می‌سازد و
+  // registerComponent("hub.games", wrap(GamesPage)) — GamesPage واقعاً mount می‌شود
+  const hubJs = '(function(){var S=window.BazinoThemeSDK,R=S.React,h=R.createElement;' +
+    'function wrap(Comp){var fn=function(props){return h(Comp,props||{});};' +
+    'fn.render=function(p){return h(Comp,p||{});};return fn;}' +
+    'function GamesPage(p){var s=R.useState("hub");return h("div",null,"games");}' +
+    'function Header(p){return h("header",null,"hdr");}' +
+    'S.registerComponent("header",wrap(Header));' +
+    'S.registerComponent("hub.games",wrap(GamesPage));})();';
+  assert.equal(validateThemeComponentJs(hubJs), null, 'factory-wrapped components with hooks must be accepted');
+});
+
+test('factory detection requires the factory to actually pass its parameter to h()/createElement()', () => {
+  // تابعی که پارامترش را به h() نمی‌دهد کارخانه نیست → hook داخل Page همچنان رد می‌شود
+  const notFactory = '(function(){var S=window.BazinoThemeSDK,R=S.React,h=R.createElement;' +
+    'function deco(Comp){return {apiVersion:2,render:function(p){return h("div",null,"x");}};}' +
+    'function Page(p){R.useState(0);return h("div",null,"x");}' +
+    'S.registerComponent("home",deco(Page));})();';
+  const err = validateThemeComponentJs(notFactory);
+  assert.ok(err, 'non-factory wrapper must not unlock hooks');
+  assert.ok(err!.includes('هوک'), 'error must explain the hook rule');
+});
+
+test('factory call with a non-identifier argument does not unlock hooks', () => {
+  const dynArg = '(function(){var S=window.BazinoThemeSDK,R=S.React,h=R.createElement;' +
+    'function wrap(Comp){return {render:function(p){return h(Comp,p||{});}};}' +
+    'function Page(p){R.useState(0);return h("div",null,"x");}' +
+    'S.registerComponent("home",wrap(window.Bool ? Page : null));})();';
+  const err = validateThemeComponentJs(dynArg);
+  assert.ok(err, 'dynamic (non-identifier) factory argument must not unlock hooks');
+});
+
 test('listFilesRecursive keeps nested asset subfolder paths (3D-theme export bug)', async () => {
   const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');

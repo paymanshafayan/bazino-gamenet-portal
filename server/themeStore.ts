@@ -265,6 +265,54 @@ export function validateThemeComponentJs(componentJs: string): string | null {
     if (first?.type === "Identifier") componentRefs.add(first.name);
   });
 
+  // ۳.۵) الگوی «کارخانهٔ کامپوننت» (۲۰۲۶-۰۹-۱۳، قالب bazino-hub v2.0.0):
+  //      تابعی مثل wrap(Comp) که پارامترش را — حتی داخل closureهای تو در تو مثل
+  //      render — مستقیم به h(Comp,…)/createElement(Comp,…) می‌دهد، کامپوننتِ
+  //      آرگومانش را واقعاً mount می‌کند؛ پس هر Identifier که به چنین تابعی داده
+  //      شود (wrap(GamesPage)) هم «کامپوننت-رفرنس‌شده» است و hookهایش مجاز.
+  //      شرط: فقط پارامترِ مستقیمِ ساده به‌عنوان آرگومان اول create-call.
+  const callSiteFirstArgs = new Map<string, Set<string>>();
+  walkAst(ast, (node) => {
+    if (node.type !== "CallExpression") return;
+    const callee = node.callee;
+    const first = node.arguments?.[0];
+    if (callee?.type === "Identifier" && first?.type === "Identifier") {
+      let args = callSiteFirstArgs.get(callee.name);
+      if (!args) { args = new Set(); callSiteFirstArgs.set(callee.name, args); }
+      args.add(first.name);
+    }
+  });
+  const factoryNames = new Set<string>();
+  walkAst(ast, (node) => {
+    if (node.type !== "FunctionDeclaration" && node.type !== "FunctionExpression" && node.type !== "ArrowFunctionExpression") return;
+    const fname = functionOwnerName(node);
+    if (!fname) return;
+    const params = new Set<string>(
+      (node.params || []).filter((p: any) => p?.type === "Identifier").map((p: any) => p.name)
+    );
+    if (!params.size) return;
+    // آیا در کل بدنهٔ تابع (شامل closureهای داخلی مثل fn.render) پارامتر
+    // به‌عنوان کامپوننت به h()/createElement() داده می‌شود؟
+    let isFactory = false;
+    walkAst(node, (inner) => {
+      if (isFactory || inner.type !== "CallExpression") return;
+      const callee = inner.callee;
+      const isCreateCall =
+        (callee?.type === "Identifier" && (callee.name === "h" || callee.name === "createElement"))
+        || (callee?.type === "MemberExpression"
+          && callee.object?.type === "Identifier" && /^R$|React|Preact|preactH$/i.test(callee.object.name)
+          && callee.property?.name === "createElement");
+      if (!isCreateCall) return;
+      const first = inner.arguments?.[0];
+      if (first?.type === "Identifier" && params.has(first.name)) isFactory = true;
+    });
+    if (isFactory) factoryNames.add(fname);
+  });
+  for (const [calleeName, args] of callSiteFirstArgs) {
+    if (!factoryNames.has(calleeName)) continue;
+    for (const argName of args) componentRefs.add(argName);
+  }
+
   // ۴) همهٔ فراخوانی hookها باید داخل یک تابعِ «کامپوننت-رفرنس‌شده» باشند
   //    (hookها هم به‌صورت bare مثل useState(…) و هم namespace مثل R.useState(…) / React.useEffect(…))
   let hookViolation: string | null = null;

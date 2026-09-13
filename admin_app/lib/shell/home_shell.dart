@@ -35,7 +35,7 @@ class AdminSection {
 ///   - سکرت‌های کانال‌های پیام‌رسانی (messaging/config)
 ///   - Web Sync shared secret (sync-settings)
 /// این‌ها فقط از پنل وب مدیریت می‌شوند.
-const List<AdminSection> kAdminSections = [
+final List<AdminSection> kAdminSections = [
   AdminSection('dashboard', 'dashboard', Icons.dashboard_outlined, _b(DashboardSection())),
   AdminSection('jarvis', 'jarvis', Icons.smart_toy_outlined, _b(JarvisSection())),
   AdminSection('systems', 'systems', Icons.computer_outlined, _b(SystemsSection())),

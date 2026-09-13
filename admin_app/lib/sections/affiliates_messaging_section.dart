@@ -161,7 +161,8 @@ class _ReportTab extends StatelessWidget {
 
   Future<Map<String, dynamic>> _load() async {
     final res = await ApiClient.get('/api/admin/affiliates/report');
-    return res is Map ? res : <String, dynamic>{};
+    if (res is Map) return Map<String, dynamic>.from(res);
+    return <String, dynamic>{};
   }
 
   @override
@@ -301,9 +302,15 @@ class _KeyValuesEditorState extends State<_KeyValuesEditor> {
       final res = await ApiClient.get(widget.loadPath);
       Map<String, dynamic> data;
       if (widget.dataKey != null) {
-        data = res is Map && res[widget.dataKey] is Map ? Map<String, dynamic>.from(res[widget.dataKey] as Map) : {};
+        if (res is Map && res[widget.dataKey] is Map) {
+          data = Map<String, dynamic>.from(res[widget.dataKey] as Map);
+        } else {
+          data = <String, dynamic>{};
+        }
+      } else if (res is Map) {
+        data = Map<String, dynamic>.from(res)..remove('success');
       } else {
-        data = res is Map ? Map<String, dynamic>.from(res)..remove('success') : {};
+        data = <String, dynamic>{};
       }
       _original = data;
       for (final e in data.entries) {
@@ -425,7 +432,8 @@ class _MessagingSectionState extends State<MessagingSection> {
 
   Future<Map<String, dynamic>> _audience() async {
     final res = await ApiClient.get('/api/management/messaging/audience');
-    return res is Map ? res : <String, dynamic>{};
+    if (res is Map) return Map<String, dynamic>.from(res);
+    return <String, dynamic>{};
   }
 
   Future<List<Map<String, dynamic>>> _campaigns() async {

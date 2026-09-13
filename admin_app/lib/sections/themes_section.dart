@@ -15,7 +15,8 @@ class ThemesSection extends StatelessWidget {
 
   Future<Map<String, dynamic>> _load() async {
     final res = await ApiClient.get('/api/themes');
-    return res is Map ? res : <String, dynamic>{};
+    if (res is Map) return Map<String, dynamic>.from(res);
+    return <String, dynamic>{};
   }
 
   static List<Map<String, dynamic>> _serverThemes(Map<String, dynamic> data) {

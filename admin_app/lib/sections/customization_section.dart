@@ -15,7 +15,8 @@ class CustomizationSection extends StatelessWidget {
 
   Future<Map<String, dynamic>> _load() async {
     final res = await ApiClient.get('/api/settings');
-    return res is Map ? res : <String, dynamic>{};
+    if (res is Map) return Map<String, dynamic>.from(res);
+    return <String, dynamic>{};
   }
 
   @override

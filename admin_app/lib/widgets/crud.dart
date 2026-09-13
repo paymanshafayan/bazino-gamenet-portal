@@ -333,7 +333,7 @@ class _EntityFormState extends State<_EntityForm> {
                     DropdownMenuItem(value: o, child: Text(o, style: const TextStyle(fontSize: 13))),
                 ],
                 onChanged: (v) => setState(() => _dropdowns[f.key] = v),
-              ]
+              )
             else if (f.type == FieldType.toggle)
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,

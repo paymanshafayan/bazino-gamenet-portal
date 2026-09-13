@@ -12,6 +12,8 @@ export interface PublishingConfig {
   selectedMode: ExecutionMode | null; defaultAgentId: string; defaultCampaignId: string;
   zernioAccountId: string; zernioProfileId: string; outboundEnabled: boolean;
   baseUrl: string; timezone: string;
+  mediagenEnabled: boolean; mediagenDesigns: string[];
+  mediagenImejisLimit: number; mediagenFluxLimit: number;
 }
 export interface CampaignPolicy {
   name: string; active: boolean; accountId: string; languages: SocialLanguage[];
@@ -49,4 +51,13 @@ export interface Publication {
   nativeMediaId?: string; scheduledAt: string; createdAt: string; updatedAt: string;
   error?: string; attemptedAt?: string; leaseUntil?: string; leaseToken?: string;
   platformResults?: Record<string, { status: string; nativeId?: string; url?: string }>;
+}
+
+export type MediaGenProvider = 'imejis' | 'flux';
+export interface MediaGenTask {
+  provider: MediaGenProvider; designId: string; fields: Record<string, string>;
+  prompt: string; title: string; language: SocialLanguage; owner: string;
+  status: 'queued' | 'rendering' | 'completed' | 'failed' | 'imported' | 'cancelled';
+  assetId?: string; draftId?: string; error?: string;
+  leaseUntil?: string; leaseToken?: string; createdAt: string; completedAt?: string;
 }

@@ -243,7 +243,7 @@ class ThemesSection extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${fileName} · ${bytes.length ~/ 1024} KB',
+              Text('$fileName · ${bytes.length ~/ 1024} KB',
                   style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
               const SizedBox(height: 14),
               if (p.status == 'completed')

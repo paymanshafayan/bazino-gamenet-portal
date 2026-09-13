@@ -326,7 +326,7 @@ class _EntityFormState extends State<_EntityForm> {
           for (final f in cfg.fields) ...[
             if (f.type == FieldType.dropdown)
               DropdownButtonFormField<String>(
-                value: _dropdowns[f.key],
+                initialValue: _dropdowns[f.key],
                 decoration: InputDecoration(labelText: lang.t(f.labelKey)),
                 items: [
                   for (final o in f.options)

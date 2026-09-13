@@ -210,7 +210,6 @@ class _SessionsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.watch<AppLang>();
     return RefreshIndicator(
       onRefresh: () async => (context as Element).markNeedsBuild(),
       child: FutureView<List<Map<String, dynamic>>>(
@@ -260,7 +259,6 @@ class _ApprovalsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.watch<AppLang>();
     return RefreshIndicator(
       onRefresh: () async => (context as Element).markNeedsBuild(),
       child: FutureView<List<Map<String, dynamic>>>(
@@ -271,7 +269,6 @@ class _ApprovalsTab extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, i) {
             final a = items[i];
-            final pending = a['status']?.toString() != 'pending';
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(14),

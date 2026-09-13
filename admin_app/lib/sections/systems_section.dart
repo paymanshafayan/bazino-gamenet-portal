@@ -87,7 +87,8 @@ class _FloorView extends StatelessWidget {
 
   Future<Map<String, dynamic>> _load() async {
     final floor = await ApiClient.get('/api/management/floor');
-    return floor is Map ? floor : <String, dynamic>{};
+    if (floor is Map) return Map<String, dynamic>.from(floor);
+    return <String, dynamic>{};
   }
 
   @override

@@ -12,7 +12,8 @@ class MigrationsSection extends StatelessWidget {
 
   Future<Map<String, dynamic>> _load() async {
     final ds = await ApiClient.get('/api/data-source');
-    return ds is Map ? ds : <String, dynamic>{};
+    if (ds is Map) return Map<String, dynamic>.from(ds);
+    return <String, dynamic>{};
   }
 
   @override
@@ -242,7 +243,7 @@ class _MessagesSectionState extends State<MessagesSection> {
                 builder: (context, snap) {
                   final users = snap.data ?? [];
                   return DropdownButtonFormField<String>(
-                    value: _recipient,
+                    initialValue: _recipient,
                     decoration: InputDecoration(labelText: lang.t('recipient')),
                     items: [
                       DropdownMenuItem(value: 'All', child: Text(lang.t('allUsers'))),

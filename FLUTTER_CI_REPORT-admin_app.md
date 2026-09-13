@@ -1,9 +1,9 @@
 # Flutter CI report — admin_app
 
-- commit: `21f7f5fca729c5895f1ed7991ccd08779e2aeb56`
+- commit: `9993931448f0fdaf78770e81d78d834349821741`
 - branch: `arena/01a089a9-bazino-gamenet-portal`
-- run:    34741804128
-- date:   2026-09-13 06:03 UTC
+- run:    34742152222
+- date:   2026-09-13 06:12 UTC
 
 ## flutter --version
 ```
@@ -91,44 +91,62 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing admin_app...                                          
-
-  error • Undefined name 'lang'. Try correcting the name to one that is defined, or defining the name • lib/sections/jarvis_section.dart:303:34 • undefined_identifier
-  error • Undefined name 'lang'. Try correcting the name to one that is defined, or defining the name • lib/sections/jarvis_section.dart:309:34 • undefined_identifier
-
-2 issues found. (ran in 9.0s)
+No issues found! (ran in 8.9s)
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter test
 ```
 
-lib/sections/jarvis_section.dart:303:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
-                          label: lang.t('approve'),
-                                 ^^^^
-lib/sections/jarvis_section.dart:309:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
-                          label: lang.t('reject'),
-                                 ^^^^
-::group::❌ loading /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart (failed)
-Failed to load "/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart":
-Compilation failed for testPath=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart: lib/sections/jarvis_section.dart:303:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
-                          label: lang.t('approve'),
-                                 ^^^^
-lib/sections/jarvis_section.dart:309:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
-                          label: lang.t('reject'),
-                                 ^^^^
-.
+::group::✅ Passing tests
+✅ بدون لاگین: فقط صفحهٔ لاگین رندر می‌شود و هیچ بخشی دیده نمی‌شود
+✅ با نشست معتبر: پوستهٔ مدیریت با داشبورد ساخته می‌شود
+✅ 401 از API (انقضای توکن) → خروج خودکار به صفحهٔ لاگین
+✅ خروج دستی → برگشت به صفحهٔ لاگین
+✅ فرم ورود خالی → پیام خطا بدون ارسال
+::endgroup::
+::group::❌ بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند (failed)
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Themes": []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart:108:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/test/widget_test.dart line 108
+The test description was:
+  بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Test failed. See exception logs above.
+The test description was: بخش‌های امنیتی (کلیدهای API/توکن‌ها) در اپ وجود ندارند
 
 ::endgroup::
+::group::✅ Passing tests
+✅ فهرست بخش‌ها: هر ۲۳ بخش عملیاتی موجودند و apiKeys نیست
+::endgroup::
+::group::❌ AuthController: خروج، توکن و نام کاربری ذخیره‌شده را پاک می‌کند (failed)
+Expected: empty
+  Actual: 'admin'
 
-::error::0 tests passed, 1 failed.
+package:matcher                                     expect
+package:flutter_test/src/widget_tester.dart 473:18  expect
+test/widget_test.dart 146:5                         main.<fn>
+::endgroup::
+::group::✅ Passing tests
+✅ AppLang: فارسی پیش‌فرض، تغییر زبان ذخیره می‌شود
+::endgroup::
+
+::error::7 tests passed, 2 failed.
 ```
 **exit 1 — FAILED**
 
@@ -137,69 +155,12 @@ Try correcting the name to the name of an existing getter, or defining a getter 
 Compiling lib/main.dart for the Web...                          
 Wasm dry run succeeded. Consider building and testing your application with the `--wasm` flag. See docs for more info: https://docs.flutter.dev/platform-integration/web/wasm
 Use --no-wasm-dry-run to disable these warnings.
-Target dart2js failed: ProcessException: Process exited abnormally with exit code 1:
-lib/sections/jarvis_section.dart:303:34:
-Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-                          label: lang.t('approve'),
-                                 ^^^^
-lib/sections/jarvis_section.dart:309:34:
-Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-                          label: lang.t('reject'),
-                                 ^^^^
-Error: Compilation failed.
-  Command: /opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/dart-sdk/bin/dart compile js --platform-binaries=/opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/flutter_web_sdk/kernel --invoker=flutter_tool -Ddart.vm.product=true -DFLUTTER_BUILD_NAME=1.0.0 -DFLUTTER_BUILD_NUMBER=1 -DFLUTTER_VERSION=3.47.4 -DFLUTTER_CHANNEL=stable -DFLUTTER_GIT_URL=https://github.com/flutter/flutter.git -DFLUTTER_FRAMEWORK_REVISION=9584c6713b -DFLUTTER_ENGINE_REVISION=06a2e2a110 -DFLUTTER_DART_VERSION=3.13.3 -DFLUTTER_WEB_USE_SKIA=true -DFLUTTER_WEB_USE_SKWASM=false -DFLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/ --write-resources --native-null-assertions --no-source-maps -O4 --minify -o /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/.dart_tool/flutter_build/b05189d13ea76cd9672b092c4b964d12/app.dill --packages=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/.dart_tool/package_config.json --cfe-only /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/.dart_tool/flutter_build/b05189d13ea76cd9672b092c4b964d12/main.dart
-#0      RunResult.throwException (package:flutter_tools/src/base/process.dart:153:5)
-#1      _DefaultProcessUtils.run (package:flutter_tools/src/base/process.dart:379:19)
-<asynchronous suspension>
-#2      Dart2JSTarget.build (package:flutter_tools/src/build_system/targets/web.dart:222:5)
-<asynchronous suspension>
-#3      _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:937:9)
-<asynchronous suspension>
-#4      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
-<asynchronous suspension>
-#5      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
-<asynchronous suspension>
-#6      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
-<asynchronous suspension>
-#7      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
-<asynchronous suspension>
-#8      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
-<asynchronous suspension>
-#9      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
-<asynchronous suspension>
-#10     FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:684:16)
-<asynchronous suspension>
-#11     WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:107:34)
-<asynchronous suspension>
-#12     BuildWebCommand.runCommand (package:flutter_tools/src/commands/build_web.dart:293:5)
-<asynchronous suspension>
-#13     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1663:27)
-<asynchronous suspension>
-#14     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
-<asynchronous suspension>
-#15     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
-<asynchronous suspension>
-#16     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:496:9)
-<asynchronous suspension>
-#17     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
-<asynchronous suspension>
-#18     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:431:5)
-<asynchronous suspension>
-#19     FlutterCommandRunner.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:307:33)
-<asynchronous suspension>
-#20     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
-<asynchronous suspension>
-#21     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
-<asynchronous suspension>
-#22     main (package:flutter_tools/executable.dart:103:3)
-<asynchronous suspension>
-
-Compiling lib/main.dart for the Web...                             34.3s
-Error: Failed to compile application for the Web.
+Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 17744 bytes (98.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Compiling lib/main.dart for the Web...                             39.0s
+✓ Built build/web
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## flutter build apk
 ```
@@ -224,46 +185,22 @@ Alternatively, use the flag "--android-skip-build-dependency-validation" to bypa
 Potential fix: Your project's KGP version is typically defined in the plugins block of the `settings.gradle` file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/android/settings.gradle), by a plugin with the id of org.jetbrains.kotlin.android. 
 If you don't see a plugins block, your project was likely created with an older template version, in which case it is most likely defined in the top-level build.gradle file (/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/android/build.gradle) by the ext.kotlin_version property.
 
-lib/sections/jarvis_section.dart:303:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
-                          label: lang.t('approve'),
-                                 ^^^^
-lib/sections/jarvis_section.dart:309:34: Error: The getter 'lang' isn't defined for the type '_ApprovalsTab'.
- - '_ApprovalsTab' is from 'package:bazino_admin_app/sections/jarvis_section.dart' ('lib/sections/jarvis_section.dart').
-Try correcting the name to the name of an existing getter, or defining a getter or field named 'lang'.
-                          label: lang.t('reject'),
-                                 ^^^^
-Target kernel_snapshot_program failed: Exception
-
-
-FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':app:compileFlutterBuildRelease'.
-> Process 'command '/opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/flutter'' finished with non-zero exit value 1
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights.
-> Get more help at https://help.gradle.org.
-
-BUILD FAILED in 2m 5s
-Running Gradle task 'assembleRelease'...                          127.8s
-Gradle task assembleRelease failed with exit code 1
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 11972 bytes (99.3% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Caught exception: Already watching path: /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/admin_app/android
+Running Gradle task 'assembleRelease'...                          259.0s
+✓ Built build/app/outputs/flutter-apk/app-release.apk (55.7MB)
 ```
-**exit 1 — FAILED**
+**exit 0 — OK**
 
 ## Summary
 ```
 flutter --version=0
 flutter pub get=0
-flutter analyze=1
+flutter analyze=0
 flutter test=1
-flutter build web=1
-flutter build apk=1
+flutter build web=0
+flutter build apk=0
 ```
 
-web size: 37M
-apk size: 
+web size: 41M
+apk size: 54M

@@ -103,6 +103,7 @@ const JarvisConsole = React.lazy(async () => ({ default: (await import('../../sh
 const TournamentsOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Tournaments')).TournamentsConsole as unknown as React.ComponentType }));
 const AdminTournamentPlanner = React.lazy(() => import('./admin/AdminTournamentPlanner'));
 const AdminMessagingPanel = React.lazy(() => import('./admin/AdminMessagingPanel'));
+const AdminContentStudioRedesigned = React.lazy(() => import('./admin/AdminContentStudioRedesigned'));
 const ContentOpsConsole = React.lazy(async () => ({ default: (await import('../../shared/management/Content')).ContentConsole as unknown as React.ComponentType }));
 
 interface Props {
@@ -2018,7 +2019,9 @@ export default function AdminPanelTab({
             <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><AdminMessagingPanel language={language} notify={addNotification} /></React.Suspense>
           )}
           {activeSubTab === 'content' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><OpsProvider language={language}><ContentOpsConsole /></OpsProvider></React.Suspense>
+            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}>
+              <AdminContentStudioRedesigned language={language as any} dir={dir} addNotification={addNotification} />
+            </React.Suspense>
           )}
 
             </>

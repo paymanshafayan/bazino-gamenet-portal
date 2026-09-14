@@ -172,20 +172,51 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   content: {
     section: 'content',
-    introFa: 'استودیوی محتوا: تولید عکس با AI، ترند یابی، صف انتشار اینستا/تلگرام.',
-    introEn: 'Content studio: AI image gen, trends, publish queue for Insta/Telegram.',
-    purposeFa: 'محتوا بسازی، زمان‌بندی کنی، منتشر کنی.',
-    purposeEn: 'Create, schedule, publish content.',
+    introFa: 'استودیوی محتوا و انتشار - نسخه بازطراحی شده v2: ساده، فارسی، برای صاحب گیم‌نت که هیچی حالیش نیست. قبلاً ۱۳ تب شلوغ و درهم بود، الان ۴ کارت بزرگ.',
+    introEn: 'Content Studio v2 redesigned: simple, Persian, for non-technical game-net owner. Previously 13 messy tabs, now 4 big cards.',
+    purposeFa: 'برای اینستاگرام و تلگرام محتوا بسازی: عکس با هوش مصنوعی، ایده از ترندهای روز، و انتشار زمان‌بندی شده. بدون سردرگمی.',
+    purposeEn: 'Create content for Instagram/Telegram: AI images, ideas from daily trends, scheduled publishing. No confusion.',
     steps: [
-      { titleFa: '۱. تولید تصویر', titleEn: '1. Generate image', descFa: 'تب mediagen → پرامپت بنویس، مدل انتخاب کن (imejis/flux)، تولید. سهمیه روزانه را ببین.',
-        imageUrl: '/images/admin-guides/content-step1.png', descEn: 'mediagen tab → write prompt, choose model, generate. See daily quota.' },
-      { titleFa: '۲. ترندها', titleEn: '2. Trends', descFa: 'تب trends → آخرین ترندهای YouTube Gaming و Twitch. برای ایده محتوا.',
-        imageUrl: '/images/admin-guides/content-step2.png', descEn: 'trends tab → latest YouTube Gaming + Twitch trends for ideas.' },
-      { titleFa: '۳. صف انتشار', titleEn: '3. Publish queue', descFa: 'پست‌ها در صف می‌ماند، ادمین تأیید می‌کند، بعد به اینستا/تلگرام می‌رود.',
-        imageUrl: '/images/admin-guides/content-step3.png', descEn: 'Posts stay in queue, admin approves, then goes to Insta/Telegram.' },
+      { 
+        titleFa: '۱. راهنمای سریع - استودیو چیست؟', 
+        titleEn: '1. Quick Guide - What is Studio?', 
+        descFa: 'وقتی وارد /admin/content می‌شی، بالا ۴ کارت بزرگ می‌بینی: راهنمای سریع، تولید تصویر، ترندهای روز، صف انتشار. اول راهنما را بخون - توضیح می‌دهد مسیر انتشار ۴ مرحله‌ای: آماده‌سازی → پیش‌نمایش و تأیید → انتشار و ثبت رسانه → دعوت و انتساب. همه تصاویر واقعی Chromium هستند.',
+        imageUrl: '/images/admin-guides/content.png',
+        tipFa: 'طراحی جدید: قبلاً ۱۳ تب کوچک با آیکون‌های ریز بود که هیچکس نمی‌فهمید. الان ۴ کارت بزرگ با توضیح فارسی ساده.',
+        descEn: 'When you enter /admin/content, top has 4 big cards: Quick Guide, MediaGen, Trends, Publish Queue. Read guide first - explains 4-step publishing flow. All real Chromium screenshots.'
+      },
+      { 
+        titleFa: '۲. تولید تصویر با AI - Flux / Imejis', 
+        titleEn: '2. AI Image Generation - Flux / Imejis', 
+        descFa: 'کارت تولید تصویر را بزن. بالا سهمیه روزانه را می‌بینی: Flux (مثلاً ۰/۲۰)، Imejis، Compose. فرم: عنوان (برای خودت)، مدل (Flux بهترین برای گیمینگ نئونی)، پرامپت دقیق فارسی یا انگلیسی مثل "سالن گیمینگ تاریک با نور نئون آبی و بنفش، ۱۰ PC با کیس RGB". تیک تأیید هزینه بزن و تولید. وظیفه در لیست پایین می‌افتد، وقتی Completed شد "ورود به پیش‌نویس" بزن.',
+        imageUrl: '/images/admin-guides/content-step1.png',
+        tipFa: 'اگر خطا داد، کلید API نداری. برو به هوش و تنظیمات فنی → کلیدهای API و اتصال‌ها → Imejis API Key, Cloudflare Token را وارد کن. همه یک‌جا اونجاست.',
+        descEn: 'Click MediaGen card. Top shows daily quota: Flux, Imejis, Compose. Form: title, model (Flux best for neon gaming), detailed prompt. Check cost confirmation and generate. Task appears below, when completed click Import to draft.'
+      },
+      { 
+        titleFa: '۳. ترندهای روز - YouTube و Twitch', 
+        titleEn: '3. Daily Trends - YouTube & Twitch', 
+        descFa: 'کارت ترندهای روز را بزن. دو ستون می‌بینی: YouTube Gaming (عنوان ویدیوهای داغ امروز با کانال و بازدید) و Twitch (پربازدیدترین بازی‌ها با تعداد بیننده). اینا برای ایده محتوا عالیه. مثلاً اگه Valorant ترند شده، پرامپت بساز "مسابقه Valorant در سالن بازینو". اگر خالیه، یعنی کلید YouTube API یا Twitch Client ID را در مرکز کلیدها وارد نکردی.',
+        imageUrl: '/images/admin-guides/content-step2.png',
+        warningFa: 'ترندها خالی؟ برو به /admin/apiKeys → شبکه اجتماعی و ترند → YouTube API Key و Twitch Client ID/Secret را وارد کن. بدون کلید، دیتایی نمیاد.',
+        descEn: 'Click Trends card. Two columns: YouTube Gaming (hot videos today) and Twitch (most viewed games). Great for content ideas. If empty, you need YouTube API or Twitch keys in Keys Center.'
+      },
+      { 
+        titleFa: '۴. صف انتشار - پیش‌نویس تا اینستا/تلگرام', 
+        titleEn: '4. Publish Queue - Draft to Insta/Telegram', 
+        descFa: 'کارت صف انتشار را بزن. پست‌هایی که ساختی اینجا لیست می‌شود: هر کارت عنوان، کپشن، وضعیت (draft/approved)، زبان، تعداد رسانه. روی پست بزن ویرایش می‌شود: عکس‌ها را مرتب کن (درگ و دراپ)، کپشن بنویس، پیش‌نمایش ببین، تأیید کن (تیک)، بعد انتشار/زمان‌بندی بزن. اگر ارسال زنده خاموشه، در صف می‌ماند تا مدیر در تنظیمات فعال کند.',
+        imageUrl: '/images/admin-guides/content-step3.png',
+        tipFa: 'مسیر کامل: تولید رسانه → وظایف → ورود به پیش‌نویس → اینجا کپشن و ترتیب → پیش‌نمایش و تأیید → انتشار. همه گام‌ها فارسی و ساده.',
+        descEn: 'Click Publish Queue card. Posts you created list here: title, caption, status, language, media count. Click to edit: reorder images (drag & drop), write caption, preview, approve (check), then publish/schedule. If live delivery paused, stays queued.'
+      },
     ],
-    commonMistakesFa: ['کلید API نگذاشتن و خالی ماندن ترندها', 'تولید بی‌رویه و تمام شدن سهمیه'],
-    commonMistakesEn: ['Missing API keys', 'Over-generating and hitting quota'],
+    commonMistakesFa: [
+      'کلید API نگذاشتن و خالی ماندن ترندها و تولید تصویر - راه‌حل: /admin/apiKeys همه یک‌جا',
+      'تولید بی‌رویه و تمام شدن سهمیه روزانه Flux/Imejis',
+      'فکر کردن انتشار خودکار است در حالی که ارسال زنده خاموش است و باید در تنظیمات فعال شود',
+      'نادیده گرفتن راهنمای سریع بالا و گیج شدن در ۱۳ تب قدیمی - الان ۴ کارت ساده کافیست'
+    ],
+    commonMistakesEn: ['Missing API keys', 'Over-generating and hitting quota', 'Thinking auto-publish while live delivery paused', 'Ignoring quick guide'],
   },
   promotions: {
     section: 'promotions',

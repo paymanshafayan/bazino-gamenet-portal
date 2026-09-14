@@ -39,7 +39,8 @@ function request(method, p, body, timeoutMs = 30000) {
 class Cdp {
   constructor(opts = {}) {
     this.match = opts.match || '';
-    this.nextId = 0;
+    // random offset: prevents cross-process response-frame collisions in the relay queue
+    this.nextId = Math.floor(Math.random() * 1000000);
     this.code = getCode();
   }
   get(p) { return request('GET', p + (p.includes('?') ? '&' : '?') + 'code=' + this.code); }

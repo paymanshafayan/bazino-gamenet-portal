@@ -3,19 +3,60 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { OpsCore, endpoint, fail, fingerprint, nowISO } from '../management/core';
 import { InstagramCampaignService } from './campaignV4';
 import { claimAttribution, recordClick } from './engine';
+
 export class FriendGateService {
   campaign:InstagramCampaignService;
   constructor(public core:OpsCore){this.campaign=new InstagramCampaignService(core);}
+
   async info(id:string,token:string,username?:string){
     const r=await this.campaign.verifyLink(id,token),m=r.data;
-    if(m.claimedBy&&m.claimedBy!==username)fail('INVITE_ALREADY_CLAIMED',409);
     const u=username?await this.core.store.getUserByUsername(username):undefined;
-    const previous=m.claimedBy===username&&username?await this.core.read('pub-claim',fingerprint({campaign:m.campaignId,username})):undefined;
-    return {campaign:m.policy.name,language:m.language,followMethod:m.followMethod,shareStatus:m.shareStatus,requireLikeAttestation:m.policy.requireLikeAttestation,
-      expiresAt:m.linkExpiresAt,needsLogin:!u,needsPhoneVerification:!!u&&!u.phoneVerifiedAt,claimed:m.claimedBy===username&&!!username,
+
+    // For partner (new flow): link is reusable, claimedBy must NOT block others.
+    // For friend (legacy): old claimedBy logic remains.
+    if(m.role==='friend' && m.claimedBy && m.claimedBy!==username){
+      fail('INVITE_ALREADY_CLAIMED',409);
+    }
+
+    let previous:any=null;
+    if(username){
+      if(m.role==='partner'){
+        // For partner link, check if this user already claimed this campaign (any partner)
+        const claimKey=fingerprint({campaign:m.campaignId,username});
+        previous=await this.core.read('pub-claim',claimKey);
+        // If previous exists but for different member, it will be handled in claim() as CAMPAIGN_ALREADY_CLAIMED
+      } else {
+        // Legacy friend: check claimedBy == username
+        if(m.claimedBy===username){
+          previous=await this.core.read('pub-claim',fingerprint({campaign:m.campaignId,username}));
+        }
+      }
+    }
+
+    const isClaimed = m.role==='partner'
+      ? !!(username && previous && previous.data.memberId===id)
+      : (m.claimedBy===username && !!username);
+
+    return {
+      campaign:m.policy.name,
+      language:m.language,
+      followMethod:m.followMethod,
+      shareStatus:m.shareStatus,
+      requireLikeAttestation:m.policy.requireLikeAttestation,
+      expiresAt:m.linkExpiresAt,
+      needsLogin:!u,
+      needsPhoneVerification:!!u&&!u.phoneVerifiedAt,
+      claimed:isClaimed,
       coupon:{enabled:m.policy.couponEnabled&&m.policy.couponValue>0,value:m.policy.couponValue,type:m.policy.couponType,minOrder:m.policy.couponMinOrder,validDays:m.policy.couponDays},
-      claimedCoupon:previous?.data.coupon||null,verificationMethod:'link_possession',requiresConsent:true};
+      claimedCoupon:previous?.data.coupon||null,
+      verificationMethod:'link_possession',
+      requiresConsent:true,
+      // New flow info
+      role:m.role,
+      partnerCode:m.partnerCode
+    };
   }
+
   async click(id:string,token:string,ip:string,ua:string){
     const r=await this.campaign.verifyLink(id,token);
     const key=fingerprint({id,visit:createHmac('sha256',await this.campaign.settings.invitationKey()).update(`${ip}:${ua}`).digest('hex'),bucket:Math.floor(Date.now()/900000)});
@@ -25,6 +66,7 @@ export class FriendGateService {
       await recordClick(this.core.store,{code:r.data.partnerCode,path:'/ig/invite',ip,ua,visitorId:key.slice(0,32)});
     });
   }
+
   async claim(id:string,username:string,b:any){
     if(!username)fail('AUTH_REQUIRED',401);
     if(b.consent!==true)fail('CONSENT_REQUIRED');
@@ -35,13 +77,24 @@ export class FriendGateService {
       if(!u.phoneVerifiedAt)fail('PHONE_VERIFICATION_REQUIRED',403);
       const staff=await this.core.read('access',username);
       if(u.role==='admin'||staff?.data.permissions?.length)fail('STAFF_NOT_ELIGIBLE',403);
-      if(m.claimedBy&&m.claimedBy!==username)fail('INVITE_ALREADY_CLAIMED',409);
+
+      if(m.role==='friend'){
+        if(m.claimedBy&&m.claimedBy!==username)fail('INVITE_ALREADY_CLAIMED',409);
+        const igKey=fingerprint({campaign:m.campaignId,igUserId:m.igUserId});
+        const igClaim=await this.core.read('pub-ig-claim',igKey);if(igClaim&&igClaim.data.username!==username)fail('INVITE_ALREADY_CLAIMED',409);
+      }
+
       if(m.policy.requireLikeAttestation&&b.likeAttested!==true)fail('LIKE_ATTESTATION_REQUIRED');
-      const claimKey=fingerprint({campaign:m.campaignId,username}),igKey=fingerprint({campaign:m.campaignId,igUserId:m.igUserId});
-      const igClaim=await this.core.read('pub-ig-claim',igKey);if(igClaim&&igClaim.data.username!==username)fail('INVITE_ALREADY_CLAIMED',409);
+
+      const claimKey=fingerprint({campaign:m.campaignId,username});
       const existing=await this.core.read('pub-claim',claimKey);
-      if(existing){if(existing.data.memberId!==id)fail('CAMPAIGN_ALREADY_CLAIMED',409);return {success:true,duplicate:true,coupon:existing.data.coupon,redirect:'/reservations'};}
+      if(existing){
+        if(existing.data.memberId!==id)fail('CAMPAIGN_ALREADY_CLAIMED',409);
+        return {success:true,duplicate:true,coupon:existing.data.coupon,redirect:'/reservations'};
+      }
+
       const attributed=await claimAttribution(this.core.store,{code:m.partnerCode,username,source:'link'});if(!attributed.ok)fail(attributed.error||'INVALID_REFERRAL');
+
       let coupon:any=null;
       if(m.policy.couponEnabled&&m.policy.couponValue>0){
         const code=`IG-${randomBytes(8).toString('hex').toUpperCase()}`;
@@ -49,15 +102,26 @@ export class FriendGateService {
         await this.core.store.createCoupon({code,type:m.policy.couponType==='percent'?'Percent':'Fixed',value:m.policy.couponValue,minOrder:m.policy.couponMinOrder,expiry:expiryDate.slice(0,10),expiryDate,maxUsageCount:1,usageCount:0,isActive:true,ownerUsername:username,scopes:JSON.stringify(['reservation'])} as any);
         coupon={code,type:m.policy.couponType,value:m.policy.couponValue,minOrder:m.policy.couponMinOrder,expiresAt:expiryDate};
       }
+
       await this.core.save('pub-claim',claimKey,{memberId:id,username,campaignId:m.campaignId,coupon,consentedAt:nowISO(),handle:String(b.handle||''),verificationMethod:'link_possession_and_phone_otp',likeMethod:b.likeAttested===true?'self_attested':'not_required'},0);
-      await this.core.save('pub-ig-claim',igKey,{username,memberId:id},0);
-      await this.core.save('pub-member',id,{...m,status:'activated',claimedBy:username,updatedAt:nowISO()},r.version);
-      await this.core.store.updateIgMember(id,{status:'activated',couponCode:coupon?.code||'',updatedAt:nowISO()});
-      await this.core.audit(username,'friend.activate',id,{campaignId:m.campaignId,verificationMethod:'link_possession_and_phone_otp',likeMethod:b.likeAttested?'self_attested':'not_required'});
+
+      if(m.role==='friend'){
+        const igKey=fingerprint({campaign:m.campaignId,igUserId:m.igUserId});
+        await this.core.save('pub-ig-claim',igKey,{username,memberId:id},0);
+        await this.core.save('pub-member',id,{...m,status:'activated',claimedBy:username,updatedAt:nowISO()},r.version);
+        await this.core.store.updateIgMember(id,{status:'activated',couponCode:coupon?.code||'',updatedAt:nowISO()});
+      } else {
+        // Partner flow: do NOT set claimedBy, keep link reusable. Only audit and keep status link_sent.
+        // Optionally track activation count via event, but not block.
+        await this.core.store.createIgEvent({id:`IGE-${Date.now()}-${Math.random()}`,memberId:id,mediaId:m.mediaId,commentId:'',kind:'partner_link_claim',payload:JSON.stringify({claimedBy:username,code:m.partnerCode}),result:'activated',verificationMethod:'link_possession_and_phone_otp',createdAt:nowISO()} as any);
+      }
+
+      await this.core.audit(username,'friend.activate',id,{campaignId:m.campaignId,verificationMethod:'link_possession_and_phone_otp',likeMethod:b.likeAttested?'self_attested':'not_required',role:m.role});
       return {success:true,duplicate:false,coupon,redirect:'/reservations'};
     });
   }
 }
+
 export function registerFriendGate(app:express.Express,service:FriendGateService){
   const headers:express.RequestHandler=(_req,res,next)=>{res.setHeader('Cache-Control','no-store');res.setHeader('Referrer-Policy','no-referrer');next();};
   app.get('/api/instagram/invites/:id',headers,endpoint(async(req,res)=>{

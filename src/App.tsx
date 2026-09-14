@@ -1283,8 +1283,10 @@ export default function App() {
       {activeTab !== 'admin' && (zipHubChrome || !(layoutMode === 'hub' && activeTab === 'home')) && (
         <ThemeRegion name="footer" fallback={null} className="w-full" />
       )}
-      {/* نوار قانونی ثابت: خارج از ThemeRegion؛ قالب‌ها نمی‌توانند آن را جایگزین یا پنهان کنند */}
-      {activeTab !== 'admin' && <LegalFooter onNavigate={navigateStandalone} />}
+      {/* نوار قانونی ثابت: خارج از ThemeRegion؛ قالب‌ها نمی‌توانند آن را جایگزین یا پنهان کنند.
+          در حالت قالب هاب (ZIP با layout=hub) کروم کامل — از جمله فوتر خودش — را theme.js
+          ثبت می‌کند، پس نوار قانونی جداگانه غیرفعال می‌شود تا فوتر تکراری رندر نشود (دستور کارفرما). */}
+      {activeTab !== 'admin' && !zipHubChrome && <LegalFooter onNavigate={navigateStandalone} />}
 
       <ScrollToTop 
         hidden={activeTab === 'admin' || activeTab === 'hub' || activeTab === 'console_grid'} 

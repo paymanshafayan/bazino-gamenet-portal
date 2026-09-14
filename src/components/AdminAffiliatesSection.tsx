@@ -250,8 +250,10 @@ function IntegrationTokensPanel({ inp, addNotification, language }: { inp: strin
   const [editName, setEditName] = useState('');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState('');
+  const [scopes, setScopes] = useState<string[]>(['instagram:ingest']);
+  const [allowedScopes, setAllowedScopes] = useState<string[]>(['instagram:ingest', 'manus:telegram', 'manus:blog']);
 
-  const load = () => fetch('/api/admin/api-tokens').then(r => r.json()).then(d => setTokens(d.tokens || [])).catch(() => {});
+  const load = () => fetch('/api/admin/api-tokens').then(r => r.json()).then(d => { setTokens(d.tokens || []); if (Array.isArray(d.scopes) && d.scopes.length) setAllowedScopes(d.scopes); }).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const copy = async (text: string, id: string) => {
@@ -266,7 +268,7 @@ function IntegrationTokensPanel({ inp, addNotification, language }: { inp: strin
   const create = async () => {
     setBusy(true);
     try {
-      const r = await fetch('/api/admin/api-tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() || 'API token' }) });
+      const r = await fetch('/api/admin/api-tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() || 'API token', scopes }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'fail');
       await load(); setName('');
@@ -285,17 +287,27 @@ function IntegrationTokensPanel({ inp, addNotification, language }: { inp: strin
     addNotification(L(language, { fa: 'توکن حذف شد', en: 'Token revoked', ru: 'Токен отозван', tr: 'Token silindi' }), 'info');
   };
 
-  const prompt = `After publishing approved Bazino Instagram content, report ONLY the native Instagram post/reel media ID.
+  const prompt = `After publishing approved Bazino Instagram content, do TWO things:
+
+1) Report ONLY the native Instagram post/reel media ID (no account ID, Zernio internal ID, or URL):
 POST https://bazino.pro/api/integrations/instagram/published-media
-Authorization: Bearer <BAZINO_MEDIA_INGEST_TOKEN>
+Authorization: Bearer <BAZINO_API_TOKEN>
 Content-Type: application/json
 Idempotency-Key: instagram:<MEDIA_ID>
 
 {"media_id":"<INSTAGRAM_MEDIA_ID>"}
 
-The backend owns campaign approval, partner codes, friend links, coupons and commissions.
+2) Create a blog DRAFT from the published post (admin approves/publishes it in the panel — this never publishes by itself):
+POST https://bazino.pro/api/manus/blog/imports
+Authorization: Bearer <BAZINO_API_TOKEN>
+Content-Type: application/json
+
+{"media_id":"<INSTAGRAM_MEDIA_ID>","media_type":"post|reel|story","caption":"<full caption>","image_url":"<stable image URL>","permalink":"<post permalink>","published_at":"<ISO 8601>","language":"fa|en|tr|ru"}
+(language optional — detected from the caption when omitted; media_id must be the same ID as in step 1; sending twice is safe and returns status:"duplicate")
+
+Rules: The backend owns campaign approval, partner codes, friend links, coupons and commissions.
 Never call partner-invite or send private invitation links to partners. No Instagram account ID, Zernio internal post ID, or URL may replace the native media_id.
-An accepted ID may require admin review; it does not by itself enable the campaign.`;
+An accepted ID may require admin review; it does not by itself enable the campaign. Blog imports stay drafts until an admin publishes them.`;
 
   return (
     <div className="space-y-3 border-t border-white/10 pt-4" data-api-tokens>
@@ -305,6 +317,14 @@ An accepted ID may require admin review; it does not by itself enable the campai
         <button type="button" disabled={busy} onClick={create} className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-100 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50" data-create-token>
           <Plus className="w-4 h-4" />{L(language, { fa: 'ساخت توکن جدید', en: 'Create token', ru: 'Создать токен', tr: 'Yeni token' })}
         </button>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1" data-token-scopes>
+        {allowedScopes.map(s => (
+          <label key={s} className="flex items-center gap-1.5 text-[11px] text-gray-300 cursor-pointer">
+            <input type="checkbox" checked={scopes.includes(s)} onChange={e => setScopes(e.target.checked ? [...scopes, s] : scopes.filter(x => x !== s))} data-scope={s} />
+            <span className="font-mono" dir="ltr">{s}</span>
+          </label>
+        ))}
       </div>
 
       <div className="space-y-2">
@@ -320,6 +340,7 @@ An accepted ID may require admin review; it does not by itself enable the campai
             ) : (
               <>
                 <span className="flex-1 text-xs text-white font-bold truncate">{t.name}</span>
+                {(t.scopes || []).map((s: string) => <span key={s} className="text-[9px] font-mono text-cyan-200/80 bg-cyan-500/10 rounded px-1 py-0.5 hidden md:inline" dir="ltr">{s}</span>)}
                 <span className="text-[10px] text-gray-500 font-mono hidden sm:inline" dir="ltr">baz_••••••••{String(t.token || '').slice(-4)}</span>
                 <button type="button" title={L(language, { fa: 'کپی مقدار توکن (بدون نمایش)', en: 'Copy token value (hidden)', ru: 'Скопировать (скрыто)', tr: 'Değeri kopyala (gizli)' })} className="p-2 text-cyan-300 hover:text-cyan-100" onClick={() => copy(t.token, t.id)} data-copy-token>
                   {copied === t.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}

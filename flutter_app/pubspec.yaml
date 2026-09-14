@@ -2,7 +2,7 @@ name: bazino_app
 description: "A complete mobile and web client application for Bazino Esports Arena & Gamer Loyalty Club."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.2.0+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -21,6 +21,8 @@ dependencies:
   permission_handler: ^11.3.1
   video_player: ^2.9.2
   flutter_tts: ^4.2.2
+  qr_flutter: ^4.1.0
+  image_picker: ^1.1.2
 
 dependency_overrides:
   google_fonts: ^6.2.1

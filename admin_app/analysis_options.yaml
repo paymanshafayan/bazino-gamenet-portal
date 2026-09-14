@@ -1,0 +1,16 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # فرم‌های ادمین پر از await+context هستند؛ گاردهای mounted کجا لازم بود
+    # نوشته شده‌اند ولی خودِ lint روی الگوهای بی‌خطر هم شلوغ می‌کند.
+    use_build_context_synchronously: ignore
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    # سبک const اختیاری در این اپ اعمال نمی‌شود (فقط نویز CI)
+    prefer_const_constructors: false
+    prefer_const_constructors_in_immutables: false
+    prefer_const_declarations: false
+    prefer_const_literals_to_create_immutables: false

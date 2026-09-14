@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
@@ -22,13 +24,160 @@ class _AuthScreenState extends State<AuthScreen> {
 
   bool _obscurePassword = true;
 
+  // ---- ورود با پیامک (OTP) — POST /api/auth/otp/{request,verify} ----
+  bool _isOtpMode = false;
+  bool _otpSent = false;
+  int _otpCooldown = 0;
+  Timer? _cooldownTimer;
+  final TextEditingController _otpPhoneController = TextEditingController();
+  final TextEditingController _otpCodeController = TextEditingController();
+
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _usernameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _otpPhoneController.dispose();
+    _otpCodeController.dispose();
     super.dispose();
+  }
+
+  void _startOtpCooldown() {
+    _otpCooldown = 60;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() => _otpCooldown = _otpCooldown - 1);
+      if (_otpCooldown <= 0) t.cancel();
+    });
+  }
+
+  Future<void> _requestOtp(AppState appState, bool isFa) async {
+    final phone = _otpPhoneController.text.trim();
+    if (phone.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isFa ? 'شمارهٔ موبایل معتبر نیست.' : 'Invalid phone number.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    final error = await appState.requestOtp(phone);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.redAccent));
+      return;
+    }
+    setState(() => _otpSent = true);
+    _startOtpCooldown();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(isFa ? 'کد تأیید پیامک شد (کد واردشده را بنویسید).' : 'Verification code sent via SMS.'), backgroundColor: GamingTheme.accentGreen),
+    );
+  }
+
+  Future<void> _verifyOtp(AppState appState, bool isFa) async {
+    final code = _otpCodeController.text.trim();
+    if (code.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isFa ? 'کد ۶ رقمی را وارد کنید.' : 'Enter the 6-digit code.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    final error = await appState.verifyOtp(_otpPhoneController.text.trim(), code);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.redAccent));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isFa ? 'خوش آمدید @${appState.user.username}! با موفقیت وارد شدید.' : 'Welcome @${appState.user.username}!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+    Navigator.pop(context);
+  }
+
+  Widget _buildOtpCard(AppState appState, bool isFa) {
+    return GlassCard(
+      radius: 24,
+      glow: GamingTheme.goldAccent,
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            isFa ? '📱 ورود با پیامک' : '📱 Phone login',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: GamingTheme.goldAccent),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isFa ? 'شمارهٔ خود را وارد کنید؛ کد ۶ رقمی برایتان پیامک می‌شود. اگر حساب نداشته باشید، خودکار ساخته می‌شود.' : 'Enter your phone; we will SMS a 6-digit code. An account is created automatically if you are new.',
+            style: const TextStyle(fontSize: 10.5, color: Colors.white54, height: 1.7),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _otpPhoneController,
+            keyboardType: TextInputType.phone,
+            enabled: !_otpSent,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: _decoration(isFa ? 'شمارهٔ موبایل (مثلاً +90 5xx…)' : 'Phone (e.g. +90 5xx…)', Icons.phone_iphone, isFa),
+          ),
+          if (!_otpSent) ...[
+            const SizedBox(height: 18),
+            NeonGradientButton(
+              label: isFa ? 'دریافت کد تأیید' : 'Send verification code',
+              icon: Icons.sms_rounded,
+              loading: _isSubmitting,
+              onPressed: () => _requestOtp(appState, isFa),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _otpCodeController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: GamingTheme.goldAccent, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 8),
+              decoration: _decoration(isFa ? 'کد ۶ رقمی' : '6-digit code', Icons.password, isFa),
+            ),
+            const SizedBox(height: 14),
+            NeonGradientButton(
+              label: isFa ? 'تأیید و ورود' : 'Verify & login',
+              icon: Icons.login_rounded,
+              loading: _isSubmitting,
+              onPressed: () => _verifyOtp(appState, isFa),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: (_otpCooldown > 0 || _isSubmitting)
+                    ? null
+                    : () {
+                        setState(() {
+                          _otpSent = false;
+                          _otpCodeController.clear();
+                        });
+                      },
+                child: Text(
+                  _otpCooldown > 0
+                      ? (isFa ? 'ارسال مجدد کد تا $_otpCooldown ثانیه' : 'Resend code in $_otpCooldown s')
+                      : (isFa ? 'ویرایش شماره / ارسال مجدد' : 'Change number / resend'),
+                  style: const TextStyle(color: GamingTheme.textMuted, fontSize: 11),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _submitForm(AppState appState, BuildContext context) async {
@@ -107,7 +256,9 @@ class _AuthScreenState extends State<AuthScreen> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
-          _isLoginMode ? (isFa ? 'ورود گیمرها' : 'Gamer Login') : (isFa ? 'عضویت در کلوپ' : 'Club Registration'),
+          _isOtpMode
+              ? (isFa ? 'ورود با پیامک' : 'SMS Login')
+              : (_isLoginMode ? (isFa ? 'ورود گیمرها' : 'Gamer Login') : (isFa ? 'عضویت در کلوپ' : 'Club Registration')),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
@@ -157,6 +308,34 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       const SizedBox(height: 28),
 
+                      // انتخاب روش ورود: رمز/ثبت‌نام یا پیامک
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ChoiceChip(
+                            label: Text(isFa ? 'ورود با رمز / ثبت‌نام' : 'Password / Sign-up', style: const TextStyle(fontSize: 10.5)),
+                            selected: !_isOtpMode,
+                            selectedColor: GamingTheme.primary,
+                            backgroundColor: Colors.white.withValues(alpha: 0.05),
+                            labelStyle: TextStyle(color: !_isOtpMode ? Colors.black : Colors.white70, fontSize: 10.5),
+                            onSelected: _isSubmitting ? null : (v) => setState(() => _isOtpMode = false),
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: Text(isFa ? 'ورود با پیامک' : 'SMS login', style: const TextStyle(fontSize: 10.5)),
+                            selected: _isOtpMode,
+                            selectedColor: GamingTheme.goldAccent,
+                            backgroundColor: Colors.white.withValues(alpha: 0.05),
+                            labelStyle: TextStyle(color: _isOtpMode ? Colors.black : Colors.white70, fontSize: 10.5),
+                            onSelected: _isSubmitting ? null : (v) => setState(() => _isOtpMode = true),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      if (_isOtpMode)
+                        _buildOtpCard(appState, isFa)
+                      else
                       GlassCard(
                         radius: 24,
                         glow: GamingTheme.secondary,
@@ -232,7 +411,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      TextButton(
+                      if (!_isOtpMode)
+                        TextButton(
                         onPressed: _isSubmitting ? null : () => setState(() => _isLoginMode = !_isLoginMode),
                         child: Text(
                           _isLoginMode

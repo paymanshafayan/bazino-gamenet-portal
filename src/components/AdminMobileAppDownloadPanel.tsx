@@ -3,6 +3,7 @@ import { AlertTriangle, Apple, Check, Copy, Download, Edit, ExternalLink, Github
 import { useLanguage } from '../context/LanguageContext';
 import type { MobileAppDownloadConfig, MobileAppStoreKind, MobileAppStoreLink } from '../types/mobileApp';
 import { getAuthToken } from '../services/authToken';
+import AdminAppLabPanel from './AdminAppLabPanel';
 
 interface Props {
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -597,6 +598,9 @@ export default function AdminMobileAppDownloadPanel({ addNotification }: Props) 
             })}
           </div>
         </section>
+
+        {/* آزمایشگاه اپ — امولاتور وب (Appetize.io): نصب APK و تست زنده در مرورگر */}
+        <AdminAppLabPanel addNotification={addNotification} />
       </div>
     </div>
   );

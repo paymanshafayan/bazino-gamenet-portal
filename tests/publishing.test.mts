@@ -16,7 +16,20 @@ test('Manus legacy setting precedence and revoked credential never falls back',a
 test('all integration settings and secret aliases are blocked from generic/public APIs',()=>{for(const key of ['zernio_webhook_secret','manus_api_key','publishing_agents','ig_ingest_token','ZERNIO_API_KEY','MANUS_API_KEY'])assert.equal(protectedIntegrationSetting(key),true);assert.equal(protectedIntegrationSetting('site_title'),false);});
 test('registry requires exact native IDs and type validation',async()=>{await assert.rejects(()=>registry.register('x',{media_id:'post-123',accountId:'acc'}),{code:'INVALID_MEDIA_ID'});await assert.rejects(()=>registry.register('x',{media_id:'123',media_type:'story',accountId:'acc'}),{code:'INVALID_MEDIA_TYPE'});});
 test('media-only ingestion is durable and cannot activate an unapproved campaign',async()=>{const r=await registry.register('ingest',{media_id:'18109137383324992',accountId:'acc'});assert.equal(r.status,'needs_review');assert.equal((await registry.list()).length,1);assert.equal(await registry.eligible('acc','18109137383324992'),null);const a=await registry.register('ingest',{media_id:'18109137383324992',accountId:'acc'});assert.equal(a.duplicate,true);assert.equal((await store.listIgMedia()).length,1);});
-test('campaign confirmation, financial policy, and partner-link guards',async()=>{const c=defaultCampaign();await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,active:true,accountId:'acc',version:0,idempotencyKey:'policy1'}),{code:'POLICY_CONFIRMATION_REQUIRED'});await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,financialApproved:true,version:0,idempotencyKey:'policy2'}),{code:'FINANCIAL_POLICY_REQUIRED'});c.messages.fa.partner2+=' {{invite_url}}';await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,version:0,idempotencyKey:'policy3'}),{code:'PRIVATE_LINK_FORBIDDEN'});});
+test('campaign confirmation, financial policy, and partner-link guards (new flow)',async()=>{
+  const c=defaultCampaign();
+  await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,active:true,accountId:'acc',version:0,idempotencyKey:'policy1'}),{code:'POLICY_CONFIRMATION_REQUIRED'});
+  await assert.rejects(()=>settings.saveCampaign('admin','X',{...c,financialApproved:true,version:0,idempotencyKey:'policy2'}),{code:'FINANCIAL_POLICY_REQUIRED'});
+  // New flow: partner1 must NOT contain private link, partner2 IS allowed to contain it
+  const c1={...c, messages:{...c.messages, fa:{...c.messages.fa, partner1: c.messages.fa.partner1+' {{invite_url}}'}}};
+  await assert.rejects(()=>settings.saveCampaign('admin','X',{...c1,version:0,idempotencyKey:'policy3'}),{code:'PRIVATE_LINK_FORBIDDEN'});
+  const c2={...c, messages:{...c.messages, fa:{...c.messages.fa, partner2: c.messages.fa.partner2}}};
+  // partner2 with invite_url should be allowed now
+  const cp0=await core.read('pub-campaign','SQUAD26');
+  await settings.saveCampaign('admin','SQUAD26-TEST',{...c2,active:false,accountId:'',policyConfirmed:false,version:0,idempotencyKey:'policy4-allowed'});
+  // clean
+  await core.store.runInTransaction(async()=>{const r=await core.read('pub-campaign','SQUAD26-TEST'); if(r) await core.save('pub-campaign','SQUAD26-TEST',{...r.data,active:false},r.version);});
+});
 test('approved registry uses exact account/media and discovery never auto-approves',async()=>{const cp=await core.read('pub-campaign','SQUAD26');await settings.saveCampaign('admin','SQUAD26',{...defaultCampaign(),active:true,accountId:'acc',policyConfirmed:true,version:cp!.version,idempotencyKey:'activate'});const r=await registry.register('ingest',{media_id:'1234567',accountId:'acc'});assert.equal(r.status,'approved');assert.ok(await registry.eligible('acc','1234567'));assert.equal(await registry.eligible('acc','123456'),null);assert.equal(await registry.eligible('other','1234567'),null);const d=await registry.register('sync',{media_id:'567890',accountId:'acc'},'external_discovery');assert.equal(d.status,'needs_review');});
 test('concurrent ingest creates just one media record',async()=>{const rs=await Promise.all(Array.from({length:5},()=>registry.register('ingest',{media_id:'777777777',accountId:'acc'})));assert.equal(rs.filter(r=>!r.duplicate).length,1);});
 test('webhook secret change does not change the frozen invitation signing key',async()=>{process.env.ZERNIO_WEBHOOK_SECRET='initial-signing-material';const before=await settings.invitationKey();process.env.ZERNIO_WEBHOOK_SECRET='changed';assert.equal(await settings.invitationKey(),before);});
@@ -69,7 +82,7 @@ test('timed-out sends become unknown and are not retried blindly',async()=>{
  await q.sendOutbox();const count=calls;await q.sendOutbox();assert.equal(calls,count);assert.equal((await core.read('pub-outbox',id))!.data.status,'delivery_unknown');
 });
 
-suite('Four-language partner/friend state machine');
+suite('Four-language partner state machine - NEW FLOW');
 const {InstagramCampaignService,wholeKeyword,commentLanguage,renderCampaign}=await import('../server/affiliate/campaignV4');
 const {CAMPAIGN_MESSAGES}=await import('../shared/publishing/messages');
 const sent:any[]=[];
@@ -78,103 +91,146 @@ const fetcher:typeof fetch=async(url,init)=>{
  sent.push({url:String(url),body:JSON.parse(String(init?.body))});return new Response(JSON.stringify({messageId:`message-${sent.length}`}),{status:200});
 };
 const campaign=new InstagramCampaignService(core,fetcher);
-let partnerId='',friendId='',partnerCode='';
+let partnerId='',partnerCode='',partnerLinkToken='';
 const comment=(id:string,authorId:string,text:string)=>({type:'comment.received',accountId:'acc',nativeId:'1234567',commentId:id,authorId,username:`test-${authorId}`,text,createdAt:new Date().toISOString(),timestamp:new Date().toISOString()});
+
 test('Unicode whole-word and Turkish casing; ambiguous language does not auto-select',()=>{
  assert.ok(wholeKeyword('من آماده هستم!','آماده','fa'));assert.ok(!wholeKeyword('آماده‌ای؟','آماده','fa'));
  assert.ok(wholeKeyword('HAZIR!','Hazır','tr'));assert.ok(!wholeKeyword('Already','Ready','en'));
  assert.ok(wholeKeyword('Я Готово!','Готово','ru'));assert.equal(commentLanguage('Ready آماده',defaultCampaign(),['fa','en']),'ambiguous');
 });
-test('partner comment queues first PR without recording sent before delivery',async()=>{
+
+test('partner comment queues first PR guide without private link',async()=>{
  const r=await campaign.onComment(comment('partner-1','10001','Ready'));assert.ok(r.ok);partnerId=r.memberId!;
- let m=(await core.read('pub-member',partnerId))!;partnerCode=m.data.partnerCode;assert.equal(m.data.language,'en');assert.equal(m.data.status,'partner_follow_pending');
- const o=await core.read('pub-outbox',r.outboxId!);assert.equal(o!.data.status,'queued');assert.ok(!o!.data.text.includes('/ig/invite/'));assert.ok(!o!.data.text.includes(partnerCode));
- await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));assert.equal((await core.read('pub-outbox',r.outboxId!))!.data.status,'sent');
+ let m=(await core.read('pub-member',partnerId))!;partnerCode=m.data.partnerCode;assert.equal(m.data.language,'en');assert.equal(m.data.status,'partner_follow_pending');assert.equal(m.data.role,'partner');
+ const o=await core.read('pub-outbox',r.outboxId!);assert.equal(o!.data.status,'queued');
+ assert.ok(!o!.data.text.includes('/ig/invite/'));assert.ok(!o!.data.text.includes('{{invite_url}}') || o!.data.text===CAMPAIGN_MESSAGES.en.partner1);
+ // New flow PR guide should be the exact message from CAMPAIGN_MESSAGES
+ assert.equal(o!.data.text, CAMPAIGN_MESSAGES.en.partner1);
+ await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
+ assert.equal((await core.read('pub-outbox',r.outboxId!))!.data.status,'sent');
 });
+
+test('numeric code comment is now retired (friend flow)',async()=>{
+ const r=await campaign.onComment(comment('friend-attempt','10002',partnerCode));
+ assert.ok(r.ignored);assert.equal(r.reason,'friend_flow_retired');
+});
+
 test('button must belong to the actual sender and conversation',async()=>{
  const m=(await core.read('pub-member',partnerId))!,button=await campaign.button(partnerId,m.data);
  const bad=await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'99999',conversationId:'wrong',button,direction:'incoming',timestamp:new Date().toISOString()});assert.ok(bad.ignored);assert.equal((await core.read('pub-member',partnerId))!.data.status,'partner_follow_pending');
 });
-test('partner DM is code plus approved text, never an invitation link',async()=>{
+
+test('partner DM now contains private invite link (new flow)',async()=>{
  const m=(await core.read('pub-member',partnerId))!,button=await campaign.button(partnerId,m.data);
  await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'10001',participantId:'10001',conversationId:'partner-conv',button,direction:'incoming',timestamp:new Date().toISOString()});
+ const afterFollow=await core.read('pub-member',partnerId);
+ assert.equal(afterFollow!.data.status,'link_ready');
+ assert.ok(afterFollow!.data.linkExpiresAt);
+ const outId=afterFollow!.data.conversationId ? (await core.list('pub-outbox')).find(o=>o.data.memberId===partnerId && o.data.stage==='partner_link')?.id : null;
+ // send
  await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
- assert.equal((await core.read('pub-member',partnerId))!.data.status,'code_sent');assert.equal((await core.read('pub-member',partnerId))!.data.followMethod,'button_event_only');
- const last=sent.at(-1);assert.ok(last.url.endsWith('/partner-conv/messages'));assert.ok(last.body.message.includes(partnerCode));assert.ok(!last.body.message.includes('/ig/invite/'));
+ const finalM=await core.read('pub-member',partnerId);
+ assert.equal(finalM!.data.status,'link_sent');
+ assert.equal(finalM!.data.followMethod,'button_event_only');
+ const last=sent.at(-1);
+ assert.ok(last.url.endsWith('/partner-conv/messages'));
+ assert.ok(last.body.message.includes('/ig/invite/'));
+ assert.ok(last.body.message.includes('token='));
+ // persisted outbox must NOT contain raw token URL (security)
+ const persisted=await core.read('pub-outbox', (await core.list('pub-outbox')).find(o=>o.data.memberId===partnerId && o.data.stage==='partner_link')!.id);
+ assert.ok(!JSON.stringify(persisted!.data).includes('token=') || persisted!.data.text.includes('{{invite_url}}'));
+ // linkToken should work for partner now
+ const token=await campaign.linkToken(partnerId,finalM!.data);
+ partnerLinkToken=token;
+ assert.ok(/^[a-f\d]{64}$/.test(token));
 });
-test('friend code on another media and self-referral never pass',async()=>{
- assert.ok((await campaign.onComment(comment('self','10001',partnerCode))).ignored);
- const r=await campaign.onComment({...comment('other-media','10002',partnerCode),nativeId:'999888'});assert.ok(r.wait);
-});
-test('friend comment inherits partner language and records indirect share evidence',async()=>{
- const r=await campaign.onComment(comment('friend-1','10002',partnerCode));friendId=r.memberId!;
- const m=(await core.read('pub-member',friendId))!;assert.equal(m.data.language,'en');assert.equal(m.data.shareStatus,'share_confirmed_by_friend_code');assert.equal(m.data.status,'friend_follow_pending');
- await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
-});
-test('only friend receives the private link; raw URL is absent from persisted outbox/admin report',async()=>{
- const m=(await core.read('pub-member',friendId))!,button=await campaign.button(friendId,m.data);
- const r=await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'10002',participantId:'10002',conversationId:'friend-conv',button,direction:'incoming',timestamp:new Date().toISOString()});
- const out=await core.read('pub-outbox',r.outboxId!);assert.ok(!JSON.stringify(out).includes('/ig/invite/'));
- await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
- assert.ok(sent.at(-1).url.endsWith('/friend-conv/messages'));assert.ok(sent.at(-1).body.message.includes('/ig/invite/'));
- assert.ok(!JSON.stringify(await campaign.list()).includes('token='));
- await assert.rejects(async()=>campaign.linkToken(partnerId,(await core.read('pub-member',partnerId))!.data),{code:'FRIEND_GATE_REQUIRED'});
-});
+
 test('concurrent repeats cannot add extra PRs or replace saved language',async()=>{
  const before=(await core.list('pub-outbox')).length;
  await Promise.all([campaign.onComment(comment('partner-1','10001','آماده')),campaign.onComment(comment('partner-1','10001','Ready'))]);
  assert.equal((await core.list('pub-outbox')).length,before);assert.equal((await core.read('pub-member',partnerId))!.data.language,'en');
 });
-test('approved Persian second message is preserved except for its code placeholder',()=>{
- assert.equal(renderCampaign(CAMPAIGN_MESSAGES.fa.partner2,'123456'),CAMPAIGN_MESSAGES.fa.partner2.replace('[عدد یکتا]','123456'));
+
+test('partner2 template contains invite_url placeholder and renders correctly',()=>{
+ const tpl=CAMPAIGN_MESSAGES.fa.partner2;
+ assert.ok(tpl.includes('{{invite_url}}'));
+ const rendered=renderCampaign(tpl,'', 'https://bazino.pro/ig/invite/ID?token=abc');
+ assert.ok(rendered.includes('https://bazino.pro/ig/invite/ID?token=abc'));
 });
-test('all four campaign languages get the matching partner message',async()=>{
+
+test('all four campaign languages get the matching partner PR guide',async()=>{
  for(const [i,l] of ['fa','tr','en','ru'].entries()){
    const r=await campaign.onComment(comment(`lang-${l}`,String(20000+i),defaultCampaign().keywords[l]));const m=await core.read('pub-member',r.memberId!);assert.equal(m!.data.language,l);
    const o=await core.read('pub-outbox',r.outboxId!);assert.equal(o!.data.text,CAMPAIGN_MESSAGES[l].partner1);
  }
 });
 
-suite('Friend web gate and per-customer coupons');
+suite('Friend web gate and per-customer coupons - NEW FLOW via partner link');
 const {FriendGateService}=await import('../server/affiliate/friendGate');
 const gate=new FriendGateService(core);
-let friendToken='',friend2Id='',friend2Token='';
-test('prepare distinct verified site customers and a coupon-enabled invitation fixture',async()=>{
- for(const name of ['coupon_friend1','coupon_friend2']){await store.createUser({username:name,password:'local-test-only',email:'',phone:name==='coupon_friend1'?'+15555551001':'+15555551002'});await store.updateUserFields(name,{phoneVerifiedAt:new Date().toISOString()});}
- const m=(await core.read('pub-member',friendId))!;await core.save('pub-member',friendId,{...m.data,policy:{...m.data.policy,couponEnabled:true,couponValue:15,couponMinOrder:100}},m.version);
- friendToken=await campaign.linkToken(friendId,(await core.read('pub-member',friendId))!.data);
+let friendToken='', secondFriendToken='';
+test('prepare verified site customers and coupon-enabled partner fixture',async()=>{
+ for(const name of ['coupon_friend1','coupon_friend2','coupon_friend3']){await store.createUser({username:name,password:'local-test-only',email:'',phone:name==='coupon_friend1'?'+15555551001':name==='coupon_friend2'?'+15555551002':'+15555551003'});await store.updateUserFields(name,{phoneVerifiedAt:new Date().toISOString()});}
+ const m=(await core.read('pub-member',partnerId))!;await core.save('pub-member',partnerId,{...m.data,policy:{...m.data.policy,couponEnabled:true,couponValue:15,couponMinOrder:100}},m.version);
+ friendToken=await campaign.linkToken(partnerId,(await core.read('pub-member',partnerId))!.data);
 });
-test('invalid or partner invitation signatures cannot reach the web gate',async()=>{
- await assert.rejects(()=>gate.info(friendId,'a'.repeat(64)),{code:'INVITE_INVALID_OR_EXPIRED'});
- await assert.rejects(()=>gate.info(partnerId,friendToken),{code:'INVITE_INVALID_OR_EXPIRED'});
+
+test('invalid signatures cannot reach the web gate',async()=>{
+ await assert.rejects(()=>gate.info(partnerId,'a'.repeat(64)),{code:'INVITE_INVALID_OR_EXPIRED'});
+ // token for different member should fail
+ await assert.rejects(()=>gate.info('non-existent-id',friendToken),{code:'INVITE_INVALID_OR_EXPIRED'});
 });
-test('invitation info is truthful and does not reveal partner identity or private keys',async()=>{
- const info=await gate.info(friendId,friendToken);assert.equal(info.needsLogin,true);assert.equal(info.followMethod,'button_event_only');assert.equal(info.verificationMethod,'link_possession');
+
+test('invitation info for partner link is truthful and does not reveal PII',async()=>{
+ const info=await gate.info(partnerId,friendToken);assert.equal(info.needsLogin,true);assert.equal(info.verificationMethod,'link_possession');
+ assert.equal(info.role,'partner');
  assert.ok(!JSON.stringify(info).includes('10001'));assert.ok(!JSON.stringify(info).includes(friendToken));
 });
+
 test('gate requires authentication, consent and explicit like self-attestation',async()=>{
- await assert.rejects(()=>gate.claim(friendId,'',{token:friendToken,consent:true}),{code:'AUTH_REQUIRED'});
- await assert.rejects(()=>gate.claim(friendId,'coupon_friend1',{token:friendToken,likeAttested:true}),{code:'CONSENT_REQUIRED'});
- await assert.rejects(()=>gate.claim(friendId,'coupon_friend1',{token:friendToken,consent:true}),{code:'LIKE_ATTESTATION_REQUIRED'});
+ await assert.rejects(()=>gate.claim(partnerId,'',{token:friendToken,consent:true}),{code:'AUTH_REQUIRED'});
+ await assert.rejects(()=>gate.claim(partnerId,'coupon_friend1',{token:friendToken,likeAttested:true}),{code:'CONSENT_REQUIRED'});
+ await assert.rejects(()=>gate.claim(partnerId,'coupon_friend1',{token:friendToken,consent:true}),{code:'LIKE_ATTESTATION_REQUIRED'});
 });
-test('five concurrent claims produce exactly one owner-bound coupon',async()=>{
- const rs=await Promise.all(Array.from({length:5},()=>gate.claim(friendId,'coupon_friend1',{token:friendToken,consent:true,likeAttested:true,handle:'@test_friend'})));
- assert.equal(rs.filter(r=>!r.duplicate).length,1);assert.equal(new Set(rs.map(r=>r.coupon.code)).size,1);
- const coupon=await store.getCouponByCode(rs[0].coupon.code);assert.equal(coupon?.ownerUsername,'coupon_friend1');assert.equal(coupon?.maxUsageCount,1);assert.equal(coupon?.type,'Percent');assert.equal(coupon?.minOrder,100);
+
+test('partner link is reusable: multiple friends can claim same partner link with independent coupons',async()=>{
+ // First friend
+ const r1=await gate.claim(partnerId,'coupon_friend1',{token:friendToken,consent:true,likeAttested:true,handle:'@test_friend1'});
+ assert.ok(r1.coupon);
+ const coupon1=await store.getCouponByCode(r1.coupon.code);assert.equal(coupon1?.ownerUsername,'coupon_friend1');
+
+ // Second friend using SAME partner link should succeed with different coupon (new flow)
+ const r2=await gate.claim(partnerId,'coupon_friend2',{token:friendToken,consent:true,likeAttested:true,handle:'@test_friend2'});
+ assert.ok(r2.coupon);
+ assert.notEqual(r1.coupon.code, r2.coupon.code);
+ const coupon2=await store.getCouponByCode(r2.coupon.code);assert.equal(coupon2?.ownerUsername,'coupon_friend2');
+
+ // Both attributions point to same partner code
  assert.equal((await store.getAttributionForUser('coupon_friend1'))?.code,partnerCode);
+ assert.equal((await store.getAttributionForUser('coupon_friend2'))?.code,partnerCode);
+
+ // Five concurrent claims for same user produce exactly one coupon (idempotency)
+ const rs=await Promise.all(Array.from({length:5},()=>gate.claim(partnerId,'coupon_friend3',{token:friendToken,consent:true,likeAttested:true,handle:'@test_friend3'})));
+ assert.equal(rs.filter(r=>!r.duplicate).length,1);
+ assert.equal(new Set(rs.map(r=>r.coupon.code)).size,1);
 });
-test('a claimed invitation cannot be moved to another account',async()=>{
- await assert.rejects(()=>gate.claim(friendId,'coupon_friend2',{token:friendToken,consent:true,likeAttested:true}),{code:'INVITE_ALREADY_CLAIMED'});
-});
-test('another friend of the same partner gets an independent coupon',async()=>{
- const r=await campaign.onComment(comment('friend-2','10003',partnerCode));friend2Id=r.memberId!;
- let m=(await core.read('pub-member',friend2Id))!;await core.save('pub-member',friend2Id,{...m.data,policy:{...m.data.policy,couponEnabled:true,couponValue:15}},m.version);
- m=(await core.read('pub-member',friend2Id))!;await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'10003',participantId:'10003',conversationId:'friend2-conv',button:await campaign.button(friend2Id,m.data),direction:'incoming',timestamp:new Date().toISOString()});
+
+test('same user cannot claim two different partners in same campaign',async()=>{
+ // Create second partner with full follow flow to get link_ready
+ const r=await campaign.onComment(comment('partner-second','10010','Ready'));
+ const secondPartnerId=r.memberId!;
+ let m=(await core.read('pub-member',secondPartnerId))!;
+ await core.save('pub-member',secondPartnerId,{...m.data,policy:{...m.data.policy,couponEnabled:true,couponValue:15,couponMinOrder:0}},m.version);
+ m=(await core.read('pub-member',secondPartnerId))!;
+ const button2=await campaign.button(secondPartnerId,m.data);
+ await campaign.onMessage({type:'message.received',accountId:'acc',authorId:'10010',participantId:'10010',conversationId:'second-partner-conv',button:button2,direction:'incoming',timestamp:new Date().toISOString()});
  await campaign.queue.sendOutbox(d=>campaign.beforeSend(d),(d,r)=>campaign.afterSend(d,r),d=>campaign.prepareMessage(d));
- friend2Token=await campaign.linkToken(friend2Id,(await core.read('pub-member',friend2Id))!.data);
- const result=await gate.claim(friend2Id,'coupon_friend2',{token:friend2Token,consent:true,likeAttested:true});
- const claims=await core.list('pub-claim');assert.equal(claims.length,2);assert.notEqual(claims[0].data.coupon.code,claims[1].data.coupon.code);assert.equal((await store.getCouponByCode(result.coupon.code))!.ownerUsername,'coupon_friend2');
+ const secondToken=await campaign.linkToken(secondPartnerId,(await core.read('pub-member',secondPartnerId))!.data);
+ // coupon_friend1 already claimed partnerId, trying to claim second partner should fail CAMPAIGN_ALREADY_CLAIMED
+ await assert.rejects(()=>gate.claim(secondPartnerId,'coupon_friend1',{token:secondToken,consent:true,likeAttested:true}),{code:'CAMPAIGN_ALREADY_CLAIMED'});
 });
+
 test('gate route is a real standalone route, not just a gate=1 query flag',async()=>{
  const {standalonePageFromPath}=await import('../src/utils/routes');assert.deepEqual(standalonePageFromPath('/ig/invite/ID','?token=abc'),{type:'invite',id:'ID',token:'abc'});
 });
@@ -270,12 +326,14 @@ test('critical comments are not starved by an older external-post backlog',async
  const seen:string[]=[];await queue.processInbox(async e=>{seen.push(e.type);return {};},'fairness',1);assert.deepEqual(seen,['comment.received']);
 });
 test('business uniqueness is retained across updates, including after activation',async()=>{
- const row=(await core.read('pub-member',friend2Id))!;assert.ok(row.uniqueKey);await core.save('pub-member',row.id,{...row.data,updatedAt:new Date().toISOString()},row.version);
+ // In new flow, partner link is reusable, so we test uniqueness still holds for same member update
+ const row=(await core.read('pub-member',partnerId))!;assert.ok(row.uniqueKey);
+ await core.save('pub-member',row.id,{...row.data,updatedAt:new Date().toISOString()},row.version);
  assert.equal((await core.read('pub-member',row.id))!.uniqueKey,row.uniqueKey);
  await assert.rejects(()=>core.save('pub-member','another-member',row.data,0,row.uniqueKey));
 });
 test('ambiguous delivery cannot be retried blindly; operator observation is recorded separately',async()=>{
- const id='review-outbox';await core.save('pub-outbox',id,{status:'delivery_unknown',stage:'partner_code',memberId:partnerId,accountId:'acc',mediaId:'1234567',recipientId:'10001',createdAt:new Date().toISOString(),attempts:1,expiresAt:new Date(Date.now()+3600000).toISOString()},0);
+ const id='review-outbox';await core.save('pub-outbox',id,{status:'delivery_unknown',stage:'partner_link',memberId:partnerId,accountId:'acc',mediaId:'1234567',recipientId:'10001',createdAt:new Date().toISOString(),attempts:1,expiresAt:new Date(Date.now()+3600000).toISOString()},0);
  await assert.rejects(()=>campaign.resolveOutbox('admin',id,'retry',{confirmed:true,idempotencyKey:'unsafe-retry'}),{code:'UNSAFE_RETRY'});
  await assert.rejects(()=>campaign.resolveOutbox('admin',id,'confirm-observed',{confirmed:true,idempotencyKey:'missing-reference'}),{code:'PROVIDER_REFERENCE_REQUIRED'});
  const r=await campaign.resolveOutbox('admin',id,'confirm-observed',{confirmed:true,idempotencyKey:'review-done',messageId:'observed-provider-message',note:'Operator reviewed the correct conversation'});assert.equal(r.sentInThisRequest,false);assert.equal(r.evidence,'operator_confirmed');

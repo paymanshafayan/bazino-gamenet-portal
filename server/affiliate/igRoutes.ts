@@ -67,13 +67,17 @@ export function registerIgRoutes(d: IgRouteDeps) {
   });
 
   // Integration API tokens (Manus / Zernio). Admin only (mounted under /api/admin).
+  /** Scope allowlist for token creation — extend here, never trust client input. */
+  const ALLOWED_API_SCOPES = ['instagram:ingest', 'manus:telegram', 'manus:blog'] as const;
   app.get('/api/admin/api-tokens', async (_req, res) => {
-    try { res.json({ tokens: await listApiTokens(store()) }); } catch (e) { httpError(res, e); }
+    try { res.json({ tokens: await listApiTokens(store()), scopes: ALLOWED_API_SCOPES }); } catch (e) { httpError(res, e); }
   });
   app.post('/api/admin/api-tokens', async (req, res) => {
     try {
       const name = String((req.body || {}).name || '').trim() || 'API token';
-      const row = await createApiToken(store(), name);
+      const requested = Array.isArray((req.body || {}).scopes) ? (req.body as any).scopes : [];
+      const scopes = requested.map(String).filter(s => (ALLOWED_API_SCOPES as readonly string[]).includes(s));
+      const row = await createApiToken(store(), name, scopes.length ? scopes : undefined);
       res.json({ success: true, token: row });
     } catch (e) { httpError(res, e); }
   });

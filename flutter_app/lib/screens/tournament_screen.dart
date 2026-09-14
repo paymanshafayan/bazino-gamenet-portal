@@ -11,6 +11,7 @@ class TournamentScreen extends StatefulWidget {
 }
 
 class _TournamentScreenState extends State<TournamentScreen> {
+  String _tourneyPayMethod = 'onsite';
   final _teamNameController = TextEditingController();
   final _leaderController = TextEditingController();
 
@@ -220,7 +221,8 @@ class _TournamentScreenState extends State<TournamentScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
+        return StatefulBuilder(
+          builder: (context, setDialog) => AlertDialog(
           backgroundColor: GamingTheme.darkCard,
           title: Text(
             isFa ? 'ثبت‌نام در ${t.game}' : 'Register squad for ${t.game}',
@@ -238,6 +240,45 @@ class _TournamentScreenState extends State<TournamentScreen> {
                 controller: _leaderController,
                 decoration: InputDecoration(hintText: isFa ? 'گیمرتگ سرپرست تیم' : 'Leader Gamertag'),
               ),
+              if (t.registrationFee > 0) ...[
+                const SizedBox(height: 14),
+                Text(
+                  isFa
+                      ? 'هزینهٔ ثبت‌نام: ${t.registrationFee.toStringAsFixed(0)} لیر — روش پرداخت:'
+                      : 'Entry fee: ${t.registrationFee.toStringAsFixed(0)} TL — pay with:',
+                  style: const TextStyle(color: GamingTheme.goldAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: Text(
+                          isFa ? 'کیف پول (${appState.walletBalance.toStringAsFixed(0)} TL)' : 'Wallet',
+                          style: TextStyle(fontSize: 10, color: _tourneyPayMethod == 'wallet' ? Colors.black : Colors.white70),
+                        ),
+                        selected: _tourneyPayMethod == 'wallet',
+                        selectedColor: GamingTheme.primary,
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        onSelected: (v) => setDialog(() => _tourneyPayMethod = 'wallet'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: Text(
+                          isFa ? 'پرداخت در محل' : 'On-site',
+                          style: TextStyle(fontSize: 10, color: _tourneyPayMethod == 'onsite' ? Colors.black : Colors.white70),
+                        ),
+                        selected: _tourneyPayMethod == 'onsite',
+                        selectedColor: GamingTheme.goldAccent,
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        onSelected: (v) => setDialog(() => _tourneyPayMethod = 'onsite'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           actions: [
@@ -255,21 +296,44 @@ class _TournamentScreenState extends State<TournamentScreen> {
                   if (_teamNameController.text.isNotEmpty && _leaderController.text.isNotEmpty) {
                     final navigator = Navigator.of(context);
                     final messenger = ScaffoldMessenger.of(context);
-                    final error = await appState.registerTeam(
-                      t.id,
-                      _teamNameController.text,
-                      _leaderController.text,
-                      [_leaderController.text],
-                    );
+                    String? error;
+                    // تورنمنت‌های دارای هزینهٔ ثبت‌نام روی زنجیرهٔ اقتصادی جدید سرور
+                    // (کیف پول/حضوری — قرارداد /api/checkout) می‌روند؛ رایگان‌ها مثل قبل.
+                    if (t.registrationFee > 0) {
+                      error = await appState.checkoutOrder(
+                        kind: 'tournament',
+                        method: _tourneyPayMethod,
+                        params: {
+                          'tournamentId': t.id,
+                          'team': {
+                            'name': _teamNameController.text,
+                            'leader': _leaderController.text,
+                            'members': [_leaderController.text],
+                          },
+                        },
+                      );
+                    } else {
+                      error = await appState.registerTeam(
+                        t.id,
+                        _teamNameController.text,
+                        _leaderController.text,
+                        [_leaderController.text],
+                      );
+                    }
                     navigator.pop();
                     if (error != null) {
                       messenger.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.redAccent));
                       return;
                     }
+                    final oid = appState.lastCheckout?.orderId ?? '';
                     messenger.showSnackBar(
                       SnackBar(
                         content: Text(
-                          isFa ? 'تیم شما با موفقیت ثبت‌نام شد!' : 'Squad registered successfully!',
+                          t.registrationFee > 0
+                              ? (isFa
+                                  ? 'ثبت‌نام و پرداخت انجام شد!$oid'
+                                  : 'Registered & paid!$oid')
+                              : (isFa ? 'تیم شما با موفقیت ثبت‌نام شد!' : 'Squad registered successfully!'),
                         ),
                         backgroundColor: Colors.green,
                       ),
@@ -284,6 +348,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
               ),
             ),
           ],
+        ),
         );
       },
     );

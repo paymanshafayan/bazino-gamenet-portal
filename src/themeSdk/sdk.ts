@@ -144,6 +144,25 @@ function notify() {
   listeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
 }
 
+/**
+ * ثبت‌های پشت‌سرهم theme.js (که معمولاً ۶+ تا در یک فایل است) هر کدام sync
+ * notify می‌شدند و hostها را در همان میکروتِیک رندرِ در حالِ اجرا re-render
+ * می‌کردند؛ در dev (preact/compat + useSyncExternalStore) این رندرِ تودرتو
+ * «Hook can only be invoked from render methods» می‌انداخت و مناطقِ تازه‌mount
+ * دوباره خالی می‌شدند. batchNotify همهٔ ثبت‌های یک تیک را در یک通知 ادغام می‌کند.
+ */
+let notifyScheduled = false;
+function batchNotify() {
+  if (notifyScheduled) return;
+  notifyScheduled = true;
+  const flush = () => {
+    notifyScheduled = false;
+    notify();
+  };
+  if (typeof queueMicrotask === 'function') queueMicrotask(flush);
+  else Promise.resolve().then(flush);
+}
+
 /** نسخه‌ی رجیستری — با هر ثبت/حذف زیاد می‌شود (برای re-render هاست‌ها) */
 export function getRegistryVersion(): number { return registryVersion; }
 
@@ -158,13 +177,13 @@ export function registerComponent(name: string, factoryOrDef: Factory | ThemeCom
   if (!name) return;
   const factory: Factory = typeof factoryOrDef === 'function' ? factoryOrDef : () => factoryOrDef;
   registry.set(name, { factory });
-  notify();
+  batchNotify();
 }
 
 /** حذف کامپوننت ثبت‌شده (بعد از حذف قالب یا قبل از بارگذاری نسخه‌ی جدید theme.js) */
 export function unregisterComponent(name: string): void {
   unmountComponent(name);
-  if (registry.delete(name)) notify();
+  if (registry.delete(name)) batchNotify();
 }
 
 /** حذف همه‌ی کامپوننت‌های قالب (هنگام تعویض/آپدیت قالب) */
@@ -172,7 +191,7 @@ export function unregisterAllComponents(): void {
   for (const name of Array.from(registry.keys())) unmountComponent(name);
   const had = registry.size > 0;
   registry.clear();
-  if (had) notify();
+  if (had) batchNotify();
 }
 
 /** آیا قالب برای این بخش کامپوننت دارد؟ */
@@ -209,12 +228,21 @@ export function mountComponent(
     mounted.set(name, root);
   }
 
-  const def = reg.factory();
+  // ۲۰۲۶-۰۹-۱۱ (حادثهٔ قالب «Bazino 3D Dimension»): فراخوانی factory بیرون از try بود و
+  // یک theme.js معیوب (فراخوانی useState خارج از رندر) کل صفحهٔ اصلی را با ErrorBoundary
+  // می‌کشت. حالا factory و render هر دو محافظت‌شده‌اند — بدترین حالت: region خالی/افته و
+  // fallback خود سایت رندر می‌شود، نه کرش کل صفحه.
+  let def: ThemeComponentDefinition | null = null;
   let out: unknown = null;
   try {
-    out = def.render ? def.render(props) : (def.create ? def.create(props).render() : null);
+    def = reg.factory();
+    out = def && def.render ? def.render(props) : (def && def.create ? def.create(props).render() : null);
+    if (!def || (!def.render && !def.create)) {
+      console.warn(`[ThemeSDK] region "${name}" factory باید یک تعریف {{ render(props) }} برگرداند — چیزی رندر نشد.`);
+    }
   } catch (e) {
-    console.error(`[ThemeSDK] render() of region "${name}" threw:`, e);
+    console.error(`[ThemeSDK] factory/render of region "${name}" threw:`, e);
+    def = null;
     out = null;
   }
   root.render(React.createElement(React.Fragment, null, normalizeRenderOutput(name, out)));

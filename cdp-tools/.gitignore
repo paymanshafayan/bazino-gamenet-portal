@@ -1,0 +1,6 @@
+# اسرار و خروجی‌های محلی — هرگز کامیت نشوند
+.session-code
+relay-events.log
+shots/
+*.zip
+node_modules/

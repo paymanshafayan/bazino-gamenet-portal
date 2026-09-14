@@ -14,7 +14,7 @@ export interface BookingView {
   /** بازی درخواستی مشتری هنگام رزرو (صفحهٔ Games) — اختیاری */
   requestedGame?: string;
 }
-export type OpsTab = 'stations' | 'buffet' | 'shop' | 'customers' | 'affiliates' | 'promotions' | 'content' | 'tournaments' | 'accounting' | 'operators' | 'settings';
+export type OpsTab = 'stations' | 'buffet' | 'shop' | 'customers' | 'affiliates' | 'promotions' | 'content' | 'tournaments' | 'accounting' | 'operators' | 'settings' | 'jarvis';
 export interface Receipt {
   id: string; action: string; direction: 'in' | 'out'; amount: number; currency: 'TRY'; method: CashMethod;
   confirmation: 'operator_cash' | 'operator_pos_manual'; reference: string; username: string;

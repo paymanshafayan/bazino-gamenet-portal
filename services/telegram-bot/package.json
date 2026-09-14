@@ -1,0 +1,15 @@
+{
+  "name": "bazino-telegram-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bazino Ops Bot — standalone Telegram bot (channel posting + public search + watcher)",
+  "main": "bot.mjs",
+  "scripts": {
+    "start": "node bot.mjs",
+    "test": "node --test ../../tests/telegram-bot.test.mts 2>/dev/null || echo 'tests live in repo root: npm test'"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

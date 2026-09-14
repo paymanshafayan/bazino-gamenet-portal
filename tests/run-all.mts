@@ -40,10 +40,15 @@ const LAYERS: Layer[] = [
   { id: 'publishing', file: 'publishing.test.mts', report: 'publishing.json', title: 'انتشار/افیلیت — یکپارچه‌سازی نسخهٔ ۴' },
   { id: 'management', file: 'management.test.mts', report: 'management.json', title: 'مدیریت — قرارداد و تراکنش اتمیک' },
   { id: 'unit', file: 'unit.test.mts', report: 'unit.json', title: 'واحد — منطق خالص' },
+  { id: 'telegram-bot', file: 'telegram-bot.test.mts', report: 'telegram-bot.json', title: 'ربات تلگرام — پارسر t.me و منطق فرمان' },
   { id: 'database', file: 'database.test.mts', report: 'database.json', title: 'دیتابیس — SQLite واقعی' },
   { id: 'providers', file: 'providers.test.mts', report: 'providers.json', title: 'پرووایدرها — SQLServer/Mongo' },
   { id: 'ui', file: 'ui.test.mts', report: 'ui.json', title: 'رابط کاربری — کامپوننت‌ها (jsdom)' },
   { id: 'manus', file: 'manus.test.mts', report: 'manus.json', title: 'منوس/تلگرام — سیاست، HMAC و Gateway mock' },
+  { id: 'integrations', file: 'integrations.test.mts', report: 'integrations.json', title: 'یکپارچه‌سازی — پاسخ غیبت اینستاگرام و ایمپورت بلاگ مانوس' },
+  { id: 'jarvis', file: 'jarvis.test.mts', report: 'jarvis.json', title: 'جارویس — دستیار ادمین (Groq mock)' },
+  { id: 'appetize', file: 'appetize.test.mts', report: 'appetize.json', title: 'آزمایشگاه اپ — امولاتور وب (Appetize ماک)', needsBuild: true },
+  { id: 'theme-install', file: 'theme-install.test.mts', report: 'theme-install.json', title: 'نصب قالب 202 — ZIP واقعی، بازیابی و امنیت', needsBuild: true },
   { id: 'api', file: 'api.test.mts', report: 'api.json', title: 'API — سرور واقعی (end-to-end)', needsBuild: true },
 ];
 

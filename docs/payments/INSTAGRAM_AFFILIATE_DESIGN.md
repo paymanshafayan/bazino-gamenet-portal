@@ -1,234 +1,170 @@
-# طرح سیستم Affiliate Marketing اینستاگرام برای Bazino Pro
+# طرح سیستم Affiliate Marketing اینستاگرام برای Bazino Pro — نسخهٔ ۲ (فلو جدید ساده‌شده)
 
-**وضعیت:** طرح پیشنهادی برای بررسی و تصمیم‌گیری — به‌روزرسانی قانون ارسال کد و لینک در ۷ سپتامبر ۲۰۲۶
+**وضعیت:** فعال — فلو جدید از ۱۴۰۵/۰۶/۲۳ (2026-09-14) پیاده‌سازی شد و ۵۶۷/۵۶۷ تست سبز است  
+**تغییر مهم نسبت به نسخهٔ ۱:** مسیر «دوست کد را کامنت کند و لینک بگیرد» بازنشسته شد. همکار مستقیماً لینک دعوت خصوصی می‌گیرد و خودش برای دوستانش می‌فرستد.  
+**دامنه:** جذب فالوور، هدایت به سایت، ثبت‌نام با لینک همکار، کوپن دوست و کمیسیون همکار از پرداخت‌های بعدی  
+**حساب:** `@bazinopro` — پورتال به Meta وصل نیست، فقط Zernio واسط PR/DM است
 
-**دامنه:** جذب فالوور، اشتراک‌گذاری پست و Reel، هدایت به سایت و اپلیکیشن، و تبدیل ارجاع‌ها به رزرو یا حضور پرداخت‌شده از طریق حساب حرفه‌ای `@bazinopro`.
+---
 
-**مبنای طراحی:** این طرح از سند Affiliate فعلی Bazino Pro برای کانال‌ها و جوامع محلی استفاده می‌کند و همان منطق را به رفتارهای قابل‌اندازه‌گیری اینستاگرام منتقل می‌کند: شناسه همکار، لینک اختصاصی، کد ارجاع، پنجره انتساب، ثبت رزرو، تأیید پرداخت/حضور و تسویه.
+## ۱. قانون صداقت و فلو جدید
 
-## ۱. قانون صداقت و شرط اجرایی Friend Gate
+- اگر بخشی از طرح از نظر فنی/دسترسی/سیاست پلتفرم ممکن نباشد، پیش از اجرا با برچسب **محدودیت / خوداظهاری / شاهد غیرمستقیم** اعلام شود
+- کمیسیون فقط برای **رزرو یا حضور پرداخت‌شدهٔ مشتری جدید** — Follow/Comment/Share به‌تنهایی کمیسیون ندارند
+- Share فردی اینستاگرام با API تأیید نمی‌شود؛ در فلو جدید Share اجباری نیست و شاهد عملی، کلیک روی لینک و ثبت‌نام است
+- **لینک دعوت خصوصی فقط برای همکار ارسال می‌شود**، نه برای دوست از طریق سیستم. همکار خودش لینک را برای دوستانش می‌فرستد
 
-از این پس اگر هر بخش از درخواست یا طرح از نظر فنی، دسترسی، سیاست پلتفرم یا ابزارهای موجود امکان‌پذیر نباشد، باید پیش از اجرا صریحاً اعلام شود. جایگزین‌ها باید با برچسب **محدودیت**، **خوداظهاری** یا **شاهد غیرمستقیم** ارائه شوند و هرگز به‌عنوان تأیید قطعی معرفی نشوند.
+---
 
-در فلو جدید، Share اجباری به‌عنوان یک **شرط قابل‌پیگیری کمپین** حفظ می‌شود، اما سیستم ادعا نمی‌کند که API اینستاگرام دکمه‌ی Share یا متن دایرکت خصوصی را برای هر فرد خوانده و تأیید کرده است. معیار عملی کمپین این است: کامنت همکار، پیام خصوصی، Follow/تأیید Follow در سطح پشتیبانی‌شده، ارسال کد عددی همراه پست، کامنت همان کد توسط دوست، کلیک روی لینک دعوت و سپس عبور از شرط‌های فعال‌سازی.
+## ۲. کمپین «Invite Your Squad» — فلو جدید ساده‌شده (مصوب 2026-09-14)
 
-کمیسیون Affiliate همچنان فقط برای **رزرو یا حضور پرداخت‌شده‌ی مشتری جدید** ایجاد می‌شود. کوپن دوست می‌تواند پس از عبور از حداقل Gate مصوب صادر شود. در این کمپین، کامنت کد یکتای دوست زیر خود پست با وضعیت `share_confirmed_by_friend_code` به‌عنوان شاهد عملی دریافت پست و Share ثبت می‌شود؛ این یک وضعیت عملیاتی کمپین است و نباید با آمار کلی Media Insights یا تأیید رسمی فردی Meta اشتباه گرفته شود.
+### پیام راهنمای مصوب (partner1 — PR)
 
-## ۲. کمپین پیشنهادی: «Invite Your Squad»
+> پیج را فالو کن و بر روی دکمه «فالو دارم» بزن تا لینک دعوت اختصاصی خودت برات ارسال بشه. بعد این لینک را برای دوستات بفرست. دوستانت با ثبت‌نام از طریق این لینک، کوپن تخفیف دریافت می‌کنند و تو هم از این به بعد از هر بار پرداخت آن‌ها در Bazino کمیسیون دریافت می‌کنی.
 
-### تجربه‌ی کاربر در فلو جدید
+ترجمه‌ها در `shared/publishing/messages.ts` — چهار زبان fa/tr/en/ru
 
-این متن‌ها **نمونه هستند** و متن نهایی هر کمپین را ادمین تعیین می‌کند؛ ادمین می‌تواند زبان، لحن، کد، CTA و شرایط کوپن را تغییر دهد، اما نباید معنای فلو یا وضعیت تأیید را تحریف کند.
+### فلو ثبت‌شده (۸ مرحله)
 
-> **قانون اجرایی جدید:** لینک دعوت هرگز برای همکار ارسال نمی‌شود. همکار فقط کد یکتای خود و متن آمادهٔ دعوت را دریافت می‌کند. پس از اینکه دوست کد را زیر پست تأییدشده کامنت کرد و شروط مصوب را تکمیل کرد، لینک دعوت دقیقاً برای دوست ارسال می‌شود.
+1. **همکار کلمهٔ کلیدی مصوب را زیر پست کامنت می‌کند** — کلیدواژه‌ها: `آماده / Hazır / Ready / Готово` — تطبیق Whole Word یونیکد با ZWNJ
+2. **پیام راهنمای بالا + دکمه «فالو دارم» برای او ارسال می‌شود** — `private_reply` به همان `commentId`، با dedup `fingerprint({account,comment,kind:'private_reply'})` → یک PR برای هر کامنت
+3. **همکار پیج `@bazinopro` را Follow می‌کند**
+4. **روی دکمه «فالو دارم» می‌زند** — event `message.received` با `postbackPayload` امضاشده `ig4.{id}.{nonce}.{hmacSHA256}` — `button` به `igUserId` مقید، replay ۳۰ روزه
+5. **لینک دعوت اختصاصی برای همکار ارسال می‌شود** — DM به `conversationId` همان همکار: `POST /v1/inbox/conversations/{conv}/messages` — متن `partner2` حاوی `{{invite_url}}` که هنگام dispatch به `https://bazino.pro/ig/invite/{memberId}?token={hmac}` تبدیل می‌شود — توکن ۶۴ hex، HMAC با `invitationKey()` و `partner:{id}:{igUserId}:{campaign}:{media}:{linkExpiresAt}` — اعتبار ۳۶۵ روز
+6. **همکار لینک را برای دوستانش می‌فرستد** — خارج از سیستم، دستی
+7. **دوستان با ثبت‌نام از طریق لینک، کوپن تخفیف دریافت می‌کنند** — `GET /api/instagram/invites/:id?token=` → `click()` با dedup ۱۵ دقیقه‌ای IP+UA → `POST .../claim` با `consent + likeAttested + phoneVerifiedAt` → `claimAttribution(code=partnerCode, source='link')` → کوپن owner-bound `IG-{8hex}` با `maxUsage=1` — لینک همکار **قابل استفاده مجدد**: چند دوست می‌توانند همان لینک را claim کنند، هرکدام کوپن جدا
+8. **همکار طبق شرایط و پرداخت موفق دوستان، کمیسیون دریافت می‌کند** — `onOrderPaid` فقط روی `reservation/tournament/session` با مبلغ مرجع پرداخت، مشتری جدید، یک صاحب کمیسیون، hold تا `refundDays`
 
-۱. همکار زیر پست یا Reel تأییدشده‌ی بازینو کامنت می‌گذارد. سیستم کامنت را از Webhook دریافت می‌کند و برای همان کامنت، با کنترل تکراری‌نبودن، پیام نمونه‌ی اول را Private Reply می‌کند.
+### موارد حذف‌شده (بازنشسته از 2026-09-14)
 
-۲. پیام نمونه‌ی اول باید هم درخواست Follow را بگوید و هم روش کامل را توضیح دهد: همکار پیج را Follow می‌کند، روی «فالو دارم» می‌زند، پیام دوم را با کد شناسایی اختصاصی دریافت می‌کند و سپس پیام دوم را عیناً برای دوستش می‌فرستد و پست بازی‌نو که برایش فرستاده شده را نیز برای دوست Share می‌کند.
+- ❌ ارسال پیام و پست توسط سیستم برای دوست
+- ❌ کامنت‌کردن کد شناسایی همکار توسط دوست (`share_confirmed_by_friend_code` دیگر تولید نمی‌شود — اگر کامنت ۶رقمی بیاید `friend_flow_retired`)
+- ❌ دریافت لینک دعوت توسط دوست از سیستم
+- ❌ ارسال لینک دعوت فقط پس از کامنت کد دوست
 
-۳. پس از رویداد قابل‌پشتیبانی دکمه یا تأیید Follow در سطح کمپین، پیام نمونه‌ی دوم شامل **فقط کد عددی یکتای همکار و متن آماده‌ی ارسال برای دوست** فرستاده می‌شود و هیچ `invite_url`ای در آن وجود ندارد. این پیام باید مستقل از خود پست باشد و بگوید: «پست بازی‌نو که برایت فرستادم را برای دوستت Share کن»؛ نه اینکه بگوید «همین پست». سیستم `affiliate_id`، `campaign_id`، `media_id`، `partner_code` و `comment_id` را نگه می‌دارد.
+### سطح‌های اثبات (جدید)
 
-۴. دوست پس از دریافت پست بازی‌نو و پیام کد، همان عدد را زیر خود پست بازی‌نو کامنت می‌کند. Webhook کامنت دوست را به `partner_code` وصل می‌کند. در این کمپین، این کامنت کد زیر خود پست، شاهد عملی دریافت پست و انجام Share برای Friend Gate محسوب می‌شود و نیازی به ارسال مجدد پست به Direct بازینو وجود ندارد.
+| سطح | چه چیزی سنجیده می‌شود | کاربرد |
+|---|---|---|
+| ۱ Campaign | `comments` کلیدی + `reach` | جذابیت پست |
+| ۲ Partner Comment | `commentId` + PR موفق | شروع فلو |
+| ۳ Button Tap | `message.received` با payload امضاشده | تأیید Follow (verified یا button_event_only) |
+| ۴ Link Sent | DM لینک به همکار | همکار آمادهٔ دعوت |
+| ۵ Referral Click | کلیک یکتا روی `/ig/invite` با dedup IP+UA ۱۵m | علاقه دوست |
+| ۶ Qualified | ثبت‌نام + کوپن + `claimAttribution` | صلاحیت پاداش |
+| ۷ Paid | رزرو/حضور پرداخت‌شده از همان کد | کمیسیون |
 
-۵. پس از کامنت کد، پیام نمونه‌ی دوست از او می‌خواهد پیج را Follow کند و روی «فالو دارم» بزند. پس از عبور از حداقل Gate مصوب، **لینک دعوت و راهنمای فعال‌سازی کوپن یک‌بارمصرف فقط برای دوست** ارسال می‌شود. رمز عبور اینستاگرام هرگز دریافت نمی‌شود.
+---
 
-۶. وضعیت Share در این فلو با `share_confirmed_by_friend_code` ثبت می‌شود: این وضعیت تأیید عملی کمپین است که پست به دوست رسیده و Friend Gate را فعال کرده است؛ لازم نیست برای صدور کوپن منتظر Webhook رسمی Share خود Meta بمانیم.
-
-۷. اگر دوست رزرو کند، کد ارجاع را وارد کند یا مراجعه‌ی حضوری را با همان کد ثبت کند، قیف به `Reserved` می‌رود و بعد از پرداخت/حضور واجد کمیسیون می‌شود.
-
-### سطح‌های اثبات Share
-
-| سطح | چه چیزی واقعاً قابل‌سنجش است | کاربرد |
-| --- | --- | --- |
-| سطح ۱: Campaign Share | تعداد کل `shares` پست یا Reel از Media Insights | سنجش جذابیت کمپین، نه شناسایی فرد |
-| سطح ۲: Partner Comment | کامنت همکار، `comment_id` و Private Reply موفق | شروع رسمی فلو و تولید کد همکار |
-| سطح ۳: Friend Code Comment | کامنت کد عددی دوست زیر خود پست بازی‌نو و تطبیق با `partner_code` | تأیید عملی کمپین از رسیدن پست و Share برای Friend Gate |
-| سطح ۴: Referral Click | کلیک یکتا روی لینک دعوت با `ref` و `partner_code` | تأیید استفاده از لینک اختصاصی |
-| سطح ۵: Qualified Referral | رزرو/پرداخت/حضور از همان لینک یا کد | تنها سطح مناسب برای پاداش یا کمیسیون |
-| سطح ۶: Optional Evidence | اسکرین‌شات Share/Like/Follow یا بررسی دستی | کنترل کمکی؛ غیرقطعی و بدون پاداش مستقل |
-
-کامنت کد عددی دوست زیر خود پست بازی‌نو، در این کمپین **شاهد عملی Share و دریافت پست** است و با وضعیت `share_confirmed_by_friend_code` ثبت می‌شود. برای فعال‌سازی لینک و کوپن لازم نیست Share با Webhook رسمی Meta تأیید شود؛ معیار کمپین، رسیدن دوست به خود پست و کامنت‌کردن کد یکتای همان همکار است. Follow واقعی، در صورت وجود سیگنال رسمی Meta، با `follow_verified` ثبت می‌شود؛ کلیک دکمه بدون آن سیگنال با `button_event_only` یا خوداظهاری ثبت می‌گردد.
-
-### پیام‌های Private Reply نهایی و چهارزبانه
-
-هر زبان کلمهٔ کلیدی مستقل خود را دارد و پاسخ همان زبان را فعال می‌کند: فارسی `آماده`، ترکی `Hazır`، انگلیسی `Ready` و روسی `Готово`. تطبیق باید Whole Word، با Deduplication بر اساس `comment_id + campaign_id + language` و بدون ارسال پاسخ زبان دیگر باشد.
-
-#### فارسی — کلمهٔ کلیدی: `آماده`
-
-**پیام اول برای همکار:**
-
-> برای شرکت در طرح دعوت بازینو، پیج @bazinopro را Follow کن و روی دکمهٔ «فالو دارم» بزن. بعد از این مرحله، یک پیام دوم برایت ارسال میشود که شامل کد شناسایی اختصاصی تو و متن آمادهٔ دعوت است. آن پیام را عیناً برای دوستت بفرست و این پست را نیز برای دوستت Share کن. دوستت باید عدد داخل پیام را زیر همان پست کامنت کند و پیج بازینو را Follow کند تا لینک دعوتبرایش ارسال و کوپن تخفیف برایش فعال شود. ما رمز عبور اینستاگرام را نمیخواهیم.
-
-**پیام دوم برای همکار — بدون لینک دعوت:**
-
-> این کد: [عدد یکتا] را زیر پستی که برایت فرستادم کامنت کن و پیج @bazinopro را Follow کن. این پیام را عیناً برای دوستت بفرست و پست بازی‌نو را نیز برای او Share کن. دوستت باید عدد داخل پیام را زیر همان پست کامنت کند و پیج @bazinopro را Follow کند تا لینک دعوت و کوپن تخفیف برای او فعال شود. ممنون میشوم اگر این کار را برایم انجام بدهی.
-
-#### ترکی — کلمهٔ کلیدی: `Hazır`
-
-**Mesaj 1:**
-
-> Bazino davet kampanyasına katılmak için @bazinopro sayfasını Follow et ve “Takip ettim” butonuna dokun. Bu adımdan sonra sana özel kimlik kodunu ve arkadaşına gönderebileceğin hazır mesajı içeren ikinci bir mesaj gönderilecek. Bu mesajı olduğu gibi arkadaşına gönder ve bu gönderiyi de arkadaşınla Share et. Arkadaşın mesajdaki numarayı aynı gönderinin altına yorumlamalı ve Bazino sayfasını Follow etmelidir; ardından davet bağlantısı gönderilecek ve indirim kuponu onun için etkinleştirilecektir. Instagram şifreni istemiyoruz.
-
-**Mesaj 2:**
-
-> Bu kodu: [benzersiz numara], sana gönderdiğim gönderinin altına yorumla ve @bazinopro sayfasını Follow et. Bu mesajı olduğu gibi arkadaşına gönder ve Bazino gönderisini de onunla Share et. Arkadaşın bu numarayı aynı gönderinin altına yorumlamalı ve @bazinopro sayfasını Follow etmelidir; davet bağlantısı ve indirim kuponu yalnızca arkadaşına gönderilecektir. Bunu benim için yaparsan çok memnun olurum.
-
-#### انگلیسی — کلمهٔ کلیدی: `Ready`
-
-**Message 1:**
-
-> To join Bazino’s invitation campaign, Follow @bazinopro and tap the “I followed” button. After this step, you will receive a second message containing your unique identification code and a ready-to-send invitation message. Send that message to your friend exactly as written and Share this post with your friend. Your friend must comment the number in the message under the same post and Follow Bazino; then an invitation link will be sent and the discount coupon will be activated for them. We do not need your Instagram password.
-
-**Message 2:**
-
-> Comment this code: [unique number] under the post I sent you and Follow @bazinopro. Send this message to your friend exactly as written and Share the Bazino post with them. Your friend must comment this number under the same post and Follow @bazinopro; the invitation link and discount coupon will be sent only to your friend. I would really appreciate it if you could do this for me.
-
-#### روسی — کلمهٔ کلیدی: `Готово`
-
-**Сообщение 1:**
-
-> Чтобы участвовать в пригласительной кампании Bazino, подпишись на @bazinopro и нажми кнопку «Я подписался». После этого тебе будет отправлено второе сообщение с твоим уникальным идентификационным кодом и готовым текстом приглашения. Отправь это сообщение другу без изменений и поделись с ним этой публикацией. Друг должен прокомментировать число из сообщения под этой же публикацией и подписаться на Bazino; после этого ему будет отправлена пригласительная ссылка и активирован купон на скидку. Нам не нужен пароль от Instagram.
-
-**Сообщение 2:**
-
-> Прокомментируй этот код: [уникальный номер] под публикацией, которую я отправил тебе, и подпишись на @bazinopro. Отправь это сообщение другу без изменений и поделись публикацией Bazino с ним. Друг должен прокомментировать это число под той же публикацией и подписаться на @bazinopro; пригласительная ссылка и купон на скидку будут отправлены только другу. Буду очень благодарен, если ты сделаешь это для меня.
-
-این پیام‌ها باید به زبان محتوای همان پست ارسال شوند. متن فارسی پیام دوم دقیقاً طبق نسخهٔ تأییدشده حفظ شده است و `[عدد یکتا]` فقط هنگام اجرا با کد اختصاصی جایگزین می‌شود.
-
-## ۳. ساختار شناسه و لینک
-
-هر Affiliate یا شرکت‌کننده‌ی واجد شرایط یک شناسه‌ی یکتا دریافت می‌کند. برای کاربر عادی کمپین می‌توان شناسه‌ی موقت و برای همکار تأییدشده شناسه‌ی پایدار داشت.
+## ۳. ساختار شناسه و لینک (جدید)
 
 | نوع | نمونه | کاربرد |
-| --- | --- | --- |
-| شناسه همکار | `ISKELE01` | انتساب پایدار صاحب کانال یا Creator |
-| شناسه کمپین | `SQUAD26` | مقایسه کمپین Invite Your Squad |
-| لینک پایه | `https://bazino.pro/?ref=ISKELE01` | ورود عمومی با انتساب |
-| لینک اینستاگرام | `https://bazino.pro/?ref=ISKELE01&utm_source=instagram&utm_medium=affiliate&utm_campaign=SQUAD26` | تفکیک کانال و کمپین |
-| لینک محتوایی | `https://bazino.pro/tournaments?ref=ISKELE01&content=REEL03` | انتساب پست یا Reel خاص |
-| کد حضوری | `ISKELE01` | ثبت در رزرو حضوری توسط کارکنان |
+|---|---|---|
+| کد همکار | `123456` (۶رقمی) | یکتا، تولید با `randomInt(100000,1000000)` + چک DB |
+| لینک خصوصی همکار | `https://bazino.pro/ig/invite/IG4-XXXX?token=64hex` | HMAC-SHA256، ۳۶۵ روز اعتبار، reusable |
+| لینک عمومی | `https://bazino.pro/?ref=123456` | fallback برای Bio/Story |
+| کوپن دوست | `IG-A1B2C3D4` | owner-bound به username دوست، ۱ بار مصرف |
 
-لینک دعوت اختصاصی پس از کامنت کد و تکمیل شروط، فقط برای دوست به‌صورت خصوصی ارسال می‌شود. لینک دعوت برای همکار ارسال نمی‌شود و نباید در پیام همکار، کامنت عمومی یا لاگ قابل‌مشاهده قرار گیرد. هر لینک عمومی احتمالی همکار حرفه‌ای در Bio، Story، Caption مجاز یا محتوای Creator، یک مسیر عمومی جداگانه است و جایگزین لینک اختصاصی دوست نیست. مقصد باید صفحه‌ی مرتبط رزرو، تورنومنت یا اپلیکیشن باشد و جزئیات جایزه، مبلغ، تاریخ و شرایط فقط از اطلاعات رسمی سایت خوانده شود.
+- لینک خصوصی همکار در `pub-outbox` فقط به‌صورت `{{invite_url}}` ذخیره می‌شود، نه URL واقعی — URL واقعی فقط هنگام dispatch ساخته می‌شود و در لاگ/لیست ادمین نمایش داده نمی‌شود
+- `partner1` اجازه ندارد حاوی `invite_url` یا `/ig/invite/` باشد (`PRIVATE_LINK_FORBIDDEN`) — `partner2` مجاز است
 
-## ۴. مدل پاداش و کمیسیون
+---
 
-اعداد زیر از سند پایه‌ی Affiliate آمده‌اند و **پیشنهاد اولیه هستند، نه تصمیم مالی نهایی**. پیش از اعلام عمومی باید توسط مالک کسب‌وکار و مشاور مالی/حقوقی تأیید شوند.
+## ۴. مدل پاداش و کمیسیون (بدون تغییر منطق مالی)
 
-| رویداد | وضعیت | پیشنهاد اولیه |
-| --- | --- | --- |
-| Follow یا Comment | محرک کمپین | بدون کمیسیون نقدی |
-| Share یا کلیک | تعامل بازاریابی | بدون کمیسیون قطعی |
-| اولین رزرو یا حضور پرداخت‌شده مشتری جدید | واجد شرایط اصلی | ۱۰٪ مبلغ خالص دریافت‌شده |
-| مشتری بازگشتی | مشروط به سیاست نهایی | ۵٪ تا حداکثر ۳۰ روز |
-| ثبت‌نام تورنومنت از مسیر همکار | قابل تنظیم | مبلغ ثابت یا ۱۰٪ مبلغ خالص |
-| لغو، بازپرداخت، تراکنش تستی یا تکراری | ردشده | صفر یا برگشت کمیسیون |
+| رویداد | وضعیت | پیشنهاد |
+|---|---|---|
+| Follow/Comment/Button | محرک | بدون کمیسیون |
+| Click لینک | تعامل | بدون کمیسیون |
+| اولین رزرو/حضور پرداخت‌شده مشتری جدید | واجد شرایط | ۱۰٪ خالص |
+| بازگشتی | مشروط | ۵٪ تا ۳۰ روز (نیازمند تأیید مالی) |
+| لغو/بازپرداخت/تست/تکراری | رد | ۰ |
 
-تعریف مبلغ خالص باید همان سند پایه باشد: مبلغ واقعاً دریافت‌شده پس از تخفیف تأمین‌شده توسط بازینو، بازپرداخت، لغو، مالیات یا کارمزد در صورت اعمال. کمیسیون تا پایان دوره‌ی بازپرداخت در حالت `Pending` باقی می‌ماند.
+- `Pending` تا `refundDays` (۷ روز) → تأیید دستی نمی‌تواند hold را دور بزند → `approved` → تسویه ماهانه به کیف پول (نه نقد فیزیکی)
+- یک تراکنش یک صاحب کمیسیون
 
-## ۵. منطق Attribution
+---
 
-انتساب پیش‌فرض، **آخرین لینک معتبر Affiliate پیش از رزرو** است، مگر اینکه کاربر کد دیگری را آگاهانه در فرم وارد کند؛ در آن صورت کد واردشده بر مقدار قبلی اولویت دارد. شناسه می‌تواند تا ۳۰ روز در مرورگر یا حساب کاربر نگه‌داری شود. برای جلوگیری از انتساب جعلی، ثبت سمت سرور لازم است و کوکی به‌تنهایی کافی نیست.
+## ۵. منطق Attribution (جدید — ساده‌شده)
 
-وضعیت‌های اصلی عبارت‌اند از `Clicked`، `Lead`، `Reserved`، `Paid`، `Attended`، `Approved`، `Reversed`، `Paid out` و `Rejected`. یک تراکنش فقط یک صاحب کمیسیون دارد. استفاده‌ی همکار از کد خودش، رزرو کارکنان، چند رزرو با هویت یکسان، پرداخت و بازپرداخت سریع، کلیک مصنوعی و تراکنش تکراری باید علامت‌گذاری شود.
+- آخرین لینک معتبر همکار پیش از رزرو (ثبت سروری `pub-click` + `attribution`) — تا `attributionDays` (۳۰ روز)
+- کد دستی فرم بر لینک مقدم، اما اگر نامعتبر باشد به قبلی برنمی‌گردد
+- یک کاربر نمی‌تواند در یک کمپین از دو همکار مختلف claim کند (`CAMPAIGN_ALREADY_CLAIMED`) — اما چند کاربر مختلف می‌توانند از یک همکار claim کنند (reusable link)
+- کارکنان/ادمین/خودارجاعی → بدون کمیسیون
 
-## ۶. قیف محتوایی اینستاگرام
+---
 
-| مرحله | محتوای پیشنهادی | CTA | شاخص اصلی |
-| --- | --- | --- | --- |
-| جذب | Reel کوتاه از PS5/Xbox، VIP و نمایشگر ۸۵ اینچی | Follow + کامنت `SQUAD` | Reach، Follows، Comments |
-| فعال‌سازی | پاسخ خصوصی و Story آموزشی | دریافت لینک اختصاصی | Private Replies sent، Link opens |
-| اشتراک‌گذاری | کارت «Invite your squad» و Reel تجربه‌محور | Share با دوستان علاقه‌مند | Shares، لینک‌های یکتا |
-| تبدیل | تورنومنت، Café یا VIP با لینک مقصد اختصاصی | رزرو در سایت/اپ | Sessions، Leads، Reservations |
-| درآمد | پیگیری پرداخت و حضور | استفاده از کد در رزرو | Paid، Attended، Net sales |
-| بازگشت | Story یادآوری و پیشنهاد رویداد رسمی | رزرو بعدی | Repeat visits، retention |
+## ۶. قیف محتوایی (جدید)
 
-برای حفظ هویت ثابت بازینو، پست‌ها چهاراسلایدی با ترتیب ترکی، فارسی، انگلیسی و روسی باقی می‌مانند و کپشن پست ترکی است. Reels طبق نسبت ثابت بازینو تولید می‌شوند: ۸۰٪ ترکی، ۱۰٪ فارسی و ۱۰٪ انگلیسی؛ روسی برای Voice Reel پیش‌فرض نیست. هر محتوای Affiliate باید صریح، غیرگمراه‌کننده و مطابق قالب تصویری مشکی/سرمه‌ای، زرد قهرمانی، آبی نئونی و فضای کنسولی باشد.
+| مرحله | CTA | شاخص |
+|---|---|---|
+| جذب | Follow + کامنت کلیدواژه | Comments, Follows |
+| فعال‌سازی | تپ دکمه | Button taps, PR sent |
+| دریافت لینک | DM لینک به همکار | Link sent |
+| اشتراک‌گذاری | همکار لینک را برای دوستان می‌فرستد | Clicks |
+| تبدیل | ثبت‌نام با لینک + کوپن | Leads, Coupons |
+| درآمد | پرداخت | Paid, Commission |
 
-هر محتوای Affiliate باید پیش از انتشار preview کامل داشته باشد: رسانه، زبان، کپشن، CTA، هشتگ، لینک، شناسه کمپین و روش اعلام همکاری. انتشار فقط با تأیید صریح همان batch انجام می‌شود و batching ثابت سه پست یا سه Reel حفظ می‌گردد.
+---
 
-## ۷. شفافیت تبلیغاتی و قواعد Meta
+## ۷. شفافیت تبلیغاتی
 
-اگر Creator یا Publisher در ازای محتوا کمیسیون دریافت می‌کند، محتوا دارای exchange of value است. راهنمای رسمی Instagram می‌گوید محتوایی که از لینک Affiliate درآمد ایجاد می‌کند باید از Paid Partnership Label استفاده کند [2]. راهنمای Meta نیز می‌گوید Creator باید Business Partner را در Branded Content تگ کند و برچسب «Paid partnership with» نمایش داده می‌شود؛ پرداخت Creator خارج از اپلیکیشن انجام می‌شود [3].
+- محتوای دارای کمیسیون = branded content → نیازمند Paid Partnership label در صورت شمول
+- همکار نباید وعدهٔ قطعی/جایزهٔ تأییدنشده دهد
 
-بنابراین در قرارداد و محتوای Creator باید هم «همکاری تبلیغاتی/Affiliate» به زبان قابل‌فهم ذکر شود و هم در صورت شمول، ابزار Paid Partnership اینستاگرام استفاده شود. همکار نباید خود را مشتری مستقل جا بزند، نتیجه‌ی قطعی وعده دهد، جایزه یا تخفیف تأییدنشده اعلام کند یا با پیام خصوصی انبوه کاربران را مزاحم شود.
+---
 
-## ۸. معماری فنی MVP
-
-برای اجرای خودکار، یک سرور رویدادمحور باید وب‌هوک‌های کامنت را دریافت کند، کلمه‌ی کلیدی را تطبیق دهد، Private Reply را فقط یک‌بار و در مهلت مجاز ارسال کند، و رویداد لینک را به سیستم رزرو منتقل کند. Meta برای کامنت‌های Media Objects وب‌هوک ارائه می‌کند و مستندات Private Replies نیز دریافت webhook، استفاده از comment ID و ارسال پاسخ خصوصی را توضیح می‌دهد [1] [4]. مستندات فعلی Media Insights همچنین metricهای `shares`، `reposts`، `saved` و `total_interactions` را برای Feed posts و Reels فهرست می‌کند؛ این‌ها در سطح Media هستند و جایگزین انتساب فردی Share نمی‌شوند [5]. به‌روزرسانی رسمی Meta درباره‌ی Collaboration نیز دسترسی به Mediaهای collaborative و metricهای engagement را توضیح می‌دهد، اما آن هم Share را به‌صورت فردبه‌فردِ فرستنده و گیرنده گزارش نمی‌کند [6].
-
-مدل داده‌ی پیشنهادی شامل `affiliate_partners`، `campaigns`، `campaign_members`، `tracking_links`، `instagram_media`، `comment_events`، `private_reply_events`، `click_events`، `friend_consents`، `friend_action_events`، `follow_checks`، `like_attestations`، `share_attestations`، `coupon_issuances`، `leads`، `reservations`، `commission_events`، `payouts` و `audit_logs` است. هر رویداد باید `verification_method`، زمان، Media ID، token، نتیجه و نسخه‌ی policy را نگه دارد. داده‌ی شخصی مشتری برای Affiliate نمایش داده نشود؛ داشبورد همکار باید تجمیعی باشد و فقط مدیر/مالی به شناسه داخلی تراکنش دسترسی داشته باشند.
-
-### منطق ساده‌ی رویداد
+## ۸. معماری فنی — فلو جدید
 
 ```
-Comment webhook
-  -> idempotency check(comment_id, keyword )
-  -> campaign eligibility check
-  -> private reply to partner with unique code only
-  -> partner shares post/Reel + code message with friend
-  -> friend comments the code under the approved post/Reel
-  -> friend gate: Follow + Like + Share required
-  -> private reply to friend with the exact referral URL
-  -> friend opens URL and records handle with consent
-  -> Follow API check when IGSID/consent exists; otherwise pending/self-attested
-  -> activate link and issue one-time coupon only after policy gate
-  -> click/ref attribution on bazino.pro
-  -> reservation + payment/attendance confirmation
-  -> pending commission
-  -> approve after refund window
-  -> monthly payout
+Manus -> POST /api/integrations/instagram/published-media {media_id} -> registry approved
+Zernio -> POST /api/webhooks/zernio {comment.received: nativeId, commentId, authorId, text, createdAt} 
+  -> HMAC raw body + accountId==cfg.zernioAccountId + nativeId==registry.nativeId
+  -> ingest dedup (eventId+hash) -> queue priority 0
+  -> processInbox: campaigns.dispatch
+    -> onComment: keyword? WholeWord fa/tr/en/ru? repeat? -> create partner member (IG4) + affiliate code + PR guide (partner1) + button signed
+  -> sendOutbox: beforeSend eligible? -> prepareMessage? (PR keeps guide) -> Zernio PR /v1/inbox/comments/{media}/{comment}/private-reply
+
+Partner taps button -> Zernio -> message.received {button=signed, conversationId, authorId}
+  -> memberForButton verifies HMAC + nonce + 30d expiry + author match
+  -> follow lookup (Zernio /follow-status) outside tx
+  -> onMessage: follow? -> status link_ready + linkExpiresAt 365d + DM partner_link (partner2 placeholder)
+  -> sendOutbox: prepareMessage replaces {{invite_url}} with /ig/invite/{id}?token={hmac} -> DM /v1/inbox/conversations/{conv}/messages
+
+Friend -> GET /ig/invite/{partnerId}?token= -> info() + click() dedup IP+UA 15m
+Friend -> POST /ig/invite/{partnerId}/claim {token, consent, likeAttested, handle} -> phoneVerified + staff check + claimKey {campaign,username} -> claimAttribution + coupon IG-... + audit
+Friend -> reservation with referralCode=partnerCode -> onOrderPaid -> pending commission -> approve after refund window -> monthly wallet settlement
 ```
 
-Meta اعلام کرده است که Private Reply فقط یک پیام برای کامنت‌کننده اجازه می‌دهد و باید حداکثر تا هفت روز پس از کامنت ارسال شود [1]. بنابراین سیستم باید idempotency key داشته باشد و برای خطا یا تکرار، پاسخ دوم خودکار نفرستد. اگر Private Reply ارسال نشد، پاسخ عمومی غیرحساس می‌تواند کاربر را به دریافت لینک از Bio هدایت کند؛ نباید توکن، داده‌ی شخصی یا لینک اختصاصی در کامنت عمومی منتشر شود.
+**نکات امنیتی:**
+- `partner1` هرگز لینک ندارد — `PRIVATE_LINK_FORBIDDEN` در `saveCampaign`
+- لینک فقط در DM همکار، با `{{invite_url}}` که هنگام ارسال جایگزین می‌شود — در DB فقط placeholder
+- دکمه `ig4.{id}.{nonce}.{sig}` — `sig = HMAC-SHA256(invitationKey, button:{id.nonce}:{igUserId}:{campaign}:{media})`
+- لینک `HMAC-SHA256(invitationKey, partner:{id}:{igUserId}:{campaign}:{media}:{linkExpiresAt})`
+- `outboundEnabled` باید true باشد وگرنه صف در queued می‌ماند
+- `pub-outbox` متن کامل خصوصی را لاگ نمی‌کند — `report()` فقط status/stage/evidence
 
-## ۹. دو مسیر قابل‌اجرا
+---
 
-| رویکرد | نتیجه و مزیت | Trade-off | هزینه | پیچیدگی راه‌اندازی |
-| --- | --- | --- | --- | --- |
-| بتای دستی ۲ تا ۴ هفته‌ای | سریع‌ترین راه برای سنجش کامنت، Share، کلیک، رزرو و نرخ تبدیل با ۵ تا ۱۰ همکار | پاسخ خصوصی، ثبت کد و تسویه دستی؛ خطای انسانی بیشتر | کم | کم |
-| MVP خودکار متصل به وب‌سایت | وب‌هوک کامنت، Private Reply، لینک یکتا، انتساب و گزارش خودکار | نیازمند اپ Meta، مجوزها، وب‌هوک، دسترسی رزرو و تست App Review | متوسط | متوسط تا زیاد |
-| ابزار Affiliate آماده | داشبورد و گزارش آماده | هزینه اشتراک، وابستگی به ابزار و احتمال ناسازگاری با رزرو حضوری/Private Reply | متوسط تا زیاد |
+## ۹. تست‌ها (فلو جدید — 2026-09-14)
 
-پیشنهاد اجرایی این سند، شروع با بتای دستی برای دو تا چهار هفته و ۵ تا ۱۰ همکار/Creator است. پس از مشاهده‌ی نرخ واقعی Share به Click، Click به Reservation و Reservation به Paid/Attended، MVP خودکار ساخته شود. اگر تیم نیاز دارد بدون بازماندن مرورگر به‌صورت خودکار به کامنت‌ها پاسخ دهد، مسیر MVP باید با وب‌هوک و سرور رویدادمحور اجرا شود؛ برای پایش دوره‌ای یا کارهای زمان‌بندی‌شده، اجرای پس‌زمینه باید در یک سرویس پایدار انجام شود، نه با polling پرهزینه‌ی مداوم.
+- `publishing.test.mts` ۵۱/۵۱: PR بدون لینک، numeric code → `friend_flow_retired`, DM حاوی `/ig/invite/?token=`, reusable link (چند دوست یک لینک), `CAMPAIGN_ALREADY_CLAIMED` برای یک user با دو partner مختلف
+- کل سوئیت ۵۶۷/۵۶۷ سبز
 
-## ۱۰. KPI و داشبورد
+---
 
-داشبورد مدیر باید برای هر کمپین و همکار این موارد را نشان دهد: Reach، Impressions/Views در صورت دسترسی، Follows attributed، Comments keyword، Private Replies sent/failed، Shares در صورت دسترسی، Link opens، Leads، Reservations، Paid، Attended، فروش خالص، کمیسیون Pending، Approved و Paid out، نرخ لغو/بازپرداخت، و درآمد خالص پس از کمیسیون.
+## ۱۰. References
 
-فرمول‌های پایه:
+[1] Private Replies — یک PR برای هر کامنت، مهلت ۷ روز  
+[2] Branded content — افشای همکاری  
+[3] Meta Business — Paid partnership  
+[4] Webhooks — comment.received + message.received  
+[5] Media Insights — shares کلی، نه فردی  
+[6] Collaboration updates
 
-- **Comment activation rate** = کامنت‌های کلمه‌ی کلیدی ÷ Reach
+---
 
-- **Share-to-click rate** = کلیک‌های لینک ÷ Shareهای کل Media؛ این نرخ فقط یک نسبت کمپینی است و ثابت نمی‌کند کدام فرد Share را انجام داده است.
+## تاریخچه
 
-- **Attributed referral rate** = Qualified Referral ÷ کلیک یکتای لینک دعوت؛ این شاخص برای تصمیم کمیسیون معتبرتر از Share خام است.
-
-- **Lead-to-reservation rate** = رزرو ÷ لید
-
-- **Reservation-to-attended rate** = حضور ÷ رزرو
-
-- **Affiliate conversion rate** = مشتری جدید Paid/Attended ÷ کلیک یکتا
-
-- **Net contribution** = فروش خالص − کمیسیون تأییدشده − هزینه‌های مستقیم کمپین
-
-نکته‌ی تحلیلی: تعداد فالوور، کامنت یا Share معیار نهایی موفقیت نیست. معیار اصلی باید **مشتری جدید پرداخت‌کرده/حاضر و درآمد خالص** باشد. تغییر فالوور کل پیج باید با تغییرات روزانه و کمپین‌های دیگر تفکیک شود و به‌تنهایی به یک Affiliate نسبت داده نشود.
-
-## ۱۱. تصمیم‌های لازم پیش از اجرا
-
-پیش از ساخت یا فعال‌سازی سیستم باید درصد کمیسیون، تعریف مشتری جدید، پنجره‌ی Attribution، حداقل تسویه، روش قانونی پرداخت، فرد مسئول اختلاف، فهرست همکاران بتا، کلمات کلیدی هر کمپین، مقصد دقیق لینک‌ها، و وضعیت دسترسی Meta/وب‌هوک مشخص شوند. برای جلوگیری از وعده‌ی غیرواقعی، مبلغ جایزه، تخفیف، تاریخ و قوانین تورنومنت فقط بعد از تأیید در سایت وارد محتوای Affiliate شود.
-
-این سند طرح اجرایی است و جایگزین مشاوره‌ی حقوقی، مالیاتی یا بررسی نهایی سیاست‌های Meta و قوانین محلی نمی‌شود.
-
-## References
-
-[1]: https://developers.facebook.com/documentation/instagram-platform/private-replies "Meta for Developers — Send a Private Reply to a Commenter"
-
-[2]: https://help.instagram.com/616901995832907 "Instagram Help Center — What is considered branded content"
-
-[3]: https://www.facebook.com/business/help/788160621327601 "Meta for Business — About branded content on Facebook, Instagram and Threads"
-
-[4]: https://developers.facebook.com/documentation/instagram-platform/webhooks "Meta for Developers — Setup Webhooks Subscriptions"
-
-[5]: https://developers.facebook.com/documentation/instagram-platform/reference/instagram-media/insights "Meta for Developers — Instagram Media Insights"
-
-[6]: https://developers.facebook.com/blog/post/2026/04/22/instagram-api-updates-for-partnerships-metrics-collaboration-and-engagement/ "Meta for Developers — Instagram API Updates for Partnerships, Metrics, Collaboration, and Engagement"
+- **نسخه ۱ (تا 2026-09-07):** همکار کد می‌گرفت، دوست کد را کامنت می‌کرد، سیستم به دوست لینک می‌داد — `share_confirmed_by_friend_code`
+- **نسخه ۲ (2026-09-14):** همکار مستقیماً لینک reusable می‌گیرد، دوست از طریق لینک ثبت‌نام می‌کند — ساده‌تر، بدون نیاز به کامنت دوست — پیاده‌سازی در `server/affiliate/campaignV4.ts` + `friendGate.ts`

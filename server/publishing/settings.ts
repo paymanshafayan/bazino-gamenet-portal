@@ -113,7 +113,9 @@ export class PublishingSettings {
       data.keywords[l]=stringValue(b.keywords?.[l]??base.keywords[l],40,true);
       for(const k of ['partner1','partner2','friend','invite','button'] as const) {
         const s=stringValue(b.messages?.[l]?.[k]??base.messages[l][k],k==='button'?20:2200,true);
-        if(k.startsWith('partner') && /invite_url|[?&](?:sig|gate|partner_code|token)=|\/ig\/invite|\/invite\//i.test(s))fail('PRIVATE_LINK_FORBIDDEN');
+        // New flow: partner1 = PR guide must NOT contain private link, partner2 = DM with link IS allowed.
+        if(k==='partner1' && /invite_url|[?&](?:sig|gate|partner_code|token)=|\/ig\/invite|\/invite\//i.test(s))fail('PRIVATE_LINK_FORBIDDEN');
+        // friend/invite may contain link for legacy, but partner1 is the only forbidden one now.
         data.messages[l][k]=s;
       }
     }

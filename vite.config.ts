@@ -81,7 +81,14 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [
-      preact(),
+      // devToolsEnabled: false — تزریق preact/devtools در dev خاموش می‌شود.
+      // دلیل: chain تزریقی options.__r/__h بین preact/hooks و preact/debug در این
+      // ریپو (Vite dev + optimizeDeps چند-ورودی) می‌شکند و ThemeRegionها هنگام ثبت
+      // قالب ZIP با «Hook can only be invoked from render methods» کرش می‌کنند و
+      // نواحی home/footer/mobileNav خالی می‌مانند (بازتولید با کرومیوم headless).
+      // پروداکشن تأثیری ندارد (devtools فقط dev است)؛ Preact DevTools مرورگر هم
+      // در صورت نیاز با import دستی 'preact/devtools' قابل بازگشت است.
+      preact({ devToolsEnabled: false }),
       tailwindcss(),
       legacy({
         targets: ['defaults', 'not IE 11']

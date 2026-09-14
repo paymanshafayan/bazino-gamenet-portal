@@ -12,7 +12,7 @@
     </queries>
 
     <application
-        android:label="Bazino Arena"
+        android:label="BAZINO PRO"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -316,4 +317,112 @@ class CircuitBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CircuitBackgroundPainter oldDelegate) => false;
+}
+
+// ============================================================
+// Console Hub widgets — بازتاب موبایلی «قالب هاب» سایت بازینو
+// (مرجع: src/components/HubLayout.tsx و ConsoleHubView.tsx —
+//  HUD گیمینگ شبیه لانچرهای Steam/Epic: دکمه‌های مداری دایره‌ایِ
+//  شیشه‌ای با رنگ نئونی اختصاصی هر بخش + ذرات نئونی پس‌زمینه)
+// ============================================================
+
+/// دکمهٔ مداری هاب: دایرهٔ شیشه‌ای تیره (#111326 با آلفا — همان رنگ دکمه‌های
+/// مداری HubLayout سایت)، بردر و هالهٔ نئونی با رنگ اختصاصی بخش، آیکون رنگی
+/// و برچسب uppercase با فاصلهٔ حروف زیاد (tracking-widest).
+class HubOrbButton extends StatelessWidget {
+  final double size;
+  final Color color;
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  const HubOrbButton({
+    super.key,
+    required this.size,
+    required this.color,
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: size + 24,
+        height: size + 24,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF111326).withValues(alpha: 0.75),
+                border: Border.all(color: color.withValues(alpha: 0.5)),
+                boxShadow: [
+                  BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 18, spreadRadius: 1),
+                ],
+              ),
+              child: Icon(icon, color: color, size: size * 0.38),
+            ),
+            const SizedBox(height: 5),
+            SizedBox(
+              width: size + 22,
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ذرات نئونی شناور پس‌زمینهٔ هاب — تقریب ایستای particle های HubLayout سایت
+/// (نقطه‌های سایان/بنفش/طلایی/قرمز با هالهٔ blur). عمداً بدون تایمر/انیمیشن
+/// ساخته شده تا در تست‌های ویجت (pumpAndSettle) گیر نکند و روی گوشی‌های
+/// ضعیف هم سبک بماند.
+class HubParticlesPainter extends CustomPainter {
+  final int seed;
+  const HubParticlesPainter({this.seed = 7});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = math.Random(seed);
+    const colors = [
+      GamingTheme.primary,
+      GamingTheme.secondary,
+      GamingTheme.goldAccent,
+      GamingTheme.accentRed,
+    ];
+    for (var i = 0; i < 18; i++) {
+      final c = colors[i % colors.length];
+      final x = rng.nextDouble() * size.width;
+      final y = rng.nextDouble() * size.height;
+      final r = 1.0 + rng.nextDouble() * 2.2;
+      final alpha = 0.10 + rng.nextDouble() * 0.20;
+      final glow = Paint()
+        ..color = c.withValues(alpha: alpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawCircle(Offset(x, y), r, glow);
+      final core = Paint()..color = c.withValues(alpha: alpha + 0.25);
+      canvas.drawCircle(Offset(x, y), r * 0.45, core);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant HubParticlesPainter oldDelegate) => oldDelegate.seed != seed;
 }

@@ -6,18 +6,25 @@ import { PublishingReports } from './reports';
 import { AgentRegistry } from './agents';
 import { ZernioClient } from './provider';
 import {PublishingService} from './publish';
+import { MediaGenService } from './mediagen';
+import { TrendService } from './trends';
+import { BriefService } from './briefs';
+import { HOOK_PATTERNS } from './hooks';
 import {registerPublicationRoutes} from './publicationRoutes';
 import { WebhookService, registerZernioReceiver } from './webhooks';
 import { InstagramCampaignService } from '../affiliate/campaignV4';
+import { AwayReplier } from '../affiliate/awayReply';
+import { DEFAULT_AWAY_MESSAGES, inAwayWindow } from '../affiliate/awayPolicy';
 import { FriendGateService,registerFriendGate } from '../affiliate/friendGate';
 export function publishingAdmin(core:OpsCore):express.RequestHandler {
   return async(req,res,next)=>{try{const staff=await core.authorize(req);if(!staff.admin)fail('ADMIN_ONLY',403);(req as any).staff=staff;next();}catch(e:any){res.status(e.statusCode||500).json({error:e.code||'OPERATION_FAILED'});}};
 }
 export function registerPublishing(app:express.Express,core:OpsCore) {
   const settings=new PublishingSettings(core),registry=new MediaRegistry(core),admin=publishingAdmin(core),base='/api/management/publishing';
-  const webhooks=new WebhookService(core),campaigns=new InstagramCampaignService(core);
+  const webhooks=new WebhookService(core),campaigns=new InstagramCampaignService(core),away=new AwayReplier(core,campaigns.queue);
   registerZernioReceiver(app,webhooks);
-  registerPublicationRoutes(app,new PublishingService(core));
+  const publishing=new PublishingService(core),mediagen=new MediaGenService(core,undefined,publishing.assets,publishing),trends=new TrendService(core),briefs=new BriefService(core);
+  registerPublicationRoutes(app,publishing,mediagen,trends);
   registerFriendGate(app,new FriendGateService(core));
   const reports=new PublishingReports(core);
   const agents=new AgentRegistry(core);
@@ -37,10 +44,23 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   app.post(`${base}/settlements`,admin,endpoint(async(req,res)=>res.json(await reports.settleMonth((req as any).staff.username,req.body||{}))));
   app.post(`${base}/outbox/:id/:action`,admin,endpoint(async(req,res)=>res.json(await campaigns.resolveOutbox((req as any).staff.username,String(req.params.id),String(req.params.action),req.body||{}))));
   app.get(`${base}/members`,admin,endpoint(async(_req,res)=>res.json(await campaigns.list())));
+  app.get(`${base}/ig-inbox`,admin,endpoint(async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({items:await away.list(100)});}));
+  app.get(`${base}/ig-away`,admin,endpoint(async(_req,res)=>{const s=await away.settings();res.setHeader('Cache-Control','no-store');res.json({settings:s,nowActive:inAwayWindow(s,new Date(),s.timezone),defaults:DEFAULT_AWAY_MESSAGES});}));
+  app.put(`${base}/ig-away`,admin,endpoint(async(req,res)=>res.json(await away.saveSettings(req.body||{}))));
   app.get(`${base}/events`,core.guard('reports'),endpoint(async(_req,res)=>res.json(await webhooks.queue.report())));
   let inboxBusy=false,analyticsBusy=false;
   const timer=setInterval(async()=>{
-    if(!inboxBusy){inboxBusy=true;webhooks.queue.processInbox(async e=>{if(e.type==='comment.received'||e.type==='message.received')return campaigns.dispatch(e);return core.store.runInTransaction(()=>webhooks.lifecycle(e));}).then(()=>campaigns.queue.sendOutbox(d=>campaigns.beforeSend(d),(d,r)=>campaigns.afterSend(d,r),d=>campaigns.prepareMessage(d))).catch(()=>{}).finally(()=>{inboxBusy=false;});}
+    if(!inboxBusy){inboxBusy=true;webhooks.queue.processInbox(async e=>{
+      if(e.type==='comment.received')return campaigns.dispatch(e);
+      if(e.type==='message.received'){
+        const r=await campaigns.dispatch(e);
+        /* Away auto-reply: only when the campaign flow did NOT answer, and only
+         * recorded/answered — never throws into the inbox loop. */
+        await away.recordAndMaybeReply(e,!!r?.ok).catch(()=>{});
+        return r;
+      }
+      return core.store.runInTransaction(()=>webhooks.lifecycle(e));
+    }).then(()=>campaigns.queue.sendOutbox(d=>campaigns.beforeSend(d),(d,r)=>campaigns.afterSend(d,r),d=>campaigns.prepareMessage(d))).catch(()=>{}).finally(()=>{inboxBusy=false;});}
     if(!analyticsBusy){analyticsBusy=true;webhooks.queue.processInbox(e=>webhooks.analytics(e),'analytics',1).catch(()=>{}).finally(()=>{analyticsBusy=false;});}
   },3000);timer.unref();
   app.get(`${base}/config`,core.guard('content'),endpoint(async(req,res)=>{
@@ -59,7 +79,20 @@ export function registerPublishing(app:express.Express,core:OpsCore) {
   app.get(`${base}/campaigns`,core.guard('content'),endpoint(async(_req,res)=>{await settings.seed();res.json(await core.list('pub-campaign'));}));
   app.put(`${base}/campaigns/:id`,admin,endpoint(async(req,res)=>res.json(await settings.saveCampaign((req as any).staff.username,String(req.params.id),req.body||{}))));
   app.get(`${base}/media`,core.guard('content'),endpoint(async(_req,res)=>res.json(await registry.list())));
+  app.get(`${base}/mediagen/quota`,core.guard('content'),endpoint(async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await mediagen.quota());}));
+  app.get(`${base}/mediagen/tasks`,core.guard('content'),endpoint(async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json({tasks:await mediagen.tasks((req as any).staff.username,(req as any).staff.admin)});}));
+  app.post(`${base}/mediagen/generate`,core.guard('publish'),endpoint(async(req,res)=>res.json(await mediagen.generate((req as any).staff.username,req.body||{}))));
+  app.post(`${base}/mediagen/tasks/:id/cancel`,core.guard('publish'),endpoint(async(req,res)=>res.json(await mediagen.cancel((req as any).staff.username,String(req.params.id),req.body||{}))));
+  app.post(`${base}/mediagen/tasks/:id/import`,core.guard('publish'),endpoint(async(req,res)=>res.json(await mediagen.import((req as any).staff.username,String(req.params.id),req.body||{}))));
+  app.get(`${base}/trends/latest`,core.guard('content'),endpoint(async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await trends.latest());}));
+  app.get(`${base}/hooks`,core.guard('content'),endpoint(async(req,res)=>{const lang=String(req.query.language||'');res.json({patterns:HOOK_PATTERNS.filter(h=>!lang||h.language===lang)});}));
+  app.get(`${base}/briefs`,core.guard('content'),endpoint(async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json({briefs:await briefs.list((req as any).staff.username,(req as any).staff.admin)});}));
+  app.post(`${base}/briefs`,core.guard('publish'),endpoint(async(req,res)=>res.json(await briefs.save((req as any).staff.username,undefined,req.body||{}))));
+  app.put(`${base}/briefs/:id`,core.guard('publish'),endpoint(async(req,res)=>res.json(await briefs.save((req as any).staff.username,String(req.params.id),req.body||{}))));
+  app.post(`${base}/briefs/:id/approve`,core.guard('publish'),endpoint(async(req,res)=>res.json(await briefs.approve((req as any).staff.username,String(req.params.id),req.body||{}))));
+  app.post(`${base}/briefs/:id/archive`,core.guard('publish'),endpoint(async(req,res)=>res.json(await briefs.archive((req as any).staff.username,String(req.params.id),req.body||{}))));
+  app.post(`${base}/briefs/suggest`,core.guard('publish'),endpoint(async(req,res)=>res.json(await briefs.suggest((req as any).staff.username,req.body||{}))));
   app.post(`${base}/media`,admin,endpoint(async(req,res)=>res.json(await registry.register((req as any).staff.username,req.body||{},'admin'))));
   app.put(`${base}/media/:id`,admin,endpoint(async(req,res)=>res.json(await registry.review((req as any).staff.username,String(req.params.id),req.body||{}))));
-  return {settings,registry,webhooks,campaigns};
+  return {settings,registry,webhooks,campaigns,away};
 }

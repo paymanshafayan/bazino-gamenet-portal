@@ -58,3 +58,4 @@ __pycache__/
 *.pyc
 .venv/
 public/__theme-snapshot.html
+services/telegram-bot/state.json

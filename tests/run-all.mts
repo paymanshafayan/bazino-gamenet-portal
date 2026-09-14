@@ -40,6 +40,7 @@ const LAYERS: Layer[] = [
   { id: 'publishing', file: 'publishing.test.mts', report: 'publishing.json', title: 'انتشار/افیلیت — یکپارچه‌سازی نسخهٔ ۴' },
   { id: 'management', file: 'management.test.mts', report: 'management.json', title: 'مدیریت — قرارداد و تراکنش اتمیک' },
   { id: 'unit', file: 'unit.test.mts', report: 'unit.json', title: 'واحد — منطق خالص' },
+  { id: 'telegram-bot', file: 'telegram-bot.test.mts', report: 'telegram-bot.json', title: 'ربات تلگرام — پارسر t.me و منطق فرمان' },
   { id: 'database', file: 'database.test.mts', report: 'database.json', title: 'دیتابیس — SQLite واقعی' },
   { id: 'providers', file: 'providers.test.mts', report: 'providers.json', title: 'پرووایدرها — SQLServer/Mongo' },
   { id: 'ui', file: 'ui.test.mts', report: 'ui.json', title: 'رابط کاربری — کامپوننت‌ها (jsdom)' },

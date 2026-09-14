@@ -21,6 +21,8 @@
 - همهٔ فرمانها فقط برای مالک (`TG_OWNER_IDS`)؛ توکن هرگز لاگ نمیشود؛ خروجی HTML_escape میشود.
 
 ## راهاندازی
+> **وضعیت (۲۰۲۶-۰۹-۱۴):** مراحل ۱ و ۲ انجام شده — ربات `@bazino_ops_bot` ساخته شد، در کانال `@bazino_pro` ادمین (فقط Post Messages) است و تست لایو پست موفق بود. فقط اجرای دائمی (مرحلهٔ ۳ یا ۴) باقی است.
+
 ### ۱) توکن از BotFather (۲ دقیقه)
 در تلگرام: `@BotFather` → `/newbot` → نام: `Bazino Ops Bot` → یوزرنیم: مثلاً `bazino_ops_bot` → توکن را کپی کنید (`123456:ABC-…`).
 
@@ -32,19 +34,27 @@
 ```powershell
 $env:TG_BOT_TOKEN='123456:ABC-DEF...'
 $env:TG_OWNER_IDS='123456789'          # اگر نمیدانید: به ربات /start بدهید؛ همان پیام، id شما را میدهد
-$env:TG_CHANNEL='@bazino_channel'      # یوزرنیم کانال بازینو
+$env:TG_CHANNEL='@bazino_pro'          # یوزرنیم کانال بازینو
 node services/telegram-bot/bot.mjs
 ```
 
-### ۴) اجرای دائمی (Railway — اختیاری)
-سرویس جدید از همین ریپو → Start Command: `node services/telegram-bot/bot.mjs` → همان سه متغیر محیطی بالا.
+### ۴) اجرای دائمی (Railway)
+سرویس جدید از همین ریپو → **Root Directory:** `services/telegram-bot` (package.json با `npm start` موجود است) → متغیرها:
+
+```
+TG_BOT_TOKEN=89140475…        # از KEYS.md
+TG_OWNER_IDS=8769056098
+TG_CHANNEL=@bazino_pro
+```
+
+> راهنمای دیگر: بدون Root Directory هم کار میکند — Start Command: `node services/telegram-bot/bot.mjs` از ریشهٔ ریپو.
 
 ## متغیرها
 | متغیر | الزامی | توضیح |
 |---|---|---|
 | `TG_BOT_TOKEN` | ✅ | توکن BotFather |
 | `TG_OWNER_IDS` | ✅ | شناسههای عددی مالک (با کاما) |
-| `TG_CHANNEL` | ✅ | یوزرنیم کانال برای /post و /photo |
+| `TG_CHANNEL` | ✅ | یوزرنیم کانال برای /post و /photo (`@bazino_pro`) |
 | `TG_WATCH_MIN` | — | بازهٔ پایش (پیشفرض ۱۵ دقیقه) |
 | `TG_STATE_PATH` | — | مسیر فایل وضعیت (پیشفرض کنار bot.mjs) |
 

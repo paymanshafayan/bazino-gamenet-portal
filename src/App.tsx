@@ -1469,36 +1469,10 @@ export default function App() {
         )} />
       )}
 
-      {activeTab === 'admin' && (
-        <header className="h-[70px] bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 border-b border-purple-500/30 px-4 md:px-8 flex justify-between items-center z-50 sticky top-0 shrink-0 shadow-2xl">
-          <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping"></span>
-            <div className="flex flex-col">
-              <span className="font-display font-black text-sm tracking-wider text-purple-200">
-                {L(language, { fa: 'پنل مدیریت بازینو پرو', en: 'BAZINO PRO ADMIN', ru: 'АДМИН-ПАНЕЛЬ BAZINO PRO', tr: 'BAZINO PRO YÖNETİM' })}
-              </span>
-              <span className="text-[10px] text-purple-400 font-medium font-sans">
-                {L(language, { fa: `مدیر: @${user?.username}`, en: `Admin: @${user?.username}`, ru: `Администратор: @${user?.username}`, tr: `Yönetici: @${user?.username}` })}
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => { setHelpMode('admin'); setIsHelpOpen(true); }}
-              className="bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/30 text-purple-200 px-3 py-2 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-            >
-              <HelpCircle className="w-4 h-4 text-purple-300 animate-pulse" />
-              <span>{L(language, { fa: 'راهنمای ادمین', en: 'Admin Guide', ru: 'Гид администратора', tr: 'Yönetici Rehberi' })}</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab('home')} 
-              className="bg-white/10 hover:bg-white/15 border border-white/20 hover:border-purple-500/40 text-white px-4 py-2 rounded-xl transition-all font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md active:scale-95"
-            >
-              {dir === 'rtl' ? <ArrowRight className="w-4 h-4 text-purple-300" /> : <ArrowLeft className="w-4 h-4 text-purple-300" />}
-              <span>{L(language, { fa: 'بازگشت به سایت', en: 'Back to Site', ru: 'Вернуться на сайт', tr: 'Siteye Dön' })}</span>
-            </button>
-          </div>
+      {/* Old 70px admin header removed — AdminPanelTab now owns single 50px #admin-bar with Visit Site + Help */}
+      {false && activeTab === 'admin' && (
+        <header className="h-[70px] hidden">
+          removed
         </header>
       )}
 

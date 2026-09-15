@@ -1,0 +1,66 @@
+{
+  "date": "2026-09-15",
+  "checks": [
+    {
+      "name": "33 chapters",
+      "ok": true
+    },
+    {
+      "name": "43 instructional figures",
+      "ok": true
+    },
+    {
+      "name": "No missing screenshots",
+      "ok": true
+    },
+    {
+      "name": "No broken internal anchors",
+      "ok": true
+    },
+    {
+      "name": "Full-text search filters chapters",
+      "ok": true
+    },
+    {
+      "name": "No-results message",
+      "ok": true
+    },
+    {
+      "name": "Clear restores all chapters",
+      "ok": true
+    },
+    {
+      "name": "Image zoom dialog opens",
+      "ok": true
+    },
+    {
+      "name": "Escape closes image",
+      "ok": true
+    },
+    {
+      "name": "Mobile has no horizontal overflow",
+      "ok": true
+    },
+    {
+      "name": "Mobile contents can open",
+      "ok": true
+    },
+    {
+      "name": "Offline document loads without network",
+      "ok": true
+    },
+    {
+      "name": "Offline images present",
+      "ok": true
+    },
+    {
+      "name": "Offline search works",
+      "ok": true
+    },
+    {
+      "name": "No handbook JavaScript errors",
+      "ok": true
+    }
+  ],
+  "externalCallsInOfflineDocument": 0
+}

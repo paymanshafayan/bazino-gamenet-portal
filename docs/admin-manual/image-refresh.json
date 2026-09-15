@@ -1,0 +1,275 @@
+{
+  "edition": "1.1",
+  "approvedUiSource": "a9c2c21010146b2fe51df323373ec279b88f5ac1",
+  "scope": "All 43 referenced screenshots recaptured from the approved single-50px-header UI. Admin shell only for navigation; content/form crops for other pages. No old assets carried over.",
+  "guards": {
+    "baseSections": 23,
+    "singleAdminBarHeight": 50,
+    "obsoletePurpleHeaderCount": 0
+  },
+  "images": [
+    {
+      "image": "login-password.png",
+      "capturedAt": "2026-09-15T10:21:53.755681+00:00",
+      "rawSha256": "2c0d237e2434b55e80cfb7b04f55181554842e5b3f11a755fec42b3ebc9d0aa8",
+      "publishedSha256": "2c0d237e2434b55e80cfb7b04f55181554842e5b3f11a755fec42b3ebc9d0aa8"
+    },
+    {
+      "image": "navigation.png",
+      "capturedAt": "2026-09-15T10:12:31.304840+00:00",
+      "rawSha256": "e399dcfc8cc9a7e0c4d0169e6be072fa1924234ee0e6cc75e8b4c34850f855e8",
+      "publishedSha256": "14783090c64942cab05ad453af683f27db894ee8537b6f09d57bb420c3196685"
+    },
+    {
+      "image": "dashboard.png",
+      "capturedAt": "2026-09-15T10:12:31.916843+00:00",
+      "rawSha256": "bd7d09c77f1f5e6f40592d3483750eb58c9dc58040801b7bd1de020b2d528fe0",
+      "publishedSha256": "bd7d09c77f1f5e6f40592d3483750eb58c9dc58040801b7bd1de020b2d528fe0"
+    },
+    {
+      "image": "systems-example.png",
+      "capturedAt": "2026-09-15T10:13:58.209279+00:00",
+      "rawSha256": "8cc352a0a80291d8c2a8c56fdb1f3c7d3e8c045d9fe016173fa8eb6adde0a0ad",
+      "publishedSha256": "4e899e14dc7cd9df334b806b93862aa4a8ae7be328c8ab06e76c92339ef036c5"
+    },
+    {
+      "image": "systems-saved.png",
+      "capturedAt": "2026-09-15T10:17:57.966490+00:00",
+      "rawSha256": "178019d27d398e5b963573ffa1ae032b3a3714895517ca7644c81cab33bb76ca",
+      "publishedSha256": "178019d27d398e5b963573ffa1ae032b3a3714895517ca7644c81cab33bb76ca"
+    },
+    {
+      "image": "cafe.png",
+      "capturedAt": "2026-09-15T10:12:43.704902+00:00",
+      "rawSha256": "ad96d1c95445cfb179ea5d24a16ff73ad0070e72e3684a01377a88a9cd423be9",
+      "publishedSha256": "ad96d1c95445cfb179ea5d24a16ff73ad0070e72e3684a01377a88a9cd423be9"
+    },
+    {
+      "image": "shop.png",
+      "capturedAt": "2026-09-15T10:12:46.304915+00:00",
+      "rawSha256": "37b7f555dc0644c52595de4d169cb3ba8f8724c7f5b94ac04ca38f12911e901e",
+      "publishedSha256": "37b7f555dc0644c52595de4d169cb3ba8f8724c7f5b94ac04ca38f12911e901e"
+    },
+    {
+      "image": "tournaments.png",
+      "capturedAt": "2026-09-15T10:12:37.724872+00:00",
+      "rawSha256": "03e697795714b53e09939173f70249b1b958e0e0918ea3a64c49df3592771245",
+      "publishedSha256": "03e697795714b53e09939173f70249b1b958e0e0918ea3a64c49df3592771245"
+    },
+    {
+      "image": "tournament-detail.png",
+      "capturedAt": "2026-09-15T10:14:41.341496+00:00",
+      "rawSha256": "74a15a415bbc62f130fbf5b11e78caefc878777123d2134c7e87b8650ced26a2",
+      "publishedSha256": "74a15a415bbc62f130fbf5b11e78caefc878777123d2134c7e87b8650ced26a2"
+    },
+    {
+      "image": "tournament-register.png",
+      "capturedAt": "2026-09-15T10:14:44.301511+00:00",
+      "rawSha256": "a6f1d545bd5a45854426b7f0e632e54c7baf6a6dcbeab999c1077e68a5c47d49",
+      "publishedSha256": "a6f1d545bd5a45854426b7f0e632e54c7baf6a6dcbeab999c1077e68a5c47d49"
+    },
+    {
+      "image": "wallet-account.png",
+      "capturedAt": "2026-09-15T10:14:03.501305+00:00",
+      "rawSha256": "3a72c02e1ea024a68f4455e5048cbf46b0ff8ff9eb412044555abf0e822c1ac9",
+      "publishedSha256": "3a72c02e1ea024a68f4455e5048cbf46b0ff8ff9eb412044555abf0e822c1ac9"
+    },
+    {
+      "image": "wallet-pos.png",
+      "capturedAt": "2026-09-15T10:14:11.161344+00:00",
+      "rawSha256": "154b3739810fada6e6cfb32820b02a6af220a47c69f867ce49a19f9994635167",
+      "publishedSha256": "154b3739810fada6e6cfb32820b02a6af220a47c69f867ce49a19f9994635167"
+    },
+    {
+      "image": "wallet-cashout.png",
+      "capturedAt": "2026-09-15T10:14:13.913358+00:00",
+      "rawSha256": "18eb74412fb3ef7e6981208db556d400b6691cb24a5017b969547bdf6587c37a",
+      "publishedSha256": "18eb74412fb3ef7e6981208db556d400b6691cb24a5017b969547bdf6587c37a"
+    },
+    {
+      "image": "coupon-form.png",
+      "capturedAt": "2026-09-15T10:14:25.249415+00:00",
+      "rawSha256": "ddf6675980fd4d5aca8eb38f861efc808eedefaa246f9729438ac8cc7e9de52f",
+      "publishedSha256": "ddf6675980fd4d5aca8eb38f861efc808eedefaa246f9729438ac8cc7e9de52f"
+    },
+    {
+      "image": "hours-form.png",
+      "capturedAt": "2026-09-15T10:14:32.269451+00:00",
+      "rawSha256": "2353e9f73b3faf040f1177cde76c02a1841905fefa52008d92a3fc38df5e8d6f",
+      "publishedSha256": "2353e9f73b3faf040f1177cde76c02a1841905fefa52008d92a3fc38df5e8d6f"
+    },
+    {
+      "image": "affiliates.png",
+      "capturedAt": "2026-09-15T10:12:58.316976+00:00",
+      "rawSha256": "90e87a74ed94c27b361e680b5e42eae6150e385533c8f525c71fe88dfb485475",
+      "publishedSha256": "90e87a74ed94c27b361e680b5e42eae6150e385533c8f525c71fe88dfb485475"
+    },
+    {
+      "image": "affiliate-register.png",
+      "capturedAt": "2026-09-15T10:15:29.061738+00:00",
+      "rawSha256": "b328545552b12ba8a1866a9f38b28b7f0791731b67b5abd0ea61301919944b87",
+      "publishedSha256": "b328545552b12ba8a1866a9f38b28b7f0791731b67b5abd0ea61301919944b87"
+    },
+    {
+      "image": "publishing-overview.png",
+      "capturedAt": "2026-09-15T10:15:06.469623+00:00",
+      "rawSha256": "db1b15dd4b448673c599048e12f6e4b591d87aad75e9511c20273d04aa3550a3",
+      "publishedSha256": "db1b15dd4b448673c599048e12f6e4b591d87aad75e9511c20273d04aa3550a3"
+    },
+    {
+      "image": "publishing-editor.png",
+      "capturedAt": "2026-09-15T10:15:19.773690+00:00",
+      "rawSha256": "cd023fdcb683a78aeddad1f7c4f9522cf80c9853e790daeeee131aab234a72d2",
+      "publishedSha256": "cd023fdcb683a78aeddad1f7c4f9522cf80c9853e790daeeee131aab234a72d2"
+    },
+    {
+      "image": "campaign-form.png",
+      "capturedAt": "2026-09-15T10:15:22.497704+00:00",
+      "rawSha256": "7981213f902298409da7108fa9431392b34d8eddb3f354521f5b18ae4f889b8b",
+      "publishedSha256": "7981213f902298409da7108fa9431392b34d8eddb3f354521f5b18ae4f889b8b"
+    },
+    {
+      "image": "publishing-media.png",
+      "capturedAt": "2026-09-15T10:15:09.993641+00:00",
+      "rawSha256": "bacdd4354efc8ace562ca6618b24a53e01cd03a82dfcf91ddc7b9711f422e720",
+      "publishedSha256": "bacdd4354efc8ace562ca6618b24a53e01cd03a82dfcf91ddc7b9711f422e720"
+    },
+    {
+      "image": "campaign-finance.png",
+      "capturedAt": "2026-09-15T10:15:24.365714+00:00",
+      "rawSha256": "7dc729dc501633027cab46d23bb904183d3212956093d0721ae2e59b29b94460",
+      "publishedSha256": "7dc729dc501633027cab46d23bb904183d3212956093d0721ae2e59b29b94460"
+    },
+    {
+      "image": "publishing-agents.png",
+      "capturedAt": "2026-09-15T10:15:12.681655+00:00",
+      "rawSha256": "973ce462202fd6cc9130c6db3c9f2bde07e4ff0f9378d3cc7ef4dbf391109c26",
+      "publishedSha256": "973ce462202fd6cc9130c6db3c9f2bde07e4ff0f9378d3cc7ef4dbf391109c26"
+    },
+    {
+      "image": "publishing-settings.png",
+      "capturedAt": "2026-09-15T10:15:14.069662+00:00",
+      "rawSha256": "b47d3aabfac9f8a34c28942db5aac625f86a402d69fc23dda2f73ad58e017599",
+      "publishedSha256": "b47d3aabfac9f8a34c28942db5aac625f86a402d69fc23dda2f73ad58e017599"
+    },
+    {
+      "image": "publishing-telegram.png",
+      "capturedAt": "2026-09-15T10:15:15.845671+00:00",
+      "rawSha256": "f57b5611ab6bb07fe02d30d8666fd7c626acbf184e092ec33f1b1fbf0082bc75",
+      "publishedSha256": "f57b5611ab6bb07fe02d30d8666fd7c626acbf184e092ec33f1b1fbf0082bc75"
+    },
+    {
+      "image": "content.png",
+      "capturedAt": "2026-09-15T10:13:16.477068+00:00",
+      "rawSha256": "e6fd28098a8dd174dce41ec8d0184ac7900062b43152ea4646fb05768fb1cd1c",
+      "publishedSha256": "e6fd28098a8dd174dce41ec8d0184ac7900062b43152ea4646fb05768fb1cd1c"
+    },
+    {
+      "image": "content-image.png",
+      "capturedAt": "2026-09-15T10:14:52.553553+00:00",
+      "rawSha256": "87efec30fa8cc0170ecd6d2a1e075d5185b4a12d240612824d7bed0c4907d005",
+      "publishedSha256": "87efec30fa8cc0170ecd6d2a1e075d5185b4a12d240612824d7bed0c4907d005"
+    },
+    {
+      "image": "blog.png",
+      "capturedAt": "2026-09-15T10:13:19.137081+00:00",
+      "rawSha256": "d909d902b0d6df0582faa037afafcaf61ca56ae1a27f80d1b46ef50d722f005b",
+      "publishedSha256": "d909d902b0d6df0582faa037afafcaf61ca56ae1a27f80d1b46ef50d722f005b"
+    },
+    {
+      "image": "appSlider.png",
+      "capturedAt": "2026-09-15T10:13:22.061096+00:00",
+      "rawSha256": "64633a37920502924371d3e85c9866948ec67b1bd25987a901cd429f9aca6f10",
+      "publishedSha256": "64633a37920502924371d3e85c9866948ec67b1bd25987a901cd429f9aca6f10"
+    },
+    {
+      "image": "themes.png",
+      "capturedAt": "2026-09-15T10:13:24.965111+00:00",
+      "rawSha256": "5ddf7f4b555da78a223b90defeed6b800dc7597e45601e5334fb7561eec50208",
+      "publishedSha256": "5ddf7f4b555da78a223b90defeed6b800dc7597e45601e5334fb7561eec50208"
+    },
+    {
+      "image": "themes-upload.png",
+      "capturedAt": "2026-09-15T10:14:58.321582+00:00",
+      "rawSha256": "9cc7e3119a180d98b99870232e09114d4a3a90566252ba0b183336757896c954",
+      "publishedSha256": "9cc7e3119a180d98b99870232e09114d4a3a90566252ba0b183336757896c954"
+    },
+    {
+      "image": "customization.png",
+      "capturedAt": "2026-09-15T10:13:28.957131+00:00",
+      "rawSha256": "af54f177c027c5abdb8ac3093ff1a2c29417d31509c8a225e87da18ecfdb401b",
+      "publishedSha256": "af54f177c027c5abdb8ac3093ff1a2c29417d31509c8a225e87da18ecfdb401b"
+    },
+    {
+      "image": "settings-legal.png",
+      "capturedAt": "2026-09-15T10:15:01.261597+00:00",
+      "rawSha256": "2405acec1b1378f946ea63bb77b59a9c97cbd47ba4eb9feccefc5f54aed34816",
+      "publishedSha256": "2405acec1b1378f946ea63bb77b59a9c97cbd47ba4eb9feccefc5f54aed34816"
+    },
+    {
+      "image": "mobileAppDownload.png",
+      "capturedAt": "2026-09-15T10:13:32.077147+00:00",
+      "rawSha256": "a340d9e49023214f948536400e55d4f2dacd0136a79cc29d6a94f79a9c6e582b",
+      "publishedSha256": "a340d9e49023214f948536400e55d4f2dacd0136a79cc29d6a94f79a9c6e582b"
+    },
+    {
+      "image": "messages.png",
+      "capturedAt": "2026-09-15T10:13:06.325016+00:00",
+      "rawSha256": "b0714634567303c817de1d78fa856b75ed03438528f860dabcf4f6c068730f74",
+      "publishedSha256": "b0714634567303c817de1d78fa856b75ed03438528f860dabcf4f6c068730f74"
+    },
+    {
+      "image": "messaging.png",
+      "capturedAt": "2026-09-15T10:13:02.624998+00:00",
+      "rawSha256": "8784672b93cb50ea92c6c93cff726b432bc26f62c823dbd6d9277f7e6da4105e",
+      "publishedSha256": "8784672b93cb50ea92c6c93cff726b432bc26f62c823dbd6d9277f7e6da4105e"
+    },
+    {
+      "image": "chat.png",
+      "capturedAt": "2026-09-15T10:13:09.009030+00:00",
+      "rawSha256": "150b5bfe61ae097377330baaf401e2e76399e2f484fb72ff78f2115bdec2bb7c",
+      "publishedSha256": "150b5bfe61ae097377330baaf401e2e76399e2f484fb72ff78f2115bdec2bb7c"
+    },
+    {
+      "image": "ticket-thread.png",
+      "capturedAt": "2026-09-15T10:14:49.277536+00:00",
+      "rawSha256": "33c06e780d2fad16464ef57bfb91d0ba5e85cee2ae48eb9d17c6a03cc1edde59",
+      "publishedSha256": "33c06e780d2fad16464ef57bfb91d0ba5e85cee2ae48eb9d17c6a03cc1edde59"
+    },
+    {
+      "image": "apiKeys.png",
+      "capturedAt": "2026-09-15T10:13:43.829206+00:00",
+      "rawSha256": "4beb6b3b3df61211b8c9a316ec2bb561eb9fc85519af9cd7d1851da06621d419",
+      "publishedSha256": "4beb6b3b3df61211b8c9a316ec2bb561eb9fc85519af9cd7d1851da06621d419"
+    },
+    {
+      "image": "jarvis.png",
+      "capturedAt": "2026-09-15T10:15:32.257754+00:00",
+      "rawSha256": "38b5ef9b4005b07a65bbaeda3cb2e0f54ad681804065b603d39fd73946a85a82",
+      "publishedSha256": "38b5ef9b4005b07a65bbaeda3cb2e0f54ad681804065b603d39fd73946a85a82"
+    },
+    {
+      "image": "dbLogs.png",
+      "capturedAt": "2026-09-15T10:13:47.349224+00:00",
+      "rawSha256": "ad229441eaf1877040a00d8902b3f9a78d5fc045dd1caa7dbb805fd90eefe2b3",
+      "publishedSha256": "ad229441eaf1877040a00d8902b3f9a78d5fc045dd1caa7dbb805fd90eefe2b3"
+    },
+    {
+      "image": "migrations.png",
+      "capturedAt": "2026-09-15T10:13:49.965237+00:00",
+      "rawSha256": "9de6d33557c39a0b864bc199eac5e479dc591337b2fc5fc8f751a2566cd66cdb",
+      "publishedSha256": "9de6d33557c39a0b864bc199eac5e479dc591337b2fc5fc8f751a2566cd66cdb"
+    },
+    {
+      "image": "presentation.png",
+      "capturedAt": "2026-09-15T10:13:38.121177+00:00",
+      "rawSha256": "2f50240b73e6c7da92bb30031ed62d47913b39252874b6ef02a95d238a2c9988",
+      "publishedSha256": "2f50240b73e6c7da92bb30031ed62d47913b39252874b6ef02a95d238a2c9988"
+    }
+  ],
+  "visualReview": "All 43 current screenshots reviewed; login, legal editor and navigation exclude the public site backdrop. Native form colors preserved; only crops, local font and two numbered callouts applied.",
+  "captureResult": {
+    "baseSectionsPassed": 23,
+    "detailsPassed": true
+  }
+}

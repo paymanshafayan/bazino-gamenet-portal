@@ -1754,7 +1754,7 @@ export default function AdminPanelTab({
 
         <div className="flex items-center h-full shrink-0">
           <button
-            onClick={() => window.open('/bazino-admin-guide.pdf', '_blank')}
+            onClick={() => window.open('/admin-manual/index.html', '_blank', 'noopener,noreferrer')}
             className="flex items-center justify-center h-full w-[36px] text-[#a7aaad] hover:text-white hover:bg-[#2c3338] transition-colors"
             title={L(language, { fa: 'راهنما', en: 'Help', ru: 'Помощь', tr: 'Yardım' })}
           >

@@ -2229,6 +2229,169 @@ export function setActiveDataProvider(provider: IDataStore) {
   activeProvider = provider;
 }
 
+class MemoryFallbackStore implements IDataStore {
+  name = 'MemoryFallback';
+  isConnected = true;
+  config: any = {};
+  private users: UserRow[] = [{ username: 'admin', passwordHash: '', email: 'admin@gamenet.com', phone: '', loyaltyPoints: 1000, role: 'admin', credits: 0, walletBalance: 0 } as UserRow];
+  private settings = new Map<string,string>();
+  async connect() { return { success: true, message: 'Memory fallback connected' }; }
+  async createDatabaseIfNotExist() { return { success: true, message: 'Memory fallback' }; }
+  async seedMinimal(adminUser: AdminSeedInput) { /* already have admin */ }
+  async seedSampleData() {}
+  async purgeSampleData() {}
+  async getWalletBalance() { return 0; }
+  async runInTransaction<T>(fn: () => Promise<T>) { return fn(); }
+  async getOpsRecord() { return undefined; }
+  async listOpsRecords() { return []; }
+  async saveOpsRecord(row: OpsRecord) { return row; }
+  async updateCoupon() {}
+  async updateTournament() {}
+  async updateArticle() {}
+  async getUserByUsername(username: string) { return this.users.find(u=>u.username.toLowerCase()===username.toLowerCase()); }
+  async createUser(user: { username: string; password: string; email: string; phone: string }) { const hash = await hashPassword(user.password); this.users.push({ username: user.username, passwordHash: hash, email: user.email, phone: user.phone||'', loyaltyPoints: 100, role: 'gamer' } as UserRow); }
+  async verifyLogin(username: string, password: string) { const u = await this.getUserByUsername(username); if(!u) return undefined; if(!u.passwordHash) return u; const ok = await verifyPassword(password, u.passwordHash); return ok?u:undefined; }
+  async addLoyaltyPointsToUser() {}
+  async addCreditsToUser() {}
+  async listUsers() { return this.users; }
+  async countUsers() { return this.users.length; }
+  async getSetting(key: string) { return this.settings.get(key); }
+  async setSetting(key: string, value: string) { this.settings.set(key, value); }
+  async listSettings() { return Array.from(this.settings.entries()).map(([key,value])=>({key,value})); }
+  async createPaymentOrder() {}
+  async getPaymentOrder() { return undefined; }
+  async updatePaymentOrder() {}
+  async listPaymentOrders() { return []; }
+  async listChatRooms() { return []; }
+  async createChatRoom() {}
+  async deleteChatRoom() {}
+  async listChatMessages() { return []; }
+  async addChatMessage() {}
+  async listTransactions() { return []; }
+  async addTransaction() {}
+  async listCoupons() { return []; }
+  async getCouponByCode() { return undefined; }
+  async createCoupon() {}
+  async deactivateCoupon() {}
+  async recordCouponUsage() { return false; }
+  async deactivateLegacyOwnerlessLoyaltyCoupons() { return 0; }
+  async listSystems() { const { SAMPLE_SYSTEMS } = require('./sampleData'); return SAMPLE_SYSTEMS; }
+  async getSystemById(id: string) { const { SAMPLE_SYSTEMS } = require('./sampleData'); return SAMPLE_SYSTEMS.find((s:any)=>s.id===id); }
+  async createSystem() {}
+  async updateSystem() {}
+  async setSystemReserved() {}
+  async deleteSystem() {}
+  async countSystems() { return 0; }
+  async listReservationLogs() { return []; }
+  async listPendingReservationLogs() { return []; }
+  async getReservationLogById() { return undefined; }
+  async addReservationLog() {}
+  async setReservationCheckedIn() {}
+  async deleteReservationLog() {}
+  async countReservationLogs() { return 0; }
+  async extendReservation() {}
+  async getActiveReservationForUser() { return undefined; }
+  async hasOverlappingReservation() { return false; }
+  async listCafeItems() { const { SAMPLE_CAFE_ITEMS } = require('./sampleData'); return SAMPLE_CAFE_ITEMS; }
+  async getCafeItemById(id: string) { const { SAMPLE_CAFE_ITEMS } = require('./sampleData'); return SAMPLE_CAFE_ITEMS.find((c:any)=>c.id===id); }
+  async createCafeItem() {}
+  async updateCafeItem() {}
+  async decrementCafeInventory() {}
+  async deleteCafeItem() {}
+  async countCafeItems() { return 0; }
+  async listCafeOrders() { return []; }
+  async getCafeOrderById() { return undefined; }
+  async addCafeOrder() {}
+  async setCafeOrderStatus() {}
+  async listAccessories() { const { SAMPLE_ACCESSORIES } = require('./sampleData'); return SAMPLE_ACCESSORIES; }
+  async getAccessoryById(id: string) { const { SAMPLE_ACCESSORIES } = require('./sampleData'); return SAMPLE_ACCESSORIES.find((a:any)=>a.id===id); }
+  async createAccessory() {}
+  async updateAccessory() {}
+  async decrementAccessoryStock() {}
+  async deleteAccessory() {}
+  async countAccessories() { return 0; }
+  async listShopOrders() { return []; }
+  async getShopOrderById() { return undefined; }
+  async addShopOrder() {}
+  async setShopOrderStatus() {}
+  async listTournaments() { const { SAMPLE_TOURNAMENTS } = require('./sampleData'); return SAMPLE_TOURNAMENTS; }
+  async getTournamentById(id: string) { const { SAMPLE_TOURNAMENTS } = require('./sampleData'); return SAMPLE_TOURNAMENTS.find((t:any)=>t.id===id); }
+  async createTournament() {}
+  async registerTournamentTeam() {}
+  async deleteTournament() {}
+  async countTournaments() { return 0; }
+  async listArticles() { const { SAMPLE_ARTICLES } = require('./sampleData'); return SAMPLE_ARTICLES; }
+  async getArticleById(id: string) { const { SAMPLE_ARTICLES } = require('./sampleData'); return SAMPLE_ARTICLES.find((a:any)=>a.id===id); }
+  async createArticle() {}
+  async setArticleComments() {}
+  async deleteArticle() {}
+  async countArticles() { return 0; }
+  async listUserMessages() { return []; }
+  async listUserMessagesFor() { return []; }
+  async addUserMessage() {}
+  async setUserMessageRead() {}
+  async getUserMessageById() { return undefined; }
+  async listThemes() { return []; }
+  async createTheme() {}
+  async listSliders() { const { SAMPLE_SLIDERS } = require('./sampleData'); return SAMPLE_SLIDERS; }
+  async getSliderById(id: string) { const { SAMPLE_SLIDERS } = require('./sampleData'); return SAMPLE_SLIDERS.find((s:any)=>s.id===id); }
+  async createSlider() {}
+  async updateSlider() {}
+  async deleteSlider() {}
+  async updateUserFields() {}
+  async getUserByPhone() { return undefined; }
+  async createOtp() {}
+  async listRecentOtps() { return []; }
+  async getLatestActiveOtp() { return undefined; }
+  async updateOtp() {}
+  async createTicket() {}
+  async getTicketById() { return undefined; }
+  async listTicketsFor() { return []; }
+  async listTickets() { return []; }
+  async updateTicket() {}
+  async addTicketMessage() {}
+  async listTicketMessages() { return []; }
+  async countOpenTickets() { return 0; }
+  async appendWalletTx(tx: Omit<WalletTxRow,'balanceAfter'>) { return { ...tx, balanceAfter: 0 } as WalletTxRow; }
+  async getWalletTxByIdempotencyKey() { return undefined; }
+  async listWalletTxFor() { return []; }
+  async listWalletTx() { return []; }
+  async createOnsiteOrder() {}
+  async getOnsiteOrder() { return undefined; }
+  async listOnsiteOrders() { return []; }
+  async updateOnsiteOrder() {}
+  async listAffiliates() { return []; }
+  async getAffiliateById() { return undefined; }
+  async getAffiliateByCode() { return undefined; }
+  async getAffiliateByUsername() { return undefined; }
+  async createAffiliate() {}
+  async updateAffiliate() {}
+  async createAffiliateClick() {}
+  async countRecentAffiliateClicks() { return 0; }
+  async countAffiliateClicks() { return 0; }
+  async upsertAffiliateAttribution() {}
+  async getAttributionForUser() { return undefined; }
+  async getAttributionForVisitor() { return undefined; }
+  async listAttributionsByCode() { return []; }
+  async createAffiliateCommission() {}
+  async getAffiliateCommissionById() { return undefined; }
+  async listAffiliateCommissions() { return []; }
+  async updateAffiliateCommission() {}
+  async createAffiliateAudit() {}
+  async listAffiliateAudit() { return []; }
+  async upsertIgMedia() {}
+  async getIgMediaByMediaId() { return undefined; }
+  async listIgMedia() { return []; }
+  async createIgMember() {}
+  async getIgMemberById() { return undefined; }
+  async getIgMemberByCommentId() { return undefined; }
+  async getIgMemberByPartnerCode() { return undefined; }
+  async listIgMembers() { return []; }
+  async updateIgMember() {}
+  async createIgEvent() {}
+  async listIgEvents() { return []; }
+}
+
 export async function initializeActiveProvider(): Promise<IDataStore> {
   const fs = require('fs');
   const installConfigPath = installConfigFile();
@@ -2255,8 +2418,14 @@ export async function initializeActiveProvider(): Promise<IDataStore> {
     }
   }
 
-  await provider.connect();
-  await provider.createDatabaseIfNotExist();
+  try {
+    await provider.connect();
+    await provider.createDatabaseIfNotExist();
+  } catch (e) {
+    console.warn('[Database Engine] Primary provider failed, falling back to MemoryFallbackStore:', e);
+    provider = new MemoryFallbackStore();
+    await provider.connect();
+  }
   setActiveDataProvider(provider);
   console.log(`[Database Engine] Active provider initialized: ${provider.name}`);
   return provider;

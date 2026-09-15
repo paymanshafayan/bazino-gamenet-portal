@@ -74,6 +74,7 @@ import { registerPublishing } from './server/publishing/routes';
 import { protectedIntegrationSetting } from './server/publishing/settings';
 import { registerIgRoutes } from "./server/affiliate/igRoutes";
 import { registerManusRoutes } from "./server/manus/routes";
+import { registerParentRoutes } from "./server/parent";
 import { seedIgSettings, IG_INGEST_TOKEN_KEY } from "./server/affiliate/igSettings";
 import { onReservationAttended } from "./server/affiliate/engine";
 import { isOnlinePaymentEnabled } from "./server/payments/paytr";
@@ -2599,6 +2600,8 @@ Use chitchat for normal conversation or unclear requests. For app tasks, choose 
     app,
     getStore: getActiveDataProvider,
   });
+
+  registerParentRoutes(app, getCurrentUser);
 
   // Blog News Articles & Comments
   app.get("/api/articles", async (req, res) => {

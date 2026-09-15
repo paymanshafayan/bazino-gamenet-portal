@@ -15,6 +15,7 @@ import { ThemeRegionProvider, type ThemeRegionBase } from './themeSdk/ThemeRegio
 import ThemeRegion from './themeSdk/ThemeRegion';
 import { useThemeScript } from './themeSdk/useThemeScript';
 import type { ThemeSlide } from './themeSdk/sdk';
+import { hasComponent as hasThemeComponent } from './themeSdk/sdk';
 // تب‌ها و مودال‌های سنگین به‌صورت lazy بارگذاری می‌شوند. HomeTab هم شامل چندین
 // بخش/دادهٔ پایین صفحه است؛ Hero سبکِ LandingHero بلافاصله paint می‌شود و خود
 // HomeTab پس از آن در یک chunk جدا می‌آید تا LCP منتظر اجرای کل صفحه نماند.
@@ -178,17 +179,34 @@ export default function App() {
   const [activeTab, setActiveTabState] = useState(() => tabFromPath(window.location.pathname));
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  // undefined = auth still loading (no flash), null = guest, UserState = authenticated - early for admin guard
+  const [user, setUser] = useState<UserState | null | undefined>(undefined);
   const setActiveTab = useCallback((rawTab: string) => {
-    // alias تب‌های قدیمی (مثل 'reservations' از اسلایدهای ذخیره‌شده) → تب فعلی
     const tab = LEGACY_TAB_ALIASES[rawTab] || rawTab;
+    if (tab === 'admin') {
+      const cur = window.location.pathname;
+      const intended = cur.startsWith('/admin') ? cur : '/admin';
+      if (user === undefined) {
+        try { sessionStorage.setItem('intendedAdminPath', intended); } catch {}
+        setActiveTabState(tab);
+        return;
+      }
+      if (user === null) {
+        try { sessionStorage.setItem('intendedAdminPath', intended); } catch {}
+        window.dispatchEvent(new CustomEvent('bazino:open-auth'));
+        return;
+      }
+      if ((user as any)?.role !== 'admin') {
+        return;
+      }
+    }
     setActiveTabState(tab);
     const target = pathFromTab(tab);
     const cur = window.location.pathname;
-    // زیرمسیر ادمین (/admin/<section>) را خودِ پنل مدیریت می‌نویسد
     if (tab === 'admin' && cur.startsWith('/admin')) return;
     if (cur !== target) window.history.pushState({}, '', target);
     setCurrentPath(target);
-  }, []);
+  }, [user]);
 
   // هر بار پنل ادمین قالبی نصب/حذف می‌کند، این شمارنده بالا می‌رود تا لیست سروری
   // (و installedAt جدید برای cache-busting) دوباره از سرور خوانده شود.
@@ -410,7 +428,6 @@ export default function App() {
   const [isAppDownloadWidgetReady, setIsAppDownloadWidgetReady] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpMode, setHelpMode] = useState<'admin' | 'gamenet'>('gamenet');
-  const [user, setUser] = useState<UserState | null>(null);
   // نشان «پاسخ جدید پشتیبانی» روی نام کاربر در هدر (تسک ۱۲)
   const [unreadTickets, setUnreadTickets] = useState(0);
   useEffect(() => {
@@ -455,6 +472,50 @@ export default function App() {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, 5000);
   };
+
+  // ── Admin route protection: no flash, redirect unauthenticated, 403 for non-admin, preserve deep link ──
+  useEffect(() => {
+    if (activeTab !== 'admin') return;
+    if (user === undefined) return; // still checking /api/user, render will show loading
+    const curPath = window.location.pathname;
+    const intended = curPath.startsWith('/admin') ? curPath : '/admin';
+    if (user === null) {
+      try { sessionStorage.setItem('intendedAdminPath', intended); } catch {}
+      if (window.location.pathname !== '/') {
+        window.history.replaceState({}, '', '/');
+        setCurrentPath('/');
+      }
+      setActiveTabState('home');
+      window.dispatchEvent(new CustomEvent('bazino:open-auth'));
+      addNotification(L(language, { fa: 'برای ورود به پنل مدیریت ابتدا وارد شوید', en: 'Please sign in to access the admin panel', ru: 'Войдите, чтобы получить доступ к админ-панели', tr: 'Yönetim paneline erişmek için giriş yapın' }), 'error');
+      return;
+    }
+    if ((user as any).role !== 'admin') {
+      try { sessionStorage.removeItem('intendedAdminPath'); } catch {}
+      if (window.location.pathname !== '/') {
+        window.history.replaceState({}, '', '/');
+        setCurrentPath('/');
+      }
+      setActiveTabState('home');
+      addNotification(L(language, { fa: 'دسترسی ادمین لازم است', en: 'Admin access required', ru: 'Требуется доступ администратора', tr: 'Yönetici erişimi gerekiyor' }), 'error');
+    }
+  }, [activeTab, user, language]);
+
+  // After successful admin login, restore deep link (/admin/*) if present
+  useEffect(() => {
+    if (!user || (user as any).role !== 'admin') return;
+    try {
+      const intended = sessionStorage.getItem('intendedAdminPath');
+      if (intended && intended.startsWith('/admin')) {
+        sessionStorage.removeItem('intendedAdminPath');
+        if (window.location.pathname !== intended) {
+          window.history.pushState({}, '', intended);
+          setCurrentPath(intended);
+        }
+        setActiveTabState('admin');
+      }
+    } catch {}
+  }, [user]);
 
   // اجرای کارهای غیربحرانی بعد از اولین paint — با fallback برای مرورگرهای بدون
   // requestIdleCallback. `timeout: 2000` تضمین می‌کند کار حتی اگر مرورگر هیچ‌وقت
@@ -704,6 +765,42 @@ export default function App() {
     : <LandingHero onNavigate={() => setActiveTab('games')} />;
 
   const renderTabContent = () => {
+    // Classic contact page override: if /contact and theme has 'contact' region, render via ThemeRegion
+    if (!isZipHub && currentPath === '/contact') {
+      const contactFallback = <ContactPage onBack={() => navigateStandalone('home')} />;
+      const contactProps = {
+        settings: siteSettings,
+        companyInfo: {
+          company: siteSettings.company_legal_name || 'Bazino Gaming Lounge',
+          address: siteSettings.club_address || siteSettings.address || '',
+          phone: siteSettings.club_phone || siteSettings.phone || siteSettings.contact_phone || '',
+          email: siteSettings.company_email || '',
+          taxNo: siteSettings.company_tax_no || '',
+        },
+        contactInfo: {
+          address: siteSettings.club_address || siteSettings.address || '',
+          phone: siteSettings.club_phone || siteSettings.phone || siteSettings.contact_phone || '',
+          email: siteSettings.company_email || '',
+          hours: siteSettings.club_hours || '',
+          mapUrl: siteSettings.club_map_url || (siteSettings.club_map_lat && siteSettings.club_map_lng ? `https://www.google.com/maps?q=${siteSettings.club_map_lat},${siteSettings.club_map_lng}` : ''),
+          lat: siteSettings.club_map_lat || '',
+          lng: siteSettings.club_map_lng || '',
+          instagram: siteSettings.club_instagram || '',
+        },
+        onNavigate: navigateTheme,
+        onBack: () => navigateStandalone('home'),
+        loading: false,
+        error: null,
+        isEmpty: false,
+      };
+      return (
+        <Suspense fallback={<div className="w-full min-h-[600px]" aria-hidden="true" />}>
+          <div className="max-w-7xl mx-auto w-full flex-grow relative pb-20">
+            <ThemeRegion name="contact" fallback={contactFallback} props={contactProps} />
+          </div>
+        </Suspense>
+      );
+    }
     if (isZipHub && hubPage && activeTab !== 'admin') {
       const regionName = hubPage === 'home' ? 'home' : ('hub.' + hubPage);
       const hubFallback =
@@ -795,23 +892,220 @@ export default function App() {
           </Suspense>
         )
       )}
-      {activeTab === 'loyalty' && <LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
-      {activeTab === 'games' && <GamesTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
-      {activeTab === 'cafe' && <CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={foodComingSoon}/>}
-      {activeTab === 'shop' && <ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={shopComingSoon}/>}
-      {activeTab === 'tournaments' && <TournamentsTab />}
-      {activeTab === 'blog' && <BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/>}
-      {activeTab === 'admin' && (
-        <AdminPanelTab 
-          themeId={themeId} 
-          setThemeId={setThemeId} 
-          availableThemes={availableThemes} 
-          setAvailableThemes={setAvailableThemes} 
-          refreshServerThemes={refreshServerThemes}
-          addNotification={addNotification} 
-          layoutMode={layoutMode}
-          setLayoutMode={setLayoutMode}
+      {activeTab === 'loyalty' && (
+        <ThemeRegion
+          name="loyalty"
+          fallback={<LoyaltyProfileTab themeId={themeId} user={user} transactions={transactions} activeCoupons={activeCoupons} onRedeemPoints={handleRedeemPoints} addNotification={addNotification}/>}
+          props={{
+            user, transactions, activeCoupons,
+            points: user?.loyaltyPoints,
+            credits: user ? Number((user as any).credits) || 0 : 0,
+            rewards: activeCoupons,
+            onRedeemPoints: handleRedeemPoints,
+            addNotification,
+            onNavigate: navigateTheme,
+            loading: false,
+            error: null,
+            isEmpty: !user,
+          }}
         />
+      )}
+      {activeTab === 'games' && (
+        <ThemeRegion
+          name="games"
+          fallback={<GamesTab themeId={themeId} systems={systems} activeCoupons={activeCoupons} onAddLoyaltyPoints={handleAddLoyaltyPoints} addNotification={addNotification}/>}
+          props={{
+            games: systems,
+            systems,
+            featuredGames: systems.slice(0, 8),
+            gameGenres: [],
+            activeCoupons,
+            selectedGame: null,
+            loading: false,
+            error: null,
+            isEmpty: systems.length === 0,
+            onAddLoyaltyPoints: handleAddLoyaltyPoints,
+            addNotification,
+            onCheckout: (kind: string, params: any, amount?: number) => openCheckout(kind, params, amount),
+            onNavigate: navigateTheme,
+            onViewDetail: (id: string) => { /* portal handles detail via internal state */ },
+            onBack: () => {},
+          }}
+        />
+      )}
+      {activeTab === 'cafe' && (
+        <ThemeRegion
+          name="cafe"
+          fallback={<CafeTab themeId={themeId} cafeItems={cafeItems} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={foodComingSoon}/>}
+          props={{
+            cafeItems,
+            cafeCategories: ['All', 'Drinks', 'Foods', 'Snacks'],
+            activeCoupons,
+            comingSoon: foodComingSoon,
+            loading: false,
+            error: null,
+            isEmpty: cafeItems.length === 0,
+            onCheckout: (kind: string, params: any, amount?: number) => openCheckout(kind, params, amount),
+            onServerState: applyServerState,
+            addNotification,
+            onNavigate: navigateTheme,
+          }}
+        />
+      )}
+      {activeTab === 'shop' && (
+        <ThemeRegion
+          name="shop"
+          fallback={<ShopTab themeId={themeId} accessories={accessories} activeCoupons={activeCoupons} onServerState={applyServerState} addNotification={addNotification} comingSoon={shopComingSoon}/>}
+          props={{
+            shopItems: accessories,
+            accessories,
+            shopCategories: ['All', 'Keyboard', 'Mouse', 'Headset', 'Controller'],
+            activeCoupons,
+            comingSoon: shopComingSoon,
+            loading: false,
+            error: null,
+            isEmpty: accessories.length === 0,
+            onCheckout: (kind: string, params: any, amount?: number) => openCheckout(kind, params, amount),
+            onServerState: applyServerState,
+            addNotification,
+            onNavigate: navigateTheme,
+          }}
+        />
+      )}
+      {activeTab === 'tournaments' && (
+        <>
+          {currentPath === '/tournaments/weekly' ? (
+            <ThemeRegion
+              name="tournaments.weekly"
+              fallback={<TournamentsTab />}
+              props={{
+                tournaments: (hubEvents as any)?.weekly || tournaments.filter((t: any) => (t as any).kind === 'weekly' || (t as any).type === 'weekly'),
+                weeklyTournaments: (hubEvents as any)?.weekly || [],
+                loading: false, error: null, isEmpty: false,
+                onNavigate: navigateTheme,
+              }}
+            />
+          ) : currentPath === '/tournaments/special' ? (
+            <ThemeRegion
+              name="tournaments.special"
+              fallback={<TournamentsTab />}
+              props={{
+                tournaments: (hubEvents as any)?.special || tournaments.filter((t: any) => (t as any).kind === 'special'),
+                specialTournaments: (hubEvents as any)?.special || [],
+                loading: false, error: null, isEmpty: false,
+                onNavigate: navigateTheme,
+              }}
+            />
+          ) : currentPath === '/tournaments/season' ? (
+            <ThemeRegion
+              name="tournaments.season"
+              fallback={<TournamentsTab />}
+              props={{
+                tournaments,
+                seasons: hubSeason ? [hubSeason] : [],
+                season: hubSeason,
+                loading: false, error: null, isEmpty: false,
+                onNavigate: navigateTheme,
+              }}
+            />
+          ) : currentPath === '/tournaments/brackets' ? (
+            <ThemeRegion
+              name="tournaments.brackets"
+              fallback={<TournamentsTab />}
+              props={{
+                tournaments,
+                bracket: hubBracket,
+                selectedTournament: tournaments[0] || null,
+                loading: false, error: null, isEmpty: false,
+                onNavigate: navigateTheme,
+              }}
+            />
+          ) : currentPath === '/tournaments/register' ? (
+            <ThemeRegion
+              name="tournaments.register"
+              fallback={<TournamentsTab />}
+              props={{
+                tournaments,
+                selectedTournament: tournaments[0] || null,
+                onRegisterTeam: handleRegisterTeam,
+                onAddLoyaltyPoints: handleAddLoyaltyPoints,
+                loading: false, error: null, isEmpty: false,
+                onNavigate: navigateTheme,
+                addNotification,
+              }}
+            />
+          ) : (
+            <ThemeRegion
+              name="tournaments"
+              fallback={<TournamentsTab />}
+              props={{
+                tournaments,
+                weeklyTournaments: (hubEvents as any)?.weekly || [],
+                specialTournaments: (hubEvents as any)?.special || [],
+                seasons: hubSeason ? [hubSeason] : [],
+                season: hubSeason,
+                eventsFeed: hubEvents,
+                bracket: hubBracket,
+                selectedTournament: null,
+                loading: false,
+                error: null,
+                isEmpty: tournaments.length === 0,
+                onNavigate: navigateTheme,
+                onOpenBracket: (id: string) => navigateTheme(`/tournaments`),
+                onRegisterTournament: (id: string) => navigateTheme(`/tournaments`),
+              }}
+            />
+          )}
+        </>
+      )}
+      {activeTab === 'blog' && (
+        <ThemeRegion
+          name="blog"
+          fallback={<BlogTab themeId={themeId} articles={articles} onAddComment={handleAddComment} addNotification={addNotification}/>}
+          props={{
+            articles,
+            selectedArticle: null,
+            loading: false,
+            error: null,
+            isEmpty: articles.length === 0,
+            onAddComment: handleAddComment,
+            addNotification,
+            onNavigate: navigateTheme,
+            onOpenArticle: (id: string) => {},
+            onBack: () => {},
+          }}
+        />
+      )}
+      {activeTab === 'admin' && (
+        user === undefined ? (
+          <div className="flex flex-col items-center justify-center py-32 gap-4">
+            <div className="w-10 h-10 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+            <p className="text-gray-400 text-xs font-mono">Checking admin access...</p>
+          </div>
+        ) : user === null ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-6 text-center" data-testid="admin-login-required">
+            <h2 className="text-xl font-black text-white">{L(language, { fa: 'ورود ادمین لازم است', en: 'Admin login required', ru: 'Требуется вход администратора', tr: 'Yönetici girişi gerekiyor' })}</h2>
+            <p className="text-gray-400 text-sm">{L(language, { fa: 'برای دسترسی به /admin ابتدا وارد شوید', en: 'Please sign in with admin account to access /admin', ru: 'Войдите как администратор для доступа к /admin', tr: '/admin erişimi için yönetici hesabıyla giriş yapın' })}</p>
+            <button onClick={() => window.dispatchEvent(new CustomEvent('bazino:open-auth'))} className="px-6 py-2.5 bg-primary text-black font-black rounded-xl text-sm">{L(language, { fa: 'ورود', en: 'Login', ru: 'Войти', tr: 'Giriş' })}</button>
+          </div>
+        ) : (user as any).role !== 'admin' ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-6 text-center" data-testid="admin-forbidden">
+            <h2 className="text-xl font-black text-white">403 - {L(language, { fa: 'دسترسی ادمین لازم است', en: 'Admin access required', ru: 'Требуется доступ администратора', tr: 'Yönetici erişimi gerekiyor' })}</h2>
+            <p className="text-gray-400 text-sm">{L(language, { fa: 'حساب شما دسترسی ادمین ندارد', en: 'Your account does not have admin privileges', ru: 'У вашей учётной записи нет прав администратора', tr: 'Hesabınızda yönetici yetkisi yok' })}</p>
+            <button onClick={() => { setActiveTabState('home'); window.history.replaceState({}, '', '/'); setCurrentPath('/'); }} className="px-6 py-2.5 bg-white/10 text-white font-bold rounded-xl text-sm">{L(language, { fa: 'بازگشت به خانه', en: 'Back to Home', ru: 'На главную', tr: 'Ana sayfaya dön' })}</button>
+          </div>
+        ) : (
+          <AdminPanelTab 
+            themeId={themeId} 
+            setThemeId={setThemeId} 
+            availableThemes={availableThemes} 
+            setAvailableThemes={setAvailableThemes} 
+            refreshServerThemes={refreshServerThemes}
+            addNotification={addNotification} 
+            layoutMode={layoutMode}
+            setLayoutMode={setLayoutMode}
+          />
+        )
       )}
 
       {activeTab === 'chat' && (chatEnabled ? <ChatTab user={user} addNotification={addNotification} onOpenAuth={() => setIsAuthModalOpen(true)} /> : <ComingSoonPanel kind="chat" />)}
@@ -854,8 +1148,16 @@ export default function App() {
     </>;
 
     if (standalone.type === 'legal') return <LegalPage slug={standalone.slug} onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} />;
-    // /contact در قالب Hub به region hub.contact می‌رود؛ ContactPage کلاسیک فقط وقتی layout!==hub است.
-    if (standalone.type === 'contact' && !isZipHub) return <ContactPage onBack={() => navigateStandalone('home')} />;
+    // /contact — classic: اگر قالب region 'contact' ثبت کرده باشد، اجازه بده تا ThemeRegion آن را رندر کند (نه early return).
+    // در غیر این صورت fallback کلاسیک.
+    if (standalone.type === 'contact' && !isZipHub) {
+      // اگر قالب کلاسیک contact را ثبت کرده، early return نکن تا ThemeRegionProvider آن را مدیریت کند.
+      // بررسی registry فوری (hasThemeComponent) — اگر theme.js هنوز لود نشده باشد، fallback کلاسیک موقتاً نمایش داده می‌شود و بعد از لود theme.js به custom می‌رود.
+      if (!hasThemeComponent('contact')) {
+        return <ContactPage onBack={() => navigateStandalone('home')} />;
+      }
+      // else fallthrough to ThemeRegionProvider rendering below — contact will be handled as a classic page
+    }
     if (standalone.type === 'profile') {
       return (
         <>
@@ -930,7 +1232,7 @@ export default function App() {
   const MOBILE_PRIMARY_TABS = NAV_TABS.slice(0, 5);
   const MOBILE_MORE_TABS = NAV_TABS.slice(5);
 
-  const isAdminView = activeTab === 'admin';
+  const isAdminView = activeTab === 'admin' && (user as any)?.role === 'admin';
   const zipHubChrome = isZipHub && !isAdminView;
   // نوار پایین موبایل در پنل ادمین و حالت console-hub نمایش داده نمی‌شود؛ قالب ZIP Hub کروم خودش را ثبت می‌کند.
   const showMobileNav = zipHubChrome || (!(layoutMode === 'hub' && activeTab === 'home') && activeTab !== 'admin');
@@ -948,7 +1250,28 @@ export default function App() {
     '--theme-card-border': 'rgba(255,255,255,0.10)',
   } as React.CSSProperties : undefined;
 
-  // داده‌های مشترک همه‌ی بخش‌های قالب (Partial Views)
+  // داده‌های مشترک همه‌ی بخش‌های قالب (Partial Views) — شامل صفحات داخلی کلاسیک
+  const companyInfo = {
+    company: siteSettings.company_legal_name || 'Bazino Gaming Lounge',
+    address: siteSettings.club_address || siteSettings.address || '',
+    phone: siteSettings.club_phone || siteSettings.phone || siteSettings.contact_phone || '',
+    email: siteSettings.company_email || '',
+    hours: siteSettings.club_hours || '',
+    mapUrl: siteSettings.club_map_url || '',
+    lat: siteSettings.club_map_lat || '',
+    lng: siteSettings.club_map_lng || '',
+    instagram: siteSettings.club_instagram || '',
+  };
+  const contactInfo = {
+    address: siteSettings.club_address || siteSettings.address || '',
+    phone: siteSettings.club_phone || siteSettings.phone || siteSettings.contact_phone || '',
+    email: siteSettings.company_email || '',
+    hours: siteSettings.club_hours || '',
+    mapUrl: siteSettings.club_map_url || (siteSettings.club_map_lat && siteSettings.club_map_lng ? `https://www.google.com/maps?q=${siteSettings.club_map_lat},${siteSettings.club_map_lng}` : ''),
+    lat: siteSettings.club_map_lat || '',
+    lng: siteSettings.club_map_lng || '',
+    instagram: siteSettings.club_instagram || '',
+  };
   const themeRegionBase: ThemeRegionBase = {
     language, dir, t,
     themeId: themeId || 'dark-gold',
@@ -973,6 +1296,25 @@ export default function App() {
     articles,
     hubPage: hubPage || undefined,
     pathname: currentPath,
+    // extended classic inner pages
+    games: systems,
+    featuredGames: systems.slice(0, 8),
+    gameGenres: [],
+    cafeItems,
+    cafeCategories: ['All', 'Drinks', 'Foods', 'Snacks'],
+    shopItems: accessories,
+    accessories,
+    shopCategories: ['All', 'Keyboard', 'Mouse', 'Headset', 'Controller'],
+    transactions,
+    activeCoupons,
+    points: user?.loyaltyPoints,
+    credits: user ? Number((user as any).credits) || 0 : 0,
+    companyInfo,
+    contactInfo,
+    weeklyTournaments: (hubEvents as any)?.weekly || tournaments.filter((t: any) => (t as any).kind === 'weekly'),
+    specialTournaments: (hubEvents as any)?.special || tournaments.filter((t: any) => (t as any).kind === 'special'),
+    seasons: hubSeason ? [hubSeason] : [],
+    currentPath,
   };
 
   return (
@@ -1283,8 +1625,10 @@ export default function App() {
       {activeTab !== 'admin' && (zipHubChrome || !(layoutMode === 'hub' && activeTab === 'home')) && (
         <ThemeRegion name="footer" fallback={null} className="w-full" />
       )}
-      {/* نوار قانونی ثابت: خارج از ThemeRegion؛ قالب‌ها نمی‌توانند آن را جایگزین یا پنهان کنند */}
-      {activeTab !== 'admin' && <LegalFooter onNavigate={navigateStandalone} />}
+      {/* نوار قانونی ثابت: خارج از ThemeRegion؛ قالب‌ها نمی‌توانند آن را جایگزین یا پنهان کنند.
+          در حالت قالب هاب (ZIP با layout=hub) کروم کامل — از جمله فوتر خودش — را theme.js
+          ثبت می‌کند، پس نوار قانونی جداگانه غیرفعال می‌شود تا فوتر تکراری رندر نشود. */}
+      {activeTab !== 'admin' && !zipHubChrome && <LegalFooter onNavigate={navigateStandalone} />}
 
       <ScrollToTop 
         hidden={activeTab === 'admin' || activeTab === 'hub' || activeTab === 'console_grid'} 

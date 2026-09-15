@@ -43,6 +43,27 @@ export interface ThemeRegionBase {
   articles?: any[];
   hubPage?: string;
   pathname?: string;
+  // ── Extended for classic inner pages ──
+  games?: any[];
+  featuredGames?: any[];
+  gameGenres?: any[];
+  cafeItems?: any[];
+  cafeCategories?: string[];
+  shopItems?: any[];
+  accessories?: any[];
+  shopCategories?: string[];
+  transactions?: any[];
+  activeCoupons?: any[];
+  points?: number;
+  credits?: number;
+  selectedGame?: any;
+  selectedArticle?: any;
+  companyInfo?: any;
+  contactInfo?: any;
+  weeklyTournaments?: any[];
+  specialTournaments?: any[];
+  seasons?: any[];
+  currentPath?: string;
 }
 
 const ThemeRegionContext = createContext<ThemeRegionBase | null>(null);
@@ -87,7 +108,7 @@ export default function ThemeRegion({ name, fallback, props, className, pending 
       onNavigate: base.onNavigate,
       activeTab: base.activeTab,
       user: base.user,
-      featuredGames: [],
+      featuredGames: base.featuredGames || [],
       tournaments: [],
       settings: base.settings,
       logoUrl: base.logoUrl,
@@ -105,6 +126,26 @@ export default function ThemeRegion({ name, fallback, props, className, pending 
       articles: base.articles,
       hubPage: base.hubPage,
       pathname: base.pathname,
+      // extended
+      games: base.games,
+      gameGenres: base.gameGenres,
+      selectedGame: base.selectedGame,
+      cafeItems: base.cafeItems,
+      cafeCategories: base.cafeCategories,
+      shopItems: base.shopItems,
+      accessories: base.accessories,
+      shopCategories: base.shopCategories,
+      transactions: base.transactions,
+      activeCoupons: base.activeCoupons,
+      points: base.points,
+      credits: base.credits,
+      selectedArticle: base.selectedArticle,
+      companyInfo: base.companyInfo,
+      contactInfo: base.contactInfo,
+      weeklyTournaments: base.weeklyTournaments,
+      specialTournaments: base.specialTournaments,
+      seasons: base.seasons,
+      currentPath: base.currentPath || base.pathname,
       ...(props || {}),
     };
     mountComponent(name, hostRef.current, full);

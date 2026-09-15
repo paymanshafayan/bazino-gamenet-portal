@@ -45,12 +45,31 @@ theme.zip
 
 | region | چه چیزی را جایگزین می‌کند |
 |---|---|
-| `header` | هدر/ناوبری بالای همه‌ی صفحات |
+| `header` | هدر/ناوبری بالای همه‌ی صفحات — در bazino-arena3d شفاف روی صفحات داخلی و شناور (floating) |
 | `hero` | جایگاه بالای صفحه‌ی اصلی — **هر طراحی آزاد است** (ویدئو، بنر ثابت، انیمیشن، اسلایدر…). اسلایدر فقط پیش‌فرض سایت است؛ اسلایدهای ادمین در `props.slides` در دسترس‌اند ولی استفاده‌شان اختیاری است |
 | `home.genres`, `home.lounges`, `home.results`, `home.tournaments`, `home.pricing`, `home.staff`, `home.location` | بخش‌های مستقل صفحه‌ی اصلی |
 | `footer` | فوتر همه‌ی صفحات |
 | `mobileNav` | نوار ناوبری پایین موبایل |
 | `home` | **کل** صفحه‌ی اصلی (قرارداد نسخه ۱ — همچنان پشتیبانی می‌شود؛ اگر ثبت شود، `hero` و `home.*` نادیده گرفته می‌شوند) |
+| **Classic inner pages (new — SDK v2 extended)** | |
+| `games` | لیست بازی‌ها / سیستم‌ها — جایگزین GamesTab پیش‌فرض |
+| `games.detail` | جزئیات بازی + جریان رزرو (ReservationsTab) — props: games/systems/featuredGames/activeCoupons/audienceFilter/focusRequestedGame/onBack/onAddLoyaltyPoints/addNotification/onNavigate |
+| `cafe` | صفحه کافه — لیست منو |
+| `cafe.detail` | گرید آیتم‌های کافه — props: cafeItems/cafeCategories/activeCoupons/cart/onAddToCart/onRemoveFromCart/onUpdateQty/onCheckout |
+| `cafe.cart` | سایدبار سبد خرید کافه — props: cart/subtotal/discount/total/appliedCoupon/couponCode/systemNumber/onUpdateQty/onRemoveFromCart/onApplyCoupon/onCheckout |
+| `shop` | صفحه فروشگاه |
+| `shop.detail` | گرید محصولات — props: shopItems/shopCategories/activeCoupons/cart/... |
+| `shop.cart` | سایدبار سبد خرید فروشگاه |
+| `tournaments` | لیست تورنمنت‌ها — props: tournaments/weeklyTournaments/specialTournaments/seasons/season/eventsFeed/bracket/selectedTournament |
+| `tournaments.weekly` | تورنمنت‌های هفتگی — props: tournaments/weeklyTournaments |
+| `tournaments.special` | تورنمنت‌های ویژه |
+| `tournaments.season` | فصل / رنکینگ |
+| `tournaments.brackets` | براکت / جدول حذفی — props: tournaments/selectedTournament/bracket |
+| `tournaments.register` | فرم ثبت‌نام تیم — props: tournaments/selectedTournament/onRegisterTeam/onAddLoyaltyPoints |
+| `loyalty` | باشگاه مشتریان — props: user/points/credits/transactions/rewards/activeCoupons/onRedeemPoints |
+| `blog` | لیست مقالات — props: articles |
+| `blog.detail` | جزئیات مقاله + کامنت — props: articles/selectedArticle/comments/onBack/onAddComment |
+| `contact` | تماس — **فقط داده واقعی** از props.companyInfo/contactInfo (address/phone/email/hours/mapUrl/lat/lng/instagram) — اگر فیلدی وجود نداشته باشد رندر نکن، هرگز آدرس/تلفن جعلی نساز |
 
 - **یک region فقط یک «جایگاه» است، نه یک نوع کامپوننت.** موتور هیچ محدودیتی روی خروجی `render` نمی‌گذارد؛ هرچه برگردانید همان‌جا رندر می‌شود (حتی `null`). مثلاً `hero` می‌تواند ویدئوی تمام‌عرض باشد:
 
@@ -237,6 +256,44 @@ SDK.registerComponent('home.location', { apiVersion: 2, render: function (p) {
 | `logoUrl` | آدرس لوگوی سایت مادر (`/logo.png`) — **فقط برای نمایش** |
 | `assetsBase` | آدرس پایه فایل‌های assets این قالب (مثل `/api/themes/<id>/assets`) |
 | `themeId` | شناسه قالب |
+| **Common** | `loading`, `error`, `isEmpty`, `comingSoon`, `currentPath`, `pathname`, `hubPage`, `onNavigate`, `onBack`, `onLogin`, `onLogout`, `onLanguage`, `onCheckout`, `addNotification` — برای همه صفحات داخلی |
+| **games** | `games`, `systems`, `featuredGames`, `gameGenres`, `selectedGame`, `activeCoupons`, `audienceFilter`, `focusRequestedGame`, `onAddLoyaltyPoints`, `onViewDetail`, `onBack`, `onReserve` |
+| **cafe** | `cafeItems`, `cafeCategories`, `activeCoupons`, `cart`, `subtotal`, `discount`, `total`, `appliedCoupon`, `couponCode`, `systemNumber`, `onAddToCart`, `onRemoveFromCart`, `onUpdateQty`, `onApplyCoupon`, `onCheckout`, `onServerState` |
+| **shop** | `shopItems`, `accessories`, `shopCategories`, `activeCoupons`, `cart`, `subtotal`, `discount`, `total`, `appliedCoupon`, `couponCode`, `onAddToCart`, `onRemoveFromCart`, `onUpdateQty`, `onApplyCoupon`, `onCheckout` |
+| **tournaments** | `tournaments`, `weeklyTournaments`, `specialTournaments`, `seasons`, `season`, `eventsFeed`, `bracket`, `selectedTournament`, `liveTournament`, `onOpenBracket`, `onRegisterTournament`, `onRegisterTeam`, `onAddLoyaltyPoints` |
+| **loyalty** | `user`, `points`, `credits`, `transactions`, `rewards`, `activeCoupons`, `onRedeemPoints` |
+| **blog** | `articles`, `selectedArticle`, `comments`, `onAddComment`, `onOpenArticle`, `onBack` |
+| **contact** | `companyInfo {company, address, phone, email, taxNo, hours, mapUrl, lat, lng, instagram}`, `contactInfo {address, phone, email, hours, mapUrl, lat, lng, instagram}`, `settings`, `onNavigate`, `onBack` — **فقط فیلدهای موجود را رندر کن، هرگز آدرس/تلفن جعلی نساز؛ اگر هیچ‌کدام نیست، پنل خالی یا پیام «no data»** |
+
+**نمونه ثبت تورنمنت (classic):**
+```js
+SDK.registerComponent('tournaments', {
+  apiVersion: 2,
+  render: function (props) {
+    var R = SDK.React;
+    var list = props.tournaments || [];
+    return R.createElement('div', null,
+      list.map(function (t) {
+        return R.createElement('div', { key: t.id },
+          R.createElement('b', null, t.title),
+          R.createElement('button', { onClick: function () { props.onNavigate('/tournaments/brackets'); } }, 'Bracket')
+        );
+      })
+    );
+  }
+});
+```
+
+**Backward compat:** SDK v2 — قالب‌های قدیمی بدون regions جدید همچنان با fallback پیش‌فرض کار می‌کنند. `THEME_COMPONENT_API_VERSION = 2`. اگر قالب `apiVersion: 1` داشته باشد، props قدیمی همچنان پاس داده می‌شود؛ props جدید optional هستند.
+
+**bazino-arena3d specifics:**
+- ID must stay `bazino-arena3d`
+- layout: `classic`
+- Transparent header on inner pages (CSS + JS detection via `props.currentPath`/`pathname` → add class `is-inner` + body[data-path])
+- Destination card only Home (`.arena-destination-card` hidden unless path `/` or `.arena-home`)
+- Inner pages floating header (`.arena-header.is-inner` fixed, rounded, blur)
+- No Chat in nav, no Reservations/Profile in main nav — main nav: Home/Games/Cafe/Shop/Tournaments/Loyalty/Blog
+- All data from Props — never fake address/phone — use `companyInfo`/`contactInfo` only if exists
 
 ---
 

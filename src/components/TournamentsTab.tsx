@@ -5,6 +5,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { CheckoutModal, formatDue, type CheckoutResult } from '../legal/CheckoutModal';
 import { storedRef } from '../utils/affiliateCapture';
 import { L, localeOf, formatJalaliForLanguage, jalaliToGregorianDate } from '../utils/i18n';
+import ThemeRegion from '../themeSdk/ThemeRegion';
+import { useThemeRegionBase } from '../themeSdk/ThemeRegion';
 
 // Jalali Date Helpers
 const persianToEnglishDigits = (str: string): string => {
@@ -87,6 +89,7 @@ export default function TournamentsTab({
   addNotification,
 }: Props) {
   const { t, dir, language } = useLanguage();
+  const themeBase = useThemeRegionBase();
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>(tournaments[0]?.id || '');
   const [teamName, setTeamName] = useState('');
   const [referralCode, setReferralCode] = useState(() => storedRef());
@@ -410,9 +413,12 @@ export default function TournamentsTab({
           </div>
         </div>
 
-        {/* Visual Bracket Section */}
+        {/* Visual Bracket Section - classic theme can override via tournaments.brackets */}
         {selectedTournament && (
-          <div className="rounded-2xl border border-white/10 bg-dark-card p-6 overflow-x-auto">
+          <ThemeRegion
+            name="tournaments.brackets"
+            fallback={(
+              <div className="rounded-2xl border border-white/10 bg-dark-card p-6 overflow-x-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-white/5">
               <div className="flex gap-4 text-xs text-gray-400 font-mono font-bold">
                 <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-primary" /> {L(language, { fa: 'شروع:', en: 'Starts:', ru: 'Начало:', tr: 'Başlangıç:' })} {formatJalaliForLanguage(selectedTournament.startDate, language)}</span>
@@ -502,6 +508,14 @@ export default function TournamentsTab({
             </div>
             )}
           </div>
+            )}
+            props={{
+              tournaments,
+              selectedTournament,
+              bracket: selectedTournament?.bracket,
+              onNavigate: themeBase?.onNavigate,
+            }}
+          />
         )}
 
         {/* Calendar Visualization Card */}
@@ -803,9 +817,12 @@ export default function TournamentsTab({
 
       </div>
 
-      {/* Registration Sidebar */}
+      {/* Registration Sidebar - classic theme can override via tournaments.register */}
       <div className="lg:col-span-1">
-        <div className="rounded-2xl border border-white/10 bg-dark-card p-6 sticky top-6">
+        <ThemeRegion
+          name="tournaments.register"
+          fallback={(
+            <div className="rounded-2xl border border-white/10 bg-dark-card p-6 sticky top-6">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-white/5 pb-3 font-display uppercase tracking-wider">
             <span className="w-1.5 h-6 bg-primary rounded-md shadow-[0_0_10px_rgba(0,240,255,0.4)]"></span>
             <span>{L(language, { fa: 'ثبت‌نام مسابقات', en: 'Tournament Register', ru: 'Регистрация на турнир', tr: 'Turnuva Kaydı' })}</span>
@@ -948,6 +965,16 @@ export default function TournamentsTab({
           )}
 
         </div>
+          )}
+          props={{
+            tournaments,
+            selectedTournament,
+            onRegisterTeam,
+            onAddLoyaltyPoints,
+            onNavigate: themeBase?.onNavigate,
+            addNotification,
+          }}
+        />
       </div>
 
     </div>

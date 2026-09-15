@@ -30,6 +30,7 @@ export type ThemeTab = 'home' | 'loyalty' | 'reservations' | 'cafe' | 'shop' | '
 
 /** بخش‌های استاندارد سایت که قالب می‌تواند جایگزین کند */
 export const THEME_REGIONS = [
+  // Classic core
   'home',
   'header',
   'hero',
@@ -42,6 +43,26 @@ export const THEME_REGIONS = [
   'home.location',
   'footer',
   'mobileNav',
+  // Classic inner pages (new — SDK v2 extended, backward compatible)
+  'games',
+  'games.detail',
+  'cafe',
+  'cafe.detail',
+  'cafe.cart',
+  'shop',
+  'shop.detail',
+  'shop.cart',
+  'tournaments',
+  'tournaments.weekly',
+  'tournaments.special',
+  'tournaments.season',
+  'tournaments.brackets',
+  'tournaments.register',
+  'loyalty',
+  'blog',
+  'blog.detail',
+  'contact',
+  // Hub (existing)
   'hub.home',
   'hub.games',
   'hub.events',
@@ -74,7 +95,10 @@ export interface ThemeSlide {
   desc: Record<string, string>;
 }
 
-/** قرارداد داده‌ای که اپ به کامپوننت قالب می‌دهد (نسخه ۲؛ v1 زیرمجموعه‌ی آن است) */
+/** قرارداد داده‌ای که اپ به کامپوننت قالب می‌دهد (نسخه ۲؛ v1 زیرمجموعه‌ی آن است)
+ *  نسخه ۲ extended — classic inner pages نیز props واقعی دارند.
+ *  همه فیلدها optional جز موارد پایه، برای سازگاری با قالب‌های قدیمی.
+ */
 export interface ThemeComponentProps {
   language: string;
   dir: 'rtl' | 'ltr';
@@ -107,7 +131,7 @@ export interface ThemeComponentProps {
   onLogin?: () => void;
   onLogout?: () => void;
   onLanguage?: (lang: string) => void;
-  onCheckout?: (kind: string, params: Record<string, unknown>, estimatedAmount?: number) => void;
+  onCheckout?: ((kind: string, params: Record<string, unknown>, estimatedAmount?: number) => void) | ((kind: string, params: any, amount?: number) => void) | (() => void | Promise<void>);
   systems?: any[];
   season?: any;
   eventsFeed?: any;
@@ -115,6 +139,89 @@ export interface ThemeComponentProps {
   articles?: any[];
   hubPage?: string;
   pathname?: string;
+
+  // ── Classic inner pages extended props (all optional, backward compatible) ──
+  // Games
+  games?: any[];
+  selectedGame?: any;
+  gameDetail?: any;
+  // Cafe / Shop
+  cafeItems?: any[];
+  cafeCategories?: string[];
+  shopItems?: any[];
+  shopCategories?: string[];
+  accessories?: any[];
+  // Generic cart (theme can manage own, but we expose callbacks)
+  cart?: any[];
+  // Tournaments extended
+  weeklyTournaments?: any[];
+  specialTournaments?: any[];
+  seasons?: any[];
+  liveTournament?: any;
+  selectedTournament?: any;
+  // Loyalty
+  points?: number;
+  credits?: number;
+  transactions?: any[];
+  rewards?: any[];
+  activeCoupons?: any[];
+  // Blog
+  selectedArticle?: any;
+  // Contact
+  companyInfo?: any;
+  contactInfo?: {
+    address?: string;
+    phone?: string;
+    email?: string;
+    hours?: string;
+    mapUrl?: string;
+    lat?: string;
+    lng?: string;
+    instagram?: string;
+  };
+  // Common states
+  loading?: boolean;
+  error?: string | null;
+  isEmpty?: boolean;
+  comingSoon?: boolean;
+  // Callbacks (real portal operations)
+  onViewDetail?: (id: string) => void;
+  onBack?: () => void;
+  onAddToCart?: (item: any, qty?: number) => void;
+  onRemoveFromCart?: (id: string) => void;
+  onUpdateQty?: (id: string, delta: number) => void;
+  onCafeCheckout?: () => void;
+  onShopCheckout?: () => void;
+  onServerState?: (data: any) => void;
+  onRedeemPoints?: (points: number) => void;
+  onAddComment?: (articleIdOrComment: any, comment?: any) => void | Promise<void>;
+  onOpenArticle?: (id: string) => void;
+  onOpenBracket?: (id: string) => void;
+  onRegisterTournament?: (id: string) => void;
+  onAddLoyaltyPoints?: (points: number, desc: string) => void;
+  addNotification?: (msg: string, type: 'success' | 'error' | 'info') => void;
+  // For games reservation flow
+  onReserve?: (systemId: string, hours: number, extraControllers?: number, requestedGame?: string) => void;
+  onRegisterTeam?: (tournamentId: string, team: { name: string; leader: string; members: string[] }) => void | Promise<void>;
+  // Settings helpers
+  currentPath?: string;
+  // Cart / checkout extended (cafe.cart, shop.cart)
+  subtotal?: number;
+  discount?: number;
+  total?: number;
+  appliedCoupon?: any;
+  couponCode?: string;
+  systemNumber?: string;
+  onApplyCoupon?: () => void;
+  // Games detail extended
+  audienceFilter?: string | null;
+  focusRequestedGame?: string | boolean | null;
+  // Blog detail
+  comments?: any[];
+  // Loyalty / generic
+  loyaltyUser?: any;
+  // For compatibility with earlier wrappers
+  onOpenDetails?: (id: string) => void;
 }
 
 export interface ThemeComponentDefinition {
@@ -144,6 +251,25 @@ function notify() {
   listeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
 }
 
+/**
+ * ثبت‌های پشت‌سرهم theme.js (که معمولاً ۶+ تا در یک فایل است) هر کدام sync
+ * notify می‌شدند و hostها را در همان میکروتِیک رندرِ در حالِ اجرا re-render
+ * می‌کردند؛ در dev (preact/compat + useSyncExternalStore) این رندرِ تودرتو
+ * «Hook can only be invoked from render methods» می‌انداخت و مناطقِ تازه‌mount
+ * دوباره خالی می‌شدند. batchNotify همهٔ ثبت‌های یک تیک را در یک通知 ادغام می‌کند.
+ */
+let notifyScheduled = false;
+function batchNotify() {
+  if (notifyScheduled) return;
+  notifyScheduled = true;
+  const flush = () => {
+    notifyScheduled = false;
+    notify();
+  };
+  if (typeof queueMicrotask === 'function') queueMicrotask(flush);
+  else Promise.resolve().then(flush);
+}
+
 /** نسخه‌ی رجیستری — با هر ثبت/حذف زیاد می‌شود (برای re-render هاست‌ها) */
 export function getRegistryVersion(): number { return registryVersion; }
 
@@ -158,13 +284,13 @@ export function registerComponent(name: string, factoryOrDef: Factory | ThemeCom
   if (!name) return;
   const factory: Factory = typeof factoryOrDef === 'function' ? factoryOrDef : () => factoryOrDef;
   registry.set(name, { factory });
-  notify();
+  batchNotify();
 }
 
 /** حذف کامپوننت ثبت‌شده (بعد از حذف قالب یا قبل از بارگذاری نسخه‌ی جدید theme.js) */
 export function unregisterComponent(name: string): void {
   unmountComponent(name);
-  if (registry.delete(name)) notify();
+  if (registry.delete(name)) batchNotify();
 }
 
 /** حذف همه‌ی کامپوننت‌های قالب (هنگام تعویض/آپدیت قالب) */
@@ -172,7 +298,7 @@ export function unregisterAllComponents(): void {
   for (const name of Array.from(registry.keys())) unmountComponent(name);
   const had = registry.size > 0;
   registry.clear();
-  if (had) notify();
+  if (had) batchNotify();
 }
 
 /** آیا قالب برای این بخش کامپوننت دارد؟ */
@@ -209,12 +335,21 @@ export function mountComponent(
     mounted.set(name, root);
   }
 
-  const def = reg.factory();
+  // ۲۰۲۶-۰۹-۱۱ (حادثهٔ قالب «Bazino 3D Dimension»): فراخوانی factory بیرون از try بود و
+  // یک theme.js معیوب (فراخوانی useState خارج از رندر) کل صفحهٔ اصلی را با ErrorBoundary
+  // می‌کشت. حالا factory و render هر دو محافظت‌شده‌اند — بدترین حالت: region خالی/افته و
+  // fallback خود سایت رندر می‌شود، نه کرش کل صفحه.
+  let def: ThemeComponentDefinition | null = null;
   let out: unknown = null;
   try {
-    out = def.render ? def.render(props) : (def.create ? def.create(props).render() : null);
+    def = reg.factory();
+    out = def && def.render ? def.render(props) : (def && def.create ? def.create(props).render() : null);
+    if (!def || (!def.render && !def.create)) {
+      console.warn(`[ThemeSDK] region "${name}" factory باید یک تعریف {{ render(props) }} برگرداند — چیزی رندر نشد.`);
+    }
   } catch (e) {
-    console.error(`[ThemeSDK] render() of region "${name}" threw:`, e);
+    console.error(`[ThemeSDK] factory/render of region "${name}" threw:`, e);
+    def = null;
     out = null;
   }
   root.render(React.createElement(React.Fragment, null, normalizeRenderOutput(name, out)));

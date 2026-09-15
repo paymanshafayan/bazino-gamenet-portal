@@ -5,18 +5,9 @@ import { L } from '../utils/i18n';
 import { useLanguage } from '../context/LanguageContext';
 import { filterSystemsForAudience, type GameAudience } from '../../shared/games';
 import ReservationsTab from './ReservationsTab';
+import ThemeRegion from '../themeSdk/ThemeRegion';
+import { useThemeRegionBase } from '../themeSdk/ThemeRegion';
 
-/**
- * صفحهٔ عمومی «Games» — سه کارت کاملاً جدا:
- *
- *   ۱) KIDS          → بازی‌های مفرح و ایمن برای بازیکنان کوچک‌تر (سیستم‌های دستهٔ kids)
- *   ۲) ADULTS        → اکشن، ورزشی، مسابقه‌ای و بیشتر (سیستم‌های دستهٔ adults)
- *   ۳) GAME REQUESTS → پیشنهاد بازی؛ جریان رزرو با فوکوس فیلد «بازی مورد درخواست» باز می‌شود
- *
- * بعد از انتخاب KIDS/ADULTS همان ReservationsTab موجود (سیستم‌ها، کوپن، کیف پول/در محل)
- * با فیلتر مخاطب رندر می‌شود — منطق رزرو دست‌نخورده است.
- * Deep-link: /games?category=kids|adults|requests
- */
 type GamesCategory = GameAudience | 'requests';
 
 interface Props {
@@ -29,11 +20,6 @@ interface Props {
 
 const CATEGORY_PARAM: Record<GamesCategory, string> = { kids: 'kids', adults: 'adults', requests: 'requests' };
 
-/**
- * توجه: این کامپوننت باید «بیرون» از GamesTab تعریف شود — تعریف داخل بدنهٔ
- * کامپوننت والد با هر رندر هویت جدید می‌سازد و کل subtree (شامل انتخاب سیستم
- * کاربر) remount می‌شود. این باگ واقعاً در تست مرورگر گرفته شد.
- */
 function GamesReservationFlow({
   audience,
   focusGame,
@@ -44,7 +30,19 @@ function GamesReservationFlow({
   focusGame?: boolean;
   onBack: () => void;
 } & Props) {
-  const { t, dir, language } = useLanguage();
+  const { dir, language } = useLanguage();
+  const themeBase = useThemeRegionBase();
+  const reservationFallback = (
+    <ReservationsTab
+      themeId={rest.themeId}
+      systems={rest.systems}
+      activeCoupons={rest.activeCoupons}
+      onAddLoyaltyPoints={rest.onAddLoyaltyPoints}
+      addNotification={rest.addNotification}
+      audienceFilter={audience}
+      focusRequestedGame={focusGame}
+    />
+  );
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -60,14 +58,24 @@ function GamesReservationFlow({
           {L(language, { fa: 'رزرو ایستگاه گیمینگ', en: 'Book a gaming station', ru: 'Бронь игровой станции', tr: 'Oyun istasyonu rezervasyonu' })}
         </span>
       </div>
-      <ReservationsTab
-        themeId={rest.themeId}
-        systems={rest.systems}
-        activeCoupons={rest.activeCoupons}
-        onAddLoyaltyPoints={rest.onAddLoyaltyPoints}
-        addNotification={rest.addNotification}
-        audienceFilter={audience}
-        focusRequestedGame={focusGame}
+      <ThemeRegion
+        name="games.detail"
+        fallback={reservationFallback}
+        props={{
+          games: rest.systems,
+          systems: rest.systems,
+          featuredGames: rest.systems.slice(0, 8),
+          activeCoupons: rest.activeCoupons,
+          audienceFilter: audience,
+          focusRequestedGame: focusGame,
+          onBack,
+          onAddLoyaltyPoints: rest.onAddLoyaltyPoints,
+          addNotification: rest.addNotification,
+          onNavigate: themeBase?.onNavigate,
+          loading: false,
+          error: null,
+          isEmpty: rest.systems.length === 0,
+        }}
       />
     </div>
   );
@@ -86,12 +94,11 @@ export default function GamesTab({
   onAddLoyaltyPoints,
   addNotification,
 }: Props) {
-  const { t, dir, language } = useLanguage();
+  const { dir, language } = useLanguage();
   const [category, setCategory] = useState<GamesCategory | null>(() => readCategoryFromUrl());
 
   const selectCategory = (c: GamesCategory | null) => {
     setCategory(c);
-    // آدرس دسته را در URL نگه می‌داریم تا رفرش/اشتراک‌گذاری همان دسته را باز کند
     if (typeof window !== 'undefined') {
       const url = c ? `/games?category=${CATEGORY_PARAM[c]}` : '/games';
       window.history.replaceState({}, '', url);
@@ -144,7 +151,6 @@ export default function GamesTab({
 
       {!category && (
         <div className="flex flex-col gap-6">
-          {/* Header */}
           <div className="rounded-2xl p-6 relative overflow-hidden bg-dark-card border border-white/10">
             <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/5 blur-3xl pointer-events-none"></div>
             <div className="relative z-10">
@@ -159,7 +165,6 @@ export default function GamesTab({
             </div>
           </div>
 
-          {/* Three separated cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {cardMeta.map((card) => (
               <button

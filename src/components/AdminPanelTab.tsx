@@ -1689,8 +1689,8 @@ export default function AdminPanelTab({
   const currentGroup = groupForSection(activeSubTab);
   return (
     <div id="admin-wrap" className="animate-fade-in font-sans min-h-screen bg-[#f0f0f1] text-[#3c434a] w-full" dir={dir} style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
-      {/* Single top bar - 32px dark, WP style */}
-      <div id="admin-bar" className="h-[32px] bg-[#1d2327] text-[#eee] flex items-center justify-between px-0 sticky top-0 z-[9999] select-none gap-0 w-full" style={{ height: '32px' }}>
+      {/* Single top bar - 50px dark */}
+      <div id="admin-bar" className="h-[50px] bg-[#1d2327] text-[#eee] flex items-center justify-between px-0 sticky top-0 z-[9999] select-none gap-0 w-full" style={{ height: '50px' }}>
         <div className="flex items-center h-full shrink-0">
           <div className="flex items-center gap-2 h-full px-3 hover:bg-[#2c3338] cursor-pointer">
             <div className="w-5 h-5 rounded bg-[#3858e9] flex items-center justify-center text-white font-black text-[11px]">B</div>
@@ -1708,7 +1708,7 @@ export default function AdminPanelTab({
 
         <div className="flex-1 flex justify-center max-w-[420px] mx-2" ref={headerSearchRef}>
           <div className="relative w-full">
-            <div className="flex items-center gap-1.5 bg-[#2c3338] border border-[#2c3338] focus-within:border-[#72aee6] rounded-[3px] px-2.5 h-[26px]">
+            <div className="flex items-center gap-1.5 bg-[#2c3338] border border-[#2c3338] focus-within:border-[#72aee6] rounded-[3px] px-2.5 h-[32px]">
               <Search className="w-3.5 h-3.5 text-[#a7aaad] shrink-0" />
               <input
                 type="search"
@@ -1769,7 +1769,7 @@ export default function AdminPanelTab({
               <span>{language.toUpperCase()}</span>
             </button>
             {isLangOpen && (
-              <div className="absolute top-[32px] right-0 bg-[#2c3338] border border-[#2c3338] shadow-[0_2px_8px_rgba(0,0,0,0.3)] overflow-hidden min-w-[160px] z-[100]">
+              <div className="absolute top-[50px] right-0 bg-[#2c3338] border border-[#2c3338] shadow-[0_2px_8px_rgba(0,0,0,0.3)] overflow-hidden min-w-[160px] z-[100]">
                 {[
                   { id: 'fa', label: 'فارسی', flag: '🇮🇷' },
                   { id: 'en', label: 'English', flag: '🇺🇸' },
@@ -1793,7 +1793,7 @@ export default function AdminPanelTab({
         </div>
       </div>
 
-      <div id="admin-content" className="flex min-h-[calc(100vh-32px)] w-full">
+      <div id="admin-content" className="flex min-h-[calc(100vh-50px)] w-full">
         <AdminSidebar
           active={activeSubTab}
           onSelect={(sec) => setActiveSubTab(sec as any)}

@@ -163,7 +163,7 @@ export default function AdminSidebar(props: Props) {
   return (
     <div
       id="adminmenumain"
-      className="shrink-0 bg-[#1d2327] min-h-[calc(100vh-32px)] flex flex-col select-none relative"
+      className="shrink-0 bg-[#1d2327] min-h-[calc(100vh-50px)] flex flex-col select-none relative"
       dir={dir}
       style={{ width: `${width}px` }}
     >

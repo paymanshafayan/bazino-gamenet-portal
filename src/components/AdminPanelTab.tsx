@@ -1687,24 +1687,26 @@ export default function AdminPanelTab({
   }
 
   const currentGroup = groupForSection(activeSubTab);
-
   return (
-    <div id="admin-wrap" className="animate-fade-in font-sans min-h-screen bg-[#f0f0f1] text-[#3c434a]" dir={dir} style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
-      {/* Top bar - 32px dark */}
-      <div id="admin-bar" className="h-[32px] bg-[#1d2327] text-[#eee] flex items-center justify-between px-3 sticky top-0 z-[9999] select-none gap-2" style={{ height: '32px' }}>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-[#3858e9] flex items-center justify-center text-white font-black text-[11px]">B</div>
-            <span className="text-[13px] text-white font-normal hidden sm:inline">Bazino — {L(language, { fa: 'مدیریت', en: 'Admin', ru: 'Админ', tr: 'Yönetim' })}</span>
+    <div id="admin-wrap" className="animate-fade-in font-sans min-h-screen bg-[#f0f0f1] text-[#3c434a] w-full" dir={dir} style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
+      {/* Single top bar - 32px dark, WP style */}
+      <div id="admin-bar" className="h-[32px] bg-[#1d2327] text-[#eee] flex items-center justify-between px-0 sticky top-0 z-[9999] select-none gap-0 w-full" style={{ height: '32px' }}>
+        <div className="flex items-center h-full shrink-0">
+          <div className="flex items-center gap-2 h-full px-3 hover:bg-[#2c3338] cursor-pointer">
+            <div className="w-5 h-5 rounded bg-[#3858e9] flex items-center justify-center text-white font-black text-[11px]">B</div>
+            <span className="text-[13px] text-white font-normal hidden sm:inline">Bazino</span>
           </div>
-          <div className="h-4 w-px bg-[#2c3338] hidden sm:block" />
-          <span className="text-[12px] text-[#a7aaad] hidden lg:inline">
+          <a href="/" className="flex items-center gap-1.5 h-full px-3 text-[13px] text-[#eee] hover:text-white hover:bg-[#2c3338] transition-colors">
+            <Globe className="w-4 h-4" />
+            <span className="hidden md:inline">{L(language, { fa: 'نمایش سایت', en: 'Visit Site', ru: 'Сайт', tr: 'Siteyi Gör' })}</span>
+          </a>
+          <div className="h-4 w-px bg-[#2c3338] hidden sm:block mx-1" />
+          <span className="text-[12px] text-[#a7aaad] hidden lg:inline px-2">
             {L(language, ADMIN_SECTION_META[activeSubTab])}
           </span>
         </div>
 
-        {/* Header search - central */}
-        <div className="flex-1 flex justify-center max-w-[500px] mx-2" ref={headerSearchRef}>
+        <div className="flex-1 flex justify-center max-w-[420px] mx-2" ref={headerSearchRef}>
           <div className="relative w-full">
             <div className="flex items-center gap-1.5 bg-[#2c3338] border border-[#2c3338] focus-within:border-[#72aee6] rounded-[3px] px-2.5 h-[26px]">
               <Search className="w-3.5 h-3.5 text-[#a7aaad] shrink-0" />
@@ -1750,19 +1752,24 @@ export default function AdminPanelTab({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Language selector */}
-          <div className="relative" ref={langRef}>
+        <div className="flex items-center h-full shrink-0">
+          <button
+            onClick={() => window.open('/bazino-admin-guide.pdf', '_blank')}
+            className="flex items-center justify-center h-full w-[36px] text-[#a7aaad] hover:text-white hover:bg-[#2c3338] transition-colors"
+            title={L(language, { fa: 'راهنما', en: 'Help', ru: 'Помощь', tr: 'Yardım' })}
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
+          <div className="relative h-full" ref={langRef}>
             <button
               onClick={() => setIsLangOpen(!isLangOpen)}
-              className="h-[26px] px-2.5 rounded bg-[#2c3338] hover:bg-[#3c434a] text-[#eee] text-[11px] flex items-center gap-1.5"
+              className="h-full px-3 text-[#eee] hover:text-white hover:bg-[#2c3338] text-[12px] flex items-center gap-1.5 transition-colors"
             >
-              <Globe className="w-3.5 h-3.5" />
+              <Globe className="w-4 h-4 text-[#a7aaad]" />
               <span>{language.toUpperCase()}</span>
-              <ChevronLeft className={`w-3 h-3 transition-transform ${isLangOpen ? '-rotate-90' : 'rotate-0'}`} />
             </button>
             {isLangOpen && (
-              <div className="absolute top-[32px] right-0 bg-white border border-[#c3c4c7] shadow-[0_2px_8px_rgba(0,0,0,0.15)] rounded-[2px] overflow-hidden min-w-[140px] z-[100]">
+              <div className="absolute top-[32px] right-0 bg-[#2c3338] border border-[#2c3338] shadow-[0_2px_8px_rgba(0,0,0,0.3)] overflow-hidden min-w-[160px] z-[100]">
                 {[
                   { id: 'fa', label: 'فارسی', flag: '🇮🇷' },
                   { id: 'en', label: 'English', flag: '🇺🇸' },
@@ -1772,21 +1779,21 @@ export default function AdminPanelTab({
                   <button
                     key={l.id}
                     onClick={() => { setLanguage(l.id as any); setIsLangOpen(false); }}
-                    className={`w-full text-left px-3 py-2 text-[12px] flex items-center gap-2 hover:bg-[#f6f7f7] ${language === l.id ? 'bg-[#f0f6fc] text-[#2271b1] font-semibold' : 'text-[#3c434a]'}`}
+                    className={`w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-[#3c434a] hover:text-white ${language === l.id ? 'bg-[#3858e9] text-white' : 'text-[#eee]'}`}
                   >
-                    <span>{l.flag}</span><span>{l.label}</span><span className="ml-auto text-[10px] font-mono">{l.id}</span>
+                    <span>{l.flag}</span><span>{l.label}</span><span className="ml-auto text-[10px] font-mono opacity-60">{l.id}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-
-          <div className="w-6 h-6 rounded-full bg-[#50575e] text-white flex items-center justify-center text-[10px] font-bold">A</div>
+          <div className="flex items-center justify-center h-full w-[40px] hover:bg-[#2c3338] cursor-pointer">
+            <div className="w-6 h-6 rounded-full bg-[#50575e] text-white flex items-center justify-center text-[10px] font-bold">A</div>
+          </div>
         </div>
       </div>
 
-      <div id="admin-content" className="flex min-h-[calc(100vh-32px)]">
-        {/* Sidebar resizable */}
+      <div id="admin-content" className="flex min-h-[calc(100vh-32px)] w-full">
         <AdminSidebar
           active={activeSubTab}
           onSelect={(sec) => setActiveSubTab(sec as any)}
@@ -1799,75 +1806,29 @@ export default function AdminPanelTab({
           setWidth={setSidebarWidth}
         />
 
-        {/* Main content */}
-        <div id="admin-body" className="flex-1 bg-[#f0f0f1] min-w-0">
-          <div id="admin-body-content" className="p-0 sm:p-5">
-            <div className="wrap max-w-[1280px] mx-auto">
-              {/* Page title */}
-              <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-none sm:rounded-[2px] mb-5">
-                <div className="px-4 sm:px-5 py-4 border-b border-[#dcdcde] flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h1 className="text-[23px] font-normal text-[#1d2327] leading-[1.3] m-0">
-                      {L(language, ADMIN_SECTION_META[activeSubTab])}
-                      <span className="ml-2 text-[13px] text-[#646970] font-normal align-middle">
-                        {currentGroup ? `— ${L(language, { fa: currentGroup.fa, en: currentGroup.en, ru: currentGroup.ru, tr: currentGroup.tr })}` : ''}
-                      </span>
-                    </h1>
-                    <p className="text-[11px] text-[#a7aaad] font-mono mt-1" dir="ltr">{pathFromAdminSection(activeSubTab)} • {dataSource}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => window.open('/bazino-admin-guide.pdf', '_blank')}
-                      className="h-[30px] px-3 rounded-[3px] bg-white border border-[#8c8f94] text-[#2c3338] hover:bg-[#f6f7f7] text-[13px]"
-                    >
-                      {L(language, { fa: 'PDF راهنما', en: 'Guide PDF', ru: 'PDF', tr: 'PDF' })}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick search inside page */}
-                <div className="px-4 sm:px-5 py-3 bg-[#fcfcfc] border-b border-[#dcdcde] relative" ref={sectionSearchRef}>
-                  <div className="flex items-center gap-2 max-w-[500px]">
-                    <Search className="w-4 h-4 text-[#646970] shrink-0" />
-                    <input
-                      type="search"
-                      value={sectionQuery}
-                      onChange={(e) => { setSectionQuery(e.target.value); setIsSectionSearchOpen(true); }}
-                      onFocus={() => setIsSectionSearchOpen(true)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && sectionMatches[0]) { setActiveSubTab(sectionMatches[0]); setSectionQuery(''); setIsSectionSearchOpen(false); }
-                        if (e.key === 'Escape') setIsSectionSearchOpen(false);
-                      }}
-                      placeholder={L(language, { fa: 'جستجوی بخش‌ها...', en: 'Search sections...', ru: 'Поиск...', tr: 'Ara...' })}
-                      className="flex-1 h-[30px] bg-white border border-[#8c8f94] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] placeholder:text-[#8c8f94] outline-none"
-                    />
-                  </div>
-                  {isSectionSearchOpen && sectionQuery.trim() && (
-                    <ul className="absolute z-40 mt-2 left-4 right-4 sm:left-5 sm:right-auto sm:w-[500px] bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] overflow-hidden max-h-72 overflow-y-auto">
-                      {sectionMatches.length === 0 && <li className="px-4 py-3 text-[13px] text-[#646970]">{L(language, { fa: 'یافت نشد', en: 'Not found', ru: '—', tr: '—' })}</li>}
-                      {sectionMatches.map((k) => (
-                        <li key={k} className="border-b border-[#f0f0f1] last:border-0">
-                          <a href={pathFromAdminSection(k)} onClick={(e) => { e.preventDefault(); setActiveSubTab(k); setSectionQuery(''); setIsSectionSearchOpen(false); }} className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[13px] hover:bg-[#f6f7f7] ${activeSubTab === k ? 'text-[#2271b1] bg-[#f6f7f7]' : 'text-[#3c434a]'}`}>
-                            <span>{L(language, ADMIN_SECTION_META[k])}</span>
-                            <span className="text-[11px] text-[#a7aaad] font-mono" dir="ltr">{pathFromAdminSection(k)}</span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+        <div id="admin-body" className="flex-1 bg-[#f0f0f1] min-w-0 w-full">
+          <div id="admin-body-content" className="p-0 sm:p-5 w-full">
+            <div className="w-full">
+              {/* Page title - simple, not a card, full width */}
+              <div className="px-5 py-4 mb-5 flex flex-wrap items-baseline gap-3">
+                <h1 className="text-[23px] font-normal text-[#1d2327] leading-[1.3] m-0">
+                  {L(language, ADMIN_SECTION_META[activeSubTab])}
+                </h1>
+                <span className="text-[13px] text-[#646970]">
+                  {currentGroup ? `${L(language, { fa: currentGroup.fa, en: currentGroup.en, ru: currentGroup.ru, tr: currentGroup.tr })}` : ''}
+                </span>
+                <span className="text-[11px] text-[#a7aaad] font-mono" dir="ltr">{pathFromAdminSection(activeSubTab)} • {dataSource}</span>
               </div>
 
-              {/* CONTENT */}
-              <div className="px-0 sm:px-0">
+              <div className="px-5 w-full">
                 {activeSubTab === 'apiKeys' ? (
-                  <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4 sm:p-5">
+                  <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4 sm:p-5 w-full">
                     <AdminKeysCenter language={language as any} dir={dir} addNotification={addNotification} />
                   </div>
                 ) : (
                   <>
                     {activeSubTab === 'dashboard' && stats && (
-                      <div className="flex flex-col gap-5">
+                      <div className="flex flex-col gap-5 w-full">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
                             <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'کاربران', en: 'Users', ru: 'Пользователи', tr: 'Kullanıcılar' })}</p>
@@ -1886,7 +1847,7 @@ export default function AdminPanelTab({
                             <p className="text-[20px] font-normal text-[#1d2327] mt-2">{openTicketCount}</p>
                           </div>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'نمای کلی', en: 'Overview', ru: 'Обзор', tr: 'Genel' })}</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px] text-[#50575e]">
                             <div className="p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde]"><span className="text-[#646970]">Tournaments:</span> {tournaments.length}</div>
@@ -1899,8 +1860,8 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'systems' && (
-                      <div className="flex flex-col gap-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="flex flex-col gap-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Monitor className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'افزودن سیستم', en: 'Add System', ru: 'Добавить систему', tr: 'Sistem Ekle' })}</h3>
                           <form onSubmit={handleAddSystem} className="grid grid-cols-1 md:grid-cols-4 gap-3">
                             <input value={newSystem.name} onChange={e => setNewSystem({ ...newSystem, name: e.target.value })} placeholder={L(language, { fa: 'نام', en: 'Name', ru: 'Название', tr: 'Ad' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
@@ -1909,7 +1870,7 @@ export default function AdminPanelTab({
                             <button type="submit" className="h-[30px] bg-[#2271b1] hover:bg-[#135e96] border border-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
                           </form>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'لیست سیستم‌ها', en: 'Systems', ru: 'Системы', tr: 'Sistemler' })} ({systems.length})</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
                             {systems.map((s: any) => (
@@ -1927,8 +1888,8 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'cafe' && (
-                      <div className="flex flex-col gap-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="flex flex-col gap-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Coffee className="w-4 h-4 text-[#996800]" /> {L(language, { fa: 'افزودن آیتم', en: 'Add Item', ru: 'Добавить', tr: 'Ekle' })}</h3>
                           <form onSubmit={handleAddCafeItem} className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <input value={newCafe.name} onChange={e => setNewCafe({ ...newCafe, name: e.target.value })} placeholder={L(language, { fa: 'نام', en: 'Name', ru: 'Название', tr: 'Ad' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
@@ -1936,7 +1897,7 @@ export default function AdminPanelTab({
                             <button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
                           </form>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'منو', en: 'Menu', ru: 'Меню', tr: 'Menü' })} ({cafeItems.length})</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {cafeItems.map((c: any) => (
@@ -1948,8 +1909,8 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'shop' && (
-                      <div className="flex flex-col gap-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="flex flex-col gap-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><ShoppingBag className="w-4 h-4 text-[#06776d]" /> {L(language, { fa: 'افزودن کالا', en: 'Add Product', ru: 'Добавить', tr: 'Ekle' })}</h3>
                           <form onSubmit={handleAddAccessory} className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <input value={newAccessory.name} onChange={e => setNewAccessory({ ...newAccessory, name: e.target.value })} placeholder={L(language, { fa: 'نام', en: 'Name', ru: 'Название', tr: 'Ad' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
@@ -1957,7 +1918,7 @@ export default function AdminPanelTab({
                             <button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
                           </form>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'انبار', en: 'Inventory', ru: 'Склад', tr: 'Stok' })} ({accessories.length})</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {accessories.map((a: any) => <div key={a.id || a.name} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327]">{a.name} — {a.price}</span><button onClick={() => handleDeleteAccessory(a.id)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>)}
@@ -1967,16 +1928,16 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'tournaments' && (
-                      <div className="flex flex-col gap-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="flex flex-col gap-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <React.Suspense fallback={<div className="p-8 text-center text-[13px] text-[#646970]">Loading…</div>}><AdminTournamentPlanner language={language as any} notify={addNotification} /></React.Suspense>
                         </div>
                       </div>
                     )}
 
                     {activeSubTab === 'blog' && (
-                      <div className="flex flex-col gap-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="flex flex-col gap-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Newspaper className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'مقاله جدید', en: 'New Article', ru: 'Новая', tr: 'Yeni' })}</h3>
                           <form onSubmit={handleAddArticle} className="flex flex-col gap-3">
                             <input value={newArticle.title} onChange={e => setNewArticle({ ...newArticle, title: e.target.value })} placeholder={L(language, { fa: 'عنوان', en: 'Title', ru: 'Заголовок', tr: 'Başlık' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
@@ -1984,7 +1945,7 @@ export default function AdminPanelTab({
                             <button type="submit" className="self-start h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-4">{L(language, { fa: 'انتشار', en: 'Publish', ru: 'Опубликовать', tr: 'Yayınla' })}</button>
                           </form>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'مقالات', en: 'Articles', ru: 'Статьи', tr: 'Makaleler' })} ({articles.length})</h3>
                           <div className="flex flex-col gap-2">
                             {articles.map((a: any) => <div key={a.id} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327] truncate">{a.title}</span><button onClick={() => handleDeleteArticle(a.id)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>)}
@@ -1994,22 +1955,22 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'chat' && (
-                      <div className="flex flex-col gap-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="flex flex-col gap-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'اتاق جدید', en: 'New Room', ru: 'Новая', tr: 'Yeni Oda' })}</h3>
                           <form onSubmit={handleAddChatRoom} className="flex gap-3"><input value={newChatRoomName} onChange={e => setNewChatRoomName(e.target.value)} placeholder="e.g. Apex" className="flex-1 h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required /><button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-4">+</button></form>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">{chatRooms.map((room: string) => <div key={room} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327]">{room}</span><button onClick={() => handleDeleteChatRoom(room)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>)}</div>
                         </div>
                       </div>
                     )}
 
                     {activeSubTab === 'messages' && (
-                      <div className="flex flex-col gap-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="flex flex-col gap-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'ارسال پیام', en: 'Send Message', ru: 'Отправить', tr: 'Gönder' })}</h3>
-                          <form onSubmit={handleSendMessage} className="flex flex-col gap-3 max-w-[600px]">
+                          <form onSubmit={handleSendMessage} className="flex flex-col gap-3">
                             <select value={recipient} onChange={e => setRecipient(e.target.value)} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]"><option value="All">All Users</option>{registeredUsers.map((u: any) => <option key={u.username} value={u.username}>{u.username}</option>)}</select>
                             <input value={msgTitle} onChange={e => setMsgTitle(e.target.value)} placeholder="Title" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
                             <textarea value={msgBody} onChange={e => setMsgBody(e.target.value)} rows={3} placeholder="Body" className="bg-white border border-[#8c8f94] rounded-[3px] px-2.5 py-2 text-[13px] text-[#2c3338]" required />
@@ -2020,37 +1981,37 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'customization' && (
-                      <div className="space-y-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="space-y-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2 mb-3"><Database className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'منبع داده', en: 'Data Source', ru: 'Источник', tr: 'Veri' })}</h3>
                           <div className="flex gap-2">
                             <button onClick={() => handleSwitchDataSource('sample')} className={`h-[30px] px-3 rounded-[3px] text-[13px] border ${dataSource === 'sample' ? 'bg-[#2271b1] border-[#2271b1] text-white' : 'bg-white border-[#8c8f94] text-[#2c3338]'}`}>Sample</button>
                             <button onClick={() => handleSwitchDataSource('database')} className={`h-[30px] px-3 rounded-[3px] text-[13px] border ${dataSource === 'database' ? 'bg-[#2271b1] border-[#2271b1] text-white' : 'bg-white border-[#8c8f94] text-[#2c3338]'}`}>Database</button>
                           </div>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4">{L(language, { fa: 'اطلاعات کلوپ', en: 'Club Info', ru: 'Инфо', tr: 'Kulüp' })}</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[600px]">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <input value={siteSettings['club_phone'] || ''} onChange={e => handleSaveSetting('club_phone', e.target.value)} placeholder="Phone" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" />
                             <input value={siteSettings['club_address'] || ''} onChange={e => handleSaveSetting('club_address', e.target.value)} placeholder="Address" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] md:col-span-2" />
                           </div>
                         </div>
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <LegalAdminSection siteSettings={siteSettings} saveSetting={handleSaveSetting} addNotification={addNotification} />
                         </div>
                       </div>
                     )}
 
                     {activeSubTab === 'themes' && (
-                      <div className="space-y-5">
-                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="space-y-5 w-full">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                           <div className="flex justify-between items-center mb-4"><h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2"><Layers className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'قالب‌ها', en: 'Themes', ru: 'Темы', tr: 'Temalar' })}</h3><button onClick={openThemeUploadPanel} className="h-[30px] px-3 bg-[#2271b1] text-white rounded-[3px] text-[13px]">{L(language, { fa: 'آپلود', en: 'Upload', ru: 'Загрузить', tr: 'Yükle' })}</button></div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             {availableThemes.map((th: ThemeInfo) => <div key={th.id} className={`p-4 rounded-[2px] border ${themeId === th.id ? 'border-[#2271b1] bg-[#f6f7f7]' : 'border-[#dcdcde] bg-white'}`}><p className="text-[13px] font-medium text-[#1d2327]">{th.name}</p><p className="text-[11px] text-[#646970] font-mono">{th.id}</p><div className="flex gap-2 mt-3"><button onClick={() => handleActivateTheme(th)} className="h-[26px] px-2 bg-white border border-[#2271b1] text-[#2271b1] rounded-[3px] text-[11px]">Activate</button><button onClick={() => handleExportThemeZip(th)} className="h-[26px] px-2 bg-white border border-[#dcdcde] rounded-[3px] text-[11px] text-[#50575e]">Export</button><button onClick={() => handleDeleteTheme(th)} className="h-[26px] px-2 bg-white border border-[#dcdcde] text-[#d63638] rounded-[3px] text-[11px]">Delete</button></div></div>)}
                           </div>
                         </div>
                         {showUploadForm && (
-                          <div ref={themeUploadPanelRef} className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <div ref={themeUploadPanelRef} className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                             <h4 className="text-[13px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'نصب ZIP', en: 'Install ZIP', ru: 'Установить', tr: 'Yükle' })}</h4>
                             <input type="file" accept=".zip" onChange={handleZipFileSelect} className="text-[13px] text-[#50575e]" />
                             {zipParsed && <div className="mt-3 p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde] text-[13px] text-[#1d2327]"><p>{zipParsed.meta.name} — {(zipParsed.css.length / 1024).toFixed(1)}KB</p><button onClick={handleInstallZip} disabled={isInstallingZip} className="mt-2 h-[30px] px-3 bg-[#2271b1] text-white rounded-[3px] text-[13px]">{isInstallingZip ? 'Installing…' : 'Install'}</button></div>}
@@ -2062,9 +2023,9 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'appSlider' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                         <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4">{L(language, { fa: 'اسلایدر', en: 'Slider', ru: 'Слайдер', tr: 'Slayt' })}</h3>
-                        <form onSubmit={editingSlideId ? handleEditSlide : handleAddSlide} className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[700px]">
+                        <form onSubmit={editingSlideId ? handleEditSlide : handleAddSlide} className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <input value={newSlideUrl} onChange={e => setNewSlideUrl(e.target.value)} placeholder="/images/..." className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] md:col-span-2" required />
                           <input value={newSlideTitleFa} onChange={e => setNewSlideTitleFa(e.target.value)} placeholder="FA Title" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
                           <input value={newSlideTitleEn} onChange={e => setNewSlideTitleEn(e.target.value)} placeholder="EN Title" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
@@ -2076,13 +2037,13 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'mobileAppDownload' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                         <React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminMobileAppDownloadPanel addNotification={addNotification} /></React.Suspense>
                       </div>
                     )}
 
                     {activeSubTab === 'dbLogs' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                         <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3 flex items-center gap-2"><Database className="w-4 h-4 text-[#2271b1]" /> Logs ({dbLogsList.length})</h3>
                         <div className="bg-[#1d2327] rounded-[2px] p-3 font-mono text-[11px] max-h-[500px] overflow-y-auto space-y-2">
                           {dbLogsList.map((log: any, i: number) => <div key={i} className="p-2 bg-[#2c3338] rounded-[2px]"><span className="text-[#72aee6]">{log.provider}</span> <span className="text-[#dba617]">{log.type || log.operation}</span> <span className="text-[#c3c4c7]">{log.command || log.query}</span></div>)}
@@ -2091,7 +2052,7 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'migrations' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full">
                         <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'مهاجرت‌ها', en: 'Migrations', ru: 'Миграции', tr: 'Geçişler' })}</h3>
                         <pre className="bg-[#f6f7f7] border border-[#dcdcde] p-4 rounded-[2px] text-[11px] text-[#3c434a] overflow-x-auto max-h-[500px]">{migrationsCode || 'No code'}</pre>
                         <button onClick={copyMigrationsToClipboard} className="mt-3 h-[30px] px-3 bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338]">Copy</button>
@@ -2099,31 +2060,31 @@ export default function AdminPanelTab({
                     )}
 
                     {activeSubTab === 'presentation' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><PresentationTab addNotification={addNotification} /></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><PresentationTab addNotification={addNotification} /></React.Suspense></div>
                     )}
                     {activeSubTab === 'tickets' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminTicketsSection addNotification={addNotification} /></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminTicketsSection addNotification={addNotification} /></React.Suspense></div>
                     )}
                     {activeSubTab === 'wallet' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminWalletSection addNotification={addNotification} /></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminWalletSection addNotification={addNotification} /></React.Suspense></div>
                     )}
                     {activeSubTab === 'affiliates' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminAffiliatesSection addNotification={addNotification} /></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminAffiliatesSection addNotification={addNotification} /></React.Suspense></div>
                     )}
                     {activeSubTab === 'promotions' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><PromotionsConsole /></OpsProvider></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><PromotionsConsole /></OpsProvider></React.Suspense></div>
                     )}
                     {activeSubTab === 'jarvis' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><JarvisConsole /></OpsProvider></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><JarvisConsole /></OpsProvider></React.Suspense></div>
                     )}
                     {activeSubTab === 'tournamentOps' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><TournamentsOpsConsole /></OpsProvider></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><TournamentsOpsConsole /></OpsProvider></React.Suspense></div>
                     )}
                     {activeSubTab === 'messaging' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminMessagingPanel language={language} notify={addNotification} /></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminMessagingPanel language={language} notify={addNotification} /></React.Suspense></div>
                     )}
                     {activeSubTab === 'content' && (
-                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminContentStudioRedesigned language={language as any} dir={dir} addNotification={addNotification} /></React.Suspense></div>
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5 w-full"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminContentStudioRedesigned language={language as any} dir={dir} addNotification={addNotification} /></React.Suspense></div>
                     )}
                   </>
                 )}

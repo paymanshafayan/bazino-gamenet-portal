@@ -72,37 +72,64 @@ export default function AdminKeysCenter({ addNotification, language: propLang, d
   // Publishing settings
   const [pubSettings, setPubSettings] = useState<any>(null);
 
+  const [hasEnvFallback, setHasEnvFallback] = useState(false);
+  const [envProviders, setEnvProviders] = useState<any[]>([]);
+
   const loadAll = async () => {
     try {
-      const [jarvisRes, syncRes, contentRes, tokenRes, pubRes] = await Promise.all([
+      const [jarvisRes, syncRes, contentRes, tokenRes, pubRes, settingsRes] = await Promise.all([
         fetch('/api/admin/jarvis-ai-providers').then(r => r.json()).catch(() => ({ providers: [] })),
         fetch('/api/admin/sync-settings').then(r => r.json()).catch(() => ({})),
-        fetch('/api/admin/publishing-settings').then(r => r.json()).catch(() => fetch('/api/admin/content-settings').then(r => r.json()).catch(() => ({}))),
+        fetch('/api/management/publishing/config').then(r => r.json()).catch(() => fetch('/api/admin/publishing-settings').then(r => r.json()).catch(() => fetch('/api/admin/content-settings').then(r => r.json()).catch(() => ({})))),
         fetch('/api/admin/api-tokens').then(r => r.json()).catch(() => ({ tokens: [] })),
         fetch('/api/admin/content/publishing-config').then(r => r.json()).catch(() => ({})),
+        fetch('/api/settings').then(r => r.json()).catch(() => ({})),
       ]);
 
-      setJarvisProviders(jarvisRes.providers || []);
+      // Jarvis: ensure default keys from env are shown even if DB empty
+      let providers = jarvisRes.providers || [];
+      if (providers.length === 0 && jarvisRes.envProviders?.length) {
+        providers = jarvisRes.envProviders;
+      }
+      // If still empty, create 3 default slots so admin sees boxes
+      if (providers.length === 0) {
+        providers = [
+          { id: 'provider-1', provider: 'groq', label: 'Groq — سریع و ارزان (پیشنهاد اول)', model: 'llama-3.1-8b-instant', apiKey: '', enabled: true },
+          { id: 'provider-2', provider: 'openrouter', label: 'OpenRouter — رایگان (پشتیبان)', model: 'meta-llama/llama-3.1-8b-instruct:free', apiKey: '', enabled: false },
+          { id: 'provider-3', provider: 'gemini', label: 'Gemini — قدرتمند (پشتیبان سوم)', model: 'gemini-3.6-flash', apiKey: '', enabled: false },
+        ];
+      }
+      // Ensure 3 slots
+      while (providers.length < 3) {
+        const idx = providers.length + 1;
+        providers.push({ id: `provider-${idx}`, provider: idx === 1 ? 'groq' : idx === 2 ? 'openrouter' : 'gemini', label: '', model: '', apiKey: '', enabled: idx === 1 });
+      }
+      setJarvisProviders(providers);
+      setHasEnvFallback(!!jarvisRes.hasEnvFallback);
+      setEnvProviders(jarvisRes.envProviders || []);
+
       setSyncConfigured(!!syncRes.configured);
       setSyncMasked(syncRes.masked || '');
       setTokens(tokenRes.tokens || []);
       setAllowedScopes(tokenRes.scopes || []);
       setPubSettings(pubRes || {});
 
-      // Try to get content secrets status from settings endpoint
-      // contentRes may have secretsStatus
-      if (contentRes?.secretsStatus) setContentSecrets(contentRes.secretsStatus);
-      else if (contentRes?.secrets) setContentSecrets(contentRes.secrets);
-      else {
-        // fallback: fetch settings keys existence
-        const settingsRes = await fetch('/api/settings').then(r => r.json()).catch(() => ({}));
-        const secretKeys = ['ZERNIO_API_KEY', 'IMEJIS_API_KEY', 'CLOUDFLARE_API_TOKEN', 'ELEVENLABS_API_KEY', 'YOUTUBE_API_KEY', 'TWITCH_CLIENT_ID', 'TWITCH_CLIENT_SECRET', 'GROQ_API_KEY'];
-        const status: any = {};
-        secretKeys.forEach(k => {
-          status[k] = { configured: !!settingsRes[k] || !!settingsRes[k.toLowerCase()] };
-        });
-        setContentSecrets(status);
-      }
+      // Content secrets: merge vault status + settings existence + env
+      const secretKeys = ['ZERNIO_API_KEY', 'IMEJIS_API_KEY', 'CLOUDFLARE_API_TOKEN', 'ELEVENLABS_API_KEY', 'YOUTUBE_API_KEY', 'TWITCH_CLIENT_ID', 'TWITCH_CLIENT_SECRET', 'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'MANUS_API_KEY'];
+      const status: any = {};
+      // from publishing config secrets
+      const pubSecrets = contentRes?.secrets || contentRes?.secretsStatus || {};
+      secretKeys.forEach(k => {
+        const lower = k.toLowerCase();
+        const fromPub = pubSecrets[k] || pubSecrets[lower] || pubSecrets[k.toLowerCase()];
+        const fromSettings = settingsRes[k] || settingsRes[lower] || settingsRes[k.toLowerCase()];
+        const configured = !!(fromPub?.configured || fromPub?.source === 'host' || fromSettings);
+        status[k] = { configured, masked: fromPub?.masked || (configured ? '••••••••' : ''), source: fromPub?.source || (fromSettings ? 'panel' : 'none') };
+      });
+      // Also include any keys returned from contentRes directly
+      if (contentRes?.secretsStatus) Object.assign(status, contentRes.secretsStatus);
+      if (contentRes?.secrets) Object.assign(status, contentRes.secrets);
+      setContentSecrets(status);
     } catch (e) {
       console.error(e);
     }
@@ -227,41 +254,94 @@ export default function AdminKeysCenter({ addNotification, language: propLang, d
         </div>
       </div>
 
-      {/* Jarvis Section */}
+      {/* Jarvis Section — now with explicit key boxes and default from env */}
       {(activeCat === 'all' || activeCat === 'jarvis') && (
         <div className="bg-[#0e1020] border border-blue-500/20 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-black text-white flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-blue-400" />
-              {L(language, { fa: 'جارویس — مدل‌های AI (تا ۳ تا)', en: 'Jarvis — AI Models (up to 3)', ru: 'Jarvis — модели ИИ', tr: 'Jarvis — AI Modelleri' })}
+              {L(language, { fa: 'جارویس — مدل‌های AI (تا ۳ تا) + کلیدها', en: 'Jarvis — AI Models (up to 3) + Keys', ru: 'Jarvis — модели ИИ + ключи', tr: 'Jarvis — AI Modelleri + Anahtarlar' })}
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Groq / OpenRouter / Gemini / Ollama</span>
             </h3>
             <button onClick={saveJarvis} disabled={isSavingJarvis} className="px-3 py-1.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-50 text-black text-xs font-black rounded-lg flex items-center gap-1.5">
-              <Save className="w-3.5 h-3.5" /> {L(language, { fa: 'ذخیره', en: 'Save', ru: 'Сохранить', tr: 'Kaydet' })}
+              <Save className="w-3.5 h-3.5" /> {L(language, { fa: 'ذخیره جارویس', en: 'Save Jarvis', ru: 'Сохранить Jarvis', tr: 'Jarvis Kaydet' })}
             </button>
           </div>
+          {hasEnvFallback && (
+            <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                {L(language, { fa: 'کلیدهای پیش‌فرض از سرویس (ENV) لود شده — در پنل به صورت ماسک شده دیده می‌شوند. مدیر فقط تغییر می‌دهد، نیازی به ثبت از صفر نیست. برای تغییر، کلید جدید را وارد و ذخیره کن.', en: 'Default keys loaded from ENV — shown masked in panel. Admin only changes them, no need to register from scratch. Enter new key and save to override.', ru: 'Ключи по умолчанию из ENV — показаны маскированно. Админ только меняет.', tr: 'Varsayılan anahtarlar ENV’den yüklendi — maskeli görünür. Yönetici sadece değiştirir.' })}
+              </p>
+            </div>
+          )}
           <div className="grid md:grid-cols-3 gap-3">
             {jarvisProviders.slice(0, 3).map((p, i) => (
-              <div key={p.id || i} className="bg-black/40 border border-white/5 rounded-xl p-3 space-y-2">
+              <div key={p.id || i} className="bg-black/40 border border-white/10 rounded-xl p-3 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">#{i + 1} {p.provider || 'groq'}</span>
-                  <label className="flex items-center gap-1 text-[10px] text-white/60">
+                  <span className="text-xs font-black text-white flex items-center gap-1.5">
+                    #{i + 1} <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">{p.provider || 'groq'}</span>
+                    {p.apiKey === '********' && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">ENV پیش‌فرض</span>}
+                  </span>
+                  <label className="flex items-center gap-1 text-[10px] text-white/60 cursor-pointer">
                     <input type="checkbox" checked={p.enabled !== false} onChange={e => setJarvisProviders(prev => prev.map((x, idx) => idx === i ? { ...x, enabled: e.target.checked } : x))} />
                     {L(language, { fa: 'فعال', en: 'Enabled', ru: 'Вкл', tr: 'Aktif' })}
                   </label>
                 </div>
-                <input value={p.model || ''} onChange={e => setJarvisProviders(prev => prev.map((x, idx) => idx === i ? { ...x, model: e.target.value } : x))} placeholder="model" className="w-full bg-[#0d1224] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white font-mono" />
-                <div className="flex gap-1">
-                  <input type={showSecrets[`jarvis-${i}`] ? 'text' : 'password'} value={p.apiKey || ''} onChange={e => setJarvisProviders(prev => prev.map((x, idx) => idx === i ? { ...x, apiKey: e.target.value } : x))} placeholder="API Key" className="flex-1 bg-[#0d1224] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white font-mono" />
-                  <button onClick={() => setShowSecrets(s => ({ ...s, [`jarvis-${i}`]: !s[`jarvis-${i}`] }))} className="p-1.5 bg-white/5 rounded-lg text-white/40 hover:text-white">
-                    {showSecrets[`jarvis-${i}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+                <div>
+                  <div className="text-[10px] text-white/40 mb-1">{L(language, { fa: 'نام نمایشی', en: 'Display name', ru: 'Имя', tr: 'Görünen ad' })}</div>
+                  <input value={p.label || ''} onChange={e => setJarvisProviders(prev => prev.map((x, idx) => idx === i ? { ...x, label: e.target.value } : x))} placeholder="label" className="w-full bg-[#0d1224] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white" />
                 </div>
+                <div>
+                  <div className="text-[10px] text-white/40 mb-1">Model</div>
+                  <input value={p.model || ''} onChange={e => setJarvisProviders(prev => prev.map((x, idx) => idx === i ? { ...x, model: e.target.value } : x))} placeholder="model" className="w-full bg-[#0d1224] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white font-mono" />
+                </div>
+                <div>
+                  <div className="text-[10px] text-white/40 mb-1 flex items-center justify-between">
+                    <span>{L(language, { fa: 'کلید API', en: 'API Key', ru: 'API ключ', tr: 'API Anahtarı' })}</span>
+                    {p.apiKey === '********' && <span className="text-[9px] text-emerald-300">{L(language, { fa: 'از ENV لود شده — برای تغییر، کلید جدید وارد کن', en: 'Loaded from ENV — enter new to override', ru: 'Из ENV — введите новый для замены', tr: 'ENV’den yüklendi — değiştirmek için yeni girin' })}</span>}
+                  </div>
+                  <div className="flex gap-1">
+                    <input type={showSecrets[`jarvis-${i}`] ? 'text' : 'password'} value={p.apiKey || ''} onChange={e => setJarvisProviders(prev => prev.map((x, idx) => idx === i ? { ...x, apiKey: e.target.value } : x))} placeholder={p.apiKey === '********' ? '•••••••• (پیش‌فرض ENV) — کلید جدید برای تغییر' : 'Paste API Key here'} className="flex-1 bg-[#0d1224] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white font-mono" />
+                    <button onClick={() => setShowSecrets(s => ({ ...s, [`jarvis-${i}`]: !s[`jarvis-${i}`] }))} className="p-1.5 bg-white/5 rounded-lg text-white/40 hover:text-white">
+                      {showSecrets[`jarvis-${i}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+                {p.provider === 'ollama' && (
+                  <div>
+                    <div className="text-[10px] text-white/40 mb-1">Base URL (Ollama)</div>
+                    <input value={p.baseUrl || ''} onChange={e => setJarvisProviders(prev => prev.map((x, idx) => idx === i ? { ...x, baseUrl: e.target.value } : x))} placeholder="http://127.0.0.1:11434" className="w-full bg-[#0d1224] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white font-mono" />
+                  </div>
+                )}
                 <p className="text-[10px] text-white/30 leading-relaxed">
-                  {p.provider === 'groq' ? 'Groq سریع و ارزان — پیشنهاد اول' : p.provider === 'openrouter' ? 'OpenRouter رایگان — پیشنهاد دوم' : 'مدل سوم پشتیبان'}
+                  {p.provider === 'groq' ? L(language, { fa: 'Groq سریع و ارزان — پیشنهاد اول، از ENV پیش‌فرض دارد', en: 'Groq fast & cheap — first choice, has ENV default', ru: 'Groq быстро и дешево', tr: 'Groq hızlı ve ucuz' }) : p.provider === 'openrouter' ? L(language, { fa: 'OpenRouter رایگان — پشتیبان دوم', en: 'OpenRouter free — second fallback', ru: 'OpenRouter бесплатно', tr: 'OpenRouter ücretsiz' }) : L(language, { fa: 'Gemini قدرتمند — پشتیبان سوم', en: 'Gemini powerful — third fallback', ru: 'Gemini мощный', tr: 'Gemini güçlü' })}
                 </p>
               </div>
             ))}
+          </div>
+          <div className="mt-4 grid md:grid-cols-3 gap-3">
+            {[
+              { key: 'GROQ_API_KEY', fa: 'Groq API Key (پیش‌فرض ENV)', en: 'Groq API Key (ENV default)' },
+              { key: 'GEMINI_API_KEY', fa: 'Gemini API Key (پیش‌فرض ENV)', en: 'Gemini API Key (ENV default)' },
+              { key: 'OPENROUTER_API_KEY', fa: 'OpenRouter API Key', en: 'OpenRouter API Key' },
+            ].map(item => {
+              const st = contentSecrets[item.key] || { configured: false };
+              return (
+                <div key={item.key} className="bg-black/30 border border-white/5 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-white">{L(language, { fa: item.fa, en: item.en, ru: item.en, tr: item.en })}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${st.configured ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20' : 'bg-rose-500/15 text-rose-300 border-rose-500/20'}`}>{st.configured ? 'پیش‌فرض ثبت شده' : 'Missing'}</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input type={showSecrets[item.key] ? 'text' : 'password'} value={contentInputs[item.key] || ''} onChange={e => setContentInputs(s => ({ ...s, [item.key]: e.target.value }))} placeholder={st.configured ? '•••••••• (برای تغییر کلید جدید وارد کن)' : 'Paste key — پیش‌فرض از ENV اگر ست باشد'} className="flex-1 bg-[#0d1224] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white font-mono" />
+                    <button onClick={() => setShowSecrets(s => ({ ...s, [item.key]: !s[item.key] }))} className="p-1.5 bg-white/5 rounded-lg text-white/40">{showSecrets[item.key] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}</button>
+                    <button onClick={() => saveContentSecret(item.key)} disabled={!contentInputs[item.key]} className="px-2.5 py-1.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-black rounded-lg"><Save className="w-3.5 h-3.5" /></button>
+                  </div>
+                  <div className="text-[10px] text-white/30 mt-1 font-mono">{item.key} — {st.source === 'host' ? 'منبع: ENV (پیش‌فرض)' : st.source === 'panel' ? 'منبع: پنل' : 'منبع: —'}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

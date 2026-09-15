@@ -1655,382 +1655,423 @@ export default function AdminPanelTab({
 
   if (loading && !stats) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-400 font-mono text-xs font-bold uppercase tracking-widest">Loading Live Server Data...</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center bg-[#f0f0f1] min-h-[60vh]">
+        <div className="w-12 h-12 border-4 border-[#2271b1] border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-[#50575e] font-mono text-xs font-bold uppercase tracking-widest">Loading Live Server Data...</p>
       </div>
     );
   }
 
   // Guide modal state for new design
   const [guideOpen, setGuideOpen] = useState(false);
+  const [guideInitialStep, setGuideInitialStep] = useState(0);
   const currentGroup = groupForSection(activeSubTab);
 
+  // WordPress-like layout wrapper
   return (
-    <div className="animate-fade-in font-sans min-h-[70vh]" dir={dir}>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* NEW SIDEBAR */}
-        <div className="lg:col-span-3">
-          <AdminSidebar
-            active={activeSubTab}
-            onSelect={(sec)=> setActiveSubTab(sec as any)}
-            openTicketCount={openTicketCount}
-            dir={dir}
-            language={language as any}
-          />
-        </div>
-
-        {/* MAIN WORKSPACE */}
-        <div className="lg:col-span-9 flex flex-col gap-5">
-          {/* Header: breadcrumb + search + guide button */}
-          <div className="bg-dark-card border border-white/10 px-5 py-4 rounded-2xl flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono flex items-center gap-1.5">
-                  <span>{L(language, { fa: 'پنل مدیریت', en: 'Admin Panel', ru: 'Панель', tr: 'Yönetim' })}</span>
-                  <span className="text-gray-600">/</span>
-                  <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px]">{currentGroup ? L(language, { fa: currentGroup.fa, en: currentGroup.en, ru: currentGroup.ru, tr: currentGroup.tr }) : ''}</span>
-                  <span className="text-gray-600">/</span>
-                  <span className="text-primary/80" dir="ltr">{pathFromAdminSection(activeSubTab)}</span>
-                </p>
-                <h2 className="text-lg md:text-xl font-black text-white font-display mt-1 truncate flex items-center gap-2">
-                  {L(language, ADMIN_SECTION_META[activeSubTab])}
-                </h2>
-                <p className="text-[11px] text-gray-400 mt-1 max-w-2xl leading-relaxed">
-                  {(() => {
-                    const g = ADMIN_GUIDES[activeSubTab];
-                    return g ? L(language, { fa: g.introFa, en: g.introEn, ru: g.introEn, tr: g.introEn } as any) : '';
-                  })()}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={()=> setGuideOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-xs font-black flex items-center gap-1.5 transition-all"
-                >
-                  <HelpCircle className="w-4 h-4" />
-                  {L(language, { fa: 'راهنمای این بخش', en: 'Guide', ru: 'Гид', tr: 'Rehber' })}
-                </button>
-              </div>
-            </div>
-
-            {/* Quick search inside header */}
-            <div className="relative w-full" ref={sectionSearchRef}>
-              <Search className={`w-4 h-4 text-gray-500 absolute top-1/2 -translate-y-1/2 ${dir === 'rtl' ? 'right-3' : 'left-3'}`} />
-              <input
-                type="search"
-                value={sectionQuery}
-                onChange={(e) => { setSectionQuery(e.target.value); setIsSectionSearchOpen(true); }}
-                onFocus={() => setIsSectionSearchOpen(true)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && sectionMatches[0]) { setActiveSubTab(sectionMatches[0]); setSectionQuery(''); setIsSectionSearchOpen(false); }
-                  if (e.key === 'Escape') setIsSectionSearchOpen(false);
-                }}
-                placeholder={L(language, { fa: 'جستجوی سریع بخش‌ها… (مثلاً قالب، اسلایدر، کیف پول)', en: 'Quick find… (themes, slider, wallet)', ru: 'Поиск раздела…', tr: 'Bölüm ara…' })}
-                className={`w-full bg-black/40 border border-white/10 focus:border-primary/60 rounded-xl py-2.5 text-xs text-white placeholder:text-gray-600 outline-none ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
-              />
-              {isSectionSearchOpen && sectionQuery.trim() && (
-                <ul className="absolute z-40 mt-2 w-full bg-[#0d1020] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto">
-                  {sectionMatches.length === 0 && <li className="px-4 py-3 text-xs text-gray-500">{L(language, { fa: 'بخشی پیدا نشد', en: 'No section found', ru: '—', tr: '—' })}</li>}
-                  {sectionMatches.map((k) => (
-                    <li key={k}>
-                      <a href={pathFromAdminSection(k)} onClick={(e)=>{e.preventDefault(); setActiveSubTab(k); setSectionQuery(''); setIsSectionSearchOpen(false);}} className={`flex items-center justify-between gap-3 px-4 py-2.5 text-xs hover:bg-primary/10 ${activeSubTab===k?'text-primary':'text-gray-200'}`}>
-                        <span className="font-bold">{L(language, ADMIN_SECTION_META[k])}</span>
-                        <span className="text-[10px] text-gray-500 font-mono" dir="ltr">{pathFromAdminSection(k)}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+    <div id="wpwrap" className="animate-fade-in font-sans min-h-screen bg-[#f0f0f1] text-[#3c434a]" dir={dir} style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
+      {/* WP Admin Bar — 32px */}
+      <div id="wpadminbar" className="h-[32px] bg-[#1d2327] text-[#eee] flex items-center justify-between px-3 sticky top-0 z-[9999] select-none" style={{ height: '32px' }}>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-[#3858e9] flex items-center justify-center text-white font-black text-[11px]">B</div>
+            <span className="text-[13px] text-white font-normal hidden sm:inline">Bazino GameNet — {L(language, { fa: 'پنل مدیریت', en: 'Admin', ru: 'Админ', tr: 'Yönetim' })}</span>
+            <span className="text-[13px] text-white sm:hidden">Bazino</span>
           </div>
-
-          {/* CONTENT PER SECTION - KEEP EXISTING LOGIC BUT WRAPPED */}
-          {activeSubTab === 'apiKeys' ? (
-            <AdminKeysCenter language={language as any} dir={dir} addNotification={addNotification} />
-          ) : (
-            <>
-
-          {/* Dashboard */}
-          {activeSubTab === 'dashboard' && stats && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-dark-card border border-white/10 rounded-2xl p-5">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase">{L(language,{fa:'کاربران ثبت‌نام شده',en:'Registered Users',ru:'Пользователи',tr:'Kullanıcılar'})}</p>
-                  <p className="text-2xl font-black text-white mt-2">{stats.users ?? '-'}</p>
-                </div>
-                <div className="bg-dark-card border border-white/10 rounded-2xl p-5">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase">{L(language,{fa:'سیستم‌ها',en:'Systems',ru:'Системы',tr:'Sistemler'})}</p>
-                  <p className="text-2xl font-black text-white mt-2">{systems.length}</p>
-                </div>
-                <div className="bg-dark-card border border-white/10 rounded-2xl p-5">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase">{L(language,{fa:'سفارشات کافه',en:'Cafe Orders',ru:'Заказы',tr:'Siparişler'})}</p>
-                  <p className="text-2xl font-black text-white mt-2">{stats.cafeOrders ?? '-'}</p>
-                </div>
-                <div className="bg-dark-card border border-white/10 rounded-2xl p-5">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase">{L(language,{fa:'تیکت باز',en:'Open Tickets',ru:'Открытые тикеты',tr:'Açık Talepler'})}</p>
-                  <p className="text-2xl font-black text-white mt-2">{openTicketCount}</p>
-                </div>
-              </div>
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> {L(language,{fa:'نمای کلی',en:'Overview',ru:'Обзор',tr:'Genel Bakış'})}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-400">
-                  <div className="p-3 bg-black/30 rounded-xl border border-white/5"><span className="text-gray-500">Tournaments:</span> {tournaments.length}</div>
-                  <div className="p-3 bg-black/30 rounded-xl border border-white/5"><span className="text-gray-500">Articles:</span> {articles.length}</div>
-                  <div className="p-3 bg-black/30 rounded-xl border border-white/5"><span className="text-gray-500">Sliders:</span> {appSliders.length}</div>
-                  <div className="p-3 bg-black/30 rounded-xl border border-white/5"><span className="text-gray-500">Chat Rooms:</span> {chatRooms.length}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Systems */}
-          {activeSubTab === 'systems' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Monitor className="w-4 h-4 text-primary" /> {L(language,{fa:'افزودن سیستم جدید',en:'Add New System',ru:'Добавить систему',tr:'Yeni Sistem Ekle'})}</h3>
-                <form onSubmit={handleAddSystem} className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <input value={newSystem.name} onChange={e=>setNewSystem({...newSystem,name:e.target.value})} placeholder={L(language,{fa:'نام سیستم',en:'System name',ru:'Название',tr:'Sistem adı'})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                  <select value={newSystem.type} onChange={e=>setNewSystem({...newSystem,type:e.target.value})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white"><option>PC</option><option>PS5</option><option>Xbox</option><option>Simulator</option></select>
-                  <input type="number" value={newSystem.hourlyRate} onChange={e=>setNewSystem({...newSystem,hourlyRate:Number(e.target.value)})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono" />
-                  <button type="submit" className="bg-primary text-black font-black rounded-lg text-xs px-4 py-2">{L(language,{fa:'افزودن',en:'Add',ru:'Добавить',tr:'Ekle'})}</button>
-                </form>
-              </div>
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">{L(language,{fa:'لیست سیستم‌ها',en:'Systems list',ru:'Список систем',tr:'Sistem listesi'})} ({systems.length})</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
-                  {systems.map((s:any)=>(
-                    <div key={s.id||s.name} className="p-3 bg-black/30 border border-white/5 rounded-xl flex justify-between items-center gap-2">
-                      <div><p className="text-xs font-bold text-white">{s.name}</p><p className="text-[10px] text-gray-500">{s.type} — {s.hourlyRate}</p></div>
-                      <div className="flex gap-1">
-                        <button onClick={()=>handleToggleSystem(s.id,s.isActive)} className={`px-2 py-1 rounded text-[10px] font-bold ${s.isActive?'bg-emerald-500/20 text-emerald-300':'bg-amber-500/20 text-amber-300'}`}>{s.isActive?'ON':'OFF'}</button>
-                        <button onClick={()=>handleDeleteSystem(s.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded"><Trash2 className="w-3 h-3" /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Cafe */}
-          {activeSubTab === 'cafe' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Coffee className="w-4 h-4 text-amber-400" /> {L(language,{fa:'افزودن آیتم کافه',en:'Add Cafe Item',ru:'Добавить позицию',tr:'Kafe Öğesi Ekle'})}</h3>
-                <form onSubmit={handleAddCafeItem} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input value={newCafe.name} onChange={e=>setNewCafe({...newCafe,name:e.target.value})} placeholder={L(language,{fa:'نام',en:'Name',ru:'Название',tr:'Ad'})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                  <input type="number" value={newCafe.price} onChange={e=>setNewCafe({...newCafe,price:Number(e.target.value)})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono" />
-                  <button type="submit" className="bg-amber-500 text-black font-black rounded-lg text-xs px-4 py-2">{L(language,{fa:'افزودن',en:'Add',ru:'Добавить',tr:'Ekle'})}</button>
-                </form>
-              </div>
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">{L(language,{fa:'منو',en:'Menu',ru:'Меню',tr:'Menü'})} ({cafeItems.length})</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {cafeItems.map((c:any)=>(
-                    <div key={c.id||c.name} className="p-3 bg-black/30 border border-white/5 rounded-xl flex justify-between items-center"><span className="text-xs text-white">{c.name} — {c.price}</span><button onClick={()=>handleDeleteCafeItem(c.id)} className="text-red-400 p-1"><Trash2 className="w-3 h-3" /></button></div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Shop */}
-          {activeSubTab === 'shop' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><ShoppingBag className="w-4 h-4 text-emerald-400" /> {L(language,{fa:'افزودن کالا',en:'Add Product',ru:'Добавить товар',tr:'Ürün Ekle'})}</h3>
-                <form onSubmit={handleAddAccessory} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input value={newAccessory.name} onChange={e=>setNewAccessory({...newAccessory,name:e.target.value})} placeholder={L(language,{fa:'نام کالا',en:'Product name',ru:'Название',tr:'Ürün adı'})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                  <input type="number" value={newAccessory.price} onChange={e=>setNewAccessory({...newAccessory,price:Number(e.target.value)})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono" />
-                  <button type="submit" className="bg-emerald-500 text-black font-black rounded-lg text-xs px-4 py-2">{L(language,{fa:'افزودن',en:'Add',ru:'Добавить',tr:'Ekle'})}</button>
-                </form>
-              </div>
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">{L(language,{fa:'انبار',en:'Inventory',ru:'Склад',tr:'Stok'})} ({accessories.length})</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {accessories.map((a:any)=><div key={a.id||a.name} className="p-3 bg-black/30 border border-white/5 rounded-xl flex justify-between items-center"><span className="text-xs text-white">{a.name} — {a.price}</span><button onClick={()=>handleDeleteAccessory(a.id)} className="text-red-400 p-1"><Trash2 className="w-3 h-3" /></button></div>)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tournaments */}
-          {activeSubTab === 'tournaments' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <React.Suspense fallback={<div className="p-8 text-center text-xs text-gray-500">Loading…</div>}><AdminTournamentPlanner language={language as any} notify={addNotification} /></React.Suspense>
-            </div>
-          )}
-
-          {/* Blog */}
-          {activeSubTab === 'blog' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Newspaper className="w-4 h-4 text-cyan-400" /> {L(language,{fa:'مقاله جدید',en:'New Article',ru:'Новая статья',tr:'Yeni Makale'})}</h3>
-                <form onSubmit={handleAddArticle} className="flex flex-col gap-3">
-                  <input value={newArticle.title} onChange={e=>setNewArticle({...newArticle,title:e.target.value})} placeholder={L(language,{fa:'عنوان',en:'Title',ru:'Заголовок',tr:'Başlık'})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                  <textarea value={newArticle.content} onChange={e=>setNewArticle({...newArticle,content:e.target.value})} rows={4} placeholder={L(language,{fa:'محتوا',en:'Content',ru:'Содержание',tr:'İçerik'})} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                  <button type="submit" className="self-start bg-cyan-500 text-black font-black rounded-lg text-xs px-6 py-2">{L(language,{fa:'انتشار',en:'Publish',ru:'Опубликовать',tr:'Yayınla'})}</button>
-                </form>
-              </div>
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">{L(language,{fa:'مقالات',en:'Articles',ru:'Статьи',tr:'Makaleler'})} ({articles.length})</h3>
-                <div className="flex flex-col gap-2">
-                  {articles.map((a:any)=><div key={a.id} className="p-3 bg-black/30 border border-white/5 rounded-xl flex justify-between items-center"><span className="text-xs text-white truncate">{a.title}</span><button onClick={()=>handleDeleteArticle(a.id)} className="text-red-400 p-1"><Trash2 className="w-3 h-3" /></button></div>)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Chat */}
-          {activeSubTab === 'chat' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-primary" /> {L(language,{fa:'اتاق جدید',en:'New Room',ru:'Новая комната',tr:'Yeni Oda'})}</h3>
-                <form onSubmit={handleAddChatRoom} className="flex gap-3"><input value={newChatRoomName} onChange={e=>setNewChatRoomName(e.target.value)} placeholder="e.g. Apex Legends" className="flex-1 bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required /><button type="submit" className="bg-primary text-black font-black rounded-lg text-xs px-6 py-2">+</button></form>
-              </div>
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">{chatRooms.map((room:string)=><div key={room} className="p-3 bg-black/30 border border-white/5 rounded-xl flex justify-between items-center"><span className="text-xs text-white">{room}</span><button onClick={()=>handleDeleteChatRoom(room)} className="text-red-400 p-1"><Trash2 className="w-3 h-3" /></button></div>)}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Messages */}
-          {activeSubTab === 'messages' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> {L(language,{fa:'ارسال پیام',en:'Send Message',ru:'Отправить сообщение',tr:'Mesaj Gönder'})}</h3>
-                <form onSubmit={handleSendMessage} className="flex flex-col gap-3">
-                  <select value={recipient} onChange={e=>setRecipient(e.target.value)} className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white"><option value="All">All Users</option>{registeredUsers.map((u:any)=><option key={u.username} value={u.username}>{u.username}</option>)}</select>
-                  <input value={msgTitle} onChange={e=>setMsgTitle(e.target.value)} placeholder="Title" className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                  <textarea value={msgBody} onChange={e=>setMsgBody(e.target.value)} rows={3} placeholder="Body" className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                  <button type="submit" className="self-start bg-primary text-black font-black rounded-lg text-xs px-6 py-2 flex items-center gap-1"><Send className="w-3 h-3" /> Send</button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Customization - KEEP ORIGINAL COMPLEX SECTION VIA OLD FILE INCLUDE? We'll reuse old logic chunk */}
-          {activeSubTab === 'customization' && (
-            <div className="animate-fade-in space-y-6">
-              {/* Data source */}
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><Database className="w-4 h-4 text-cyan-400" /> {L(language,{fa:'منبع داده',en:'Data Source',ru:'Источник',tr:'Veri Kaynağı'})}</h3>
-                <div className="flex gap-3">
-                  <button onClick={()=>handleSwitchDataSource('sample')} className={`px-4 py-2 rounded-xl text-xs font-bold border ${dataSource==='sample'?'bg-cyan-500/20 border-cyan-500/40 text-cyan-300':'bg-white/5 border-white/10 text-gray-400'}`}>Sample</button>
-                  <button onClick={()=>handleSwitchDataSource('database')} className={`px-4 py-2 rounded-xl text-xs font-bold border ${dataSource==='database'?'bg-emerald-500/20 border-emerald-500/40 text-emerald-300':'bg-white/5 border-white/10 text-gray-400'}`}>Database</button>
-                </div>
-              </div>
-              {/* Club info simplified */}
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4">{L(language,{fa:'اطلاعات کلوپ',en:'Club Info',ru:'Инфо клуба',tr:'Kulüp Bilgileri'})}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <input value={siteSettings['club_phone']||''} onChange={e=>handleSaveSetting('club_phone',e.target.value)} placeholder="Phone" className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" />
-                  <input value={siteSettings['club_address']||''} onChange={e=>handleSaveSetting('club_address',e.target.value)} placeholder="Address" className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white md:col-span-2" />
-                </div>
-              </div>
-              <LegalAdminSection siteSettings={siteSettings} saveSetting={handleSaveSetting} addNotification={addNotification} />
-            </div>
-          )}
-
-          {/* Themes */}
-          {activeSubTab === 'themes' && (
-            <div className="animate-fade-in space-y-6">
-              <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold text-white flex items-center gap-2"><Layers className="w-4 h-4 text-[#1bc2ca]" /> {L(language,{fa:'قالب‌ها',en:'Themes',ru:'Темы',tr:'Temalar'})}</h3><button onClick={openThemeUploadPanel} className="px-3 py-1.5 bg-[#1bc2ca] text-black rounded-lg text-xs font-bold">{L(language,{fa:'آپلود قالب',en:'Upload Theme',ru:'Загрузить тему',tr:'Tema Yükle'})}</button></div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {availableThemes.map((th:ThemeInfo)=><div key={th.id} className={`p-4 rounded-xl border ${themeId===th.id?'border-primary bg-primary/10':'border-white/5 bg-black/30'}`}><p className="text-xs font-bold text-white">{th.name}</p><p className="text-[10px] text-gray-500 font-mono">{th.id}</p><div className="flex gap-2 mt-3"><button onClick={()=>handleActivateTheme(th)} className="px-2 py-1 bg-white/10 rounded text-[10px] text-white">Activate</button><button onClick={()=>handleExportThemeZip(th)} className="px-2 py-1 bg-white/5 rounded text-[10px] text-gray-400">Export</button><button onClick={()=>handleDeleteTheme(th)} className="px-2 py-1 bg-red-500/10 rounded text-[10px] text-red-400">Delete</button></div></div>)}
-                </div>
-              </div>
-              {showUploadForm && (
-                <div ref={themeUploadPanelRef} className="bg-dark-card border border-white/10 rounded-2xl p-6">
-                  <h4 className="text-xs font-bold text-white mb-3">{L(language,{fa:'نصب قالب ZIP',en:'Install ZIP Theme',ru:'Установить ZIP тему',tr:'ZIP Tema Yükle'})}</h4>
-                  <input type="file" accept=".zip" onChange={handleZipFileSelect} className="text-xs text-gray-400" />
-                  {zipParsed && <div className="mt-3 p-3 bg-black/30 rounded-xl border border-white/5 text-xs text-white"><p>{zipParsed.meta.name} — {(zipParsed.css.length/1024).toFixed(1)}KB</p><button onClick={handleInstallZip} disabled={isInstallingZip} className="mt-2 px-4 py-1.5 bg-primary text-black rounded-lg font-bold text-xs">{isInstallingZip?'Installing…':'Install'}</button></div>}
-                  {zipError && <p className="mt-2 text-xs text-red-400">{zipError}</p>}
-                  {installJob && <p className="mt-2 text-xs text-amber-300 font-mono">{installJob.status} {installJob.filesDone}/{installJob.filesTotal}</p>}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* App Slider */}
-          {activeSubTab === 'appSlider' && (
-            <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-white mb-4">{L(language,{fa:'اسلایدر',en:'Slider',ru:'Слайдер',tr:'Slayt'})}</h3>
-              <form onSubmit={editingSlideId?handleEditSlide:handleAddSlide} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input value={newSlideUrl} onChange={e=>setNewSlideUrl(e.target.value)} placeholder="/images/..." className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white md:col-span-2" required />
-                <input value={newSlideTitleFa} onChange={e=>setNewSlideTitleFa(e.target.value)} placeholder="FA Title" className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                <input value={newSlideTitleEn} onChange={e=>setNewSlideTitleEn(e.target.value)} placeholder="EN Title" className="bg-[#0d122b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white" required />
-                <button type="submit" className="bg-amber-500 text-black font-black rounded-lg text-xs px-4 py-2">{editingSlideId?'Save':'Add'}</button>
-                {editingSlideId && <button type="button" onClick={cancelEditSlide} className="bg-white/10 text-white rounded-lg text-xs px-4 py-2">Cancel</button>}
-              </form>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">{appSliders.map((s:any)=><div key={s.id} className="p-3 bg-black/30 border border-white/5 rounded-xl flex justify-between items-center"><span className="text-xs text-white truncate">{s.titleFa}</span><div className="flex gap-1"><button onClick={()=>startEditSlide(s)} className="text-blue-400 p-1"><Edit className="w-3 h-3" /></button><button onClick={()=>handleDeleteSlide(s.id)} className="text-red-400 p-1"><Trash2 className="w-3 h-3" /></button></div></div>)}</div>
-            </div>
-          )}
-
-          {/* Mobile App */}
-          {activeSubTab === 'mobileAppDownload' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><AdminMobileAppDownloadPanel addNotification={addNotification} /></React.Suspense>
-          )}
-
-          {/* DB Logs */}
-          {activeSubTab === 'dbLogs' && (
-            <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Database className="w-4 h-4 text-emerald-400" /> DB Logs ({dbLogsList.length})</h3>
-              <div className="bg-black/80 rounded-xl p-3 font-mono text-[11px] max-h-[500px] overflow-y-auto space-y-2">
-                {dbLogsList.map((log:any,i:number)=><div key={i} className="p-2 bg-white/5 rounded"><span className="text-emerald-400">{log.provider}</span> <span className="text-amber-300">{log.type||log.operation}</span> <span className="text-gray-300">{log.command||log.query}</span></div>)}
-              </div>
-            </div>
-          )}
-
-          {/* Migrations */}
-          {activeSubTab === 'migrations' && (
-            <div className="bg-dark-card border border-white/10 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-white mb-3">{L(language,{fa:'مهاجرت‌ها',en:'Migrations',ru:'Миграции',tr:'Geçişler'})}</h3>
-              <pre className="bg-black/60 p-4 rounded-xl text-[10px] text-gray-300 overflow-x-auto max-h-[500px]">{migrationsCode||'No code'}</pre>
-              <button onClick={copyMigrationsToClipboard} className="mt-3 px-3 py-1.5 bg-white/10 rounded text-xs text-white">Copy</button>
-            </div>
-          )}
-
-          {/* Presentation */}
-          {activeSubTab === 'presentation' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><PresentationTab addNotification={addNotification} /></React.Suspense>
-          )}
-          {activeSubTab === 'tickets' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><AdminTicketsSection addNotification={addNotification} /></React.Suspense>
-          )}
-          {activeSubTab === 'wallet' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><AdminWalletSection addNotification={addNotification} /></React.Suspense>
-          )}
-          {activeSubTab === 'affiliates' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><AdminAffiliatesSection addNotification={addNotification} /></React.Suspense>
-          )}
-          {activeSubTab === 'promotions' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><OpsProvider language={language}><PromotionsConsole /></OpsProvider></React.Suspense>
-          )}
-          {activeSubTab === 'jarvis' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><OpsProvider language={language}><JarvisConsole /></OpsProvider></React.Suspense>
-          )}
-          {activeSubTab === 'tournamentOps' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><OpsProvider language={language}><TournamentsOpsConsole /></OpsProvider></React.Suspense>
-          )}
-          {activeSubTab === 'messaging' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}><AdminMessagingPanel language={language} notify={addNotification} /></React.Suspense>
-          )}
-          {activeSubTab === 'content' && (
-            <React.Suspense fallback={<div className="p-8 text-center text-xs">Loading…</div>}>
-              <AdminContentStudioRedesigned language={language as any} dir={dir} addNotification={addNotification} />
-            </React.Suspense>
-          )}
-
-            </>
-          )}
+          <div className="h-4 w-px bg-[#2c3338] hidden sm:block" />
+          <span className="text-[12px] text-[#a7aaad] hidden md:inline">
+            {L(language, ADMIN_SECTION_META[activeSubTab])} • <span className="font-mono text-[11px]">{pathFromAdminSection(activeSubTab)}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setGuideInitialStep(0); setGuideOpen(true); }}
+            className="h-[28px] px-2.5 rounded bg-[#2c3338] hover:bg-[#3858e9] text-[#eee] hover:text-white text-[11px] font-normal flex items-center gap-1.5 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{L(language, { fa: 'راهنما', en: 'Help', ru: 'Помощь', tr: 'Yardım' })}</span>
+          </button>
+          <div className="w-6 h-6 rounded-full bg-[#50575e] text-white flex items-center justify-center text-[10px] font-bold">A</div>
         </div>
       </div>
 
-      {/* New Guide */}
-      <AdminGuide section={activeSubTab} isOpen={guideOpen} onClose={()=>setGuideOpen(false)} language={language as any} dir={dir} />
+      <div id="wpcontent" className="flex min-h-[calc(100vh-32px)]">
+        {/* Sidebar — 160px WP style */}
+        <AdminSidebar
+          active={activeSubTab}
+          onSelect={(sec) => setActiveSubTab(sec as any)}
+          openTicketCount={openTicketCount}
+          dir={dir}
+          language={language as any}
+          query={sectionQuery}
+          setQuery={setSectionQuery}
+          wpMode={true}
+        />
+
+        {/* Main content — #f0f0f1 */}
+        <div id="wpbody" className="flex-1 bg-[#f0f0f1] min-w-0">
+          <div id="wpbody-content" className="p-0 sm:p-5">
+            <div className="wrap max-w-[1280px] mx-auto">
+              {/* WP Page Title — like .wp-heading-inline */}
+              <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-none sm:rounded-[2px] mb-5">
+                <div className="px-4 sm:px-5 py-4 border-b border-[#dcdcde] flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h1 className="wp-heading-inline text-[23px] font-normal text-[#1d2327] leading-[1.3] m-0">
+                      {L(language, ADMIN_SECTION_META[activeSubTab])}
+                      <span className="ml-2 text-[13px] text-[#646970] font-normal align-middle">
+                        {currentGroup ? `— ${L(language, { fa: currentGroup.fa, en: currentGroup.en, ru: currentGroup.ru, tr: currentGroup.tr })}` : ''}
+                      </span>
+                    </h1>
+                    <p className="text-[13px] text-[#50575e] mt-2 max-w-3xl leading-[1.5]">
+                      {(() => {
+                        const g = ADMIN_GUIDES[activeSubTab];
+                        return g ? L(language, { fa: g.introFa, en: g.introEn, ru: g.introEn, tr: g.introEn } as any) : '';
+                      })()}
+                    </p>
+                    <p className="text-[11px] text-[#a7aaad] font-mono mt-1" dir="ltr">{pathFromAdminSection(activeSubTab)} • {L(language, { fa: 'منبع', en: 'source', ru: 'src', tr: 'kaynak' })}: {dataSource}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => { setGuideInitialStep(0); setGuideOpen(true); }}
+                      className="h-[30px] px-3 rounded-[3px] bg-white border border-[#2271b1] text-[#2271b1] hover:bg-[#f6f7f7] text-[13px] font-normal flex items-center gap-1.5"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      {L(language, { fa: 'راهنمای این بخش', en: 'Guide for this section', ru: 'Руководство', tr: 'Bu bölüm kılavuzu' })}
+                    </button>
+                    <button
+                      onClick={() => window.open('/bazino-admin-guide.pdf', '_blank')}
+                      className="h-[30px] px-3 rounded-[3px] bg-[#2271b1] border border-[#2271b1] text-white hover:bg-[#135e96] text-[13px] font-normal"
+                    >
+                      {L(language, { fa: 'PDF کامل', en: 'Full PDF', ru: 'Полный PDF', tr: 'Tam PDF' })}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick search inside header — WP style */}
+                <div className="px-4 sm:px-5 py-3 bg-[#fcfcfc] border-b border-[#dcdcde] relative" ref={sectionSearchRef}>
+                  <div className="flex items-center gap-2 max-w-[500px]">
+                    <Search className="w-4 h-4 text-[#646970] shrink-0" />
+                    <input
+                      type="search"
+                      value={sectionQuery}
+                      onChange={(e) => { setSectionQuery(e.target.value); setIsSectionSearchOpen(true); }}
+                      onFocus={() => setIsSectionSearchOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && sectionMatches[0]) { setActiveSubTab(sectionMatches[0]); setSectionQuery(''); setIsSectionSearchOpen(false); }
+                        if (e.key === 'Escape') setIsSectionSearchOpen(false);
+                      }}
+                      placeholder={L(language, { fa: 'جستجوی سریع بخش‌ها… (مثلاً قالب، اسلایدر، کیف پول)', en: 'Quick find… (themes, slider, wallet)', ru: 'Поиск раздела…', tr: 'Bölüm ara…' })}
+                      className="flex-1 h-[30px] bg-white border border-[#8c8f94] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] placeholder:text-[#8c8f94] outline-none"
+                    />
+                  </div>
+                  {isSectionSearchOpen && sectionQuery.trim() && (
+                    <ul className="absolute z-40 mt-2 left-4 right-4 sm:left-5 sm:right-auto sm:w-[500px] bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] overflow-hidden max-h-72 overflow-y-auto">
+                      {sectionMatches.length === 0 && <li className="px-4 py-3 text-[13px] text-[#646970]">{L(language, { fa: 'بخشی پیدا نشد', en: 'No section found', ru: '—', tr: '—' })}</li>}
+                      {sectionMatches.map((k) => (
+                        <li key={k} className="border-b border-[#f0f0f1] last:border-0">
+                          <a href={pathFromAdminSection(k)} onClick={(e) => { e.preventDefault(); setActiveSubTab(k); setSectionQuery(''); setIsSectionSearchOpen(false); }} className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[13px] hover:bg-[#f6f7f7] ${activeSubTab === k ? 'text-[#2271b1] bg-[#f6f7f7]' : 'text-[#3c434a]'}`}>
+                            <span>{L(language, ADMIN_SECTION_META[k])}</span>
+                            <span className="text-[11px] text-[#a7aaad] font-mono" dir="ltr">{pathFromAdminSection(k)}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {/* CONTENT PER SECTION — WP cards */}
+              <div className="px-0 sm:px-0">
+                {activeSubTab === 'apiKeys' ? (
+                  <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4 sm:p-5">
+                    <AdminKeysCenter language={language as any} dir={dir} addNotification={addNotification} />
+                  </div>
+                ) : (
+                  <>
+                    {/* Dashboard */}
+                    {activeSubTab === 'dashboard' && stats && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
+                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'کاربران ثبت‌نام شده', en: 'Registered Users', ru: 'Пользователи', tr: 'Kullanıcılar' })}</p>
+                            <p className="text-[20px] font-normal text-[#1d2327] mt-2">{stats.users ?? '-'}</p>
+                          </div>
+                          <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
+                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'سیستم‌ها', en: 'Systems', ru: 'Системы', tr: 'Sistemler' })}</p>
+                            <p className="text-[20px] font-normal text-[#1d2327] mt-2">{systems.length}</p>
+                          </div>
+                          <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
+                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'سفارشات کافه', en: 'Cafe Orders', ru: 'Заказы', tr: 'Siparişler' })}</p>
+                            <p className="text-[20px] font-normal text-[#1d2327] mt-2">{stats.cafeOrders ?? '-'}</p>
+                          </div>
+                          <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
+                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'تیکت باز', en: 'Open Tickets', ru: 'Открытые тикеты', tr: 'Açık Talepler' })}</p>
+                            <p className="text-[20px] font-normal text-[#1d2327] mt-2">{openTicketCount}</p>
+                          </div>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'نمای کلی', en: 'Overview', ru: 'Обзор', tr: 'Genel Bakış' })}</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px] text-[#50575e]">
+                            <div className="p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde]"><span className="text-[#646970]">Tournaments:</span> {tournaments.length}</div>
+                            <div className="p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde]"><span className="text-[#646970]">Articles:</span> {articles.length}</div>
+                            <div className="p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde]"><span className="text-[#646970]">Sliders:</span> {appSliders.length}</div>
+                            <div className="p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde]"><span className="text-[#646970]">Chat Rooms:</span> {chatRooms.length}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Systems */}
+                    {activeSubTab === 'systems' && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Monitor className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'افزودن سیستم جدید', en: 'Add New System', ru: 'Добавить систему', tr: 'Yeni Sistem Ekle' })}</h3>
+                          <form onSubmit={handleAddSystem} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <input value={newSystem.name} onChange={e => setNewSystem({ ...newSystem, name: e.target.value })} placeholder={L(language, { fa: 'نام سیستم', en: 'System name', ru: 'Название', tr: 'Sistem adı' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                            <select value={newSystem.type} onChange={e => setNewSystem({ ...newSystem, type: e.target.value })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]"><option>PC</option><option>PS5</option><option>Xbox</option><option>Simulator</option></select>
+                            <input type="number" value={newSystem.hourlyRate} onChange={e => setNewSystem({ ...newSystem, hourlyRate: Number(e.target.value) })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] font-mono" />
+                            <button type="submit" className="h-[30px] bg-[#2271b1] hover:bg-[#135e96] border border-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
+                          </form>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'لیست سیستم‌ها', en: 'Systems list', ru: 'Список систем', tr: 'Sistem listesi' })} ({systems.length})</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
+                            {systems.map((s: any) => (
+                              <div key={s.id || s.name} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center gap-2">
+                                <div><p className="text-[13px] font-medium text-[#1d2327]">{s.name}</p><p className="text-[11px] text-[#646970]">{s.type} — {s.hourlyRate}</p></div>
+                                <div className="flex gap-1">
+                                  <button onClick={() => handleToggleSystem(s.id, s.isActive)} className={`h-[26px] px-2 rounded-[3px] text-[11px] font-medium border ${s.isActive ? 'bg-[#d5e9f0] border-[#a7d0e4] text-[#0676a3]' : 'bg-[#fcf0f1] border-[#e9a0a0] text-[#8a2424]'}`}>{s.isActive ? 'ON' : 'OFF'}</button>
+                                  <button onClick={() => handleDeleteSystem(s.id)} className="h-[26px] px-2 bg-white border border-[#dcdcde] text-[#d63638] rounded-[3px]"><Trash2 className="w-3 h-3" /></button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Cafe */}
+                    {activeSubTab === 'cafe' && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Coffee className="w-4 h-4 text-[#996800]" /> {L(language, { fa: 'افزودن آیتم کافه', en: 'Add Cafe Item', ru: 'Добавить позицию', tr: 'Kafe Öğesi Ekle' })}</h3>
+                          <form onSubmit={handleAddCafeItem} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input value={newCafe.name} onChange={e => setNewCafe({ ...newCafe, name: e.target.value })} placeholder={L(language, { fa: 'نام', en: 'Name', ru: 'Название', tr: 'Ad' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                            <input type="number" value={newCafe.price} onChange={e => setNewCafe({ ...newCafe, price: Number(e.target.value) })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] font-mono" />
+                            <button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
+                          </form>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'منو', en: 'Menu', ru: 'Меню', tr: 'Menü' })} ({cafeItems.length})</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {cafeItems.map((c: any) => (
+                              <div key={c.id || c.name} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327]">{c.name} — {c.price}</span><button onClick={() => handleDeleteCafeItem(c.id)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Shop */}
+                    {activeSubTab === 'shop' && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><ShoppingBag className="w-4 h-4 text-[#06776d]" /> {L(language, { fa: 'افزودن کالا', en: 'Add Product', ru: 'Добавить товар', tr: 'Ürün Ekle' })}</h3>
+                          <form onSubmit={handleAddAccessory} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input value={newAccessory.name} onChange={e => setNewAccessory({ ...newAccessory, name: e.target.value })} placeholder={L(language, { fa: 'نام کالا', en: 'Product name', ru: 'Название', tr: 'Ürün adı' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                            <input type="number" value={newAccessory.price} onChange={e => setNewAccessory({ ...newAccessory, price: Number(e.target.value) })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] font-mono" />
+                            <button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
+                          </form>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'انبار', en: 'Inventory', ru: 'Склад', tr: 'Stok' })} ({accessories.length})</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {accessories.map((a: any) => <div key={a.id || a.name} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327]">{a.name} — {a.price}</span><button onClick={() => handleDeleteAccessory(a.id)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tournaments */}
+                    {activeSubTab === 'tournaments' && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <React.Suspense fallback={<div className="p-8 text-center text-[13px] text-[#646970]">Loading…</div>}><AdminTournamentPlanner language={language as any} notify={addNotification} /></React.Suspense>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Blog */}
+                    {activeSubTab === 'blog' && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Newspaper className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'مقاله جدید', en: 'New Article', ru: 'Новая статья', tr: 'Yeni Makale' })}</h3>
+                          <form onSubmit={handleAddArticle} className="flex flex-col gap-3">
+                            <input value={newArticle.title} onChange={e => setNewArticle({ ...newArticle, title: e.target.value })} placeholder={L(language, { fa: 'عنوان', en: 'Title', ru: 'Заголовок', tr: 'Başlık' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                            <textarea value={newArticle.content} onChange={e => setNewArticle({ ...newArticle, content: e.target.value })} rows={4} placeholder={L(language, { fa: 'محتوا', en: 'Content', ru: 'Содержание', tr: 'İçerik' })} className="bg-white border border-[#8c8f94] rounded-[3px] px-2.5 py-2 text-[13px] text-[#2c3338]" required />
+                            <button type="submit" className="self-start h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-4">{L(language, { fa: 'انتشار', en: 'Publish', ru: 'Опубликовать', tr: 'Yayınla' })}</button>
+                          </form>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'مقالات', en: 'Articles', ru: 'Статьи', tr: 'Makaleler' })} ({articles.length})</h3>
+                          <div className="flex flex-col gap-2">
+                            {articles.map((a: any) => <div key={a.id} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327] truncate">{a.title}</span><button onClick={() => handleDeleteArticle(a.id)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Chat */}
+                    {activeSubTab === 'chat' && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'اتاق جدید', en: 'New Room', ru: 'Новая комната', tr: 'Yeni Oda' })}</h3>
+                          <form onSubmit={handleAddChatRoom} className="flex gap-3"><input value={newChatRoomName} onChange={e => setNewChatRoomName(e.target.value)} placeholder="e.g. Apex Legends" className="flex-1 h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required /><button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-4">+</button></form>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">{chatRooms.map((room: string) => <div key={room} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327]">{room}</span><button onClick={() => handleDeleteChatRoom(room)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>)}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Messages */}
+                    {activeSubTab === 'messages' && (
+                      <div className="flex flex-col gap-5 animate-fade-in">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'ارسال پیام', en: 'Send Message', ru: 'Отправить сообщение', tr: 'Mesaj Gönder' })}</h3>
+                          <form onSubmit={handleSendMessage} className="flex flex-col gap-3 max-w-[600px]">
+                            <select value={recipient} onChange={e => setRecipient(e.target.value)} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]"><option value="All">All Users</option>{registeredUsers.map((u: any) => <option key={u.username} value={u.username}>{u.username}</option>)}</select>
+                            <input value={msgTitle} onChange={e => setMsgTitle(e.target.value)} placeholder="Title" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                            <textarea value={msgBody} onChange={e => setMsgBody(e.target.value)} rows={3} placeholder="Body" className="bg-white border border-[#8c8f94] rounded-[3px] px-2.5 py-2 text-[13px] text-[#2c3338]" required />
+                            <button type="submit" className="self-start h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-4 flex items-center gap-1"><Send className="w-3 h-3" /> Send</button>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Customization */}
+                    {activeSubTab === 'customization' && (
+                      <div className="animate-fade-in space-y-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2 mb-3"><Database className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'منبع داده', en: 'Data Source', ru: 'Источник', tr: 'Veri Kaynağı' })}</h3>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleSwitchDataSource('sample')} className={`h-[30px] px-3 rounded-[3px] text-[13px] border ${dataSource === 'sample' ? 'bg-[#2271b1] border-[#2271b1] text-white' : 'bg-white border-[#8c8f94] text-[#2c3338]'}`}>Sample</button>
+                            <button onClick={() => handleSwitchDataSource('database')} className={`h-[30px] px-3 rounded-[3px] text-[13px] border ${dataSource === 'database' ? 'bg-[#2271b1] border-[#2271b1] text-white' : 'bg-white border-[#8c8f94] text-[#2c3338]'}`}>Database</button>
+                          </div>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4">{L(language, { fa: 'اطلاعات کلوپ', en: 'Club Info', ru: 'Инфо клуба', tr: 'Kulüp Bilgileri' })}</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[600px]">
+                            <input value={siteSettings['club_phone'] || ''} onChange={e => handleSaveSetting('club_phone', e.target.value)} placeholder="Phone" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" />
+                            <input value={siteSettings['club_address'] || ''} onChange={e => handleSaveSetting('club_address', e.target.value)} placeholder="Address" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] md:col-span-2" />
+                          </div>
+                        </div>
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <LegalAdminSection siteSettings={siteSettings} saveSetting={handleSaveSetting} addNotification={addNotification} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Themes */}
+                    {activeSubTab === 'themes' && (
+                      <div className="animate-fade-in space-y-5">
+                        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                          <div className="flex justify-between items-center mb-4"><h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2"><Layers className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'قالب‌ها', en: 'Themes', ru: 'Темы', tr: 'Temalar' })}</h3><button onClick={openThemeUploadPanel} className="h-[30px] px-3 bg-[#2271b1] text-white rounded-[3px] text-[13px]">{L(language, { fa: 'آپلود قالب', en: 'Upload Theme', ru: 'Загрузить тему', tr: 'Tema Yükle' })}</button></div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {availableThemes.map((th: ThemeInfo) => <div key={th.id} className={`p-4 rounded-[2px] border ${themeId === th.id ? 'border-[#2271b1] bg-[#f6f7f7]' : 'border-[#dcdcde] bg-white'}`}><p className="text-[13px] font-medium text-[#1d2327]">{th.name}</p><p className="text-[11px] text-[#646970] font-mono">{th.id}</p><div className="flex gap-2 mt-3"><button onClick={() => handleActivateTheme(th)} className="h-[26px] px-2 bg-white border border-[#2271b1] text-[#2271b1] rounded-[3px] text-[11px]">Activate</button><button onClick={() => handleExportThemeZip(th)} className="h-[26px] px-2 bg-white border border-[#dcdcde] rounded-[3px] text-[11px] text-[#50575e]">Export</button><button onClick={() => handleDeleteTheme(th)} className="h-[26px] px-2 bg-white border border-[#dcdcde] text-[#d63638] rounded-[3px] text-[11px]">Delete</button></div></div>)}
+                          </div>
+                        </div>
+                        {showUploadForm && (
+                          <div ref={themeUploadPanelRef} className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                            <h4 className="text-[13px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'نصب قالب ZIP', en: 'Install ZIP Theme', ru: 'Установить ZIP тему', tr: 'ZIP Tema Yükle' })}</h4>
+                            <input type="file" accept=".zip" onChange={handleZipFileSelect} className="text-[13px] text-[#50575e]" />
+                            {zipParsed && <div className="mt-3 p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde] text-[13px] text-[#1d2327]"><p>{zipParsed.meta.name} — {(zipParsed.css.length / 1024).toFixed(1)}KB</p><button onClick={handleInstallZip} disabled={isInstallingZip} className="mt-2 h-[30px] px-3 bg-[#2271b1] text-white rounded-[3px] text-[13px]">{isInstallingZip ? 'Installing…' : 'Install'}</button></div>}
+                            {zipError && <p className="mt-2 text-[13px] text-[#d63638]">{zipError}</p>}
+                            {installJob && <p className="mt-2 text-[11px] text-[#996800] font-mono">{installJob.status} {installJob.filesDone}/{installJob.filesTotal}</p>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* App Slider */}
+                    {activeSubTab === 'appSlider' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4">{L(language, { fa: 'اسلایدر', en: 'Slider', ru: 'Слайдер', tr: 'Slayt' })}</h3>
+                        <form onSubmit={editingSlideId ? handleEditSlide : handleAddSlide} className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[700px]">
+                          <input value={newSlideUrl} onChange={e => setNewSlideUrl(e.target.value)} placeholder="/images/..." className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] md:col-span-2" required />
+                          <input value={newSlideTitleFa} onChange={e => setNewSlideTitleFa(e.target.value)} placeholder="FA Title" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                          <input value={newSlideTitleEn} onChange={e => setNewSlideTitleEn(e.target.value)} placeholder="EN Title" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                          <button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{editingSlideId ? 'Save' : 'Add'}</button>
+                          {editingSlideId && <button type="button" onClick={cancelEditSlide} className="h-[30px] bg-white border border-[#8c8f94] text-[#2c3338] rounded-[3px] text-[13px] px-3">Cancel</button>}
+                        </form>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">{appSliders.map((s: any) => <div key={s.id} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327] truncate">{s.titleFa}</span><div className="flex gap-1"><button onClick={() => startEditSlide(s)} className="text-[#2271b1] p-1"><Edit className="w-3 h-3" /></button><button onClick={() => handleDeleteSlide(s.id)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div></div>)}</div>
+                      </div>
+                    )}
+
+                    {/* Mobile App */}
+                    {activeSubTab === 'mobileAppDownload' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminMobileAppDownloadPanel addNotification={addNotification} /></React.Suspense>
+                      </div>
+                    )}
+
+                    {/* DB Logs */}
+                    {activeSubTab === 'dbLogs' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3 flex items-center gap-2"><Database className="w-4 h-4 text-[#2271b1]" /> DB Logs ({dbLogsList.length})</h3>
+                        <div className="bg-[#1d2327] rounded-[2px] p-3 font-mono text-[11px] max-h-[500px] overflow-y-auto space-y-2">
+                          {dbLogsList.map((log: any, i: number) => <div key={i} className="p-2 bg-[#2c3338] rounded-[2px]"><span className="text-[#72aee6]">{log.provider}</span> <span className="text-[#dba617]">{log.type || log.operation}</span> <span className="text-[#c3c4c7]">{log.command || log.query}</span></div>)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Migrations */}
+                    {activeSubTab === 'migrations' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
+                        <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'مهاجرت‌ها', en: 'Migrations', ru: 'Миграции', tr: 'Geçişler' })}</h3>
+                        <pre className="bg-[#f6f7f7] border border-[#dcdcde] p-4 rounded-[2px] text-[11px] text-[#3c434a] overflow-x-auto max-h-[500px]">{migrationsCode || 'No code'}</pre>
+                        <button onClick={copyMigrationsToClipboard} className="mt-3 h-[30px] px-3 bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338]">Copy</button>
+                      </div>
+                    )}
+
+                    {/* Other sections */}
+                    {activeSubTab === 'presentation' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><PresentationTab addNotification={addNotification} /></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'tickets' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminTicketsSection addNotification={addNotification} /></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'wallet' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminWalletSection addNotification={addNotification} /></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'affiliates' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminAffiliatesSection addNotification={addNotification} /></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'promotions' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><PromotionsConsole /></OpsProvider></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'jarvis' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><JarvisConsole /></OpsProvider></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'tournamentOps' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><OpsProvider language={language}><TournamentsOpsConsole /></OpsProvider></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'messaging' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminMessagingPanel language={language} notify={addNotification} /></React.Suspense></div>
+                    )}
+                    {activeSubTab === 'content' && (
+                      <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminContentStudioRedesigned language={language as any} dir={dir} addNotification={addNotification} /></React.Suspense></div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Guide — WordPress style centered modal accounting for header */}
+      <AdminGuide section={activeSubTab} isOpen={guideOpen} onClose={() => setGuideOpen(false)} initialStep={guideInitialStep} language={language as any} dir={dir} />
     </div>
   );
 }

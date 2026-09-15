@@ -35,7 +35,6 @@ import {
   Handshake,
   MessageCircleMore,
   ChevronDown,
-  ChevronUp,
   Search,
   Settings,
   X,
@@ -83,20 +82,30 @@ interface Props {
   openTicketCount?: number;
   query?: string;
   setQuery?: (q: string) => void;
+  wpMode?: boolean;
 }
 
+/**
+ * WordPress admin sidebar — exact replica style
+ * - width 160px, bg #1d2327
+ * - menu item 34px, icon 20px, text 14px, color #eee
+ * - hover: bg #2c3338, color #72aee6
+ * - active: bg #3858e9 or #2271b1, color white, left border 4px #72aee6 or #00a0d2
+ * - submenu: bg #2c3338, items 34px, text 13px
+ * - separators: border-top #2c3338
+ */
 export default function AdminSidebar(props: Props) {
   const activeSection = (props.activeSection || props.active || 'dashboard') as AdminSection;
   const setActiveSection = (props.setActiveSection || props.onSelect || (()=>{})) as (s: AdminSection) => void;
   const { language, dir, openTicketCount = 0, query = '', setQuery } = props;
+  const wpMode = props.wpMode !== false; // default true now — WordPress style
+
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
-    // همه باز به جز advanced که بسته باشد برای تمیزی
     return { advanced: true };
   });
 
   const activeGroup = useMemo(() => groupForSection(activeSection), [activeSection]);
 
-  // auto-expand group containing active section
   React.useEffect(() => {
     if (activeGroup && collapsedGroups[activeGroup.id]) {
       setCollapsedGroups(prev => ({ ...prev, [activeGroup.id]: false }));
@@ -125,9 +134,115 @@ export default function AdminSidebar(props: Props) {
     setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  if (wpMode) {
+    // WORDPRESS STYLE SIDEBAR
+    return (
+      <div id="adminmenumain" className="w-[160px] shrink-0 bg-[#1d2327] min-h-[calc(100vh-32px)] flex flex-col select-none" dir={dir}>
+        <style>{`
+          #adminmenumain { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif; }
+          .wp-menu-name { font-size: 14px; line-height: 1.4; }
+          .wp-submenu-item { font-size: 13px; line-height: 1.4; }
+        `}</style>
+
+        {/* WP Search box in sidebar like WP admin */}
+        {setQuery && (
+          <div className="p-2 border-b border-[#2c3338]">
+            <div className="relative">
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={L(language, { fa: 'جستجوی منو...', en: 'Search menu...', ru: 'Поиск меню...', tr: 'Menü ara...' })}
+                className="w-full bg-[#2c3338] border border-[#2c3338] focus:border-[#72aee6] rounded text-[12px] text-[#eee] placeholder:text-[#a7aaad] outline-none py-1.5 px-2"
+              />
+              {query && (
+                <button onClick={() => setQuery('')} className="absolute top-1/2 -translate-y-1/2 right-1.5 text-[#a7aaad] hover:text-white">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div id="adminmenu" className="flex-1 py-1">
+          {filteredGroups.map((group, gi) => {
+            const GroupIcon = ICON_MAP[group.icon] || LayoutDashboard;
+            const isCollapsed = !!collapsedGroups[group.id];
+            const isActiveGroup = activeGroup?.id === group.id;
+            const hasActiveChild = group.sections.includes(activeSection);
+
+            return (
+              <div key={group.id} className={`wp-menu-group ${gi !== 0 ? 'border-t border-[#2c3338] mt-1 pt-1' : ''}`}>
+                {/* Group header — like WP menu top level */}
+                <button
+                  onClick={() => toggleGroup(group.id)}
+                  className={`wp-menu-top w-full flex items-center gap-2 px-2 py-0 h-[34px] text-left transition-colors group
+                    ${dir === 'rtl' ? 'text-right flex-row-reverse' : ''}
+                    ${hasActiveChild ? 'bg-[#3858e9] text-white' : isActiveGroup ? 'bg-[#2c3338] text-[#72aee6]' : 'text-[#eee] hover:bg-[#2c3338] hover:text-[#72aee6]'}
+                  `}
+                  style={{ borderLeft: hasActiveChild ? (dir === 'rtl' ? 'none' : '4px solid #72aee6') : '4px solid transparent', borderRight: hasActiveChild && dir === 'rtl' ? '4px solid #72aee6' : '4px solid transparent' }}
+                >
+                  <GroupIcon className={`w-5 h-5 shrink-0 ${hasActiveChild ? 'text-white' : 'text-[#a7aaad] group-hover:text-[#72aee6]'}`} />
+                  <span className="wp-menu-name flex-1 truncate font-normal">{L(language, { fa: group.fa, en: group.en, ru: group.ru, tr: group.tr })}</span>
+                  <span className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] font-mono bg-[#2c3338] text-[#a7aaad] px-1 py-0.5 rounded">{group.sections.length}</span>
+                    <ChevronDown className={`w-3 h-3 text-[#a7aaad] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
+                  </span>
+                </button>
+
+                {/* Submenu — like wp-submenu */}
+                {!isCollapsed && (
+                  <ul className="wp-submenu bg-[#2c3338] py-1 m-0 list-none">
+                    {group.sections.map(sec => {
+                      const meta = ADMIN_SECTION_META[sec];
+                      const IconComp = ICON_MAP[SECTION_ICONS[sec]] || BarChart3;
+                      const isActive = activeSection === sec;
+                      return (
+                        <li key={sec} className="m-0 p-0">
+                          <button
+                            onClick={() => setActiveSection(sec)}
+                            className={`wp-submenu-item w-full flex items-center gap-2 h-[34px] px-3 text-left transition-colors
+                              ${dir === 'rtl' ? 'text-right flex-row-reverse pr-6' : 'pl-6'}
+                              ${isActive ? 'bg-[#3858e9] text-white font-semibold' : 'text-[#c3c4c7] hover:text-[#72aee6] hover:bg-[#1d2327] font-normal'}
+                            `}
+                          >
+                            <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#a7aaad]'}`} />
+                            <span className="truncate flex-1">{L(language, meta)}</span>
+                            {sec === 'tickets' && openTicketCount > 0 && (
+                              <span className={`text-[10px] rounded-full px-1.5 py-0.5 min-w-[18px] text-center font-bold ${isActive ? 'bg-white text-[#3858e9]' : 'bg-[#d63638] text-white'}`}>{openTicketCount}</span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer — WP style */}
+        <div className="border-t border-[#2c3338] p-3">
+          <p className="text-[11px] leading-[1.4] text-[#a7aaad]">
+            {L(language, {
+              fa: 'راهنما: برای کلید API برو «هوش و فنی → مرکز کلیدها». همه کلیدها یک‌جا هستند.',
+              en: 'Tip: API keys? Go to Intelligence → Keys Center.',
+              ru: 'Подсказка: API-ключи — в «ИИ и техника → Центр ключей».',
+              tr: 'İpucu: API anahtarları Zeka ve Teknik → Anahtar Merkezi.',
+            })}
+          </p>
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[#646970] font-mono">
+            <span className="w-2 h-2 rounded-full bg-[#00a32a] inline-block"></span>
+            WP-Style v2 • 160px
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback old style (should not be used now)
   return (
     <div className="flex flex-col gap-3 bg-[#0e1020] border border-white/10 rounded-[20px] p-3 h-fit sticky top-4">
-      {/* Header */}
       <div className="px-3 py-3 rounded-xl bg-gradient-to-br from-primary/15 to-violet-500/10 border border-white/5">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-primary text-black flex items-center justify-center">
@@ -140,98 +255,6 @@ export default function AdminSidebar(props: Props) {
             <p className="text-[10px] text-white/60 mt-1 font-mono">v2 • grouped • clean</p>
           </div>
         </div>
-        {setQuery && (
-          <div className="relative mt-3">
-            <Search className={`w-3.5 h-3.5 text-white/30 absolute top-1/2 -translate-y-1/2 ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'}`} />
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder={L(language, { fa: 'جستجو... مثلاً کلید، تم، کافه', en: 'Search... e.g. keys, theme, cafe', ru: 'Поиск...', tr: 'Ara...' })}
-              className={`w-full bg-black/40 border border-white/10 rounded-lg py-2 text-[11px] text-white placeholder:text-white/30 outline-none focus:border-primary/40 ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'}`}
-            />
-            {query && (
-              <button onClick={() => setQuery('')} className={`absolute top-1/2 -translate-y-1/2 ${dir === 'rtl' ? 'left-2' : 'right-2'} text-white/40 hover:text-white`}>
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Groups */}
-      <div className="flex flex-col gap-2">
-        {filteredGroups.map(group => {
-          const GroupIcon = ICON_MAP[group.icon] || LayoutDashboard;
-          const isCollapsed = !!collapsedGroups[group.id];
-          const isActiveGroup = activeGroup?.id === group.id;
-          return (
-            <div key={group.id} className={`rounded-xl border transition-all ${isActiveGroup ? 'bg-white/[0.03] border-white/10' : 'bg-transparent border-transparent'}`}>
-              <button
-                onClick={() => toggleGroup(group.id)}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left ${dir === 'rtl' ? 'text-right' : ''} hover:bg-white/[0.04] transition-colors`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
-                    ${group.color === 'emerald' ? 'bg-emerald-500/15 text-emerald-400' : ''}
-                    ${group.color === 'cyan' ? 'bg-cyan-500/15 text-cyan-400' : ''}
-                    ${group.color === 'amber' ? 'bg-amber-500/15 text-amber-400' : ''}
-                    ${group.color === 'violet' ? 'bg-violet-500/15 text-violet-400' : ''}
-                    ${group.color === 'fuchsia' ? 'bg-fuchsia-500/15 text-fuchsia-400' : ''}
-                    ${group.color === 'blue' ? 'bg-blue-500/15 text-blue-400' : ''}
-                  `}>
-                    <GroupIcon className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-black text-white leading-none truncate">{L(language, { fa: group.fa, en: group.en, ru: group.ru, tr: group.tr })}</div>
-                    <div className="text-[10px] text-white/40 truncate mt-1">{L(language, { fa: group.descFa, en: group.descEn, ru: group.descEn, tr: group.descEn })}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] font-mono bg-white/5 text-white/40 px-1.5 py-0.5 rounded-full">{group.sections.length}</span>
-                  {isCollapsed ? <ChevronDown className="w-3.5 h-3.5 text-white/30" /> : <ChevronUp className="w-3.5 h-3.5 text-white/30" />}
-                </div>
-              </button>
-
-              {!isCollapsed && (
-                <div className="px-2 pb-2 pt-1 flex flex-col gap-1">
-                  {group.sections.map(sec => {
-                    const meta = ADMIN_SECTION_META[sec];
-                    const IconComp = ICON_MAP[SECTION_ICONS[sec]] || BarChart3;
-                    const isActive = activeSection === sec;
-                    return (
-                      <button
-                        key={sec}
-                        onClick={() => setActiveSection(sec)}
-                        className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-bold transition-all w-full text-left ${dir === 'rtl' ? 'text-right' : ''}
-                          ${isActive ? 'bg-primary text-black shadow-[0_0_12px_rgba(255,184,0,0.25)]' : 'text-white/60 hover:text-white hover:bg-white/5'}
-                        `}
-                      >
-                        <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-black' : 'text-white/40 group-hover:text-white/80'}`} />
-                        <span className="truncate flex-1">{L(language, meta)}</span>
-                        {sec === 'tickets' && openTicketCount > 0 && (
-                          <span className={`text-[10px] rounded-full px-1.5 py-0.5 min-w-[18px] text-center font-black ${isActive ? 'bg-black text-primary' : 'bg-rose-500 text-white'}`}>{openTicketCount}</span>
-                        )}
-                        <span className={`text-[9px] font-mono opacity-40 hidden lg:inline ${isActive ? 'text-black' : ''}`} dir="ltr">{pathFromAdminSection(sec)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Footer hint */}
-      <div className="px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/5">
-        <p className="text-[10px] leading-relaxed text-white/30">
-          {L(language, {
-            fa: 'نکته برای صاحب گیم‌نت: هر گروه یک کار مشخص دارد. اگر دنبال کلید API هستید برو «هوش و فنی → مرکز کلیدها». همه کلیدها یک‌جا هستند.',
-            en: 'Tip for owner: each group has one job. Looking for API keys? Go to Intelligence → Keys Center. All keys in one place.',
-            ru: 'Подсказка: каждая группа — одна задача. API-ключи — в «ИИ и техника → Центр ключей».',
-            tr: 'İpucu: her grubun tek bir işi var. API anahtarları mı? Zeka ve Teknik → Anahtar Merkezi.',
-          })}
-        </p>
       </div>
     </div>
   );

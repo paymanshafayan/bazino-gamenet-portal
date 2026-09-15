@@ -1,7 +1,7 @@
 /**
  * سیستم راهنمای جدید بازینو — بازطراحی کامل v2
- * - WordPress استایل: کارت سفید، بوردر #c3c4c7، هدر #f0f0f1
- * - مودال وسط‌چین با در نظر گرفتن هدر 32px (WP admin bar)
+ * - مدیریت استایل: کارت سفید، بوردر #c3c4c7، هدر #f0f0f1
+ * - مودال وسط‌چین با در نظر گرفتن هدر 32px ( admin bar)
  * - تصاویر با هایلایت overlay (باکس زرد/آبی دور ناحیه مرجع)
  * - PDF جامع با viewer فول‌اسکرین: prev/next، search، close
  * - توضیح کامل منو، هر آیتم چه کار می‌کند
@@ -68,8 +68,8 @@ interface SectionGuide {
 export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   dashboard: {
     section: 'dashboard',
-    introFa: 'داشبورد قلب تپنده سالن است. همه‌چیز را یک‌جا می‌بینی: پول امروز، سیستم‌های پر، مشتری‌های فعال. طراحی وردپرس: کارت‌های سفید با بوردر #c3c4c7 و سایه ملایم.',
-    introEn: 'Dashboard is the beating heart. See everything at once: today revenue, busy systems, active customers. WP style: white cards border #c3c4c7.',
+    introFa: 'داشبورد قلب تپنده سالن است. همه‌چیز را یک‌جا می‌بینی: پول امروز، سیستم‌های پر، مشتری‌های فعال. طراحی مدیریت: کارت‌های سفید با بوردر #c3c4c7 و سایه ملایم.',
+    introEn: 'Dashboard is the beating heart. See everything at once: today revenue, busy systems, active customers.  style: white cards border #c3c4c7.',
     purposeFa: 'بدانی امروز چقدر درآوردی، کدام سیستم‌ها خراب یا پر هستند، و آیا سالن شلوغ است یا خلوت. اگر درآمد صفر است، منبع داده Sample است.',
     purposeEn: 'Know today earnings, which systems are broken/busy, and if venue is crowded. If zero revenue, data source is Sample.',
     menuExplainFa: 'داشبورد در گروه داشبورد - اولین آیتم منو. آیکون LayoutDashboard، مسیر /admin/dashboard.',
@@ -78,8 +78,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. نگاه اول به کارت‌های بالا - درآمد، رزرو، آنلاین، تیکت',
         titleEn: '1. First look at top cards - revenue, reservations, online, tickets',
-        descFa: 'بالای داشبورد ۴ کارت سفید وردپرس استایل می‌بینی: درآمد امروز (با عدد بزرگ و نمودار کوچک)، رزروهای فعال، کاربر آنلاین، تیکت باز. هر کارت بوردر #c3c4c7 و سایه 0 1px 1px دارد. اگر درآمد صفر است، احتمالاً منبع داده روی Sample است نه Database - به سفارشی‌سازی > منبع داده برو و Database را انتخاب کن. این کارت‌ها مثل وردپرس At a Glance هستند.',
-        descEn: 'Top has 4 white WP-style cards: today revenue (big number + mini chart), active reservations, online users, open tickets. Each border #c3c4c7 shadow 0 1px 1px. If revenue zero, data source might be Sample not Database - go to Customization > Data Source and choose Database. Like WP At a Glance.',
+        descFa: 'بالای داشبورد ۴ کارت سفید مدیریت استایل می‌بینی: درآمد امروز (با عدد بزرگ و نمودار کوچک)، رزروهای فعال، کاربر آنلاین، تیکت باز. هر کارت بوردر #c3c4c7 و سایه 0 1px 1px دارد. اگر درآمد صفر است، احتمالاً منبع داده روی Sample است نه Database - به سفارشی‌سازی > منبع داده برو و Database را انتخاب کن. این کارت‌ها مثل مدیریت At a Glance هستند.',
+        descEn: 'Top has 4 white -style cards: today revenue (big number + mini chart), active reservations, online users, open tickets. Each border #c3c4c7 shadow 0 1px 1px. If revenue zero, data source might be Sample not Database - go to Customization > Data Source and choose Database. Like  At a Glance.',
         imageUrl: '/images/admin-guides/dashboard-step1.png',
         highlights: [
           { x: 5, y: 5, w: 22, h: 30, labelFa: 'درآمد امروز', labelEn: 'Today Revenue', color: 'yellow' },
@@ -93,8 +93,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۲. نمودار اوج مصرف - کدام ساعت شلوغ‌ترین بوده',
         titleEn: '2. Peak usage chart - busiest hour',
-        descFa: 'نمودار میله‌ای وسط صفحه نشان می‌دهد کدام ساعت شلوغ‌ترین بوده - مثلاً ۱۸ تا ۲۲. برای تنظیم شیفت کارمند و قیمت پویا عالیه. می‌توانی جمعه‌ها را نیم‌بها کنی اگر خلوت است. در وردپرس، این بخش مثل Activity chart است.',
-        descEn: 'Bar chart middle shows busiest hour - e.g. 18-22. Great for staff shift and dynamic pricing. Make Fridays half-price if empty. Like WP Activity chart.',
+        descFa: 'نمودار میله‌ای وسط صفحه نشان می‌دهد کدام ساعت شلوغ‌ترین بوده - مثلاً ۱۸ تا ۲۲. برای تنظیم شیفت کارمند و قیمت پویا عالیه. می‌توانی جمعه‌ها را نیم‌بها کنی اگر خلوت است. در مدیریت، این بخش مثل Activity chart است.',
+        descEn: 'Bar chart middle shows busiest hour - e.g. 18-22. Great for staff shift and dynamic pricing. Make Fridays half-price if empty. Like  Activity chart.',
         imageUrl: '/images/admin-guides/dashboard-step2.png',
         highlights: [
           { x: 10, y: 15, w: 80, h: 60, labelFa: 'نمودار اوج - ساعت شلوغ', labelEn: 'Peak chart - busy hour', color: 'blue' },
@@ -103,8 +103,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۳. لیست سیستم‌ها و سفارشات اخیر - پایین داشبورد',
         titleEn: '3. Systems and recent orders list - bottom',
-        descFa: 'پایین داشبورد لیست سیستم‌ها با وضعیت آنلاین/آفلاین (سبز/قرمز) و آخرین سفارشات کافه را می‌بینی. روی هر سیستم بزن به تب مدیریت کلاینت‌ها می‌روی. روی سفارش بزن به کافه. این لیست مثل وردپرس Recent Posts / Recent Comments است.',
-        descEn: 'Bottom shows systems with online/offline (green/red) and recent cafe orders. Click system goes to Clients tab. Click order goes to Cafe. Like WP Recent Posts.',
+        descFa: 'پایین داشبورد لیست سیستم‌ها با وضعیت آنلاین/آفلاین (سبز/قرمز) و آخرین سفارشات کافه را می‌بینی. روی هر سیستم بزن به تب مدیریت کلاینت‌ها می‌روی. روی سفارش بزن به کافه. این لیست مثل مدیریت Recent Posts / Recent Comments است.',
+        descEn: 'Bottom shows systems with online/offline (green/red) and recent cafe orders. Click system goes to Clients tab. Click order goes to Cafe. Like  Recent Posts.',
         imageUrl: '/images/admin-guides/dashboard-step3.png',
         highlights: [
           { x: 5, y: 10, w: 45, h: 80, labelFa: 'لیست سیستم‌ها - کلیک به تب سیستم‌ها', labelEn: 'Systems list - click to Systems tab', color: 'yellow' },
@@ -117,8 +117,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   systems: {
     section: 'systems',
-    introFa: 'اینجا همه PC و کنسول‌ها را مدیریت می‌کنی. اسم، قیمت ساعتی، فعال/غیرفعال. طراحی وردپرس: فرم بالا سفید، لیست پایین کارت‌های سفید.',
-    introEn: 'Manage all PCs and consoles. Name, hourly rate, active/inactive. WP style: top form white, list bottom white cards.',
+    introFa: 'اینجا همه PC و کنسول‌ها را مدیریت می‌کنی. اسم، قیمت ساعتی، فعال/غیرفعال. طراحی مدیریت: فرم بالا سفید، لیست پایین کارت‌های سفید.',
+    introEn: 'Manage all PCs and consoles. Name, hourly rate, active/inactive.  style: top form white, list bottom white cards.',
     purposeFa: 'سیستم جدید اضافه کنی، قیمت را عوض کنی، یا سیستمی که خراب است را غیرفعال کنی تا رزرو نگیرد.',
     purposeEn: 'Add new system, change price, disable broken one to not get reservations.',
     menuExplainFa: 'در گروه مدیریت - آیتم مدیریت کلاینت‌ها و سیستم‌ها، آیکون Monitor، مسیر /admin/systems.',
@@ -127,8 +127,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. افزودن سیستم جدید - فرم بالای صفحه',
         titleEn: '1. Add new system - top form',
-        descFa: 'فرم بالا را پر کن: نام (مثل PC VIP 04 یا PS5 Pro 02)، نوع (PC/PS5/Xbox/Simulator از select)، قیمت ساعتی (مثلاً 25000 تومان)، دسته مخاطب (اختیاری - مثلاً VIP، Standard). دکمه افزودن آبی وردپرس استایل (#2271b1) را بزن. فوری در لیست پایین ظاهر می‌شود و در سایت قابل رزرو است. اگر منبع داده Sample است، پیام می‌دهد باید Database کنی تا نمایش داده شود.',
-        descEn: 'Fill top form: name (e.g. PC VIP 04), type (PC/PS5/Xbox/Simulator from select), hourly rate (e.g. 25000), audience (optional - VIP, Standard). Click Add blue WP-style button (#2271b1). Instantly appears in bottom list and bookable on site. If data source Sample, shows note to switch to Database.',
+        descFa: 'فرم بالا را پر کن: نام (مثل PC VIP 04 یا PS5 Pro 02)، نوع (PC/PS5/Xbox/Simulator از select)، قیمت ساعتی (مثلاً 25000 تومان)، دسته مخاطب (اختیاری - مثلاً VIP، Standard). دکمه افزودن آبی مدیریت استایل (#2271b1) را بزن. فوری در لیست پایین ظاهر می‌شود و در سایت قابل رزرو است. اگر منبع داده Sample است، پیام می‌دهد باید Database کنی تا نمایش داده شود.',
+        descEn: 'Fill top form: name (e.g. PC VIP 04), type (PC/PS5/Xbox/Simulator from select), hourly rate (e.g. 25000), audience (optional - VIP, Standard). Click Add blue -style button (#2271b1). Instantly appears in bottom list and bookable on site. If data source Sample, shows note to switch to Database.',
         imageUrl: '/images/admin-guides/systems-step1.png',
         highlights: [
           { x: 5, y: 10, w: 20, h: 15, labelFa: 'نام سیستم', labelEn: 'System name', color: 'yellow' },
@@ -151,8 +151,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۳. حذف سیستم - وقتی جمع شد',
         titleEn: '3. Delete system - when removed',
-        descFa: 'اگر سیستمی جمع شد یا فروختی، دکمه حذف قرمز (آیکون Trash2) را بزن. رزروهای قبلی پاک نمی‌شود (برای حسابداری می‌ماند)، فقط دیگر قابل رزرو نیست. مثل وردپرس Trash.',
-        descEn: 'If system removed/sold, click delete red button (Trash2 icon). Past reservations stay (for accounting), just not bookable anymore. Like WP Trash.',
+        descFa: 'اگر سیستمی جمع شد یا فروختی، دکمه حذف قرمز (آیکون Trash2) را بزن. رزروهای قبلی پاک نمی‌شود (برای حسابداری می‌ماند)، فقط دیگر قابل رزرو نیست. مثل مدیریت Trash.',
+        descEn: 'If system removed/sold, click delete red button (Trash2 icon). Past reservations stay (for accounting), just not bookable anymore. Like  Trash.',
         imageUrl: '/images/admin-guides/systems-step3.png',
         highlights: [
           { x: 85, y: 20, w: 8, h: 10, labelFa: 'حذف - سطل زباله قرمز', labelEn: 'Delete - red trash', color: 'red' },
@@ -164,8 +164,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   cafe: {
     section: 'cafe',
-    introFa: 'منوی کافه و بوفه را اینجا می‌چینی. سفارشات زنده هم همین‌جاست. وردپرس استایل: کارت سفید.',
-    introEn: 'Cafe menu here. Live orders too. WP style white cards.',
+    introFa: 'منوی کافه و بوفه را اینجا می‌چینی. سفارشات زنده هم همین‌جاست. مدیریت استایل: کارت سفید.',
+    introEn: 'Cafe menu here. Live orders too.  style white cards.',
     purposeFa: 'غذا، نوشیدنی اضافه کنی، موجودی را کم‌وزیاد کنی، سفارش گیمر را آماده کنی.',
     purposeEn: 'Add food/drink, manage stock, fulfill gamer orders.',
     menuExplainFa: 'گروه مدیریت - بوفه و کافه، آیکون Coffee، مسیر /admin/cafe.',
@@ -174,8 +174,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. افزودن آیتم جدید - نام، دسته، قیمت، عکس، موجودی',
         titleEn: '1. Add new item - name, category, price, image, stock',
-        descFa: 'فرم: نام (مثلاً پیتزا مخصوص)، دسته (Foods/Drinks از select)، قیمت (50000)، آدرس عکس (/images/...), موجودی (20)، تیک موجود بودن. دکمه افزودن زرد/آبی وردپرس. عکس را حتماً بگذار - بدون عکس منو زشت می‌شود. موجودی صفر ولی تیک موجود روشن نباشد.',
-        descEn: 'Form: name (e.g. Special Pizza), category (Foods/Drinks from select), price (50000), image URL (/images/...), stock (20), available check. Add button yellow/blue WP. Always add image - without image menu ugly. Zero stock but available checked should not happen.',
+        descFa: 'فرم: نام (مثلاً پیتزا مخصوص)، دسته (Foods/Drinks از select)، قیمت (50000)، آدرس عکس (/images/...), موجودی (20)، تیک موجود بودن. دکمه افزودن زرد/آبی مدیریت. عکس را حتماً بگذار - بدون عکس منو زشت می‌شود. موجودی صفر ولی تیک موجود روشن نباشد.',
+        descEn: 'Form: name (e.g. Special Pizza), category (Foods/Drinks from select), price (50000), image URL (/images/...), stock (20), available check. Add button yellow/blue . Always add image - without image menu ugly. Zero stock but available checked should not happen.',
         imageUrl: '/images/admin-guides/cafe-step1.png',
         highlights: [
           { x: 5, y: 10, w: 18, h: 12, labelFa: 'نام غذا', labelEn: 'Food name', color: 'yellow' },
@@ -186,8 +186,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۲. مدیریت سفارشات - Pending به Preparing/Delivered',
         titleEn: '2. Manage orders - Pending to Preparing/Delivered',
-        descFa: 'سفارشات جدید با وضعیت Pending (زرد) می‌آید. وقتی آشپز شروع کرد، Preparing (آبی) کن. وقتی آماده شد و به میز گیمر بردی، Delivered (سبز) کن تا به فاکتور مشتری اضافه شود و از موجودی کم شود. مثل وردپرس Order status.',
-        descEn: 'New orders come as Pending (yellow). When chef starts, set Preparing (blue). When ready and delivered to gamer desk, set Delivered (green) to bill customer and deduct stock. Like WP Order status.',
+        descFa: 'سفارشات جدید با وضعیت Pending (زرد) می‌آید. وقتی آشپز شروع کرد، Preparing (آبی) کن. وقتی آماده شد و به میز گیمر بردی، Delivered (سبز) کن تا به فاکتور مشتری اضافه شود و از موجودی کم شود. مثل مدیریت Order status.',
+        descEn: 'New orders come as Pending (yellow). When chef starts, set Preparing (blue). When ready and delivered to gamer desk, set Delivered (green) to bill customer and deduct stock. Like  Order status.',
         imageUrl: '/images/admin-guides/cafe-step2.png',
         highlights: [
           { x: 60, y: 15, w: 18, h: 10, labelFa: 'وضعیت Pending زرد', labelEn: 'Pending status yellow', color: 'yellow' },
@@ -200,8 +200,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   shop: {
     section: 'shop',
-    introFa: 'فروشگاه لوازم جانبی: موس، هدست، کیبورد. مشتری با امتیاز می‌خرد. کارت سفید وردپرس.',
-    introEn: 'Accessory shop: mouse, headset, keyboard. Customer buys with points. White WP card.',
+    introFa: 'فروشگاه لوازم جانبی: موس، هدست، کیبورد. مشتری با امتیاز می‌خرد. کارت سفید مدیریت.',
+    introEn: 'Accessory shop: mouse, headset, keyboard. Customer buys with points. White  card.',
     purposeFa: 'کالا اضافه کنی، قیمت و موجودی را مدیریت کنی.',
     purposeEn: 'Add products, manage price and stock.',
     menuExplainFa: 'گروه مدیریت - فروشگاه لوازم جانبی، آیکون ShoppingBag، مسیر /admin/shop.',
@@ -232,8 +232,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   tournaments: {
     section: 'tournaments',
-    introFa: 'مسابقات و تورنمنت‌ها را اینجا می‌سازی. جایزه، بازی، تاریخ شمسی. وردپرس استایل.',
-    introEn: 'Tournaments here. Prize, game, date. WP style.',
+    introFa: 'مسابقات و تورنمنت‌ها را اینجا می‌سازی. جایزه، بازی، تاریخ شمسی. مدیریت استایل.',
+    introEn: 'Tournaments here. Prize, game, date.  style.',
     purposeFa: 'تورنمنت جدید بسازی و ثبت‌نام تیم‌ها را ببینی.',
     purposeEn: 'Create tournament and see team registrations.',
     menuExplainFa: 'گروه مدیریت - مسابقات و تورنمنت‌ها، آیکون Trophy، مسیر /admin/tournaments.',
@@ -294,9 +294,9 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   blog: {
     section: 'blog',
-    introFa: 'وبلاگ و اخبار کلوپ. مقاله جدید بنویس و منتشر کن. وردپرس استایل مثل Posts.',
-    introEn: 'Blog and club news. Write and publish. WP style like Posts.',
-    purposeFa: 'خبر تورنمنت، آموزش بازی، اطلاعیه کلوپ.',
+    introFa: 'وبلاگ و اخبار کل. مقاله جدید بنویس و منتشر کن. مدیریت استایل مثل Posts.',
+    introEn: 'Blog and club news. Write and publish.  style like Posts.',
+    purposeFa: 'خبر تورنمنت، آموزش بازی، اطلاعیه کل.',
     purposeEn: 'Tournament news, game tutorials, club announcements.',
     menuExplainFa: 'گروه پیام و محتوا - وبلاگ و اخبار، آیکون Newspaper، مسیر /admin/blog.',
     menuExplainEn: 'Messaging & Content group - Blog & News, icon Newspaper, path /admin/blog.',
@@ -319,8 +319,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   content: {
     section: 'content',
-    introFa: 'استودیوی محتوا و انتشار - نسخه بازطراحی شده v2: ساده، فارسی، برای صاحب گیم‌نت که هیچی حالیش نیست. قبلاً ۱۳ تب شلوغ و درهم بود، الان ۴ کارت بزرگ سفید وردپرس استایل.',
-    introEn: 'Content Studio v2 redesigned: simple, Persian, for non-technical owner. Previously 13 messy tabs, now 4 big white WP-style cards.',
+    introFa: 'استودیوی محتوا و انتشار - نسخه بازطراحی شده v2: ساده، فارسی، برای صاحب گیم‌نت که هیچی حالیش نیست. قبلاً ۱۳ تب شلوغ و درهم بود، الان ۴ کارت بزرگ سفید مدیریت استایل.',
+    introEn: 'Content Studio v2 redesigned: simple, Persian, for non-technical owner. Previously 13 messy tabs, now 4 big white -style cards.',
     purposeFa: 'برای اینستاگرام و تلگرام محتوا بسازی: عکس با هوش مصنوعی Flux/Imejis، ایده از ترندهای روز YouTube/Twitch، و انتشار زمان‌بندی شده. بدون سردرگمی.',
     purposeEn: 'Create content for Instagram/Telegram: AI images Flux/Imejis, ideas from daily trends YouTube/Twitch, scheduled publishing. No confusion.',
     menuExplainFa: 'گروه پیام و محتوا - استودیوی محتوا و انتشار، آیکون Images، مسیر /admin/content. مهم‌ترین بخش بعد از کلیدها.',
@@ -329,8 +329,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. راهنمای سریع - استودیو چیست؟ ۴ کارت بزرگ',
         titleEn: '1. Quick Guide - What is Studio? 4 big cards',
-        descFa: 'وقتی وارد /admin/content می‌شی، بالا ۴ کارت بزرگ سفید وردپرس می‌بینی: راهنمای سریع (توضیح مسیر ۴ مرحله‌ای: آماده‌سازی -> پیش‌نمایش و تأیید -> انتشار و ثبت رسانه -> دعوت و انتساب)، تولید تصویر (MediaGen)، ترندهای روز (Trends)، صف انتشار (Publish Queue). اول راهنما را بخون - همه تصاویر واقعی Chromium هستند، نه ساختگی. قبلاً ۱۳ تب کوچک با آیکون ریز بود که هیچکس نمی‌فهمید، الان ۴ کارت بزرگ با توضیح فارسی ساده.',
-        descEn: 'When you enter /admin/content, top has 4 big white WP cards: Quick Guide (explains 4-step flow: Prep -> Preview & Approve -> Publish & Record Media -> Invite & Assign), MediaGen, Trends, Publish Queue. Read guide first - all real Chromium screenshots, not fake. Previously 13 small tabs with tiny icons no one understood, now 4 big cards with simple Persian.',
+        descFa: 'وقتی وارد /admin/content می‌شی، بالا ۴ کارت بزرگ سفید مدیریت می‌بینی: راهنمای سریع (توضیح مسیر ۴ مرحله‌ای: آماده‌سازی -> پیش‌نمایش و تأیید -> انتشار و ثبت رسانه -> دعوت و انتساب)، تولید تصویر (MediaGen)، ترندهای روز (Trends)، صف انتشار (Publish Queue). اول راهنما را بخون - همه تصاویر واقعی Chromium هستند، نه ساختگی. قبلاً ۱۳ تب کوچک با آیکون ریز بود که هیچکس نمی‌فهمید، الان ۴ کارت بزرگ با توضیح فارسی ساده.',
+        descEn: 'When you enter /admin/content, top has 4 big white  cards: Quick Guide (explains 4-step flow: Prep -> Preview & Approve -> Publish & Record Media -> Invite & Assign), MediaGen, Trends, Publish Queue. Read guide first - all real Chromium screenshots, not fake. Previously 13 small tabs with tiny icons no one understood, now 4 big cards with simple Persian.',
         imageUrl: '/images/admin-guides/content.png',
         highlights: [
           { x: 5, y: 5, w: 22, h: 25, labelFa: 'راهنمای سریع - اول بخون', labelEn: 'Quick Guide - read first', color: 'yellow' },
@@ -372,8 +372,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۴. صف انتشار - پیش‌نویس تا اینستا/تلگرام - درگ و دراپ',
         titleEn: '4. Publish Queue - Draft to Insta/Telegram - drag & drop',
-        descFa: 'کارت صف انتشار را بزن. پست‌هایی که ساختی اینجا لیست می‌شود: هر کارت سفید عنوان، کپشن، وضعیت (draft زرد/approved سبز)، زبان (fa/en)، تعداد رسانه (مثلاً 3 عکس). روی پست بزن ویرایش می‌شود: عکس‌ها را مرتب کن (درگ و دراپ - بکش و رها کن)، کپشن فارسی/انگلیسی بنویس، پیش‌نمایش اینستاگرام/تلگرام ببین (موبایل فریم)، تأیید کن (تیک سبز)، بعد انتشار فوری یا زمان‌بندی (تقویم) بزن. اگر ارسال زنده خاموشه (mediagenEnabled false)، در صف می‌ماند تا مدیر در تنظیمات فعال کند. مثل وردپرس Posts list.',
-        descEn: 'Click Publish Queue card. Posts you created list here: each white card title, caption, status (draft yellow/approved green), language (fa/en), media count (e.g. 3 images). Click to edit: reorder images (drag & drop), write caption FA/EN, preview Insta/Telegram (mobile frame), approve (green check), then publish now or schedule (calendar). If live delivery paused (mediagenEnabled false), stays queued until admin enables in settings. Like WP Posts list.',
+        descFa: 'کارت صف انتشار را بزن. پست‌هایی که ساختی اینجا لیست می‌شود: هر کارت سفید عنوان، کپشن، وضعیت (draft زرد/approved سبز)، زبان (fa/en)، تعداد رسانه (مثلاً 3 عکس). روی پست بزن ویرایش می‌شود: عکس‌ها را مرتب کن (درگ و دراپ - بکش و رها کن)، کپشن فارسی/انگلیسی بنویس، پیش‌نمایش اینستاگرام/تلگرام ببین (موبایل فریم)، تأیید کن (تیک سبز)، بعد انتشار فوری یا زمان‌بندی (تقویم) بزن. اگر ارسال زنده خاموشه (mediagenEnabled false)، در صف می‌ماند تا مدیر در تنظیمات فعال کند. مثل مدیریت Posts list.',
+        descEn: 'Click Publish Queue card. Posts you created list here: each white card title, caption, status (draft yellow/approved green), language (fa/en), media count (e.g. 3 images). Click to edit: reorder images (drag & drop), write caption FA/EN, preview Insta/Telegram (mobile frame), approve (green check), then publish now or schedule (calendar). If live delivery paused (mediagenEnabled false), stays queued until admin enables in settings. Like  Posts list.',
         imageUrl: '/images/admin-guides/content-step3.png',
         highlights: [
           { x: 5, y: 10, w: 90, h: 15, labelFa: 'لیست پست‌ها - کارت سفید', labelEn: 'Posts list - white card', color: 'yellow' },
@@ -381,8 +381,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
           { x: 45, y: 30, w: 25, h: 15, labelFa: 'کپشن بنویس', labelEn: 'Write caption', color: 'green' },
           { x: 75, y: 30, w: 20, h: 15, labelFa: 'تأیید و انتشار', labelEn: 'Approve & Publish', color: 'red' },
         ],
-        tipFa: 'مسیر کامل: تولید رسانه → وظایف → ورود به پیش‌نویس → اینجا کپشن و ترتیب → پیش‌نمایش و تأیید → انتشار. همه گام‌ها فارسی و ساده، مثل وردپرس.',
-        tipEn: 'Full path: MediaGen -> Tasks -> Import to draft -> here caption & order -> preview & approve -> publish. All steps Persian simple like WP.',
+        tipFa: 'مسیر کامل: تولید رسانه → وظایف → ورود به پیش‌نویس → اینجا کپشن و ترتیب → پیش‌نمایش و تأیید → انتشار. همه گام‌ها فارسی و ساده، مثل مدیریت.',
+        tipEn: 'Full path: MediaGen -> Tasks -> Import to draft -> here caption & order -> preview & approve -> publish. All steps Persian simple like .',
       },
     ],
     commonMistakesFa: [
@@ -395,21 +395,21 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   promotions: {
     section: 'promotions',
-    introFa: 'کوپن‌ها و ساعات ویژه: تخفیف، ساعت رایگان، نیم‌بها. وردپرس استایل.',
-    introEn: 'Coupons and special hours: discount, free hour, half-price. WP style.',
+    introFa: 'کن‌ها و ساعات ویژه: تخفیف، ساعت رایگان، نیم‌بها. مدیریت استایل.',
+    introEn: 'Coupons and special hours: discount, free hour, half-price.  style.',
     purposeFa: 'مشتری را با تخفیف برگردانی - مثلاً جمعه صبح نیم‌بها.',
     purposeEn: 'Bring back customers with discounts - e.g. Friday morning half-price.',
-    menuExplainFa: 'گروه فروش و مالی - کوپن‌ها و ساعات رایگان/نیم‌بها، آیکون Ticket، مسیر /admin/promotions.',
+    menuExplainFa: 'گروه فروش و مالی - کن‌ها و ساعات رایگان/نیم‌بها، آیکون Ticket، مسیر /admin/promotions.',
     menuExplainEn: 'Sales & Finance group - Coupons & Free/Half Hours, icon Ticket, path /admin/promotions.',
     steps: [
       {
-        titleFa: '۱. ساخت کوپن - کد، درصد، انقضا، تعداد',
+        titleFa: '۱. ساخت کن - کد، درصد، انقضا، تعداد',
         titleEn: '1. Create coupon - code, %, expiry, limit',
-        descFa: 'فرم: کد (مثلاً WELCOME10)، درصد تخفیف (10%)، تاریخ انقضا (۱۴۰۵/۰۶/۳۰)، تعداد استفاده (100). ذخیره آبی #2271b1. کوپن بدون تاریخ انقضا نگذار - سوءاستفاده می‌شود.',
+        descFa: 'فرم: کد (مثلاً WELCOME10)، درصد تخفیف (10%)، تاریخ انقضا (۱۴۰۵/۰۶/۳۰)، تعداد استفاده (100). ذخیره آبی #2271b1. کن بدون تاریخ انقضا نگذار - سوءاستفاده می‌شود.',
         descEn: 'Form: code (e.g. WELCOME10), discount % (10%), expiry (1405/06/30), usage limit (100). Save blue #2271b1. Not without expiry - abuse.',
         imageUrl: '/images/admin-guides/promotions-step1.png',
         highlights: [
-          { x: 5, y: 10, w: 15, h: 10, labelFa: 'کد کوپن', labelEn: 'Coupon code', color: 'yellow' },
+          { x: 5, y: 10, w: 15, h: 10, labelFa: 'کد کن', labelEn: 'Coupon code', color: 'yellow' },
           { x: 22, y: 10, w: 10, h: 10, labelFa: 'درصد', labelEn: '%', color: 'blue' },
           { x: 50, y: 10, w: 15, h: 10, labelFa: 'انقضا', labelEn: 'Expiry', color: 'red' },
         ],
@@ -422,13 +422,13 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
         imageUrl: '/images/admin-guides/promotions-step2.png',
       },
     ],
-    commonMistakesFa: ['کوپن بدون تاریخ انقضا و سوءاستفاده', 'درصد تخفیف خیلی بالا (90%) و ضرر'],
+    commonMistakesFa: ['کن بدون تاریخ انقضا و سوءاستفاده', 'درصد تخفیف خیلی بالا (90%) و ضرر'],
     commonMistakesEn: ['No expiry and abuse', 'Too high discount % (90%) and loss'],
   },
   chat: {
     section: 'chat',
-    introFa: 'اتاق‌های گفتگوی زنده: گیمرها با هم چت می‌کنند. وردپرس استایل.',
-    introEn: 'Live chat rooms: gamers chat together. WP style.',
+    introFa: 'اتاق‌های گفتگوی زنده: گیمرها با هم چت می‌کنند. مدیریت استایل.',
+    introEn: 'Live chat rooms: gamers chat together.  style.',
     purposeFa: 'اتاق بسازی، مدیریت کنی، حذف کنی.',
     purposeEn: 'Create, manage, delete rooms.',
     menuExplainFa: 'گروه ارتباط - اتاق‌های گفتگوی زنده، آیکون MessageSquare، مسیر /admin/chat.',
@@ -451,8 +451,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   messages: {
     section: 'messages',
-    introFa: 'ارسال پیام و نوتیفیکیشن به کاربرها: تکی یا گروهی. وردپرس استایل.',
-    introEn: 'Send messages and notifications to users: single or bulk. WP style.',
+    introFa: 'ارسال پیام و نوتیفیکیشن به کاربرها: تکی یا گروهی. مدیریت استایل.',
+    introEn: 'Send messages and notifications to users: single or bulk.  style.',
     purposeFa: 'اطلاع‌رسانی، تأیید رزرو، تبلیغ.',
     purposeEn: 'Announcements, reservation confirm, promo.',
     menuExplainFa: 'گروه ارتباط - پیام‌ها و اعلان‌ها، آیکون Mail، مسیر /admin/messages.',
@@ -486,8 +486,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   tickets: {
     section: 'tickets',
-    introFa: 'تیکت‌های پشتیبانی: مشکل کاربر را حل کن. وردپرس استایل.',
-    introEn: 'Support tickets: solve user problems. WP style.',
+    introFa: 'تیکت‌های پشتیبانی: مشکل کاربر را حل کن. مدیریت استایل.',
+    introEn: 'Support tickets: solve user problems.  style.',
     purposeFa: 'پاسخ به تیکت، بستن تیکت.',
     purposeEn: 'Answer and close tickets.',
     menuExplainFa: 'گروه ارتباط - تیکت‌های پشتیبانی، آیکون LifeBuoy، مسیر /admin/tickets. نشان تعداد باز دارد.',
@@ -496,8 +496,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. دیدن تیکت باز - لیست',
         titleEn: '1. See open ticket - list',
-        descFa: 'لیست تیکت‌های باز با وضعیت Open (قرمز) - روی یکی بزن تا جزئیات باز شود. مثل وردپرس Comments list.',
-        descEn: 'List of open tickets with Open status (red) - click one to see details. Like WP Comments list.',
+        descFa: 'لیست تیکت‌های باز با وضعیت Open (قرمز) - روی یکی بزن تا جزئیات باز شود. مثل مدیریت Comments list.',
+        descEn: 'List of open tickets with Open status (red) - click one to see details. Like  Comments list.',
         imageUrl: '/images/admin-guides/tickets-step1.png',
         highlights: [
           { x: 5, y: 10, w: 90, h: 15, labelFa: 'لیست تیکت باز - کلیک برای جزئیات', labelEn: 'Open tickets list - click for details', color: 'yellow' },
@@ -520,8 +520,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   wallet: {
     section: 'wallet',
-    introFa: 'کیف پول و پرداخت حضوری: شارژ، کسر، تاریخچه. وردپرس استایل.',
-    introEn: 'Wallet and on-site payments: top-up, deduct, history. WP style.',
+    introFa: 'کیف پول و پرداخت حضوری: شارژ، کسر، تاریخچه. مدیریت استایل.',
+    introEn: 'Wallet and on-site payments: top-up, deduct, history.  style.',
     purposeFa: 'موجودی کاربر را مدیریت کنی - شارژ دستی.',
     purposeEn: 'Manage user balance - manual top-up.',
     menuExplainFa: 'گروه فروش و مالی - کیف پول و پرداخت حضوری، آیکون Wallet، مسیر /admin/wallet.',
@@ -555,8 +555,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   affiliates: {
     section: 'affiliates',
-    introFa: 'همکاری در فروش: معرف، کمیسیون، لینک دعوت. وردپرس استایل.',
-    introEn: 'Affiliate marketing: referral, commission, invite link. WP style.',
+    introFa: 'همکاری در فروش: معرف، کمیسیون، لینک دعوت. مدیریت استایل.',
+    introEn: 'Affiliate marketing: referral, commission, invite link.  style.',
     purposeFa: 'همکار اضافه کنی، کمیسیون ببینی، تنظیمات درصد.',
     purposeEn: 'Add affiliate, see commission, set percentages.',
     menuExplainFa: 'گروه فروش و مالی - همکاری در فروش، آیکون Handshake، مسیر /admin/affiliates. جریان جدید: کامنت کلیدواژه -> PR guide + follow button -> follow check -> DM private invite link -> share -> coupon -> commission.',
@@ -584,7 +584,7 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۳. لینک دعوت خصوصی - ?ref=CODE - جریان جدید',
         titleEn: '3. Private invite link - ?ref=CODE - new flow',
-        descFa: 'جریان جدید: ۱) کاربر کامنت کلیدواژه (مثلاً "بازینو") می‌گذارد، ۲) سیستم PR guide + دکمه فالو می‌فرستد، ۳) فالو چک می‌کند، ۴) لینک دعوت خصوصی ?ref=CODE را در DM می‌فرستد (فقط در دیسپچ محاسبه می‌شود، هرگز در لیست ادمین ذخیره نمی‌شود)، ۵) همکار لینک را شیر می‌کند، ۶) دوست از طریق لینک بیاید کوپن می‌گیرد، ۷) همکار به ازای هر پرداخت پورسانت می‌گیرد. لینک خصوصی فقط در لحظه ارسال ساخته می‌شود.',
+        descFa: 'جریان جدید: ۱) کاربر کامنت کلیدواژه (مثلاً "بازینو") می‌گذارد، ۲) سیستم PR guide + دکمه فالو می‌فرستد، ۳) فالو چک می‌کند، ۴) لینک دعوت خصوصی ?ref=CODE را در DM می‌فرستد (فقط در دیسپچ محاسبه می‌شود، هرگز در لیست ادمین ذخیره نمی‌شود)، ۵) همکار لینک را شیر می‌کند، ۶) دوست از طریق لینک بیاید کن می‌گیرد، ۷) همکار به ازای هر پرداخت پورسانت می‌گیرد. لینک خصوصی فقط در لحظه ارسال ساخته می‌شود.',
         descEn: 'New flow: 1) User comments keyword (e.g. "bazino"), 2) System sends PR guide + follow button, 3) Checks follow, 4) Sends private invite link ?ref=CODE in DM (computed only at dispatch, never stored in admin lists), 5) Partner shares link, 6) Friend via link gets coupon, 7) Partner gets commission per payment. Private link computed only at dispatch.',
         imageUrl: '/images/admin-guides/affiliates-step3.png',
         highlights: [
@@ -598,8 +598,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   messaging: {
     section: 'messaging',
-    introFa: 'پیامک گروهی: SMS, Viber, WhatsApp با Messaggio. وردپرس استایل.',
-    introEn: 'Bulk messaging: SMS, Viber, WhatsApp via Messaggio. WP style.',
+    introFa: 'پیامک گروهی: SMS, Viber, WhatsApp با Messaggio. مدیریت استایل.',
+    introEn: 'Bulk messaging: SMS, Viber, WhatsApp via Messaggio.  style.',
     purposeFa: 'کمپین تبلیغاتی بفرستی - مثلاً تخفیف جمعه.',
     purposeEn: 'Send promo campaigns - e.g. Friday discount.',
     menuExplainFa: 'گروه پیام و محتوا - پیامک گروهی، آیکون Megaphone، مسیر /admin/messaging.',
@@ -629,12 +629,12 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   themes: {
     section: 'themes',
-    introFa: 'قالب‌ها: ظاهر سایت را عوض کن. وردپرس استایل دقیقاً مثل Appearance > Themes.',
-    introEn: 'Themes: change site look. WP style exactly like Appearance > Themes.',
+    introFa: 'قالب‌ها: ظاهر سایت را عوض کن. مدیریت استایل دقیقاً مثل Appearance > Themes.',
+    introEn: 'Themes: change site look.  style exactly like Appearance > Themes.',
     purposeFa: 'قالب نصب کنی، فعال کنی، خروجی بگیری.',
     purposeEn: 'Install, activate, export themes.',
-    menuExplainFa: 'گروه پیشرفته - مدیریت قالب‌ها، آیکون Palette، مسیر /admin/themes. مثل وردپرس Appearance > Themes.',
-    menuExplainEn: 'Advanced group - Themes, icon Palette, path /admin/themes. Like WP Appearance > Themes.',
+    menuExplainFa: 'گروه پیشرفته - مدیریت قالب‌ها، آیکون Palette، مسیر /admin/themes. مثل مدیریت Appearance > Themes.',
+    menuExplainEn: 'Advanced group - Themes, icon Palette, path /admin/themes. Like  Appearance > Themes.',
     steps: [
       {
         titleFa: '۱. نصب ZIP - theme.json + theme.css + assets',
@@ -663,8 +663,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   appSlider: {
     section: 'appSlider',
-    introFa: 'اسلایدر صفحه اصلی و اپ: بنر بزرگ بالا. وردپرس استایل.',
-    introEn: 'Home & App slider: big banner top. WP style.',
+    introFa: 'اسلایدر صفحه اصلی و اپ: بنر بزرگ بالا. مدیریت استایل.',
+    introEn: 'Home & App slider: big banner top.  style.',
     purposeFa: 'اسلاید اضافه کنی، عکس، عنوان، لینک مقصد.',
     purposeEn: 'Add slide with image, title, link target.',
     menuExplainFa: 'گروه پیشرفته - اسلایدر صفحه اصلی و اپ، آیکون Images، مسیر /admin/appSlider.',
@@ -695,8 +695,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   mobileAppDownload: {
     section: 'mobileAppDownload',
-    introFa: 'دانلود اپ موبایل: لینک APK و توضیح. وردپرس استایل.',
-    introEn: 'Mobile app download: APK link and info. WP style.',
+    introFa: 'دانلود اپ موبایل: لینک APK و توضیح. مدیریت استایل.',
+    introEn: 'Mobile app download: APK link and info.  style.',
     purposeFa: 'لینک دانلود اپ را بگذاری.',
     purposeEn: 'Set download link for app.',
     menuExplainFa: 'گروه پیشرفته - دانلود اپلیکیشن موبایل، آیکون Smartphone، مسیر /admin/mobileAppDownload.',
@@ -718,11 +718,11 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   customization: {
     section: 'customization',
-    introFa: 'سفارشی‌سازی سایت و اطلاعات کلوپ: آدرس، تلفن، شبکه اجتماعی، قیمت‌ها. مثل وردپرس Settings.',
-    introEn: 'Site customization & club info: address, phone, social, pricing. Like WP Settings.',
-    purposeFa: 'اطلاعات کلوپ را ویرایش کنی.',
+    introFa: 'سفارشی‌سازی سایت و اطلاعات کل: آدرس، تلفن، شبکه اجتماعی، قیمت‌ها. مثل مدیریت Settings.',
+    introEn: 'Site customization & club info: address, phone, social, pricing. Like  Settings.',
+    purposeFa: 'اطلاعات کل را ویرایش کنی.',
     purposeEn: 'Edit club info.',
-    menuExplainFa: 'گروه پیشرفته - سفارشی‌سازی سایت و اطلاعات کلوپ، آیکون Sliders، مسیر /admin/customization. منبع داده اینجاست.',
+    menuExplainFa: 'گروه پیشرفته - سفارشی‌سازی سایت و اطلاعات کل، آیکون Sliders، مسیر /admin/customization. منبع داده اینجاست.',
     menuExplainEn: 'Advanced group - Site Customization & Club Info, icon Sliders, path /admin/customization. Data source here.',
     steps: [
       {
@@ -741,15 +741,15 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۲. اطلاعات تماس - تلفن، آدرس، ساعات، نقشه',
         titleEn: '2. Contact info - phone, address, hours, map',
-        descFa: 'فرم: تلفن کلوپ، آدرس (برای نقشه)، ساعات کاری، لینک نقشه Google. ذخیره. آدرس اشتباه روی نقشه نرود.',
+        descFa: 'فرم: تلفن کل، آدرس (برای نقشه)، ساعات کاری، لینک نقشه Google. ذخیره. آدرس اشتباه روی نقشه نرود.',
         descEn: 'Form: club phone, address (for map), hours, Google map link. Save. Not wrong address on map.',
         imageUrl: '/images/admin-guides/customization-step2.png',
       },
       {
         titleFa: '۳. شبکه اجتماعی - اینستا، تلگرام، یوتیوب',
         titleEn: '3. Social links - Insta, Telegram, YouTube',
-        descFa: 'لیست لینک‌ها: اینستا، تلگرام، یوتیوب. افزودن/ویرایش/حذف. مثل وردپرس Social Links.',
-        descEn: 'Links list: Insta, Telegram, YouTube. Add/edit/delete. Like WP Social Links.',
+        descFa: 'لیست لینک‌ها: اینستا، تلگرام، یوتیوب. افزودن/ویرایش/حذف. مثل مدیریت Social Links.',
+        descEn: 'Links list: Insta, Telegram, YouTube. Add/edit/delete. Like  Social Links.',
         imageUrl: '/images/admin-guides/customization-step3.png',
       },
     ],
@@ -758,7 +758,7 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   dbLogs: {
     section: 'dbLogs',
-    introFa: 'لاگ‌های دیتابیس: ببینی چه درخواستی به DB رفته. برای دولوپر.',
+    introFa: 'لاگ‌های دیتابیس: ببینی چه درخواستی به DB رفته. برای دولر.',
     introEn: 'Database logs: see what queries went to DB. For dev.',
     purposeFa: 'دیباگ و بررسی عملکرد - چه خطایی رفته.',
     purposeEn: 'Debug and performance - what error went.',
@@ -768,8 +768,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. دیدن لاگ - زمان و نوع',
         titleEn: '1. View logs - time and type',
-        descFa: 'لیست لاگ‌ها با زمان، نوع عملیات (query/error)، provider. مثل وردپرس Debug log.',
-        descEn: 'List with time, operation type (query/error), provider. Like WP Debug log.',
+        descFa: 'لیست لاگ‌ها با زمان، نوع عملیات (query/error)، provider. مثل مدیریت Debug log.',
+        descEn: 'List with time, operation type (query/error), provider. Like  Debug log.',
         imageUrl: '/images/admin-guides/dbLogs-step1.png',
       },
       {
@@ -785,8 +785,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   apiKeys: {
     section: 'apiKeys',
-    introFa: 'مرکز کلیدها — قبلاً پراکنده بود، الان همه اینجاست. مهم‌ترین بخش. وردپرس استایل با تب دسته‌بندی.',
-    introEn: 'Keys Center — previously scattered, now all here. Most important. WP style with category tabs.',
+    introFa: 'مرکز کلیدها — قبلاً پراکنده بود، الان همه اینجاست. مهم‌ترین بخش. مدیریت استایل با تب دسته‌بندی.',
+    introEn: 'Keys Center — previously scattered, now all here. Most important.  style with category tabs.',
     purposeFa: 'همه API Key ها را یک‌جا مدیریت کنی - جارویس 3 مدل با کلید پیش‌فرض ENV.',
     purposeEn: 'Manage all API keys in one place - Jarvis 3 models with ENV default keys.',
     menuExplainFa: 'گروه هوش و فنی - مرکز کلیدها، آیکون KeyRound، مسیر /admin/apiKeys. همه کلیدها یک‌جاست - قبلاً 3 جا پراکنده بود.',
@@ -795,8 +795,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. انتخاب دسته - جارویس، دسکتاپ، محتوا، اجتماعی، همکاری',
         titleEn: '1. Choose category - Jarvis, Desktop, Content, Social, Affiliate',
-        descFa: 'بالا 7 تب دایره‌ای: همه کلیدها، جارویس (AI)، اتصال دسکتاپ، تولید محتوا، شبکه اجتماعی، همکاری، انتشار. روی هر کدام بزن تا کارت‌های آن دسته بیاید. مثل وردپرس Settings tabs.',
-        descEn: 'Top 7 circle tabs: All Keys, Jarvis AI, Desktop Sync, Content Gen, Social APIs, Affiliate, Publishing. Click each to show its cards. Like WP Settings tabs.',
+        descFa: 'بالا 7 تب دایره‌ای: همه کلیدها، جارویس (AI)، اتصال دسکتاپ، تولید محتوا، شبکه اجتماعی، همکاری، انتشار. روی هر کدام بزن تا کارت‌های آن دسته بیاید. مثل مدیریت Settings tabs.',
+        descEn: 'Top 7 circle tabs: All Keys, Jarvis AI, Desktop Sync, Content Gen, Social APIs, Affiliate, Publishing. Click each to show its cards. Like  Settings tabs.',
         imageUrl: '/images/admin-guides/apiKeys-step1.png',
         highlights: [
           { x: 5, y: 5, w: 90, h: 12, labelFa: 'تب دسته‌ها - 7 دسته', labelEn: 'Category tabs - 7 categories', color: 'yellow' },
@@ -852,8 +852,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
       {
         titleFa: '۱. دیدن اسلایدها',
         titleEn: '1. View slides',
-        descFa: 'اسلایدها را با قبلی/بعدی ورق بزن - مثل وردپرس Presentation.',
-        descEn: 'Flip through slides with prev/next - like WP Presentation.',
+        descFa: 'اسلایدها را با قبلی/بعدی ورق بزن - مثل مدیریت Presentation.',
+        descEn: 'Flip through slides with prev/next - like  Presentation.',
         imageUrl: '/images/admin-guides/presentation-step1.png',
       },
     ],
@@ -862,8 +862,8 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   jarvis: {
     section: 'jarvis',
-    introFa: 'جارویس دستیار AI مدیر: دستور بده، کار انجام می‌دهد. مثل وردپرس AI assistant.',
-    introEn: 'Jarvis AI assistant: command, it does. Like WP AI assistant.',
+    introFa: 'جارویس دستیار AI مدیر: دستور بده، کار انجام می‌دهد. مثل مدیریت AI assistant.',
+    introEn: 'Jarvis AI assistant: command, it does. Like  AI assistant.',
     purposeFa: 'مدیریت سریع با زبان طبیعی - بدون کلیک زیاد.',
     purposeEn: 'Fast management with natural language - without many clicks.',
     menuExplainFa: 'گروه هوش و فنی - جارویس دستیار مدیر (AI)، آیکون Brain، مسیر /admin/jarvis. نیاز به کلید در مرکز کلیدها دارد.',
@@ -904,9 +904,9 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
   },
   migrations: {
     section: 'migrations',
-    introFa: 'مهاجرت‌های دیتابیس: کد C# برای EF Core. برای دولوپر.',
+    introFa: 'مهاجرت‌های دیتابیس: کد C# برای EF Core. برای دولر.',
     introEn: 'Database migrations: C# code for EF Core. For dev.',
-    purposeFa: 'برای دولوپر: ببینی جدول‌ها چطور ساخته می‌شود.',
+    purposeFa: 'برای دولر: ببینی جدول‌ها چطور ساخته می‌شود.',
     purposeEn: 'For dev: see how tables are created.',
     menuExplainFa: 'گروه پیشرفته - مهاجرت‌های دیتابیس (EF Core)، آیکون FileClock، مسیر /admin/migrations.',
     menuExplainEn: 'Advanced group - Database Migrations (EF Core), icon FileClock, path /admin/migrations.',
@@ -926,7 +926,7 @@ export const ADMIN_GUIDES: Record<AdminSection, SectionGuide> = {
 
 // PDF sections for viewer - comprehensive
 export const PDF_SECTIONS = [
-  { id: 'intro', titleFa: 'مقدمه و طراحی وردپرس', titleEn: 'Intro & WP Design', pages: '1-2' },
+  { id: 'intro', titleFa: 'مقدمه و طراحی مدیریت', titleEn: 'Intro &  Design', pages: '1-2' },
   { id: 'dashboard', titleFa: 'داشبورد', titleEn: 'Dashboard', pages: '3' },
   { id: 'systems', titleFa: 'سیستم‌ها', titleEn: 'Systems', pages: '4' },
   { id: 'cafe', titleFa: 'کافه', titleEn: 'Cafe', pages: '5' },
@@ -988,14 +988,14 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
     return PDF_SECTIONS.filter(s => [s.id, s.titleFa, s.titleEn].join(' ').toLowerCase().includes(q));
   }, [pdfSearchQuery]);
 
-  // WordPress style modal centered accounting for header height 32px
+  // مدیریت style modal centered accounting for header height 32px
   return (
     <>
       <div
         className="fixed z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm"
         dir={dir}
         style={{
-          top: '32px', // accounting for WP admin bar height 32px - not hidden under header
+          top: '32px', // accounting for  admin bar height 32px - not hidden under header
           left: 0,
           right: 0,
           bottom: 0,
@@ -1004,7 +1004,7 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
       >
         <div className="absolute inset-0" onClick={onClose} />
         <div className="relative bg-white border border-[#c3c4c7] shadow-[0_5px_15px_rgba(0,0,0,0.3)] rounded-[2px] w-full max-w-5xl max-h-[calc(100vh-32px-16px)] overflow-hidden flex flex-col animate-fade-in" style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
-          {/* WP Header */}
+          {/*  Header */}
           <div className="px-4 py-3 border-b border-[#dcdcde] flex items-center justify-between bg-[#fcfcfc]">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-[2px] bg-[#2271b1] text-white flex items-center justify-center shrink-0">
@@ -1050,7 +1050,7 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 grid lg:grid-cols-12 gap-4 bg-[#f0f0f1]">
-            {/* Steps list - WP style */}
+            {/* Steps list -  style */}
             <div className="lg:col-span-4 space-y-3">
               <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-3">
                 <h4 className="text-[11px] font-bold text-[#646970] uppercase tracking-wide mb-2 flex items-center gap-1.5">
@@ -1089,7 +1089,7 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
               </div>
             </div>
 
-            {/* Step detail - WP style with highlight overlays */}
+            {/* Step detail -  style with highlight overlays */}
             <div className="lg:col-span-8 space-y-3">
               <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
                 <h3 className="text-[14px] font-semibold text-[#1d2327] mb-2">{L(language, { fa: step.titleFa, en: step.titleEn, ru: step.titleEn, tr: step.titleEn })}</h3>
@@ -1165,7 +1165,7 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
                 )}
               </div>
 
-              {/* Navigation - WP style */}
+              {/* Navigation -  style */}
               <div className="flex items-center justify-between bg-white border border-[#c3c4c7] rounded-[2px] p-3 shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
                 <button
                   disabled={activeStepIdx === 0}
@@ -1184,7 +1184,7 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
                 </button>
               </div>
 
-              {/* Purpose box - WP style */}
+              {/* Purpose box -  style */}
               <div className="bg-white border border-[#c3c4c7] border-l-4 border-l-[#2271b1] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-3 flex gap-2.5">
                 <div className="w-7 h-7 rounded-[2px] bg-[#f0f6fc] border border-[#c3c4c7] text-[#2271b1] flex items-center justify-center shrink-0">
                   <Play className="w-3.5 h-3.5" />
@@ -1202,7 +1202,7 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
       {/* PDF Viewer Fullscreen - with prev/next, search, close */}
       {isPdfViewerOpen && (
         <div className="fixed inset-0 z-[200] bg-[#f0f0f1] flex flex-col" dir={dir} style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
-          {/* PDF Top Bar - WP style */}
+          {/* PDF Top Bar -  style */}
           <div className="h-[50px] bg-[#1d2327] text-white flex items-center justify-between px-4 shrink-0">
             <div className="flex items-center gap-3">
               <FileText className="w-5 h-5 text-[#72aee6]" />
@@ -1297,7 +1297,7 @@ export default function AdminGuide({ section, language, dir, isOpen, onClose, in
                     title="Bazino Admin Guide PDF"
                   />
                   <div className="h-[36px] bg-[#fcfcfc] border-t border-[#dcdcde] flex items-center justify-between px-3 text-[11px] text-[#646970]">
-                    <span className="font-mono">Page {pdfPage + 1} • {filteredPdfSections[pdfPage]?.id} • WordPress Style Guide</span>
+                    <span className="font-mono">Page {pdfPage + 1} • {filteredPdfSections[pdfPage]?.id} • مدیریت Style Guide</span>
                     <span className="hidden sm:inline">Use Prev/Next or search to navigate • Close X top-right</span>
                   </div>
                 </div>

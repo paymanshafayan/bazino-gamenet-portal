@@ -68,30 +68,30 @@ import { LegalAdminSection } from '../legal/LegalAdminSection';
 
 /** نام و کلیدواژه‌های هر بخش پنل — برای عنوان صفحه، هدر بخش و جستجوی سریع */
 export const ADMIN_SECTION_META: Record<AdminSection, { fa: string; en: string; ru: string; tr: string; keywords: string }> = {
-  dashboard:         { fa: 'داشبورد و آمار زنده', en: 'Dashboard & Live Stats', ru: 'Дашборд и живая статистика', tr: 'Gösterge Paneli ve Canlı İstatistikler', keywords: 'stats آمار statistics dashboard home' },
-  jarvis:            { fa: 'جارویس — دستیار مدیر (AI)', en: 'Jarvis — Admin AI Assistant', ru: 'Джарвис — ИИ-помощник админа', tr: 'Jarvis — Yönetici AI Asistanı', keywords: 'ai جارویس jarvis assistant chatbot groq automation' },
-  systems:           { fa: 'مدیریت کلاینت‌ها و سیستم‌ها', en: 'Clients & Systems', ru: 'Клиенты и системы', tr: 'İstemciler ve Sistemler', keywords: 'pc ps5 console کنسول کامپیوتر رزرو reservation station' },
-  cafe:              { fa: 'بوفه و کافه', en: 'Cafe Buffet', ru: 'Кафе-буфет', tr: 'Kafe Büfe', keywords: 'menu منو غذا نوشیدنی food drink' },
-  shop:              { fa: 'فروشگاه لوازم جانبی', en: 'Accessory Shop', ru: 'Магазин аксессуаров', tr: 'Ekipman Mağazası', keywords: 'products محصول کالا mouse headset' },
-  tournaments:       { fa: 'مسابقات و تورنمنت‌ها', en: 'Tournaments', ru: 'Турниры', tr: 'Turnuvalar', keywords: 'match تورنمنت جایزه prize bracket' },
-  tournamentOps:     { fa: 'مدیریت عملیاتی مسابقات', en: 'Tournament Operations', ru: 'Управление турнирами', tr: 'Turnuva Operasyonları', keywords: 'bracket براکت ثبت‌نام حضور نتیجه تیم checkin team result مساقات' },
-  messaging:         { fa: 'پیامک گروهی', en: 'Bulk Messaging', ru: 'Рассылки', tr: 'Toplu Mesaj', keywords: 'sms پیامک وایبر واتساپ whatsapp viber کمپین تبلیغات گروهی messaggio campaign' },
-  blog:              { fa: 'وبلاگ و اخبار', en: 'Blog & News', ru: 'Блог и новости', tr: 'Blog ve Haberler', keywords: 'article مقاله خبر post' },
-  content:           { fa: 'استودیوی محتوا و انتشار', en: 'Content & Publish Queue', ru: 'Контент и очередь публикаций', tr: 'İçerik ve Yayın Kuyruğu', keywords: 'manus سوشیال social instagram telegram صف انتشار queue publish schedule زمانبندی' },
-  promotions:        { fa: 'کوپن‌ها و ساعات رایگان/نیم‌بها', en: 'Coupons & Free/Half Hours', ru: 'Купоны и бесплатные/льготные часы', tr: 'Kuponlar ve Ücretsiz/Yarım Saatler', keywords: 'coupon کوپن تخفیف discount happy hour رایگان نیم‌بها ساعت ویژه' },
-  chat:              { fa: 'اتاق‌های گفتگوی زنده', en: 'Live Chat Rooms', ru: 'Живые чат-комнаты', tr: 'Canlı Sohbet Odaları', keywords: 'room پیام گفتگو message' },
-  messages:          { fa: 'پیام‌ها و اعلان‌ها', en: 'Messages & Notifications', ru: 'Сообщения и уведомления', tr: 'Mesajlar ve Bildirimler', keywords: 'notification ایمیل تماس contact inbox' },
-  migrations:        { fa: 'مهاجرت‌های دیتابیس (EF Core)', en: 'Database Migrations', ru: 'Миграции БД', tr: 'Veritabanı Geçişleri', keywords: 'ef core sql schema جدول' },
-  themes:            { fa: 'مدیریت قالب‌ها', en: 'Themes', ru: 'Темы', tr: 'Tema Yönetimi', keywords: 'theme zip css تم پوسته ظاهر skin color رنگ' },
-  appSlider:         { fa: 'اسلایدر صفحه اصلی و اپ', en: 'Home & App Slider', ru: 'Слайдер главной и приложения', tr: 'Ana Sayfa ve Uygulama Slaytı', keywords: 'slider hero banner بنر اسلاید تصویر' },
-  mobileAppDownload: { fa: 'دانلود اپلیکیشن موبایل', en: 'Mobile App Download', ru: 'Загрузка мобильного приложения', tr: 'Mobil Uygulama İndirme', keywords: 'apk android ios اپ موبایل' },
-  customization:     { fa: 'سفارشی‌سازی سایت و اطلاعات کلوپ', en: 'Site Customization & Club Info', ru: 'Настройка сайта и данные клуба', tr: 'Site Özelleştirme ve Kulüp Bilgileri', keywords: 'settings تنظیمات آدرس تلفن logo address phone hours layout' },
-  dbLogs:            { fa: 'لاگ‌های دیتابیس', en: 'Database Logs', ru: 'Логи БД', tr: 'Veritabanı Günlükleri', keywords: 'log گزارش خطا error query' },
-  apiKeys:           { fa: 'کلیدهای API و اتصال‌ها', en: 'API Keys & Integrations', ru: 'API-ключи и интеграции', tr: 'API Anahtarları ve Entegrasyonlar', keywords: 'token jarvis web sync کلید اتصال integration' },
-  presentation:      { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum', keywords: 'slides معرفی pitch' },
-  tickets:           { fa: 'تیکت‌های پشتیبانی', en: 'Support Tickets', ru: 'Обращения в поддержку', tr: 'Destek Talepleri', keywords: 'support help ticket پشتیبانی تیکت destek' },
-  wallet:            { fa: 'کیف پول و پرداخت حضوری', en: 'Wallet & On-site Payments', ru: 'Кошелёк и оплата на месте', tr: 'Cüzdan ve Mekânda Ödeme', keywords: 'wallet onsite cash pos payment کیف پول پرداخت حضوری cüzdan ödeme' },
-  affiliates:        { fa: 'همکاری در فروش', en: 'Affiliate Marketing', ru: 'Партнёрский маркетинг', tr: 'Satış Ortaklığı', keywords: 'affiliate referral commission همکار معرفی کمیسیون ref کمپین کمپین‌ها campaign squad دعوت اینستاگرام instagram پورسانت کد معرف لینک همکاری' },
+  dashboard:         { fa: 'داشبورد', en: 'Dashboard', ru: 'Дашборд', tr: 'Panel', keywords: 'stats آمار dashboard home' },
+  jarvis:            { fa: 'جارویس', en: 'Jarvis', ru: 'Джарвис', tr: 'Jarvis', keywords: 'ai جارویس jarvis assistant chatbot groq' },
+  systems:           { fa: 'سیستم‌ها', en: 'Systems', ru: 'Системы', tr: 'Sistemler', keywords: 'pc ps5 console سیستم رزرو station' },
+  cafe:              { fa: 'کافه', en: 'Cafe', ru: 'Кафе', tr: 'Kafe', keywords: 'menu کافه بوفه food' },
+  shop:              { fa: 'فروشگاه', en: 'Shop', ru: 'Магазин', tr: 'Mağaza', keywords: 'shop محصول کالا mouse' },
+  tournaments:       { fa: 'تورنمنت', en: 'Tournaments', ru: 'Турниры', tr: 'Turnuva', keywords: 'tournament تورنمنت prize' },
+  tournamentOps:     { fa: 'عملیات تورنمنت', en: 'T-Ops', ru: 'Т-Опс', tr: 'T-Operasyon', keywords: 'bracket براکت مساقات tournament operations' },
+  messaging:         { fa: 'پیامک', en: 'SMS', ru: 'SMS', tr: 'SMS', keywords: 'sms پیامک messaging campaign' },
+  blog:              { fa: 'بلاگ', en: 'Blog', ru: 'Блог', tr: 'Blog', keywords: 'blog مقاله خبر' },
+  content:           { fa: 'محتوا', en: 'Content', ru: 'Контент', tr: 'İçerik', keywords: 'content محتوا publish' },
+  promotions:        { fa: 'کوپن', en: 'Coupons', ru: 'Купоны', tr: 'Kupon', keywords: 'coupon کوپن discount' },
+  chat:              { fa: 'چت', en: 'Chat', ru: 'Чат', tr: 'Sohbet', keywords: 'chat گفتگو' },
+  messages:          { fa: 'پیام‌ها', en: 'Messages', ru: 'Сообщения', tr: 'Mesajlar', keywords: 'message پیام notification' },
+  migrations:        { fa: 'مهاجرت', en: 'Migrations', ru: 'Миграции', tr: 'Geçişler', keywords: 'migration مهاجرت ef sql' },
+  themes:            { fa: 'قالب', en: 'Themes', ru: 'Темы', tr: 'Tema', keywords: 'theme قالب css' },
+  appSlider:         { fa: 'اسلایدر', en: 'Slider', ru: 'Слайдер', tr: 'Slayt', keywords: 'slider اسلایدر banner' },
+  mobileAppDownload: { fa: 'اپ موبایل', en: 'Mobile App', ru: 'Моб. приложение', tr: 'Mobil App', keywords: 'apk app موبایل' },
+  customization:     { fa: 'تنظیمات', en: 'Settings', ru: 'Настройки', tr: 'Ayarlar', keywords: 'settings تنظیمات club' },
+  dbLogs:            { fa: 'لاگ', en: 'Logs', ru: 'Логи', tr: 'Loglar', keywords: 'log لاگ error' },
+  apiKeys:           { fa: 'کلیدها', en: 'Keys', ru: 'Ключи', tr: 'Anahtarlar', keywords: 'keys کلید token api' },
+  presentation:      { fa: 'پرزنتیشن', en: 'Presentation', ru: 'Презентация', tr: 'Sunum', keywords: 'slides پرزنتیشن' },
+  tickets:           { fa: 'تیکت', en: 'Tickets', ru: 'Тикеты', tr: 'Talepler', keywords: 'ticket تیکت support' },
+  wallet:            { fa: 'کیف پول', en: 'Wallet', ru: 'Кошелёк', tr: 'Cüzdan', keywords: 'wallet کیف پول payment' },
+  affiliates:        { fa: 'همکاری', en: 'Affiliates', ru: 'Партнёры', tr: 'Ortaklar', keywords: 'affiliate همکاری referral commission' },
 };
 
 const PresentationTab = React.lazy(() => import('./PresentationTab'));
@@ -128,7 +128,7 @@ export default function AdminPanelTab({
   layoutMode = 'classic',
   setLayoutMode
 }: Props) {
-  const { language, dir } = useLanguage();
+  const { language, dir, setLanguage } = useLanguage() as any;
   // بخش فعال از آدرس مرورگر خوانده می‌شود (/admin/<section>) تا رفرش همان بخش را باز کند
   const [activeSubTab, setActiveSubTabState] = useState<AdminSection>(() => adminSectionFromPath(window.location.pathname));
   const setActiveSubTab = (sec: AdminSection) => {
@@ -170,8 +170,33 @@ export default function AdminPanelTab({
       return [k, m.fa, m.en, m.ru, m.tr, m.keywords].join(' ').toLowerCase().includes(q);
     });
   })();
+  // header search
+  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
+  const [isHeaderSearchOpen, setIsHeaderSearchOpen] = useState(false);
+  const headerSearchRef = useRef<HTMLDivElement | null>(null);
+  const headerSearchMatches = (() => {
+    const q = headerSearchQuery.trim().toLowerCase();
+    if (!q) return [] as AdminSection[];
+    return (Object.keys(ADMIN_SECTION_META) as AdminSection[]).filter((k) => {
+      const m = ADMIN_SECTION_META[k];
+      return [k, m.fa, m.en, m.ru, m.tr, m.keywords].join(' ').toLowerCase().includes(q);
+    });
+  })();
+  // language dropdown
+  const langRef = useRef<HTMLDivElement | null>(null);
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  // sidebar resizable
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try { const v = localStorage.getItem('bazino.admin.sidebarWidth'); return v ? parseInt(v, 10) : 200; } catch { return 200; }
+  });
+  useEffect(() => { try { localStorage.setItem('bazino.admin.sidebarWidth', String(sidebarWidth)); } catch {} }, [sidebarWidth]);
+
   useEffect(() => {
-    const onDoc = (e: MouseEvent) => { if (sectionSearchRef.current && !sectionSearchRef.current.contains(e.target as Node)) setIsSectionSearchOpen(false); };
+    const onDoc = (e: MouseEvent) => {
+      if (sectionSearchRef.current && !sectionSearchRef.current.contains(e.target as Node)) setIsSectionSearchOpen(false);
+      if (headerSearchRef.current && !headerSearchRef.current.contains(e.target as Node)) setIsHeaderSearchOpen(false);
+      if (langRef.current && !langRef.current.contains(e.target as Node)) setIsLangOpen(false);
+    };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
@@ -1649,54 +1674,119 @@ export default function AdminPanelTab({
 
   const copyMigrationsToClipboard = () => {
     navigator.clipboard.writeText(migrationsCode);
-    addNotification(L(language, { fa: 'کد کلاس مهاجرت EF Core با موفقیت کپی شد', en: 'EF Core migration class copied', ru: 'Класс миграции EF Core скопирован', tr: 'EF Core geçiş sınıfı kopyalandı' }), 'success');
+    addNotification(L(language, { fa: 'کد مهاجرت کپی شد', en: 'Migration code copied', ru: 'Код миграции скопирован', tr: 'Geçiş kodu kopyalandı' }), 'success');
   };
-
 
   if (loading && !stats) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center bg-[#f0f0f1] min-h-[60vh]">
         <div className="w-12 h-12 border-4 border-[#2271b1] border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[#50575e] font-mono text-xs font-bold uppercase tracking-widest">Loading Live Server Data...</p>
+        <p className="text-[#50575e] font-mono text-xs font-bold uppercase tracking-widest">Loading...</p>
       </div>
     );
   }
 
-  // Guide modal state for new design
-  const [guideOpen, setGuideOpen] = useState(false);
-  const [guideInitialStep, setGuideInitialStep] = useState(0);
   const currentGroup = groupForSection(activeSubTab);
 
-  // WordPress-like layout wrapper
   return (
-    <div id="wpwrap" className="animate-fade-in font-sans min-h-screen bg-[#f0f0f1] text-[#3c434a]" dir={dir} style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
-      {/* WP Admin Bar — 32px */}
-      <div id="wpadminbar" className="h-[32px] bg-[#1d2327] text-[#eee] flex items-center justify-between px-3 sticky top-0 z-[9999] select-none" style={{ height: '32px' }}>
-        <div className="flex items-center gap-3">
+    <div id="admin-wrap" className="animate-fade-in font-sans min-h-screen bg-[#f0f0f1] text-[#3c434a]" dir={dir} style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif' }}>
+      {/* Top bar - 32px dark */}
+      <div id="admin-bar" className="h-[32px] bg-[#1d2327] text-[#eee] flex items-center justify-between px-3 sticky top-0 z-[9999] select-none gap-2" style={{ height: '32px' }}>
+        <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded bg-[#3858e9] flex items-center justify-center text-white font-black text-[11px]">B</div>
-            <span className="text-[13px] text-white font-normal hidden sm:inline">Bazino GameNet — {L(language, { fa: 'پنل مدیریت', en: 'Admin', ru: 'Админ', tr: 'Yönetim' })}</span>
-            <span className="text-[13px] text-white sm:hidden">Bazino</span>
+            <span className="text-[13px] text-white font-normal hidden sm:inline">Bazino — {L(language, { fa: 'مدیریت', en: 'Admin', ru: 'Админ', tr: 'Yönetim' })}</span>
           </div>
           <div className="h-4 w-px bg-[#2c3338] hidden sm:block" />
-          <span className="text-[12px] text-[#a7aaad] hidden md:inline">
-            {L(language, ADMIN_SECTION_META[activeSubTab])} • <span className="font-mono text-[11px]">{pathFromAdminSection(activeSubTab)}</span>
+          <span className="text-[12px] text-[#a7aaad] hidden lg:inline">
+            {L(language, ADMIN_SECTION_META[activeSubTab])}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setGuideInitialStep(0); setGuideOpen(true); }}
-            className="h-[28px] px-2.5 rounded bg-[#2c3338] hover:bg-[#3858e9] text-[#eee] hover:text-white text-[11px] font-normal flex items-center gap-1.5 transition-colors"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{L(language, { fa: 'راهنما', en: 'Help', ru: 'Помощь', tr: 'Yardım' })}</span>
-          </button>
+
+        {/* Header search - central */}
+        <div className="flex-1 flex justify-center max-w-[500px] mx-2" ref={headerSearchRef}>
+          <div className="relative w-full">
+            <div className="flex items-center gap-1.5 bg-[#2c3338] border border-[#2c3338] focus-within:border-[#72aee6] rounded-[3px] px-2.5 h-[26px]">
+              <Search className="w-3.5 h-3.5 text-[#a7aaad] shrink-0" />
+              <input
+                type="search"
+                value={headerSearchQuery}
+                onChange={e => { setHeaderSearchQuery(e.target.value); setIsHeaderSearchOpen(true); }}
+                onFocus={() => setIsHeaderSearchOpen(true)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && headerSearchMatches[0]) {
+                    setActiveSubTab(headerSearchMatches[0]);
+                    setHeaderSearchQuery('');
+                    setIsHeaderSearchOpen(false);
+                  }
+                  if (e.key === 'Escape') setIsHeaderSearchOpen(false);
+                }}
+                placeholder={L(language, { fa: 'جستجو بخش‌ها...', en: 'Search sections...', ru: 'Поиск...', tr: 'Bölüm ara...' })}
+                className="flex-1 bg-transparent border-0 outline-none text-[12px] text-[#eee] placeholder:text-[#a7aaad]"
+              />
+              {headerSearchQuery && (
+                <button onClick={() => { setHeaderSearchQuery(''); setIsHeaderSearchOpen(false); }} className="text-[#a7aaad] hover:text-white">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            {isHeaderSearchOpen && headerSearchQuery.trim() && (
+              <ul className="absolute z-[100] mt-1 left-0 right-0 bg-white border border-[#c3c4c7] shadow-[0_2px_8px_rgba(0,0,0,0.15)] rounded-[2px] overflow-hidden max-h-[320px] overflow-y-auto">
+                {headerSearchMatches.length === 0 && <li className="px-3 py-2 text-[12px] text-[#646970]">{L(language, { fa: 'یافت نشد', en: 'Not found', ru: '—', tr: '—' })}</li>}
+                {headerSearchMatches.map(k => (
+                  <li key={k} className="border-b border-[#f0f0f1] last:border-0">
+                    <a
+                      href={pathFromAdminSection(k)}
+                      onClick={e => { e.preventDefault(); setActiveSubTab(k); setHeaderSearchQuery(''); setIsHeaderSearchOpen(false); }}
+                      className={`flex items-center justify-between gap-2 px-3 py-2 text-[13px] hover:bg-[#f6f7f7] ${activeSubTab === k ? 'text-[#2271b1] bg-[#f0f6fc]' : 'text-[#3c434a]'}`}
+                    >
+                      <span className="flex items-center gap-2"><span className="w-5 h-5 rounded bg-[#f0f0f1] border border-[#dcdcde] flex items-center justify-center text-[10px]">{k[0].toUpperCase()}</span>{L(language, ADMIN_SECTION_META[k])}</span>
+                      <span className="text-[11px] text-[#a7aaad] font-mono" dir="ltr">{pathFromAdminSection(k)}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Language selector */}
+          <div className="relative" ref={langRef}>
+            <button
+              onClick={() => setIsLangOpen(!isLangOpen)}
+              className="h-[26px] px-2.5 rounded bg-[#2c3338] hover:bg-[#3c434a] text-[#eee] text-[11px] flex items-center gap-1.5"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>{language.toUpperCase()}</span>
+              <ChevronLeft className={`w-3 h-3 transition-transform ${isLangOpen ? '-rotate-90' : 'rotate-0'}`} />
+            </button>
+            {isLangOpen && (
+              <div className="absolute top-[32px] right-0 bg-white border border-[#c3c4c7] shadow-[0_2px_8px_rgba(0,0,0,0.15)] rounded-[2px] overflow-hidden min-w-[140px] z-[100]">
+                {[
+                  { id: 'fa', label: 'فارسی', flag: '🇮🇷' },
+                  { id: 'en', label: 'English', flag: '🇺🇸' },
+                  { id: 'ru', label: 'Русский', flag: '🇷🇺' },
+                  { id: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+                ].map(l => (
+                  <button
+                    key={l.id}
+                    onClick={() => { setLanguage(l.id as any); setIsLangOpen(false); }}
+                    className={`w-full text-left px-3 py-2 text-[12px] flex items-center gap-2 hover:bg-[#f6f7f7] ${language === l.id ? 'bg-[#f0f6fc] text-[#2271b1] font-semibold' : 'text-[#3c434a]'}`}
+                  >
+                    <span>{l.flag}</span><span>{l.label}</span><span className="ml-auto text-[10px] font-mono">{l.id}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="w-6 h-6 rounded-full bg-[#50575e] text-white flex items-center justify-center text-[10px] font-bold">A</div>
         </div>
       </div>
 
-      <div id="wpcontent" className="flex min-h-[calc(100vh-32px)]">
-        {/* Sidebar — 160px WP style */}
+      <div id="admin-content" className="flex min-h-[calc(100vh-32px)]">
+        {/* Sidebar resizable */}
         <AdminSidebar
           active={activeSubTab}
           onSelect={(sec) => setActiveSubTab(sec as any)}
@@ -1705,49 +1795,37 @@ export default function AdminPanelTab({
           language={language as any}
           query={sectionQuery}
           setQuery={setSectionQuery}
-          wpMode={true}
+          width={sidebarWidth}
+          setWidth={setSidebarWidth}
         />
 
-        {/* Main content — #f0f0f1 */}
-        <div id="wpbody" className="flex-1 bg-[#f0f0f1] min-w-0">
-          <div id="wpbody-content" className="p-0 sm:p-5">
+        {/* Main content */}
+        <div id="admin-body" className="flex-1 bg-[#f0f0f1] min-w-0">
+          <div id="admin-body-content" className="p-0 sm:p-5">
             <div className="wrap max-w-[1280px] mx-auto">
-              {/* WP Page Title — like .wp-heading-inline */}
+              {/* Page title */}
               <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-none sm:rounded-[2px] mb-5">
                 <div className="px-4 sm:px-5 py-4 border-b border-[#dcdcde] flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h1 className="wp-heading-inline text-[23px] font-normal text-[#1d2327] leading-[1.3] m-0">
+                    <h1 className="text-[23px] font-normal text-[#1d2327] leading-[1.3] m-0">
                       {L(language, ADMIN_SECTION_META[activeSubTab])}
                       <span className="ml-2 text-[13px] text-[#646970] font-normal align-middle">
                         {currentGroup ? `— ${L(language, { fa: currentGroup.fa, en: currentGroup.en, ru: currentGroup.ru, tr: currentGroup.tr })}` : ''}
                       </span>
                     </h1>
-                    <p className="text-[13px] text-[#50575e] mt-2 max-w-3xl leading-[1.5]">
-                      {(() => {
-                        const g = ADMIN_GUIDES[activeSubTab];
-                        return g ? L(language, { fa: g.introFa, en: g.introEn, ru: g.introEn, tr: g.introEn } as any) : '';
-                      })()}
-                    </p>
-                    <p className="text-[11px] text-[#a7aaad] font-mono mt-1" dir="ltr">{pathFromAdminSection(activeSubTab)} • {L(language, { fa: 'منبع', en: 'source', ru: 'src', tr: 'kaynak' })}: {dataSource}</p>
+                    <p className="text-[11px] text-[#a7aaad] font-mono mt-1" dir="ltr">{pathFromAdminSection(activeSubTab)} • {dataSource}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => { setGuideInitialStep(0); setGuideOpen(true); }}
-                      className="h-[30px] px-3 rounded-[3px] bg-white border border-[#2271b1] text-[#2271b1] hover:bg-[#f6f7f7] text-[13px] font-normal flex items-center gap-1.5"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                      {L(language, { fa: 'راهنمای این بخش', en: 'Guide for this section', ru: 'Руководство', tr: 'Bu bölüm kılavuzu' })}
-                    </button>
-                    <button
                       onClick={() => window.open('/bazino-admin-guide.pdf', '_blank')}
-                      className="h-[30px] px-3 rounded-[3px] bg-[#2271b1] border border-[#2271b1] text-white hover:bg-[#135e96] text-[13px] font-normal"
+                      className="h-[30px] px-3 rounded-[3px] bg-white border border-[#8c8f94] text-[#2c3338] hover:bg-[#f6f7f7] text-[13px]"
                     >
-                      {L(language, { fa: 'PDF کامل', en: 'Full PDF', ru: 'Полный PDF', tr: 'Tam PDF' })}
+                      {L(language, { fa: 'PDF راهنما', en: 'Guide PDF', ru: 'PDF', tr: 'PDF' })}
                     </button>
                   </div>
                 </div>
 
-                {/* Quick search inside header — WP style */}
+                {/* Quick search inside page */}
                 <div className="px-4 sm:px-5 py-3 bg-[#fcfcfc] border-b border-[#dcdcde] relative" ref={sectionSearchRef}>
                   <div className="flex items-center gap-2 max-w-[500px]">
                     <Search className="w-4 h-4 text-[#646970] shrink-0" />
@@ -1760,13 +1838,13 @@ export default function AdminPanelTab({
                         if (e.key === 'Enter' && sectionMatches[0]) { setActiveSubTab(sectionMatches[0]); setSectionQuery(''); setIsSectionSearchOpen(false); }
                         if (e.key === 'Escape') setIsSectionSearchOpen(false);
                       }}
-                      placeholder={L(language, { fa: 'جستجوی سریع بخش‌ها… (مثلاً قالب، اسلایدر، کیف پول)', en: 'Quick find… (themes, slider, wallet)', ru: 'Поиск раздела…', tr: 'Bölüm ara…' })}
+                      placeholder={L(language, { fa: 'جستجوی بخش‌ها...', en: 'Search sections...', ru: 'Поиск...', tr: 'Ara...' })}
                       className="flex-1 h-[30px] bg-white border border-[#8c8f94] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] placeholder:text-[#8c8f94] outline-none"
                     />
                   </div>
                   {isSectionSearchOpen && sectionQuery.trim() && (
                     <ul className="absolute z-40 mt-2 left-4 right-4 sm:left-5 sm:right-auto sm:w-[500px] bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] overflow-hidden max-h-72 overflow-y-auto">
-                      {sectionMatches.length === 0 && <li className="px-4 py-3 text-[13px] text-[#646970]">{L(language, { fa: 'بخشی پیدا نشد', en: 'No section found', ru: '—', tr: '—' })}</li>}
+                      {sectionMatches.length === 0 && <li className="px-4 py-3 text-[13px] text-[#646970]">{L(language, { fa: 'یافت نشد', en: 'Not found', ru: '—', tr: '—' })}</li>}
                       {sectionMatches.map((k) => (
                         <li key={k} className="border-b border-[#f0f0f1] last:border-0">
                           <a href={pathFromAdminSection(k)} onClick={(e) => { e.preventDefault(); setActiveSubTab(k); setSectionQuery(''); setIsSectionSearchOpen(false); }} className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[13px] hover:bg-[#f6f7f7] ${activeSubTab === k ? 'text-[#2271b1] bg-[#f6f7f7]' : 'text-[#3c434a]'}`}>
@@ -1780,7 +1858,7 @@ export default function AdminPanelTab({
                 </div>
               </div>
 
-              {/* CONTENT PER SECTION — WP cards */}
+              {/* CONTENT */}
               <div className="px-0 sm:px-0">
                 {activeSubTab === 'apiKeys' ? (
                   <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4 sm:p-5">
@@ -1788,12 +1866,11 @@ export default function AdminPanelTab({
                   </div>
                 ) : (
                   <>
-                    {/* Dashboard */}
                     {activeSubTab === 'dashboard' && stats && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
-                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'کاربران ثبت‌نام شده', en: 'Registered Users', ru: 'Пользователи', tr: 'Kullanıcılar' })}</p>
+                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'کاربران', en: 'Users', ru: 'Пользователи', tr: 'Kullanıcılar' })}</p>
                             <p className="text-[20px] font-normal text-[#1d2327] mt-2">{stats.users ?? '-'}</p>
                           </div>
                           <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
@@ -1801,16 +1878,16 @@ export default function AdminPanelTab({
                             <p className="text-[20px] font-normal text-[#1d2327] mt-2">{systems.length}</p>
                           </div>
                           <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
-                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'سفارشات کافه', en: 'Cafe Orders', ru: 'Заказы', tr: 'Siparişler' })}</p>
+                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'سفارش کافه', en: 'Cafe Orders', ru: 'Заказы', tr: 'Siparişler' })}</p>
                             <p className="text-[20px] font-normal text-[#1d2327] mt-2">{stats.cafeOrders ?? '-'}</p>
                           </div>
                           <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4">
-                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'تیکت باز', en: 'Open Tickets', ru: 'Открытые тикеты', tr: 'Açık Talepler' })}</p>
+                            <p className="text-[11px] text-[#646970] font-bold uppercase tracking-wide">{L(language, { fa: 'تیکت باز', en: 'Open Tickets', ru: 'Тикеты', tr: 'Talepler' })}</p>
                             <p className="text-[20px] font-normal text-[#1d2327] mt-2">{openTicketCount}</p>
                           </div>
                         </div>
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'نمای کلی', en: 'Overview', ru: 'Обзор', tr: 'Genel Bakış' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'نمای کلی', en: 'Overview', ru: 'Обзор', tr: 'Genel' })}</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px] text-[#50575e]">
                             <div className="p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde]"><span className="text-[#646970]">Tournaments:</span> {tournaments.length}</div>
                             <div className="p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde]"><span className="text-[#646970]">Articles:</span> {articles.length}</div>
@@ -1821,20 +1898,19 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Systems */}
                     {activeSubTab === 'systems' && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Monitor className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'افزودن سیستم جدید', en: 'Add New System', ru: 'Добавить систему', tr: 'Yeni Sistem Ekle' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Monitor className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'افزودن سیستم', en: 'Add System', ru: 'Добавить систему', tr: 'Sistem Ekle' })}</h3>
                           <form onSubmit={handleAddSystem} className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                            <input value={newSystem.name} onChange={e => setNewSystem({ ...newSystem, name: e.target.value })} placeholder={L(language, { fa: 'نام سیستم', en: 'System name', ru: 'Название', tr: 'Sistem adı' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                            <input value={newSystem.name} onChange={e => setNewSystem({ ...newSystem, name: e.target.value })} placeholder={L(language, { fa: 'نام', en: 'Name', ru: 'Название', tr: 'Ad' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
                             <select value={newSystem.type} onChange={e => setNewSystem({ ...newSystem, type: e.target.value })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]"><option>PC</option><option>PS5</option><option>Xbox</option><option>Simulator</option></select>
                             <input type="number" value={newSystem.hourlyRate} onChange={e => setNewSystem({ ...newSystem, hourlyRate: Number(e.target.value) })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] font-mono" />
                             <button type="submit" className="h-[30px] bg-[#2271b1] hover:bg-[#135e96] border border-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
                           </form>
                         </div>
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'لیست سیستم‌ها', en: 'Systems list', ru: 'Список систем', tr: 'Sistem listesi' })} ({systems.length})</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'لیست سیستم‌ها', en: 'Systems', ru: 'Системы', tr: 'Sistemler' })} ({systems.length})</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
                             {systems.map((s: any) => (
                               <div key={s.id || s.name} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center gap-2">
@@ -1850,11 +1926,10 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Cafe */}
                     {activeSubTab === 'cafe' && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Coffee className="w-4 h-4 text-[#996800]" /> {L(language, { fa: 'افزودن آیتم کافه', en: 'Add Cafe Item', ru: 'Добавить позицию', tr: 'Kafe Öğesi Ekle' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Coffee className="w-4 h-4 text-[#996800]" /> {L(language, { fa: 'افزودن آیتم', en: 'Add Item', ru: 'Добавить', tr: 'Ekle' })}</h3>
                           <form onSubmit={handleAddCafeItem} className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <input value={newCafe.name} onChange={e => setNewCafe({ ...newCafe, name: e.target.value })} placeholder={L(language, { fa: 'نام', en: 'Name', ru: 'Название', tr: 'Ad' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
                             <input type="number" value={newCafe.price} onChange={e => setNewCafe({ ...newCafe, price: Number(e.target.value) })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] font-mono" />
@@ -1872,13 +1947,12 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Shop */}
                     {activeSubTab === 'shop' && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><ShoppingBag className="w-4 h-4 text-[#06776d]" /> {L(language, { fa: 'افزودن کالا', en: 'Add Product', ru: 'Добавить товар', tr: 'Ürün Ekle' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><ShoppingBag className="w-4 h-4 text-[#06776d]" /> {L(language, { fa: 'افزودن کالا', en: 'Add Product', ru: 'Добавить', tr: 'Ekle' })}</h3>
                           <form onSubmit={handleAddAccessory} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <input value={newAccessory.name} onChange={e => setNewAccessory({ ...newAccessory, name: e.target.value })} placeholder={L(language, { fa: 'نام کالا', en: 'Product name', ru: 'Название', tr: 'Ürün adı' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
+                            <input value={newAccessory.name} onChange={e => setNewAccessory({ ...newAccessory, name: e.target.value })} placeholder={L(language, { fa: 'نام', en: 'Name', ru: 'Название', tr: 'Ad' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
                             <input type="number" value={newAccessory.price} onChange={e => setNewAccessory({ ...newAccessory, price: Number(e.target.value) })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] font-mono" />
                             <button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-3">{L(language, { fa: 'افزودن', en: 'Add', ru: 'Добавить', tr: 'Ekle' })}</button>
                           </form>
@@ -1892,20 +1966,18 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Tournaments */}
                     {activeSubTab === 'tournaments' && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
                           <React.Suspense fallback={<div className="p-8 text-center text-[13px] text-[#646970]">Loading…</div>}><AdminTournamentPlanner language={language as any} notify={addNotification} /></React.Suspense>
                         </div>
                       </div>
                     )}
 
-                    {/* Blog */}
                     {activeSubTab === 'blog' && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Newspaper className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'مقاله جدید', en: 'New Article', ru: 'Новая статья', tr: 'Yeni Makale' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Newspaper className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'مقاله جدید', en: 'New Article', ru: 'Новая', tr: 'Yeni' })}</h3>
                           <form onSubmit={handleAddArticle} className="flex flex-col gap-3">
                             <input value={newArticle.title} onChange={e => setNewArticle({ ...newArticle, title: e.target.value })} placeholder={L(language, { fa: 'عنوان', en: 'Title', ru: 'Заголовок', tr: 'Başlık' })} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
                             <textarea value={newArticle.content} onChange={e => setNewArticle({ ...newArticle, content: e.target.value })} rows={4} placeholder={L(language, { fa: 'محتوا', en: 'Content', ru: 'Содержание', tr: 'İçerik' })} className="bg-white border border-[#8c8f94] rounded-[3px] px-2.5 py-2 text-[13px] text-[#2c3338]" required />
@@ -1921,12 +1993,11 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Chat */}
                     {activeSubTab === 'chat' && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'اتاق جدید', en: 'New Room', ru: 'Новая комната', tr: 'Yeni Oda' })}</h3>
-                          <form onSubmit={handleAddChatRoom} className="flex gap-3"><input value={newChatRoomName} onChange={e => setNewChatRoomName(e.target.value)} placeholder="e.g. Apex Legends" className="flex-1 h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required /><button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-4">+</button></form>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'اتاق جدید', en: 'New Room', ru: 'Новая', tr: 'Yeni Oda' })}</h3>
+                          <form onSubmit={handleAddChatRoom} className="flex gap-3"><input value={newChatRoomName} onChange={e => setNewChatRoomName(e.target.value)} placeholder="e.g. Apex" className="flex-1 h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required /><button type="submit" className="h-[30px] bg-[#2271b1] text-white rounded-[3px] text-[13px] px-4">+</button></form>
                         </div>
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">{chatRooms.map((room: string) => <div key={room} className="p-3 bg-[#fcfcfc] border border-[#dcdcde] rounded-[2px] flex justify-between items-center"><span className="text-[13px] text-[#1d2327]">{room}</span><button onClick={() => handleDeleteChatRoom(room)} className="text-[#d63638] p-1"><Trash2 className="w-3 h-3" /></button></div>)}</div>
@@ -1934,11 +2005,10 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Messages */}
                     {activeSubTab === 'messages' && (
-                      <div className="flex flex-col gap-5 animate-fade-in">
+                      <div className="flex flex-col gap-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'ارسال پیام', en: 'Send Message', ru: 'Отправить сообщение', tr: 'Mesaj Gönder' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'ارسال پیام', en: 'Send Message', ru: 'Отправить', tr: 'Gönder' })}</h3>
                           <form onSubmit={handleSendMessage} className="flex flex-col gap-3 max-w-[600px]">
                             <select value={recipient} onChange={e => setRecipient(e.target.value)} className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]"><option value="All">All Users</option>{registeredUsers.map((u: any) => <option key={u.username} value={u.username}>{u.username}</option>)}</select>
                             <input value={msgTitle} onChange={e => setMsgTitle(e.target.value)} placeholder="Title" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" required />
@@ -1949,18 +2019,17 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Customization */}
                     {activeSubTab === 'customization' && (
-                      <div className="animate-fade-in space-y-5">
+                      <div className="space-y-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2 mb-3"><Database className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'منبع داده', en: 'Data Source', ru: 'Источник', tr: 'Veri Kaynağı' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2 mb-3"><Database className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'منبع داده', en: 'Data Source', ru: 'Источник', tr: 'Veri' })}</h3>
                           <div className="flex gap-2">
                             <button onClick={() => handleSwitchDataSource('sample')} className={`h-[30px] px-3 rounded-[3px] text-[13px] border ${dataSource === 'sample' ? 'bg-[#2271b1] border-[#2271b1] text-white' : 'bg-white border-[#8c8f94] text-[#2c3338]'}`}>Sample</button>
                             <button onClick={() => handleSwitchDataSource('database')} className={`h-[30px] px-3 rounded-[3px] text-[13px] border ${dataSource === 'database' ? 'bg-[#2271b1] border-[#2271b1] text-white' : 'bg-white border-[#8c8f94] text-[#2c3338]'}`}>Database</button>
                           </div>
                         </div>
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4">{L(language, { fa: 'اطلاعات کلوپ', en: 'Club Info', ru: 'Инфо клуба', tr: 'Kulüp Bilgileri' })}</h3>
+                          <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4">{L(language, { fa: 'اطلاعات کلوپ', en: 'Club Info', ru: 'Инфо', tr: 'Kulüp' })}</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[600px]">
                             <input value={siteSettings['club_phone'] || ''} onChange={e => handleSaveSetting('club_phone', e.target.value)} placeholder="Phone" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338]" />
                             <input value={siteSettings['club_address'] || ''} onChange={e => handleSaveSetting('club_address', e.target.value)} placeholder="Address" className="h-[30px] bg-white border border-[#8c8f94] rounded-[3px] px-2.5 text-[13px] text-[#2c3338] md:col-span-2" />
@@ -1972,18 +2041,17 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Themes */}
                     {activeSubTab === 'themes' && (
-                      <div className="animate-fade-in space-y-5">
+                      <div className="space-y-5">
                         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                          <div className="flex justify-between items-center mb-4"><h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2"><Layers className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'قالب‌ها', en: 'Themes', ru: 'Темы', tr: 'Temalar' })}</h3><button onClick={openThemeUploadPanel} className="h-[30px] px-3 bg-[#2271b1] text-white rounded-[3px] text-[13px]">{L(language, { fa: 'آپلود قالب', en: 'Upload Theme', ru: 'Загрузить тему', tr: 'Tema Yükle' })}</button></div>
+                          <div className="flex justify-between items-center mb-4"><h3 className="text-[14px] font-semibold text-[#1d2327] flex items-center gap-2"><Layers className="w-4 h-4 text-[#2271b1]" /> {L(language, { fa: 'قالب‌ها', en: 'Themes', ru: 'Темы', tr: 'Temalar' })}</h3><button onClick={openThemeUploadPanel} className="h-[30px] px-3 bg-[#2271b1] text-white rounded-[3px] text-[13px]">{L(language, { fa: 'آپلود', en: 'Upload', ru: 'Загрузить', tr: 'Yükle' })}</button></div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             {availableThemes.map((th: ThemeInfo) => <div key={th.id} className={`p-4 rounded-[2px] border ${themeId === th.id ? 'border-[#2271b1] bg-[#f6f7f7]' : 'border-[#dcdcde] bg-white'}`}><p className="text-[13px] font-medium text-[#1d2327]">{th.name}</p><p className="text-[11px] text-[#646970] font-mono">{th.id}</p><div className="flex gap-2 mt-3"><button onClick={() => handleActivateTheme(th)} className="h-[26px] px-2 bg-white border border-[#2271b1] text-[#2271b1] rounded-[3px] text-[11px]">Activate</button><button onClick={() => handleExportThemeZip(th)} className="h-[26px] px-2 bg-white border border-[#dcdcde] rounded-[3px] text-[11px] text-[#50575e]">Export</button><button onClick={() => handleDeleteTheme(th)} className="h-[26px] px-2 bg-white border border-[#dcdcde] text-[#d63638] rounded-[3px] text-[11px]">Delete</button></div></div>)}
                           </div>
                         </div>
                         {showUploadForm && (
                           <div ref={themeUploadPanelRef} className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                            <h4 className="text-[13px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'نصب قالب ZIP', en: 'Install ZIP Theme', ru: 'Установить ZIP тему', tr: 'ZIP Tema Yükle' })}</h4>
+                            <h4 className="text-[13px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'نصب ZIP', en: 'Install ZIP', ru: 'Установить', tr: 'Yükle' })}</h4>
                             <input type="file" accept=".zip" onChange={handleZipFileSelect} className="text-[13px] text-[#50575e]" />
                             {zipParsed && <div className="mt-3 p-3 bg-[#f6f7f7] rounded-[2px] border border-[#dcdcde] text-[13px] text-[#1d2327]"><p>{zipParsed.meta.name} — {(zipParsed.css.length / 1024).toFixed(1)}KB</p><button onClick={handleInstallZip} disabled={isInstallingZip} className="mt-2 h-[30px] px-3 bg-[#2271b1] text-white rounded-[3px] text-[13px]">{isInstallingZip ? 'Installing…' : 'Install'}</button></div>}
                             {zipError && <p className="mt-2 text-[13px] text-[#d63638]">{zipError}</p>}
@@ -1993,7 +2061,6 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* App Slider */}
                     {activeSubTab === 'appSlider' && (
                       <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
                         <h3 className="text-[14px] font-semibold text-[#1d2327] mb-4">{L(language, { fa: 'اسلایدر', en: 'Slider', ru: 'Слайдер', tr: 'Slayt' })}</h3>
@@ -2008,24 +2075,21 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Mobile App */}
                     {activeSubTab === 'mobileAppDownload' && (
                       <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
                         <React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><AdminMobileAppDownloadPanel addNotification={addNotification} /></React.Suspense>
                       </div>
                     )}
 
-                    {/* DB Logs */}
                     {activeSubTab === 'dbLogs' && (
                       <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
-                        <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3 flex items-center gap-2"><Database className="w-4 h-4 text-[#2271b1]" /> DB Logs ({dbLogsList.length})</h3>
+                        <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3 flex items-center gap-2"><Database className="w-4 h-4 text-[#2271b1]" /> Logs ({dbLogsList.length})</h3>
                         <div className="bg-[#1d2327] rounded-[2px] p-3 font-mono text-[11px] max-h-[500px] overflow-y-auto space-y-2">
                           {dbLogsList.map((log: any, i: number) => <div key={i} className="p-2 bg-[#2c3338] rounded-[2px]"><span className="text-[#72aee6]">{log.provider}</span> <span className="text-[#dba617]">{log.type || log.operation}</span> <span className="text-[#c3c4c7]">{log.command || log.query}</span></div>)}
                         </div>
                       </div>
                     )}
 
-                    {/* Migrations */}
                     {activeSubTab === 'migrations' && (
                       <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5">
                         <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">{L(language, { fa: 'مهاجرت‌ها', en: 'Migrations', ru: 'Миграции', tr: 'Geçişler' })}</h3>
@@ -2034,7 +2098,6 @@ export default function AdminPanelTab({
                       </div>
                     )}
 
-                    {/* Other sections */}
                     {activeSubTab === 'presentation' && (
                       <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-5"><React.Suspense fallback={<div className="p-8 text-center text-[13px]">Loading…</div>}><PresentationTab addNotification={addNotification} /></React.Suspense></div>
                     )}
@@ -2069,9 +2132,6 @@ export default function AdminPanelTab({
           </div>
         </div>
       </div>
-
-      {/* Guide — WordPress style centered modal accounting for header */}
-      <AdminGuide section={activeSubTab} isOpen={guideOpen} onClose={() => setGuideOpen(false)} initialStep={guideInitialStep} language={language as any} dir={dir} />
     </div>
   );
 }

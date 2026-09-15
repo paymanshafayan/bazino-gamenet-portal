@@ -222,6 +222,9 @@ export interface ThemeComponentProps {
   loyaltyUser?: any;
   // For compatibility with earlier wrappers
   onOpenDetails?: (id: string) => void;
+  // Hub events shorthand (weekly/special) for backward compat with EventsTab
+  weekly?: any[];
+  special?: any[];
 }
 
 export interface ThemeComponentDefinition {

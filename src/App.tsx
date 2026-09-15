@@ -31,7 +31,9 @@ const LoyaltyProfileTab = lazy(() => import('./components/LoyaltyProfileTab'));
 const GamesTab = lazy(() => import('./components/GamesTab'));
 const CafeTab = lazy(() => import('./components/CafeTab'));
 const ShopTab = lazy(() => import('./components/ShopTab'));
-const TournamentsTab = lazy(() => import('./components/tournaments/EventsTab'));
+const ClassicTournamentsTab = lazy(() => import('./components/TournamentsTab'));
+const EventsTab = lazy(() => import('./components/tournaments/EventsTab'));
+const TournamentsTab = ClassicTournamentsTab; // backward alias, but we use both explicitly below
 const BlogTab = lazy(() => import('./components/BlogTab'));
 const AdminPanelTab = lazy(() => import('./components/AdminPanelTab'));
 
@@ -813,7 +815,7 @@ export default function App() {
         hubPage === 'contact' ? <ContactPage onBack={() => navigateStandalone('home')} /> :
         hubPage === 'rules' ? <LegalPage slug="rules" onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} /> :
         hubPage === 'privacy' ? <LegalPage slug="privacy" onBack={() => navigateStandalone('home')} onNavigate={navigateStandalone} /> :
-        (hubPage === 'events' || hubPage === 'weekly' || hubPage === 'special' || hubPage === 'season' || hubPage === 'brackets' || hubPage === 'register') ? <TournamentsTab /> :
+        (hubPage === 'events' || hubPage === 'weekly' || hubPage === 'special' || hubPage === 'season' || hubPage === 'brackets' || hubPage === 'register') ? <EventsTab /> :
         hubPage === 'home' ? (
           !isHomeContentReady ? homePlaceholder : (
             <HomeTab themeId={themeId} tournaments={tournaments} onNavigate={setActiveTab} />
@@ -977,56 +979,96 @@ export default function App() {
           {currentPath === '/tournaments/weekly' ? (
             <ThemeRegion
               name="tournaments.weekly"
-              fallback={<TournamentsTab />}
+              fallback={<ClassicTournamentsTab tournaments={(hubEvents as any)?.weekly || tournaments.filter((t: any) => (t as any).kind === 'weekly' || (t as any).type === 'weekly')} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification} />}
               props={{
                 tournaments: (hubEvents as any)?.weekly || tournaments.filter((t: any) => (t as any).kind === 'weekly' || (t as any).type === 'weekly'),
-                weeklyTournaments: (hubEvents as any)?.weekly || [],
+                weeklyTournaments: (hubEvents as any)?.weekly || tournaments.filter((t: any) => (t as any).kind === 'weekly' || (t as any).type === 'weekly'),
+                specialTournaments: (hubEvents as any)?.special || [],
+                seasons: hubSeason ? [hubSeason] : [],
+                season: hubSeason,
+                eventsFeed: hubEvents,
+                bracket: hubBracket,
+                selectedTournament: null,
                 loading: false, error: null, isEmpty: false,
                 onNavigate: navigateTheme,
+                onAddLoyaltyPoints: handleAddLoyaltyPoints,
+                onRegisterTeam: handleRegisterTeam,
+                addNotification,
               }}
             />
           ) : currentPath === '/tournaments/special' ? (
             <ThemeRegion
               name="tournaments.special"
-              fallback={<TournamentsTab />}
+              fallback={<ClassicTournamentsTab tournaments={(hubEvents as any)?.special || tournaments.filter((t: any) => (t as any).kind === 'special')} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification} />}
               props={{
                 tournaments: (hubEvents as any)?.special || tournaments.filter((t: any) => (t as any).kind === 'special'),
-                specialTournaments: (hubEvents as any)?.special || [],
+                specialTournaments: (hubEvents as any)?.special || tournaments.filter((t: any) => (t as any).kind === 'special'),
+                weeklyTournaments: (hubEvents as any)?.weekly || [],
+                seasons: hubSeason ? [hubSeason] : [],
+                season: hubSeason,
+                eventsFeed: hubEvents,
+                bracket: hubBracket,
+                selectedTournament: null,
                 loading: false, error: null, isEmpty: false,
                 onNavigate: navigateTheme,
+                onAddLoyaltyPoints: handleAddLoyaltyPoints,
+                onRegisterTeam: handleRegisterTeam,
+                addNotification,
               }}
             />
           ) : currentPath === '/tournaments/season' ? (
             <ThemeRegion
               name="tournaments.season"
-              fallback={<TournamentsTab />}
+              fallback={<ClassicTournamentsTab tournaments={tournaments} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification} />}
               props={{
                 tournaments,
                 seasons: hubSeason ? [hubSeason] : [],
                 season: hubSeason,
+                weeklyTournaments: (hubEvents as any)?.weekly || [],
+                specialTournaments: (hubEvents as any)?.special || [],
+                eventsFeed: hubEvents,
+                bracket: hubBracket,
+                selectedTournament: null,
                 loading: false, error: null, isEmpty: false,
                 onNavigate: navigateTheme,
+                onAddLoyaltyPoints: handleAddLoyaltyPoints,
+                onRegisterTeam: handleRegisterTeam,
+                addNotification,
               }}
             />
           ) : currentPath === '/tournaments/brackets' ? (
             <ThemeRegion
               name="tournaments.brackets"
-              fallback={<TournamentsTab />}
+              fallback={<ClassicTournamentsTab tournaments={tournaments} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification} />}
               props={{
                 tournaments,
                 bracket: hubBracket,
                 selectedTournament: tournaments[0] || null,
+                weeklyTournaments: (hubEvents as any)?.weekly || [],
+                specialTournaments: (hubEvents as any)?.special || [],
+                seasons: hubSeason ? [hubSeason] : [],
+                season: hubSeason,
+                eventsFeed: hubEvents,
                 loading: false, error: null, isEmpty: false,
                 onNavigate: navigateTheme,
+                onAddLoyaltyPoints: handleAddLoyaltyPoints,
+                onRegisterTeam: handleRegisterTeam,
+                addNotification,
               }}
             />
           ) : currentPath === '/tournaments/register' ? (
             <ThemeRegion
               name="tournaments.register"
-              fallback={<TournamentsTab />}
+              fallback={<ClassicTournamentsTab tournaments={tournaments} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification} />}
               props={{
                 tournaments,
                 selectedTournament: tournaments[0] || null,
+                weeklyTournaments: (hubEvents as any)?.weekly || [],
+                specialTournaments: (hubEvents as any)?.special || [],
+                seasons: hubSeason ? [hubSeason] : [],
+                season: hubSeason,
+                eventsFeed: hubEvents,
+                bracket: hubBracket,
                 onRegisterTeam: handleRegisterTeam,
                 onAddLoyaltyPoints: handleAddLoyaltyPoints,
                 loading: false, error: null, isEmpty: false,
@@ -1037,7 +1079,7 @@ export default function App() {
           ) : (
             <ThemeRegion
               name="tournaments"
-              fallback={<TournamentsTab />}
+              fallback={<ClassicTournamentsTab tournaments={tournaments} onAddLoyaltyPoints={handleAddLoyaltyPoints} onRegisterTeam={handleRegisterTeam} addNotification={addNotification} />}
               props={{
                 tournaments,
                 weeklyTournaments: (hubEvents as any)?.weekly || [],
@@ -1053,6 +1095,9 @@ export default function App() {
                 onNavigate: navigateTheme,
                 onOpenBracket: (id: string) => navigateTheme(`/tournaments`),
                 onRegisterTournament: (id: string) => navigateTheme(`/tournaments`),
+                onAddLoyaltyPoints: handleAddLoyaltyPoints,
+                onRegisterTeam: handleRegisterTeam,
+                addNotification,
               }}
             />
           )}

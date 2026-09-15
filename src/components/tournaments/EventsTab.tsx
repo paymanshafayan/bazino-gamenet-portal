@@ -14,6 +14,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { L } from '../../utils/i18n';
 import { formatJalaliForLanguage } from '../../utils/i18n';
 import { localeOf } from '../../utils/i18n';
+import ThemeRegion from '../../themeSdk/ThemeRegion';
+import { useThemeRegionBase } from '../../themeSdk/ThemeRegion';
 
 type TabKey = 'weekly' | 'special' | 'season' | 'bracket' | 'register';
 
@@ -67,10 +69,25 @@ const TABS: { key: TabKey; icon: React.ReactNode; fa: string; en: string }[] = [
 
 export default function EventsTab() {
   const { t, language } = useLanguage();
+  const themeBase = useThemeRegionBase();
   const [tab, setTab] = useState<TabKey>('bracket');
   const [data, setData] = useState<EventsPayload | null>(null);
   const [error, setError] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
+
+  // Respect hubPage / pathname for direct link & refresh: /weekly -> weekly tab, etc.
+  useEffect(() => {
+    var hp = (themeBase && (themeBase.hubPage || '')) || '';
+    var path = (themeBase && (themeBase.pathname || '')) || (typeof window !== 'undefined' ? window.location.pathname : '');
+    var target: TabKey | null = null;
+    if (hp === 'weekly' || path.indexOf('/weekly') !== -1) target = 'weekly';
+    else if (hp === 'special' || path.indexOf('/special') !== -1) target = 'special';
+    else if (hp === 'season' || path.indexOf('/season') !== -1) target = 'season';
+    else if (hp === 'brackets' || path.indexOf('/brackets') !== -1) target = 'bracket';
+    else if (hp === 'register' || path.indexOf('/register') !== -1) target = 'register';
+    else if (hp === 'events' || path.indexOf('/events') !== -1) target = 'weekly';
+    if (target) setTab(target);
+  }, [themeBase && themeBase.hubPage, themeBase && themeBase.pathname]);
 
   const load = useCallback(async () => {
     try { setData(await getJson<EventsPayload>('/api/tournaments/events')); setError(''); }
@@ -127,18 +144,103 @@ export default function EventsTab() {
         <div className="flex items-center justify-center py-20 text-primary"><Loader2 className="w-8 h-8 animate-spin" /></div>
       )}
 
-      {data && tab === 'weekly' && <WeeklyList cards={data.weekly} language={language} onWatch={() => setTab('bracket')} />}
-      {data && tab === 'special' && <SpecialList cards={data.special} language={language} />}
-      {data && tab === 'season' && season && <SeasonBoard season={season} language={language} />}
-      {data && tab === 'bracket' && (
-        <BracketBoard
-          language={language}
-          fullscreen={fullscreen}
-          onToggleFullscreen={() => setFullscreen(v => !v)}
-          onChanged={load}
+      {data && tab === 'weekly' && (
+        <ThemeRegion
+          name="hub.weekly"
+          fallback={<WeeklyList cards={data.weekly} language={language} onWatch={() => setTab('bracket')} />}
+          props={{
+            weekly: data.weekly,
+            weeklyTournaments: data.weekly,
+            tournaments: data.weekly,
+            season: data.season,
+            eventsFeed: data,
+            onNavigate: themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: data.weekly.length === 0,
+          }}
         />
       )}
-      {data && tab === 'register' && <RegisterCard language={language} weekly={data.weekly} onDone={load} />}
+      {data && tab === 'special' && (
+        <ThemeRegion
+          name="hub.special"
+          fallback={<SpecialList cards={data.special} language={language} />}
+          props={{
+            special: data.special,
+            specialTournaments: data.special,
+            tournaments: data.special,
+            season: data.season,
+            eventsFeed: data,
+            onNavigate: themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: data.special.length === 0,
+          }}
+        />
+      )}
+      {data && tab === 'season' && season && (
+        <ThemeRegion
+          name="hub.season"
+          fallback={<SeasonBoard season={season} language={language} />}
+          props={{
+            season,
+            seasons: [season],
+            eventsFeed: data,
+            onNavigate: themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: false,
+          }}
+        />
+      )}
+      {data && tab === 'bracket' && (
+        <ThemeRegion
+          name="hub.brackets"
+          fallback={
+            <BracketBoard
+              language={language}
+              fullscreen={fullscreen}
+              onToggleFullscreen={() => setFullscreen(v => !v)}
+              onChanged={load}
+            />
+          }
+          props={{
+            bracket: null,
+            eventsFeed: data,
+            season: data.season,
+            tournaments: [...data.weekly, ...data.special],
+            onNavigate: themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: false,
+          }}
+        />
+      )}
+      {data && tab === 'register' && (
+        <ThemeRegion
+          name="hub.register"
+          fallback={<RegisterCard language={language} weekly={data.weekly} onDone={load} />}
+          props={{
+            weekly: data.weekly,
+            weeklyTournaments: data.weekly,
+            tournaments: data.weekly,
+            season: data.season,
+            eventsFeed: data,
+            onNavigate: themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: data.weekly.length === 0,
+          }}
+        />
+      )}
+      {data && (
+        <ThemeRegion
+          name="hub.events"
+          fallback={null}
+          props={{
+            weekly: data.weekly,
+            special: data.special,
+            weeklyTournaments: data.weekly,
+            specialTournaments: data.special,
+            season: data.season,
+            seasons: [data.season],
+            eventsFeed: data,
+            tournaments: [...data.weekly, ...data.special],
+            onNavigate: themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: false,
+          }}
+        />
+      )}
 
       {fullscreen && <TvOverlay language={language} onClose={() => setFullscreen(false)} />}
     </div>

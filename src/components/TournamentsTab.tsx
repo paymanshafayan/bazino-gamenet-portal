@@ -80,6 +80,18 @@ interface Props {
   onAddLoyaltyPoints: (points: number, desc: string) => void | Promise<void>;
   onRegisterTeam: (tournamentId: string, team: { name: string; leader: string; members: string[] }) => void | Promise<void>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  // extended for ThemeRegion ownership (optional, backward compatible)
+  weeklyTournaments?: Tournament[];
+  specialTournaments?: Tournament[];
+  seasons?: any[];
+  season?: any;
+  eventsFeed?: any;
+  bracket?: any;
+  selectedTournament?: Tournament | null;
+  loading?: boolean;
+  error?: string | null;
+  isEmpty?: boolean;
+  onNavigate?: (path: string) => void;
 }
 
 export default function TournamentsTab({
@@ -87,6 +99,14 @@ export default function TournamentsTab({
   onAddLoyaltyPoints,
   onRegisterTeam,
   addNotification,
+  weeklyTournaments,
+  specialTournaments,
+  seasons,
+  season,
+  eventsFeed,
+  bracket,
+  selectedTournament: selectedTournamentProp,
+  onNavigate,
 }: Props) {
   const { t, dir, language } = useLanguage();
   const themeBase = useThemeRegionBase();
@@ -371,8 +391,82 @@ export default function TournamentsTab({
     }
   };
 
+  // Weekly/special/season derived from props or tournaments
+  const weeklyList = weeklyTournaments || tournaments.filter((t: any) => (t as any).kind === 'weekly' || (t as any).type === 'weekly');
+  const specialList = specialTournaments || tournaments.filter((t: any) => (t as any).kind === 'special');
+  const seasonList = seasons || (season ? [season] : []);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in font-sans" dir={dir}>
+      {/* Classic sub-regions: weekly, special, season — theme can override */}
+      <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <ThemeRegion
+          name="tournaments.weekly"
+          fallback={(
+            <div className="rounded-2xl border border-white/10 bg-dark-card p-4">
+              <h4 className="text-white font-bold text-xs mb-2">WEEKLY ({weeklyList.length}) — real</h4>
+              <div className="flex flex-col gap-1 text-[11px] text-gray-400">{weeklyList.slice(0,5).map((t:any)=><div key={t.id}>{t.title}</div>)}</div>
+            </div>
+          )}
+          props={{
+            tournaments: weeklyList,
+            weeklyTournaments: weeklyList,
+            specialTournaments: specialList,
+            seasons: seasonList,
+            season,
+            eventsFeed,
+            bracket,
+            selectedTournament: selectedTournamentProp || tournaments[0] || null,
+            onNavigate: onNavigate || themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: weeklyList.length===0,
+            onAddLoyaltyPoints, onRegisterTeam, addNotification,
+          }}
+        />
+        <ThemeRegion
+          name="tournaments.special"
+          fallback={(
+            <div className="rounded-2xl border border-white/10 bg-dark-card p-4">
+              <h4 className="text-white font-bold text-xs mb-2">SPECIAL ({specialList.length}) — real</h4>
+              <div className="flex flex-col gap-1 text-[11px] text-gray-400">{specialList.slice(0,5).map((t:any)=><div key={t.id}>{t.title}</div>)}</div>
+            </div>
+          )}
+          props={{
+            tournaments: specialList,
+            specialTournaments: specialList,
+            weeklyTournaments: weeklyList,
+            seasons: seasonList,
+            season,
+            eventsFeed,
+            bracket,
+            selectedTournament: selectedTournamentProp || tournaments[0] || null,
+            onNavigate: onNavigate || themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: specialList.length===0,
+            onAddLoyaltyPoints, onRegisterTeam, addNotification,
+          }}
+        />
+        <ThemeRegion
+          name="tournaments.season"
+          fallback={(
+            <div className="rounded-2xl border border-white/10 bg-dark-card p-4">
+              <h4 className="text-white font-bold text-xs mb-2">SEASON ({seasonList.length}) — real</h4>
+              <div className="text-[11px] text-gray-400">{season ? (season.name || season.title || 'Season') : 'No season'}</div>
+            </div>
+          )}
+          props={{
+            tournaments,
+            seasons: seasonList,
+            season,
+            weeklyTournaments: weeklyList,
+            specialTournaments: specialList,
+            eventsFeed,
+            bracket,
+            selectedTournament: selectedTournamentProp || tournaments[0] || null,
+            onNavigate: onNavigate || themeBase?.onNavigate,
+            loading: false, error: null, isEmpty: seasonList.length===0,
+            onAddLoyaltyPoints, onRegisterTeam, addNotification,
+          }}
+        />
+      </div>
       {checkout && <CheckoutModal kind="tournament" params={checkout.params} estimatedAmount={checkout.amount} title={checkout.title} onClose={() => setCheckout(null)}
         onDone={(r: CheckoutResult) => {
           setCheckout(null);

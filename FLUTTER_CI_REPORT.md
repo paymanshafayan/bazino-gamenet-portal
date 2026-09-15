@@ -1,16 +1,16 @@
 # Flutter CI report
 
-- commit: `ea03d969fda1f0477ab813324158d7621514a670`
-- branch: `main`
-- run:    33748394083
-- date:   2026-09-03 11:12 UTC
+- commit: `8271bb8b410a09f7e2a8d7ddd972d0c918ba05dc`
+- branch: `arena/01a0a0e1-bazino-gamenet-portal`
+- run:    34929800973
+- date:   2026-09-15 04:42 UTC
 
 ## flutter --version
 ```
-Flutter 3.47.2 • channel stable • https://github.com/flutter/flutter.git
-Framework • revision d3b14c8769 (8 days ago) • 2026-08-26 16:07:51 -0700
-Engine • hash 1cf1c4773fb941c4c74a7f8bb144a8837596c0f4 (revision a804b26164) (7 days ago) • 2026-08-26 18:46:13.000Z
-Tools • Dart 3.13.2 • DevTools 2.60.0
+Flutter 3.47.4 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision 9584c6713b (4 days ago) • 2026-09-10 15:25:10 -0700
+Engine • hash 0e228ec8c8d2abc9fcf1d053e8a40665bb859ec7 (revision 06a2e2a110) (11 days ago) • 2026-09-03 16:07:13.000Z
+Tools • Dart 3.13.3 • DevTools 2.60.0
 ```
 **exit 0 — OK**
 
@@ -61,13 +61,13 @@ Downloading packages...
 * path_provider_linux 2.2.2 (was 2.2.2)
 * path_provider_platform_interface 2.1.3 (was 2.1.3)
 * path_provider_windows 2.3.0 (was 2.3.0)
-* permission_handler 11.4.0 (was 11.4.0) (13.0.1 available)
-* permission_handler_android 12.1.0 (was 12.1.0) (14.0.0 available)
+* permission_handler 11.4.0 (was 11.4.0) (13.0.2 available)
+* permission_handler_android 12.1.0 (was 12.1.0) (14.1.0 available)
 * permission_handler_apple 9.6.1 (was 9.4.10)
 * permission_handler_html 0.1.4+1 (was 0.1.3+5)
-* permission_handler_platform_interface 4.4.0 (was 4.3.0)
+* permission_handler_platform_interface 4.4.1 (was 4.3.0)
 * permission_handler_windows 0.2.2 (was 0.2.1)
-* platform 3.1.6 (was 3.1.6)
+* platform 3.2.0 (was 3.1.6)
 * plugin_platform_interface 2.1.8 (was 2.1.8)
 * provider 6.1.5+1 (was 6.1.5+1)
 * pub_semver 2.2.1 (was 2.2.0)
@@ -80,7 +80,7 @@ Downloading packages...
 * shared_preferences_web 2.4.3 (was 2.4.3)
 * shared_preferences_windows 2.4.1 (was 2.4.1)
 * source_span 1.10.2 (was 1.10.2)
-* speech_to_text 7.4.0 (was 7.4.0)
+* speech_to_text 7.5.0 (was 7.4.0)
 * speech_to_text_platform_interface 2.4.0 (was 2.4.0)
 * speech_to_text_windows 1.0.1 (was 1.0.1)
 * stack_trace 1.12.2 (was 1.12.1)
@@ -92,7 +92,7 @@ Downloading packages...
 * vector_math 2.4.2 (was 2.2.0)
 + video_player 2.14.0
 + video_player_android 2.12.2
-+ video_player_avfoundation 2.11.1
++ video_player_avfoundation 2.12.0
 + video_player_platform_interface 6.9.0
 + video_player_web 2.4.0
 * vm_service 15.3.0 (was 15.2.0)
@@ -111,58 +111,153 @@ Upgrading analysis_options.yaml to exclude build and platform directories.
 ## flutter analyze
 ```
 Analyzing flutter_app...                                        
-No issues found! (ran in 8.3s)
+
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/screens/cafe_screen.dart:301:48 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/screens/cafe_screen.dart:305:46 • use_build_context_synchronously
+  error • Target of URI doesn't exist: 'account_screen.dart'. Try creating the file referenced by the URI, or try using a URI for a file that does exist • lib/screens/hub_screen.dart:8:8 • uri_does_not_exist
+  error • The name 'AccountScreen' isn't a class. Try correcting the name to match an existing class • lib/screens/hub_screen.dart:162:13 • creation_with_non_type
+  error • Invalid constant value • lib/screens/hub_screen.dart:663:43 • invalid_constant
+  error • The method 'HubParticlesPainter' isn't defined for the type '_HubScreenState'. Try correcting the name to the name of an existing method, or defining a method named 'HubParticlesPainter' • lib/screens/hub_screen.dart:663:43 • undefined_method
+  error • The method 'HubOrbButton' isn't defined for the type '_HubScreenState'. Try correcting the name to the name of an existing method, or defining a method named 'HubOrbButton' • lib/screens/hub_screen.dart:680:24 • undefined_method
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/screens/shop_screen.dart:209:42 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/screens/shop_screen.dart:213:40 • use_build_context_synchronously
+
+9 issues found. (ran in 9.2s)
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## flutter test
 ```
 
-::group::✅ Passing tests
-✅ BazinoApp — رندر بدون استثنا بالا می‌آید و MaterialApp با عنوان درست می‌دهد
-✅ BazinoApp — رندر اولین فریم قبل از خواندن SharedPreferences، لودر نشان می‌دهد
-✅ BazinoApp — رندر کاربر تازه صفحه‌ی intro را می‌بیند
-✅ BazinoApp — رندر کاربری که intro را دیده، دیگر آن را نمی‌بیند
-✅ AppState پیش‌فرض فارسی و راست‌به‌چپ است و کاربر مهمان است
-✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ واقعی /api/auth/me
-✅ parse کردن پاسخ سرور UserState.fromJson — پاسخ ناقص نباید کرش کند
-✅ parse کردن پاسخ سرور GameSystem.fromJson — شناسه‌های جدید سرور (پیشوند sys-) پذیرفته می‌شوند
-✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — نوع Bonus هم پشتیبانی می‌شود
-✅ parse کردن پاسخ سرور LoyaltyTx.fromJson — شرح خالی سرور نباید کرش کند
+lib/screens/hub_screen.dart:8:8: Error: Error when reading 'lib/screens/account_screen.dart': No such file or directory
+import 'account_screen.dart';
+       ^
+lib/screens/hub_screen.dart:162:13: Error: Not a constant expression.
+      const AccountScreen(),
+            ^^^^^^^^^^^^^
+lib/screens/hub_screen.dart:663:43: Error: Not a constant expression.
+              child: CustomPaint(painter: HubParticlesPainter(seed: 7)),
+                                          ^^^^^^^^^^^^^^^^^^^
+lib/screens/hub_screen.dart:680:24: Error: The method 'HubOrbButton' isn't defined for the type '_HubScreenState'.
+ - '_HubScreenState' is from 'package:bazino_app/screens/hub_screen.dart' ('lib/screens/hub_screen.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'HubOrbButton'.
+                child: HubOrbButton(
+                       ^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart (failed)
+Failed to load "/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart":
+Compilation failed for testPath=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/test/widget_test.dart: lib/screens/hub_screen.dart:8:8: Error: Error when reading 'lib/screens/account_screen.dart': No such file or directory
+import 'account_screen.dart';
+       ^
+lib/screens/hub_screen.dart:162:13: Error: Not a constant expression.
+      const AccountScreen(),
+            ^^^^^^^^^^^^^
+lib/screens/hub_screen.dart:663:43: Error: Not a constant expression.
+              child: CustomPaint(painter: HubParticlesPainter(seed: 7)),
+                                          ^^^^^^^^^^^^^^^^^^^
+lib/screens/hub_screen.dart:680:24: Error: The method 'HubOrbButton' isn't defined for the type '_HubScreenState'.
+ - '_HubScreenState' is from 'package:bazino_app/screens/hub_screen.dart' ('lib/screens/hub_screen.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'HubOrbButton'.
+                child: HubOrbButton(
+                       ^^^^^^^^^^^^
+.
+
 ::endgroup::
 
-🎉 10 tests passed.
+::error::0 tests passed, 1 failed.
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## flutter build web
 ```
 Compiling lib/main.dart for the Web...                          
-Wasm dry run failed:
+Wasm dry run findings:
 Found incompatibilities with WebAssembly.
 
 file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_web.dart 104:23 - invalid_runtime_check_with_js_interop_types lint violation: Cast from 'JSAny?' to 'int' casts a JS interop value to a Dart type, which might not be platform-consistent. (8)
 file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_web.dart 105:21 - invalid_runtime_check_with_js_interop_types lint violation: Cast from 'JSAny?' to 'String' casts a JS interop value to a Dart type, which might not be platform-consistent. (8)
 file:///home/runner/.pub-cache/hosted/pub.dev/flutter_tts-4.2.5/lib/flutter_tts_web.dart 107:21 - invalid_runtime_check_with_js_interop_types lint violation: Cast from 'JSAny?' to 'String' casts a JS interop value to a Dart type, which might not be platform-consistent. (8)
 
-'record-use' is now enabled by default; this flag is no longer required.
-'record-use' is now enabled by default; this flag is no longer required.
+Consider addressing these issues to enable wasm builds. See docs for more info: https://docs.flutter.dev/platform-integration/web/wasm
 
 Use --no-wasm-dry-run to disable these warnings.
-Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 1472 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 14436 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
-Compiling lib/main.dart for the Web...                             39.6s
-✓ Built build/web
+Target dart2js failed: ProcessException: Process exited abnormally with exit code 1:
+lib/screens/hub_screen.dart:8:8:
+Error: Error when reading 'lib/screens/account_screen.dart': Error reading 'lib/screens/account_screen.dart'  (No such file or directory)
+import 'account_screen.dart';
+       ^
+lib/screens/hub_screen.dart:162:13:
+Error: Not a constant expression.
+      const AccountScreen(),
+            ^^^^^^^^^^^^^
+lib/screens/hub_screen.dart:663:43:
+Error: Not a constant expression.
+              child: CustomPaint(painter: HubParticlesPainter(seed: 7)),
+                                          ^^^^^^^^^^^^^^^^^^^
+lib/screens/hub_screen.dart:680:24:
+Error: The method 'HubOrbButton' isn't defined for the type '_HubScreenState'.
+ - '_HubScreenState' is from 'package:bazino_app/screens/hub_screen.dart' ('lib/screens/hub_screen.dart').
+                child: HubOrbButton(
+                       ^^^^^^^^^^^^
+Error: Compilation failed.
+  Command: /opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/dart-sdk/bin/dart compile js --platform-binaries=/opt/hostedtoolcache/flutter/stable-3.47.4-x64/flutter/bin/cache/flutter_web_sdk/kernel --invoker=flutter_tool -Ddart.vm.product=true -DFLUTTER_BUILD_NAME=1.0.0 -DFLUTTER_BUILD_NUMBER=1 -DFLUTTER_VERSION=3.47.4 -DFLUTTER_CHANNEL=stable -DFLUTTER_GIT_URL=https://github.com/flutter/flutter.git -DFLUTTER_FRAMEWORK_REVISION=9584c6713b -DFLUTTER_ENGINE_REVISION=06a2e2a110 -DFLUTTER_DART_VERSION=3.13.3 -DFLUTTER_WEB_USE_SKIA=true -DFLUTTER_WEB_USE_SKWASM=false -DFLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/06a2e2a110089dff50fe635cffd2a61e1b24fbcd/ --write-resources --native-null-assertions --no-source-maps -O4 --minify -o /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/flutter_build/28c85ddc708cf4d7957a376cfc3d250f/app.dill --packages=/home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/package_config.json --cfe-only /home/runner/work/bazino-gamenet-portal/bazino-gamenet-portal/flutter_app/.dart_tool/flutter_build/28c85ddc708cf4d7957a376cfc3d250f/main.dart
+#0      RunResult.throwException (package:flutter_tools/src/base/process.dart:153:5)
+#1      _DefaultProcessUtils.run (package:flutter_tools/src/base/process.dart:379:19)
+<asynchronous suspension>
+#2      Dart2JSTarget.build (package:flutter_tools/src/build_system/targets/web.dart:222:5)
+<asynchronous suspension>
+#3      _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:937:9)
+<asynchronous suspension>
+#4      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
+<asynchronous suspension>
+#5      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#6      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
+<asynchronous suspension>
+#7      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#8      Future.wait.<anonymous closure> (dart:async/future.dart:567:21)
+<asynchronous suspension>
+#9      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#10     FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:684:16)
+<asynchronous suspension>
+#11     WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:107:34)
+<asynchronous suspension>
+#12     BuildWebCommand.runCommand (package:flutter_tools/src/commands/build_web.dart:293:5)
+<asynchronous suspension>
+#13     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1663:27)
+<asynchronous suspension>
+#14     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#15     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#16     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:496:9)
+<asynchronous suspension>
+#17     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#18     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:431:5)
+<asynchronous suspension>
+#19     FlutterCommandRunner.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:307:33)
+<asynchronous suspension>
+#20     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
+<asynchronous suspension>
+#21     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#22     main (package:flutter_tools/executable.dart:103:3)
+<asynchronous suspension>
+
+Compiling lib/main.dart for the Web...                             37.9s
+Error: Failed to compile application for the Web.
 ```
-**exit 0 — OK**
+**exit 1 — FAILED**
 
 ## Summary
 ```
 flutter --version=0
 flutter pub get=0
-flutter analyze=0
-flutter test=0
-flutter build web=0
+flutter analyze=1
+flutter test=1
+flutter build web=1
 ```
 
-build/web size: 45M
+build/web size: 37M

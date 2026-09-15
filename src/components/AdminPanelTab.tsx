@@ -1807,20 +1807,9 @@ export default function AdminPanelTab({
         />
 
         <div id="admin-body" className="flex-1 bg-[#f0f0f1] min-w-0 w-full">
-          <div id="admin-body-content" className="p-0 sm:p-5 w-full">
+          <div id="admin-body-content" className="p-5 w-full">
             <div className="w-full">
-              {/* Page title - simple, not a card, full width */}
-              <div className="px-5 py-4 mb-5 flex flex-wrap items-baseline gap-3">
-                <h1 className="text-[23px] font-normal text-[#1d2327] leading-[1.3] m-0">
-                  {L(language, ADMIN_SECTION_META[activeSubTab])}
-                </h1>
-                <span className="text-[13px] text-[#646970]">
-                  {currentGroup ? `${L(language, { fa: currentGroup.fa, en: currentGroup.en, ru: currentGroup.ru, tr: currentGroup.tr })}` : ''}
-                </span>
-                <span className="text-[11px] text-[#a7aaad] font-mono" dir="ltr">{pathFromAdminSection(activeSubTab)} • {dataSource}</span>
-              </div>
-
-              <div className="px-5 w-full">
+              <div className="w-full">
                 {activeSubTab === 'apiKeys' ? (
                   <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[2px] p-4 sm:p-5 w-full">
                     <AdminKeysCenter language={language as any} dir={dir} addNotification={addNotification} />
